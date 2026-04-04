@@ -6,7 +6,7 @@ import {
   UserProfile,
 } from "./types";
 
-const STORAGE_KEY = "healthkit-v2";
+const STORAGE_KEY = "protocolize-v1";
 
 function getDefaultRoutine(): UserRoutine {
   return {

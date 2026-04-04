@@ -16,8 +16,8 @@ export default function OnboardingPage() {
   const isNameStep = step === 0;
   const questionIndex = step - 1;
   const currentQuestion = quizQuestions[questionIndex];
-  const totalSteps = quizQuestions.length + 1;
-  const progress = ((step + 1) / (totalSteps + 1)) * 100;
+  const totalSteps = 1 + quizQuestions.length + 1; // name + questions + result
+  const progress = showResult ? 100 : ((step + 1) / totalSteps) * 100;
 
   function handleAnswer(value: string) {
     const newAnswers = { ...answers, [currentQuestion.id]: value };

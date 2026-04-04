@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HealthKit — Your Longevity Routine, Simplified",
+  title: "Protocolize — Your Longevity Routine, Simplified",
   description:
     "Build a science-backed longevity routine with structured programs for sleep, exercise, nutrition, and supplements. Track your progress and optimize your health.",
 };

@@ -18,7 +18,34 @@ export default function DashboardPage() {
     setRoutine(loadRoutine());
   }, [router]);
 
-  if (!routine) return null;
+  if (!routine) return (
+    <Shell>
+      <div className="mb-10">
+        <div className="h-4 w-40 bg-[#f5f5f7] rounded animate-pulse" />
+        <div className="h-10 w-64 bg-[#f5f5f7] rounded animate-pulse mt-2" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-[#fbfbfd] rounded-2xl p-5 border border-[#d2d2d7]/30">
+            <div className="h-9 w-12 bg-[#f5f5f7] rounded animate-pulse" />
+            <div className="h-3 w-24 bg-[#f5f5f7] rounded animate-pulse mt-3" />
+          </div>
+        ))}
+      </div>
+      <div className="mb-10">
+        <div className="h-3 w-28 bg-[#f5f5f7] rounded animate-pulse mb-4" />
+        <div className="grid sm:grid-cols-3 gap-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-[#fbfbfd] rounded-2xl p-5 border border-[#d2d2d7]/30">
+              <div className="h-7 w-7 bg-[#f5f5f7] rounded animate-pulse mb-2" />
+              <div className="h-4 w-28 bg-[#f5f5f7] rounded animate-pulse" />
+              <div className="h-3 w-36 bg-[#f5f5f7] rounded animate-pulse mt-2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </Shell>
+  );
 
   const streak = getStreakDays(routine);
   const today = new Date().toISOString().split("T")[0];
@@ -35,6 +62,20 @@ export default function DashboardPage() {
   const recentWorkouts = routine.workoutLogs
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 3);
+
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() + mondayOffset);
+  const mondayStr = monday.toISOString().split("T")[0];
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const sundayStr = sunday.toISOString().split("T")[0];
+  const workoutsThisWeek = routine.workoutLogs.filter(
+    (w) => w.date >= mondayStr && w.date <= sundayStr
+  ).length;
 
   return (
     <Shell>
@@ -54,7 +95,7 @@ export default function DashboardPage() {
           { value: streak, label: "Day Streak", color: "#0071e3" },
           { value: totalProtocols, label: "Active Protocols", color: "#30d158" },
           { value: todayCompleted, label: "Done Today", color: "#5e5ce6" },
-          { value: recentWorkouts.length, label: "Workouts This Week", color: "#ff453a" },
+          { value: workoutsThisWeek, label: "Workouts This Week", color: "#ff453a" },
         ].map((stat) => (
           <div key={stat.label} className="bg-[#fbfbfd] rounded-2xl p-5 border border-[#d2d2d7]/30">
             <p className="text-[32px] font-semibold" style={{ color: stat.color }}>

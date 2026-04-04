@@ -72,16 +72,18 @@ export default function ProgressPage() {
     const log = routine.dailyLogs.find((l) => l.date === date);
     const dayIndex = new Date(date + "T12:00:00").getDay();
     const adjDayIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-    const scheduled = routine.selectedProtocols.filter(
+    const scheduledProtocols = routine.selectedProtocols.filter(
       (sp) => sp.weeklySchedule[adjDayIndex]
-    ).length;
-    const completed = log?.completedProtocols.length ?? 0;
+    );
+    const scheduled = scheduledProtocols.length;
+    const scheduledIds = scheduledProtocols.map((sp) => sp.protocolId);
+    const completed = log?.completedProtocols.filter((id) => scheduledIds.includes(id)).length ?? 0;
     return {
       date,
       day: shortDay(date),
       scheduled,
       completed,
-      pct: scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0,
+      pct: scheduled > 0 ? Math.min(100, Math.round((completed / scheduled) * 100)) : 0,
     };
   });
 
@@ -90,11 +92,13 @@ export default function ProgressPage() {
     const log = routine.dailyLogs.find((l) => l.date === date);
     const dayIndex = new Date(date + "T12:00:00").getDay();
     const adjDayIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-    const scheduled = routine.selectedProtocols.filter(
+    const scheduledProtocols = routine.selectedProtocols.filter(
       (sp) => sp.weeklySchedule[adjDayIndex]
-    ).length;
-    const completed = log?.completedProtocols.length ?? 0;
-    const pct = scheduled > 0 ? completed / scheduled : 0;
+    );
+    const scheduled = scheduledProtocols.length;
+    const scheduledIds = scheduledProtocols.map((sp) => sp.protocolId);
+    const completed = log?.completedProtocols.filter((id) => scheduledIds.includes(id)).length ?? 0;
+    const pct = scheduled > 0 ? Math.min(1, completed / scheduled) : 0;
     return { date, pct };
   });
 

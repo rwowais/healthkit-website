@@ -13,7 +13,7 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-50 glass border-b border-[#d2d2d7]/40">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-12">
-          <span className="text-[17px] font-semibold tracking-tight">HealthKit</span>
+          <span className="text-[17px] font-semibold tracking-tight">Protocolize</span>
           <div className="flex items-center gap-4">
             <Link href="/protocols" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] transition-apple">
               Protocols
@@ -195,7 +195,7 @@ export default function LandingPage() {
       <footer className="py-8 border-t border-[#d2d2d7]/40">
         <div className="max-w-6xl mx-auto px-6 text-center">
           <p className="text-[12px] text-[#86868b]">
-            HealthKit is not medical advice. Consult your physician before starting any new health protocol.
+            Protocolize is not medical advice. Consult your physician before starting any new health protocol.
           </p>
         </div>
       </footer>

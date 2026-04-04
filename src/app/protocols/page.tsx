@@ -21,6 +21,7 @@ export default function ProtocolsPage() {
   const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
   const [filterDifficulty, setFilterDifficulty] = useState<Difficulty | "all">("all");
   const [filterSource, setFilterSource] = useState<string>("all");
+  const [premiumToast, setPremiumToast] = useState(false);
 
   useEffect(() => {
     setRoutine(loadRoutine());
@@ -45,6 +46,11 @@ export default function ProtocolsPage() {
       const updated = addProtocol(protocolId);
       setRoutine({ ...updated });
     }
+  }
+
+  function handlePremiumClick() {
+    setPremiumToast(true);
+    setTimeout(() => setPremiumToast(false), 3000);
   }
 
   return (
@@ -193,16 +199,33 @@ export default function ProtocolsPage() {
                 </span>
               </div>
 
-              <button
-                onClick={() => handleToggle(p.id)}
-                className={`w-full py-2.5 rounded-full text-[13px] font-semibold transition-apple ${
-                  isAdded
-                    ? "bg-[#30d158]/10 text-[#30d158] hover:bg-[#ff453a]/10 hover:text-[#ff453a]"
-                    : "bg-[#0071e3] text-white hover:bg-[#0077ed]"
-                }`}
-              >
-                {isAdded ? "\u2713 Added" : "+ Add to Routine"}
-              </button>
+              {isPremium ? (
+                <button
+                  onClick={handlePremiumClick}
+                  className="w-full py-2.5 rounded-full text-[13px] font-semibold transition-apple bg-[#af52de]/10 text-[#af52de] hover:bg-[#af52de]/20 flex items-center justify-center gap-1.5"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" />
+                  </svg>
+                  Unlock with Premium
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleToggle(p.id)}
+                  className={`w-full py-2.5 rounded-full text-[13px] font-semibold transition-apple ${
+                    isAdded
+                      ? "bg-[#30d158]/10 text-[#30d158] hover:bg-[#ff453a]/10 hover:text-[#ff453a]"
+                      : "bg-[#0071e3] text-white hover:bg-[#0077ed]"
+                  }`}
+                >
+                  {isAdded ? "\u2713 Added" : "+ Add to Routine"}
+                </button>
+              )}
             </div>
           );
         })}
@@ -217,6 +240,22 @@ export default function ProtocolsPage() {
       )}
 
       <div className="h-20 lg:hidden" />
+
+      {/* Premium Toast */}
+      {premiumToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1d1d1f] text-white px-5 py-3 rounded-2xl shadow-lg text-[13px] font-medium flex items-center gap-2 animate-fade-in">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="text-[#af52de]"
+          >
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" />
+          </svg>
+          Premium subscription coming soon
+        </div>
+      )}
     </Shell>
   );
 }

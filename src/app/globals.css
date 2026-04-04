@@ -77,6 +77,21 @@ html {
   transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
+/* Toast fade-in */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fadeInUp 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
 /* Focus ring */
 *:focus-visible {
   outline: 2px solid var(--accent);
