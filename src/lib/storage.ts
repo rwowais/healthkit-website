@@ -1,13 +1,26 @@
-import { UserRoutine, SelectedProtocol, DailyLog } from "./types";
+import {
+  UserRoutine,
+  SelectedProtocol,
+  DailyLog,
+  WorkoutLog,
+  UserProfile,
+} from "./types";
 
-const STORAGE_KEY = "healthkit-routine";
+const STORAGE_KEY = "healthkit-v2";
 
 function getDefaultRoutine(): UserRoutine {
   return {
+    profile: {
+      name: "",
+      goal: "",
+      experience: "",
+      quizAnswers: {},
+      isPremium: false,
+    },
     selectedProtocols: [],
     dailyLogs: [],
+    workoutLogs: [],
     startDate: new Date().toISOString().split("T")[0],
-    planWeeks: 4,
   };
 }
 
@@ -25,6 +38,18 @@ export function loadRoutine(): UserRoutine {
 export function saveRoutine(routine: UserRoutine): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(routine));
+}
+
+export function hasCompletedOnboarding(): boolean {
+  const routine = loadRoutine();
+  return routine.profile.goal !== "";
+}
+
+export function saveProfile(profile: UserProfile): UserRoutine {
+  const routine = loadRoutine();
+  routine.profile = profile;
+  saveRoutine(routine);
+  return routine;
 }
 
 export function addProtocol(protocolId: string): UserRoutine {
@@ -73,44 +98,44 @@ export function toggleDailyCompletion(
   const routine = loadRoutine();
   let log = routine.dailyLogs.find((l) => l.date === date);
   if (!log) {
-    log = {
-      date,
-      completedProtocols: [],
-      mood: 0,
-      energy: 0,
-      sleepHours: 0,
-      notes: "",
-    };
+    log = { date, completedProtocols: [], mood: 0, energy: 0, sleepHours: 0, notes: "" };
     routine.dailyLogs.push(log);
   }
   const idx = log.completedProtocols.indexOf(protocolId);
-  if (idx >= 0) {
-    log.completedProtocols.splice(idx, 1);
-  } else {
-    log.completedProtocols.push(protocolId);
-  }
+  if (idx >= 0) log.completedProtocols.splice(idx, 1);
+  else log.completedProtocols.push(protocolId);
   saveRoutine(routine);
   return routine;
 }
 
-export function updateDailyLog(
-  date: string,
-  updates: Partial<DailyLog>
-): UserRoutine {
+export function updateDailyLog(date: string, updates: Partial<DailyLog>): UserRoutine {
   const routine = loadRoutine();
   let log = routine.dailyLogs.find((l) => l.date === date);
   if (!log) {
-    log = {
-      date,
-      completedProtocols: [],
-      mood: 0,
-      energy: 0,
-      sleepHours: 0,
-      notes: "",
-    };
+    log = { date, completedProtocols: [], mood: 0, energy: 0, sleepHours: 0, notes: "" };
     routine.dailyLogs.push(log);
   }
   Object.assign(log, updates);
+  saveRoutine(routine);
+  return routine;
+}
+
+export function saveWorkoutLog(workoutLog: WorkoutLog): UserRoutine {
+  const routine = loadRoutine();
+  const existing = routine.workoutLogs.findIndex((w) => w.id === workoutLog.id);
+  if (existing >= 0) routine.workoutLogs[existing] = workoutLog;
+  else routine.workoutLogs.push(workoutLog);
+  saveRoutine(routine);
+  return routine;
+}
+
+export function startProgram(programId: string): UserRoutine {
+  const routine = loadRoutine();
+  routine.activeProgram = {
+    programId,
+    currentWeek: 1,
+    startDate: new Date().toISOString().split("T")[0],
+  };
   saveRoutine(routine);
   return routine;
 }
@@ -124,11 +149,8 @@ export function getStreakDays(routine: UserRoutine): number {
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split("T")[0];
     const log = routine.dailyLogs.find((l) => l.date === dateStr);
-    if (log && log.completedProtocols.length > 0) {
-      streak++;
-    } else if (i > 0) {
-      break;
-    }
+    if (log && log.completedProtocols.length > 0) streak++;
+    else if (i > 0) break;
   }
   return streak;
 }

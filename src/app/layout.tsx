@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HealthKit — Longevity Routine Builder",
+  title: "HealthKit — Your Longevity Routine, Simplified",
   description:
-    "Build your longevity routine based on protocols from Peter Attia and Andrew Huberman. Plan, track, and optimize your sleep, exercise, diet, and supplements.",
+    "Build a science-backed longevity routine with structured programs for sleep, exercise, nutrition, and supplements. Track your progress and optimize your health.",
 };
 
 export default function RootLayout({
@@ -26,9 +26,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }

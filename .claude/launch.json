@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Next.js Dev Server",
+      "runtimeExecutable": "/Users/rami/local/bin/npx",
+      "runtimeArgs": ["next", "dev", "--turbopack"],
+      "port": 3000
+    }
+  ]
+}

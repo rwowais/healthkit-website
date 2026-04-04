@@ -1,150 +1,204 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Shell from "@/components/Shell";
-import ProtocolCard from "@/components/ProtocolCard";
-import { protocols, categoryInfo } from "@/lib/protocols";
-import { Category } from "@/lib/types";
-import { loadRoutine, addProtocol, removeProtocol } from "@/lib/storage";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { hasCompletedOnboarding } from "@/lib/storage";
 
-const categories: Category[] = ["sleep", "exercise", "diet", "supplements"];
-
-export default function BrowsePage() {
-  const [activeCategory, setActiveCategory] = useState<Category>("sleep");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
-  const [filterSource, setFilterSource] = useState<string>("all");
-
-  useEffect(() => {
-    const routine = loadRoutine();
-    setSelectedIds(new Set(routine.selectedProtocols.map((p) => p.protocolId)));
-  }, []);
-
-  const filtered = protocols
-    .filter((p) => p.category === activeCategory)
-    .filter(
-      (p) => filterDifficulty === "all" || p.difficulty === filterDifficulty
-    )
-    .filter(
-      (p) =>
-        filterSource === "all" || p.recommendedBy.includes(filterSource)
-    );
-
-  function handleToggle(protocolId: string) {
-    if (selectedIds.has(protocolId)) {
-      removeProtocol(protocolId);
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(protocolId);
-        return next;
-      });
-    } else {
-      addProtocol(protocolId);
-      setSelectedIds((prev) => new Set(prev).add(protocolId));
-    }
-  }
-
-  const totalSelected = selectedIds.size;
+export default function LandingPage() {
+  const [onboarded, setOnboarded] = useState(false);
+  useEffect(() => { setOnboarded(hasCompletedOnboarding()); }, []);
 
   return (
-    <Shell>
-      {/* Hero */}
-      <div className="mb-10">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-3">
-          Build Your{" "}
-          <span className="bg-gradient-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent">
-            Longevity Routine
-          </span>
-        </h1>
-        <p className="text-[#6b6b80] text-lg max-w-2xl">
-          Evidence-based protocols from Peter Attia and Andrew Huberman. Pick
-          the ones that fit your life, plan your weeks, and track your progress.
-        </p>
-        {totalSelected > 0 && (
-          <div className="mt-4 inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-lg text-sm">
-            <span className="font-semibold">{totalSelected}</span> protocols
-            selected
-          </div>
-        )}
-      </div>
-
-      {/* Category Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {categories.map((cat) => {
-          const info = categoryInfo[cat];
-          const count = protocols.filter((p) => p.category === cat).length;
-          const selectedCount = protocols.filter(
-            (p) => p.category === cat && selectedIds.has(p.id)
-          ).length;
-          const active = activeCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                active
-                  ? "bg-white/10 text-white ring-1 ring-white/10"
-                  : "bg-[#12121a] text-[#6b6b80] hover:bg-[#1a1a25] hover:text-white"
-              }`}
+    <div className="min-h-screen bg-white">
+      {/* Nav */}
+      <header className="sticky top-0 z-50 glass border-b border-[#d2d2d7]/40">
+        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-12">
+          <span className="text-[17px] font-semibold tracking-tight">HealthKit</span>
+          <div className="flex items-center gap-4">
+            <Link href="/protocols" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] transition-apple">
+              Protocols
+            </Link>
+            <Link href="/programs" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] transition-apple">
+              Programs
+            </Link>
+            <Link
+              href={onboarded ? "/dashboard" : "/onboarding"}
+              className="text-[13px] font-medium bg-[#0071e3] text-white px-4 py-1.5 rounded-full hover:bg-[#0077ed] transition-apple"
             >
-              <span>{info.icon}</span>
-              <span>{info.label}</span>
-              <span className="text-xs opacity-60">
-                {selectedCount}/{count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-3 mb-6 flex-wrap">
-        <select
-          value={filterDifficulty}
-          onChange={(e) => setFilterDifficulty(e.target.value)}
-          className="bg-[#12121a] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e8e8ed] focus:outline-none focus:ring-1 focus:ring-white/20"
-        >
-          <option value="all">All difficulties</option>
-          <option value="easy">Easy</option>
-          <option value="moderate">Moderate</option>
-          <option value="advanced">Advanced</option>
-        </select>
-        <select
-          value={filterSource}
-          onChange={(e) => setFilterSource(e.target.value)}
-          className="bg-[#12121a] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e8e8ed] focus:outline-none focus:ring-1 focus:ring-white/20"
-        >
-          <option value="all">All sources</option>
-          <option value="Attia">Peter Attia</option>
-          <option value="Huberman">Andrew Huberman</option>
-        </select>
-      </div>
-
-      {/* Category Description */}
-      <p className="text-[#6b6b80] text-sm mb-6">
-        {categoryInfo[activeCategory].description}
-      </p>
-
-      {/* Protocol Grid */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.map((protocol) => (
-          <ProtocolCard
-            key={protocol.id}
-            protocol={protocol}
-            isSelected={selectedIds.has(protocol.id)}
-            onToggle={() => handleToggle(protocol.id)}
-          />
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="text-center py-16 text-[#6b6b80]">
-          <p className="text-lg">No protocols match your filters.</p>
-          <p className="text-sm mt-1">Try adjusting the filters above.</p>
+              {onboarded ? "Open App" : "Get Started"}
+            </Link>
+          </div>
         </div>
-      )}
+      </header>
 
-      <div className="h-20 md:hidden" />
-    </Shell>
+      {/* Hero */}
+      <section className="pt-24 pb-20 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <h1 className="text-[48px] sm:text-[64px] font-semibold leading-[1.05] tracking-tight text-[#1d1d1f]">
+            Your longevity routine,{" "}
+            <span className="bg-gradient-to-r from-[#0071e3] to-[#30d158] bg-clip-text text-transparent">
+              simplified.
+            </span>
+          </h1>
+          <p className="mt-6 text-[19px] sm:text-[21px] text-[#86868b] leading-relaxed max-w-xl mx-auto">
+            Science-backed protocols for sleep, exercise, nutrition, and
+            supplements. Build your routine, follow structured programs, and
+            track your progress.
+          </p>
+          <div className="mt-10 flex items-center justify-center gap-4">
+            <Link
+              href={onboarded ? "/dashboard" : "/onboarding"}
+              className="text-[17px] font-medium bg-[#0071e3] text-white px-8 py-3 rounded-full hover:bg-[#0077ed] transition-apple"
+            >
+              {onboarded ? "Open App" : "Get Started — Free"}
+            </Link>
+            <Link
+              href="/programs"
+              className="text-[17px] font-medium text-[#0071e3] px-8 py-3 rounded-full hover:bg-[#f5f5f7] transition-apple"
+            >
+              View Programs
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-20 bg-[#fbfbfd]">
+        <div className="max-w-6xl mx-auto px-6">
+          <h2 className="text-center text-[13px] font-semibold text-[#86868b] uppercase tracking-wider mb-3">
+            Everything you need
+          </h2>
+          <p className="text-center text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-tight mb-16">
+            One app for your entire health routine.
+          </p>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: "🌙",
+                title: "Sleep",
+                desc: "Circadian rhythm protocols, sleep hygiene habits, and supplement stacks to optimize recovery.",
+              },
+              {
+                icon: "💪",
+                title: "Exercise",
+                desc: "Structured strength programs with progressive overload, Zone 2 cardio, and mobility work.",
+              },
+              {
+                icon: "🥗",
+                title: "Nutrition",
+                desc: "Macro-optimized meal plans, carb backloading, time-restricted eating, and a full meal library.",
+              },
+              {
+                icon: "💊",
+                title: "Supplements",
+                desc: "Evidence-based supplement protocols for metabolism, sleep, performance, and longevity.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="bg-white rounded-2xl p-6 border border-[#d2d2d7]/40">
+                <span className="text-3xl">{f.icon}</span>
+                <h3 className="mt-4 text-[17px] font-semibold text-[#1d1d1f]">{f.title}</h3>
+                <p className="mt-2 text-[14px] text-[#86868b] leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <h2 className="text-center text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-tight mb-16">
+            How it works
+          </h2>
+          <div className="space-y-12">
+            {[
+              {
+                step: "01",
+                title: "Take the assessment",
+                desc: "Answer a few questions about your goals, fitness level, and current habits. We'll recommend the right starting point.",
+              },
+              {
+                step: "02",
+                title: "Choose your path",
+                desc: "Start a guided multi-week program like Metabolic Reset or Body Recomposition — or build a custom routine from our protocol library.",
+              },
+              {
+                step: "03",
+                title: "Track everything",
+                desc: "Log workouts with sets, reps, and weights. Track daily protocols, mood, energy, and sleep. Watch your progress over time.",
+              },
+            ].map((s) => (
+              <div key={s.step} className="flex gap-6 items-start">
+                <div className="shrink-0 w-12 h-12 rounded-full bg-[#f5f5f7] flex items-center justify-center text-[15px] font-semibold text-[#86868b]">
+                  {s.step}
+                </div>
+                <div>
+                  <h3 className="text-[19px] font-semibold text-[#1d1d1f]">{s.title}</h3>
+                  <p className="mt-1 text-[15px] text-[#86868b] leading-relaxed">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section className="py-20 bg-[#fbfbfd]">
+        <div className="max-w-4xl mx-auto px-6">
+          <h2 className="text-center text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-tight mb-16">
+            Simple pricing
+          </h2>
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <div className="bg-white rounded-2xl p-8 border border-[#d2d2d7]/40">
+              <p className="text-[13px] font-semibold text-[#86868b] uppercase tracking-wider">Free</p>
+              <p className="mt-2 text-[40px] font-semibold text-[#1d1d1f]">$0</p>
+              <p className="text-[13px] text-[#86868b]">forever</p>
+              <ul className="mt-6 space-y-3">
+                {["Basic protocol library", "Custom routine builder", "Daily tracker", "Progress dashboard", "Meal inspiration (select)"].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-[14px] text-[#1d1d1f]">
+                    <span className="text-[#30d158]">✓</span> {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/onboarding" className="mt-8 block text-center text-[15px] font-medium text-[#0071e3] border border-[#0071e3] px-6 py-2.5 rounded-full hover:bg-[#0071e3] hover:text-white transition-apple">
+                Get Started
+              </Link>
+            </div>
+            <div className="bg-[#1d1d1f] rounded-2xl p-8 text-white">
+              <p className="text-[13px] font-semibold text-[#86868b] uppercase tracking-wider">Premium</p>
+              <p className="mt-2 text-[40px] font-semibold">$7<span className="text-[19px] font-normal text-[#86868b]">/mo</span></p>
+              <p className="text-[13px] text-[#86868b]">cancel anytime</p>
+              <ul className="mt-6 space-y-3">
+                {[
+                  "Everything in Free",
+                  "Structured multi-week programs",
+                  "Full protocol library",
+                  "Workout logger with %1RM",
+                  "Full meal library with macros",
+                  "Advanced supplement stacks",
+                ].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-[14px]">
+                    <span className="text-[#30d158]">✓</span> {f}
+                  </li>
+                ))}
+              </ul>
+              <button className="mt-8 w-full text-center text-[15px] font-medium bg-white text-[#1d1d1f] px-6 py-2.5 rounded-full hover:bg-[#f5f5f7] transition-apple">
+                Coming Soon
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 border-t border-[#d2d2d7]/40">
+        <div className="max-w-6xl mx-auto px-6 text-center">
+          <p className="text-[12px] text-[#86868b]">
+            HealthKit is not medical advice. Consult your physician before starting any new health protocol.
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 }
