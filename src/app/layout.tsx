@@ -1,34 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Protocolize — Your Longevity Routine, Simplified",
+  title: "Protocolize — Your Longevity Protocol, Simplified",
   description:
-    "Build a science-backed longevity routine with structured programs for sleep, exercise, nutrition, and supplements. Track your progress and optimize your health.",
+    "Build science-backed routines for sleep, exercise, nutrition, and supplements. Track daily adherence and optimize your health with protocols from Huberman, Attia, and Walker.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-    >
-      <body>{children}</body>
+    <html lang="en">
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

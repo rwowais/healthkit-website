@@ -1,0 +1,178 @@
+import type { ProtocolItem } from "../types";
+
+export const defaultExerciseProtocol: ProtocolItem[] = [
+  // ── MORNING (timingAnchor: "wake") ────────────────────────────
+  {
+    id: "exercise-default-001",
+    pillar: "exercise",
+    name: "Morning Walk",
+    description:
+      "20-30 min walk at a conversational pace. Zone 2 movement first thing accelerates cortisol clearance and primes the body for the day.",
+    source: "default",
+    timingAnchor: "wake",
+    timingOffsetMinutes: 30,
+    timeOfDay: "morning",
+    daysActive: [true, true, true, true, true, true, true],
+    sortOrder: 1,
+    isEnabled: true,
+    icon: "🚶",
+    recommendedBy: ["Attia", "Huberman"],
+    evidenceNote:
+      "Low-intensity morning movement has been shown to improve insulin sensitivity for the remainder of the day. Walking outdoors also provides the bright-light exposure needed to anchor circadian rhythm.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "exercise-default-002",
+    pillar: "exercise",
+    name: "Zone 2 Cardio",
+    description:
+      "30-60 min at a pace where you can still hold a conversation. The foundation of metabolic health and mitochondrial function.",
+    source: "default",
+    timingAnchor: "wake",
+    timingOffsetMinutes: 120,
+    timeOfDay: "morning",
+    daysActive: [true, false, true, false, true, false, false],
+    sortOrder: 2,
+    isEnabled: true,
+    icon: "🫀",
+    recommendedBy: ["Attia"],
+    evidenceNote:
+      "Peter Attia recommends 3-4 hours per week of Zone 2 training to improve mitochondrial efficiency. Zone 2 is defined as the highest intensity at which lactate remains stable, typically 60-70% of max heart rate.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "exercise-default-003",
+    pillar: "exercise",
+    name: "Strength Training",
+    description:
+      "45-60 min of resistance training focused on compound lifts. Preserving muscle mass is one of the most important predictors of longevity.",
+    source: "default",
+    timingAnchor: "wake",
+    timingOffsetMinutes: 120,
+    timeOfDay: "morning",
+    daysActive: [false, true, false, true, false, true, false],
+    sortOrder: 3,
+    isEnabled: true,
+    icon: "🏋️",
+    recommendedBy: ["Attia", "Huberman"],
+    evidenceNote:
+      "Muscle mass and strength (especially grip strength and leg strength) are among the strongest predictors of all-cause mortality. Attia recommends 3-4 sessions per week emphasizing squat, hinge, push, pull, and carry patterns.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "exercise-default-004",
+    pillar: "exercise",
+    name: "Mobility & Stretching",
+    description:
+      "10-15 min of dynamic stretching and joint mobility work. Maintaining range of motion is essential for injury prevention and functional longevity.",
+    source: "default",
+    timingAnchor: "wake",
+    timingOffsetMinutes: 60,
+    timeOfDay: "morning",
+    daysActive: [true, true, true, true, true, true, true],
+    sortOrder: 4,
+    isEnabled: true,
+    icon: "🧘",
+    recommendedBy: ["Attia"],
+    evidenceNote:
+      "Attia's stability framework emphasizes that flexibility and joint mobility decline with age and are a leading cause of falls and fractures. Daily mobility work is a longevity insurance policy.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "exercise-default-005",
+    pillar: "exercise",
+    name: "VO2 Max Intervals",
+    description:
+      "4x4 min high-intensity intervals at 90-95% max heart rate with 3 min recovery. The single best marker of cardiovascular fitness and longevity.",
+    source: "default",
+    timingAnchor: "wake",
+    timingOffsetMinutes: 120,
+    timeOfDay: "morning",
+    daysActive: [false, false, false, false, false, true, false],
+    sortOrder: 5,
+    isEnabled: true,
+    icon: "🔥",
+    recommendedBy: ["Attia"],
+    evidenceNote:
+      "VO2 max is the strongest predictor of all-cause mortality, stronger even than smoking, diabetes, or cardiovascular disease. Moving from the bottom 25th percentile to above average confers a 5x reduction in mortality risk.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "exercise-default-006",
+    pillar: "exercise",
+    name: "Grip & Carry Work",
+    description:
+      "Farmer's carries, dead hangs, or grip training. Grip strength is independently associated with longevity and functional independence.",
+    source: "default",
+    timingAnchor: "wake",
+    timingOffsetMinutes: 150,
+    timeOfDay: "morning",
+    daysActive: [false, true, false, true, false, false, false],
+    sortOrder: 6,
+    isEnabled: true,
+    icon: "✊",
+    recommendedBy: ["Attia"],
+    evidenceNote:
+      "Grip strength is one of the most robust biomarkers of biological age. Low grip strength is associated with higher risk of cardiovascular events, disability, and mortality independent of other factors.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "exercise-default-007",
+    pillar: "exercise",
+    name: "Balance & Stability",
+    description:
+      "Single-leg stands, stability ball work, or proprioceptive drills. Falls are a leading cause of death over age 65 — train balance now.",
+    source: "default",
+    timingAnchor: "wake",
+    timingOffsetMinutes: 75,
+    timeOfDay: "morning",
+    daysActive: [true, false, true, false, true, false, false],
+    sortOrder: 7,
+    isEnabled: true,
+    icon: "⚖️",
+    recommendedBy: ["Attia"],
+    evidenceNote:
+      "Attia emphasizes that the ability to balance on one foot with eyes closed for 10+ seconds is a practical longevity test. Falls account for more injury-related deaths than any other cause after age 65.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+
+  // ── EVENING (timingAnchor: "bed") ─────────────────────────────
+  {
+    id: "exercise-default-008",
+    pillar: "exercise",
+    name: "Evening Walk",
+    description:
+      "15-20 min walk after dinner. Improves post-meal glucose disposal and supports parasympathetic activation before bed.",
+    source: "default",
+    timingAnchor: "bed",
+    timingOffsetMinutes: -150,
+    timeOfDay: "evening",
+    daysActive: [true, true, true, true, true, true, true],
+    sortOrder: 8,
+    isEnabled: true,
+    icon: "🌆",
+    recommendedBy: ["Attia", "Huberman"],
+    evidenceNote:
+      "A 15-minute post-meal walk has been shown to reduce post-prandial glucose spikes by up to 30%. This is one of the simplest and most effective metabolic health interventions.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "exercise-default-009",
+    pillar: "exercise",
+    name: "No Intense Exercise",
+    description:
+      "Avoid vigorous exercise within 2-3 hours of bed. Late intense exercise raises core temperature and cortisol, delaying sleep onset.",
+    source: "default",
+    timingAnchor: "bed",
+    timingOffsetMinutes: -180,
+    timeOfDay: "evening",
+    daysActive: [true, true, true, true, true, true, true],
+    sortOrder: 9,
+    isEnabled: true,
+    icon: "⛔",
+    recommendedBy: ["Huberman", "Walker"],
+    evidenceNote:
+      "Vigorous exercise elevates core body temperature for several hours. Since the body needs to drop 1-1.5°C for sleep initiation, late-night intense exercise delays the thermoregulatory sleep trigger.",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+];

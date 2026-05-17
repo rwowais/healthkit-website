@@ -1,203 +1,199 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { hasCompletedOnboarding } from "@/lib/storage";
+import { useRouter } from "next/navigation";
+import { loadState } from "@/lib/storage";
 
 export default function LandingPage() {
-  const [onboarded, setOnboarded] = useState(false);
-  useEffect(() => { setOnboarded(hasCompletedOnboarding()); }, []);
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const state = loadState();
+    if (state.settings.completedOnboarding) {
+      router.replace("/today");
+    } else {
+      setChecking(false);
+    }
+  }, [router]);
+
+  if (checking) return null;
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Nav */}
-      <header className="sticky top-0 z-50 glass border-b border-[#d2d2d7]/40">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-12">
-          <span className="text-[17px] font-semibold tracking-tight">Protocolize</span>
-          <div className="flex items-center gap-4">
-            <Link href="/protocols" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] transition-apple">
-              Protocols
-            </Link>
-            <Link href="/programs" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] transition-apple">
-              Programs
-            </Link>
-            <Link
-              href={onboarded ? "/dashboard" : "/onboarding"}
-              className="text-[13px] font-medium bg-[#0071e3] text-white px-4 py-1.5 rounded-full hover:bg-[#0077ed] transition-apple"
-            >
-              {onboarded ? "Open App" : "Get Started"}
-            </Link>
-          </div>
-        </div>
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4 max-w-4xl mx-auto">
+        <span className="text-[20px] font-bold text-[#1d1d1f] tracking-tight">
+          Protocolize
+        </span>
+        <button
+          onClick={() => router.push("/onboarding")}
+          className="bg-[#0071e3] hover:bg-[#0077ed] text-white px-5 py-2.5 rounded-full text-[13px] font-semibold transition-apple"
+        >
+          Get Started
+        </button>
       </header>
 
       {/* Hero */}
-      <section className="pt-24 pb-20 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-[48px] sm:text-[64px] font-semibold leading-[1.05] tracking-tight text-[#1d1d1f]">
-            Your longevity routine,{" "}
-            <span className="bg-gradient-to-r from-[#0071e3] to-[#30d158] bg-clip-text text-transparent">
-              simplified.
-            </span>
-          </h1>
-          <p className="mt-6 text-[19px] sm:text-[21px] text-[#86868b] leading-relaxed max-w-xl mx-auto">
-            Science-backed protocols for sleep, exercise, nutrition, and
-            supplements. Build your routine, follow structured programs, and
-            track your progress.
-          </p>
-          <div className="mt-10 flex items-center justify-center gap-4">
-            <Link
-              href={onboarded ? "/dashboard" : "/onboarding"}
-              className="text-[17px] font-medium bg-[#0071e3] text-white px-8 py-3 rounded-full hover:bg-[#0077ed] transition-apple"
+      <section className="text-center px-6 pt-16 pb-20 max-w-3xl mx-auto">
+        <h1 className="text-[44px] sm:text-[56px] font-bold tracking-tight text-[#1d1d1f] leading-[1.05] mb-6">
+          Your longevity
+          <br />
+          protocol,{" "}
+          <span className="bg-gradient-to-r from-[#5e5ce6] via-[#0071e3] to-[#30d158] bg-clip-text text-transparent">
+            simplified.
+          </span>
+        </h1>
+        <p className="text-[19px] text-[#86868b] leading-relaxed max-w-xl mx-auto mb-10">
+          Build your daily routine around science-backed protocols for sleep,
+          exercise, nutrition, and supplements. Track everything. See what works.
+        </p>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => router.push("/onboarding")}
+            className="bg-[#0071e3] hover:bg-[#0077ed] text-white px-8 py-3.5 rounded-full text-[15px] font-semibold transition-apple"
+          >
+            Start Free Trial
+          </button>
+          <span className="text-[13px] text-[#86868b]">
+            7 days free, then $7/mo
+          </span>
+        </div>
+      </section>
+
+      {/* Pillars */}
+      <section className="px-6 pb-20 max-w-3xl mx-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            {
+              icon: "🌙",
+              label: "Sleep",
+              color: "#5e5ce6",
+              desc: "Wind-down routines & morning habits",
+            },
+            {
+              icon: "⚡",
+              label: "Exercise",
+              color: "#ff453a",
+              desc: "Strength, cardio & mobility",
+            },
+            {
+              icon: "🥗",
+              label: "Nutrition",
+              color: "#30d158",
+              desc: "Meal timing & macro guidelines",
+            },
+            {
+              icon: "💊",
+              label: "Supplements",
+              color: "#ff9f0a",
+              desc: "Evidence-based stacks",
+            },
+          ].map((pillar) => (
+            <div
+              key={pillar.label}
+              className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-5 text-center"
             >
-              {onboarded ? "Open App" : "Get Started — Free"}
-            </Link>
-            <Link
-              href="/programs"
-              className="text-[17px] font-medium text-[#0071e3] px-8 py-3 rounded-full hover:bg-[#f5f5f7] transition-apple"
-            >
-              View Programs
-            </Link>
-          </div>
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3"
+                style={{ backgroundColor: `${pillar.color}15` }}
+              >
+                {pillar.icon}
+              </div>
+              <p className="text-[15px] font-semibold text-[#1d1d1f] mb-1">
+                {pillar.label}
+              </p>
+              <p className="text-[12px] text-[#86868b] leading-snug">
+                {pillar.desc}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-20 bg-[#fbfbfd]">
-        <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-center text-[13px] font-semibold text-[#86868b] uppercase tracking-wider mb-3">
-            Everything you need
-          </h2>
-          <p className="text-center text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-tight mb-16">
-            One app for your entire health routine.
+      {/* How It Works */}
+      <section className="px-6 pb-20 max-w-3xl mx-auto">
+        <h2 className="text-[28px] font-bold text-[#1d1d1f] text-center mb-12">
+          How it works
+        </h2>
+        <div className="grid sm:grid-cols-3 gap-8">
+          {[
+            {
+              step: "1",
+              title: "Start with science",
+              desc: "Get a ready-made protocol template based on the latest longevity research from Huberman, Attia, and Walker.",
+            },
+            {
+              step: "2",
+              title: "Make it yours",
+              desc: "Edit, remove, or add your own items. Set your bedtime and wake time — everything adjusts dynamically.",
+            },
+            {
+              step: "3",
+              title: "Track daily",
+              desc: "Check off items each day, log your sleep, mood, and energy. Watch your score and streak grow.",
+            },
+          ].map((item) => (
+            <div key={item.step} className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-[15px] font-bold mx-auto mb-4">
+                {item.step}
+              </div>
+              <p className="text-[17px] font-semibold text-[#1d1d1f] mb-2">
+                {item.title}
+              </p>
+              <p className="text-[13px] text-[#86868b] leading-relaxed">
+                {item.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="px-6 pb-20 max-w-xl mx-auto text-center">
+        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-8">
+          <p className="text-[13px] font-semibold text-[#0071e3] uppercase tracking-wider mb-2">
+            Premium
           </p>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <p className="text-[36px] font-bold text-[#1d1d1f] mb-1">
+            $7<span className="text-[17px] text-[#86868b] font-normal">/mo</span>
+          </p>
+          <p className="text-[13px] text-[#86868b] mb-6">
+            7-day free trial. Cancel anytime.
+          </p>
+          <ul className="text-left space-y-2 mb-8">
             {[
-              {
-                icon: "🌙",
-                title: "Sleep",
-                desc: "Circadian rhythm protocols, sleep hygiene habits, and supplement stacks to optimize recovery.",
-              },
-              {
-                icon: "💪",
-                title: "Exercise",
-                desc: "Structured strength programs with progressive overload, Zone 2 cardio, and mobility work.",
-              },
-              {
-                icon: "🥗",
-                title: "Nutrition",
-                desc: "Macro-optimized meal plans, carb backloading, time-restricted eating, and a full meal library.",
-              },
-              {
-                icon: "💊",
-                title: "Supplements",
-                desc: "Evidence-based supplement protocols for metabolism, sleep, performance, and longevity.",
-              },
-            ].map((f) => (
-              <div key={f.title} className="bg-white rounded-2xl p-6 border border-[#d2d2d7]/40">
-                <span className="text-3xl">{f.icon}</span>
-                <h3 className="mt-4 text-[17px] font-semibold text-[#1d1d1f]">{f.title}</h3>
-                <p className="mt-2 text-[14px] text-[#86868b] leading-relaxed">{f.desc}</p>
-              </div>
+              "Science-backed protocol templates",
+              "Smart timing based on your schedule",
+              "Daily score & streak tracking",
+              "Sleep, mood, and energy logging",
+              "Custom protocol items",
+              "AI-powered insights (coming soon)",
+            ].map((feature) => (
+              <li
+                key={feature}
+                className="flex items-center gap-2 text-[14px] text-[#1d1d1f]"
+              >
+                <span className="text-[#30d158] text-[16px]">✓</span>
+                {feature}
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="py-20">
-        <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-center text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-tight mb-16">
-            How it works
-          </h2>
-          <div className="space-y-12">
-            {[
-              {
-                step: "01",
-                title: "Take the assessment",
-                desc: "Answer a few questions about your goals, fitness level, and current habits. We'll recommend the right starting point.",
-              },
-              {
-                step: "02",
-                title: "Choose your path",
-                desc: "Start a guided multi-week program like Metabolic Reset or Body Recomposition — or build a custom routine from our protocol library.",
-              },
-              {
-                step: "03",
-                title: "Track everything",
-                desc: "Log workouts with sets, reps, and weights. Track daily protocols, mood, energy, and sleep. Watch your progress over time.",
-              },
-            ].map((s) => (
-              <div key={s.step} className="flex gap-6 items-start">
-                <div className="shrink-0 w-12 h-12 rounded-full bg-[#f5f5f7] flex items-center justify-center text-[15px] font-semibold text-[#86868b]">
-                  {s.step}
-                </div>
-                <div>
-                  <h3 className="text-[19px] font-semibold text-[#1d1d1f]">{s.title}</h3>
-                  <p className="mt-1 text-[15px] text-[#86868b] leading-relaxed">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section className="py-20 bg-[#fbfbfd]">
-        <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-center text-[32px] sm:text-[40px] font-semibold text-[#1d1d1f] tracking-tight mb-16">
-            Simple pricing
-          </h2>
-          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            <div className="bg-white rounded-2xl p-8 border border-[#d2d2d7]/40">
-              <p className="text-[13px] font-semibold text-[#86868b] uppercase tracking-wider">Free</p>
-              <p className="mt-2 text-[40px] font-semibold text-[#1d1d1f]">$0</p>
-              <p className="text-[13px] text-[#86868b]">forever</p>
-              <ul className="mt-6 space-y-3">
-                {["Basic protocol library", "Custom routine builder", "Daily tracker", "Progress dashboard", "Meal inspiration (select)"].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-[14px] text-[#1d1d1f]">
-                    <span className="text-[#30d158]">✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/onboarding" className="mt-8 block text-center text-[15px] font-medium text-[#0071e3] border border-[#0071e3] px-6 py-2.5 rounded-full hover:bg-[#0071e3] hover:text-white transition-apple">
-                Get Started
-              </Link>
-            </div>
-            <div className="bg-[#1d1d1f] rounded-2xl p-8 text-white">
-              <p className="text-[13px] font-semibold text-[#86868b] uppercase tracking-wider">Premium</p>
-              <p className="mt-2 text-[40px] font-semibold">$7<span className="text-[19px] font-normal text-[#86868b]">/mo</span></p>
-              <p className="text-[13px] text-[#86868b]">cancel anytime</p>
-              <ul className="mt-6 space-y-3">
-                {[
-                  "Everything in Free",
-                  "Structured multi-week programs",
-                  "Full protocol library",
-                  "Workout logger with %1RM",
-                  "Full meal library with macros",
-                  "Advanced supplement stacks",
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-[14px]">
-                    <span className="text-[#30d158]">✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-              <button className="mt-8 w-full text-center text-[15px] font-medium bg-white text-[#1d1d1f] px-6 py-2.5 rounded-full hover:bg-[#f5f5f7] transition-apple">
-                Coming Soon
-              </button>
-            </div>
-          </div>
+          </ul>
+          <button
+            onClick={() => router.push("/onboarding")}
+            className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-3.5 rounded-full text-[15px] font-semibold transition-apple"
+          >
+            Start Free Trial
+          </button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-8 border-t border-[#d2d2d7]/40">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <p className="text-[12px] text-[#86868b]">
-            Protocolize is not medical advice. Consult your physician before starting any new health protocol.
-          </p>
-        </div>
+      <footer className="px-6 py-8 border-t border-[#d2d2d7]/30 max-w-3xl mx-auto text-center">
+        <p className="text-[11px] text-[#86868b] leading-relaxed">
+          Protocolize is not a medical device and does not provide medical advice.
+          Always consult your physician before starting any new health protocol.
+        </p>
       </footer>
     </div>
   );

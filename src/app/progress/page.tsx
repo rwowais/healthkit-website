@@ -1,18 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useMemo } from "react";
 import Shell from "@/components/Shell";
-import { protocols, categoryInfo } from "@/lib/protocols";
-import { loadRoutine, getStreakDays } from "@/lib/storage";
-import type { UserRoutine } from "@/lib/types";
+import { useAppState } from "@/hooks/useAppState";
+import { PILLAR_META, PILLARS } from "@/lib/constants";
+import type { Pillar } from "@/lib/types";
+
+// ── Helpers ───────────────────────────────────────────────────────
+
+function getDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const d = date.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 function getLast7Days(): string[] {
   const days: string[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    days.push(d.toISOString().split("T")[0]);
+    days.push(getDateString(d));
   }
   return days;
 }
@@ -22,309 +30,341 @@ function getLast30Days(): string[] {
   for (let i = 29; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    days.push(d.toISOString().split("T")[0]);
+    days.push(getDateString(d));
   }
   return days;
 }
 
-function shortDay(dateStr: string): string {
+function getDayLabel(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   return d.toLocaleDateString("en-US", { weekday: "short" });
 }
 
+// ── Stat Card ─────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  icon: string;
+  color?: string;
+}) {
+  return (
+    <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-4 text-center">
+      <span className="text-[20px]">{icon}</span>
+      <p
+        className="text-[22px] font-bold mt-1"
+        style={{ color: color || "#1d1d1f" }}
+      >
+        {value}
+      </p>
+      <p className="text-[11px] font-medium text-[#86868b] uppercase tracking-wide mt-0.5">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────
+
 export default function ProgressPage() {
-  const [routine, setRoutine] = useState<UserRoutine | null>(null);
+  const { state, loading } = useAppState();
 
-  useEffect(() => {
-    setRoutine(loadRoutine());
-  }, []);
+  const stats = useMemo(() => {
+    const logs = state.dailyLogs;
+    const last7 = getLast7Days();
+    const last30 = getLast30Days();
 
-  if (!routine) return null;
+    // Streak
+    const streak = state.currentStreak;
 
-  if (routine.selectedProtocols.length === 0) {
+    // Average score (last 7 days)
+    const last7Logs = logs.filter((l) => last7.includes(l.date));
+    const avgScore =
+      last7Logs.length > 0
+        ? Math.round(
+            last7Logs.reduce((sum, l) => sum + l.score, 0) / last7Logs.length
+          )
+        : 0;
+
+    // Average mood & energy (last 7)
+    const moodLogs = last7Logs.filter((l) => l.moodLevel !== null);
+    const energyLogs = last7Logs.filter((l) => l.energyLevel !== null);
+    const avgMood =
+      moodLogs.length > 0
+        ? (
+            moodLogs.reduce((s, l) => s + (l.moodLevel || 0), 0) /
+            moodLogs.length
+          ).toFixed(1)
+        : "—";
+    const avgEnergy =
+      energyLogs.length > 0
+        ? (
+            energyLogs.reduce((s, l) => s + (l.energyLevel || 0), 0) /
+            energyLogs.length
+          ).toFixed(1)
+        : "—";
+
+    // 7-day scores for bar chart
+    const weekScores = last7.map((date) => {
+      const log = logs.find((l) => l.date === date);
+      return {
+        date,
+        dayLabel: getDayLabel(date),
+        score: log?.score ?? 0,
+        hasLog: !!log,
+      };
+    });
+
+    // 30-day heatmap data
+    const monthData = last30.map((date) => {
+      const log = logs.find((l) => l.date === date);
+      return {
+        date,
+        score: log?.score ?? 0,
+        hasLog: !!log,
+      };
+    });
+
+    // Per-pillar adherence (last 30 days)
+    const pillarAdherence = PILLARS.map((pillar: Pillar) => {
+      const pillarItems = state.protocols[pillar].filter((i) => i.isEnabled);
+      if (pillarItems.length === 0)
+        return { pillar, percentage: 0, label: PILLAR_META[pillar].label };
+
+      const pillarItemIds = new Set(pillarItems.map((i) => i.id));
+      const last30Logs = logs.filter((l) => last30.includes(l.date));
+
+      let totalPossible = 0;
+      let totalCompleted = 0;
+
+      for (const log of last30Logs) {
+        const relevant = log.completions.filter((c) =>
+          pillarItemIds.has(c.itemId)
+        );
+        totalPossible += relevant.length;
+        totalCompleted += relevant.filter((c) => c.completedAt !== null).length;
+      }
+
+      const percentage =
+        totalPossible > 0
+          ? Math.round((totalCompleted / totalPossible) * 100)
+          : 0;
+
+      return { pillar, percentage, label: PILLAR_META[pillar].label };
+    });
+
+    // Total enabled protocols
+    const totalEnabled = PILLARS.reduce(
+      (sum, p) => sum + state.protocols[p].filter((i) => i.isEnabled).length,
+      0
+    );
+
+    return {
+      streak,
+      avgScore,
+      avgMood,
+      avgEnergy,
+      weekScores,
+      monthData,
+      pillarAdherence,
+      totalEnabled,
+    };
+  }, [state]);
+
+  if (loading) {
     return (
       <Shell>
-        <div className="text-center py-24">
-          <div className="text-6xl mb-4">{"\uD83D\uDCCA"}</div>
-          <h1 className="text-[19px] font-semibold text-[#1d1d1f] mb-2">
-            No Data Yet
-          </h1>
-          <p className="text-[15px] text-[#86868b] mb-6 max-w-md mx-auto">
-            Start tracking your protocols to see your progress here.
-          </p>
-          <Link
-            href="/protocols"
-            className="inline-flex items-center gap-2 bg-[#0071e3] hover:bg-[#0077ed] text-white px-6 py-3 rounded-full text-[13px] font-semibold transition-apple"
-          >
-            Browse Protocols
-          </Link>
+        <div className="space-y-6 animate-pulse">
+          <div className="h-9 w-40 bg-[#f5f5f7] rounded-xl" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-[#f5f5f7] rounded-2xl" />
+            ))}
+          </div>
+          <div className="h-48 bg-[#f5f5f7] rounded-2xl" />
         </div>
       </Shell>
     );
   }
 
-  const streak = getStreakDays(routine);
-  const last7 = getLast7Days();
-  const last30 = getLast30Days();
-
-  // Weekly completion data
-  const weeklyData = last7.map((date) => {
-    const log = routine.dailyLogs.find((l) => l.date === date);
-    const dayIndex = new Date(date + "T12:00:00").getDay();
-    const adjDayIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-    const scheduledProtocols = routine.selectedProtocols.filter(
-      (sp) => sp.weeklySchedule[adjDayIndex]
-    );
-    const scheduled = scheduledProtocols.length;
-    const scheduledIds = scheduledProtocols.map((sp) => sp.protocolId);
-    const completed = log?.completedProtocols.filter((id) => scheduledIds.includes(id)).length ?? 0;
-    return {
-      date,
-      day: shortDay(date),
-      scheduled,
-      completed,
-      pct: scheduled > 0 ? Math.min(100, Math.round((completed / scheduled) * 100)) : 0,
-    };
-  });
-
-  // 30-day heatmap data
-  const heatmapData = last30.map((date) => {
-    const log = routine.dailyLogs.find((l) => l.date === date);
-    const dayIndex = new Date(date + "T12:00:00").getDay();
-    const adjDayIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-    const scheduledProtocols = routine.selectedProtocols.filter(
-      (sp) => sp.weeklySchedule[adjDayIndex]
-    );
-    const scheduled = scheduledProtocols.length;
-    const scheduledIds = scheduledProtocols.map((sp) => sp.protocolId);
-    const completed = log?.completedProtocols.filter((id) => scheduledIds.includes(id)).length ?? 0;
-    const pct = scheduled > 0 ? Math.min(1, completed / scheduled) : 0;
-    return { date, pct };
-  });
-
-  // Per-protocol adherence
-  const protocolStats = routine.selectedProtocols
-    .map((sp) => {
-      const protocol = protocols.find((p) => p.id === sp.protocolId);
-      if (!protocol) return null;
-      let scheduledDays = 0;
-      let completedDays = 0;
-      last30.forEach((date) => {
-        const dayIndex = new Date(date + "T12:00:00").getDay();
-        const adjDayIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-        if (sp.weeklySchedule[adjDayIndex]) {
-          scheduledDays++;
-          const log = routine.dailyLogs.find((l) => l.date === date);
-          if (log?.completedProtocols.includes(sp.protocolId)) {
-            completedDays++;
-          }
-        }
-      });
-      return {
-        protocol,
-        scheduledDays,
-        completedDays,
-        pct:
-          scheduledDays > 0
-            ? Math.round((completedDays / scheduledDays) * 100)
-            : 0,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b!.pct - a!.pct) as {
-    protocol: (typeof protocols)[0];
-    scheduledDays: number;
-    completedDays: number;
-    pct: number;
-  }[];
-
-  // Mood, energy, sleep averages
-  const recentLogs = routine.dailyLogs
-    .filter((l) => last7.includes(l.date))
-    .filter((l) => l.mood > 0 || l.energy > 0);
-  const avgMood =
-    recentLogs.length > 0
-      ? (
-          recentLogs.reduce((s, l) => s + l.mood, 0) / recentLogs.length
-        ).toFixed(1)
-      : "\u2014";
-  const avgEnergy =
-    recentLogs.length > 0
-      ? (
-          recentLogs.reduce((s, l) => s + l.energy, 0) / recentLogs.length
-        ).toFixed(1)
-      : "\u2014";
-  const sleepLogs = recentLogs.filter((l) => l.sleepHours > 0);
-  const avgSleep =
-    sleepLogs.length > 0
-      ? (
-          sleepLogs.reduce((s, l) => s + l.sleepHours, 0) / sleepLogs.length
-        ).toFixed(1)
-      : "\u2014";
-
   return (
     <Shell>
-      <h1 className="text-[32px] font-bold tracking-tight text-[#1d1d1f] mb-8">
-        Progress
-      </h1>
+      <div className="space-y-8 pb-4">
+        {/* Header */}
+        <div>
+          <h1 className="text-[32px] font-bold text-[#1d1d1f] tracking-tight leading-tight">
+            Progress
+          </h1>
+          <p className="text-[15px] text-[#86868b] mt-1">
+            Your health protocol analytics
+          </p>
+        </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
-        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-4 text-center">
-          <p className="text-[28px] font-bold text-[#0071e3]">{streak}</p>
-          <p className="text-[11px] text-[#86868b] font-medium uppercase tracking-wide mt-1">
-            Day Streak
-          </p>
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            label="Day Streak"
+            value={stats.streak}
+            icon="🔥"
+            color={stats.streak > 0 ? "#ff9f0a" : "#86868b"}
+          />
+          <StatCard label="Avg Score" value={stats.avgScore} icon="📊" color="#0071e3" />
+          <StatCard label="Avg Mood" value={stats.avgMood} icon="😊" />
+          <StatCard label="Avg Energy" value={stats.avgEnergy} icon="⚡" />
         </div>
-        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-4 text-center">
-          <p className="text-[28px] font-bold text-[#30d158]">
-            {routine.selectedProtocols.length}
-          </p>
-          <p className="text-[11px] text-[#86868b] font-medium uppercase tracking-wide mt-1">
-            Active
-          </p>
-        </div>
-        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-4 text-center">
-          <p className="text-[28px] font-bold text-[#ff9f0a]">{avgMood}</p>
-          <p className="text-[11px] text-[#86868b] font-medium uppercase tracking-wide mt-1">
-            Avg Mood
-          </p>
-        </div>
-        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-4 text-center">
-          <p className="text-[28px] font-bold text-[#ff453a]">{avgEnergy}</p>
-          <p className="text-[11px] text-[#86868b] font-medium uppercase tracking-wide mt-1">
-            Avg Energy
-          </p>
-        </div>
-        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-4 text-center col-span-2 sm:col-span-1">
-          <p className="text-[28px] font-bold text-[#5e5ce6]">{avgSleep}</p>
-          <p className="text-[11px] text-[#86868b] font-medium uppercase tracking-wide mt-1">
-            Avg Sleep
-          </p>
-        </div>
-      </div>
 
-      {/* 7-Day Completion Bar Chart */}
-      <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-6 mb-6">
-        <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-4">
-          Last 7 Days
-        </h2>
-        <div className="flex items-end gap-2 h-32">
-          {weeklyData.map((d) => (
-            <div key={d.date} className="flex-1 flex flex-col items-center">
-              <div className="w-full relative h-24 flex items-end">
+        {/* 7-Day Bar Chart */}
+        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-5">
+          <p className="text-[13px] font-semibold text-[#1d1d1f] mb-4">
+            Last 7 Days
+          </p>
+          <div className="flex items-end gap-2 h-32">
+            {stats.weekScores.map((day) => {
+              const heightPct = Math.max(day.score, 2);
+              const barColor =
+                day.score >= 80
+                  ? "#30d158"
+                  : day.score >= 50
+                  ? "#0071e3"
+                  : day.score > 0
+                  ? "#ff9f0a"
+                  : "#e5e5ea";
+              return (
                 <div
-                  className="w-full rounded-t-lg transition-all duration-300"
-                  style={{
-                    height: `${Math.max(d.pct, 4)}%`,
-                    backgroundColor:
-                      d.pct === 100
-                        ? "#30d158"
-                        : d.pct > 50
-                          ? "#0071e3"
-                          : d.pct > 0
-                            ? "#ff9f0a"
-                            : "#f5f5f7",
-                  }}
-                />
-              </div>
-              <span className="text-[10px] text-[#86868b] mt-1">{d.day}</span>
-              <span className="text-[10px] text-[#86868b]">{d.pct}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 30-Day Heatmap */}
-      <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-6 mb-6">
-        <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-4">
-          30-Day Heatmap
-        </h2>
-        <div className="grid grid-cols-10 gap-1.5">
-          {heatmapData.map((d) => (
-            <div
-              key={d.date}
-              className="aspect-square rounded-md transition-all"
-              style={{
-                backgroundColor:
-                  d.pct === 0
-                    ? "#f5f5f7"
-                    : d.pct < 0.33
-                      ? "#0071e333"
-                      : d.pct < 0.66
-                        ? "#0071e377"
-                        : d.pct < 1
-                          ? "#0071e3bb"
-                          : "#30d158",
-              }}
-              title={`${d.date}: ${Math.round(d.pct * 100)}%`}
-            />
-          ))}
-        </div>
-        <div className="flex items-center gap-2 mt-3 text-[10px] text-[#86868b]">
-          <span>Less</span>
-          <div className="w-3 h-3 rounded-sm bg-[#f5f5f7]" />
-          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "#0071e333" }} />
-          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "#0071e377" }} />
-          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "#0071e3bb" }} />
-          <div className="w-3 h-3 rounded-sm bg-[#30d158]" />
-          <span>More</span>
-        </div>
-      </div>
-
-      {/* Per-Protocol Adherence */}
-      <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-6 mb-6">
-        <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-4">
-          Protocol Adherence (30 days)
-        </h2>
-        <div className="space-y-3">
-          {protocolStats.map((ps) => {
-            const catColor = categoryInfo[ps.protocol.category].color;
-            return (
-              <div key={ps.protocol.id}>
-                <div className="flex items-center justify-between text-[13px] mb-1.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: catColor }}
+                  key={day.date}
+                  className="flex-1 flex flex-col items-center gap-1"
+                >
+                  <span className="text-[10px] font-semibold text-[#1d1d1f]">
+                    {day.score > 0 ? day.score : ""}
+                  </span>
+                  <div className="w-full relative" style={{ height: "100px" }}>
+                    <div
+                      className="absolute bottom-0 w-full rounded-lg transition-all duration-500"
+                      style={{
+                        height: `${heightPct}%`,
+                        backgroundColor: barColor,
+                      }}
                     />
-                    <span className="text-[#1d1d1f] truncate">
-                      {ps.protocol.name}
-                    </span>
                   </div>
-                  <span
-                    className={`text-[12px] font-semibold shrink-0 ml-2 ${
-                      ps.pct >= 80
-                        ? "text-[#30d158]"
-                        : ps.pct >= 50
-                          ? "text-[#ff9f0a]"
-                          : "text-[#ff453a]"
-                    }`}
-                  >
-                    {ps.pct}%
+                  <span className="text-[10px] font-medium text-[#86868b]">
+                    {day.dayLabel}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-[#f5f5f7] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${ps.pct}%`,
-                      backgroundColor:
-                        ps.pct >= 80
-                          ? "#30d158"
-                          : ps.pct >= 50
-                            ? "#ff9f0a"
-                            : "#ff453a",
-                    }}
-                  />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 30-Day Heatmap */}
+        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-5">
+          <p className="text-[13px] font-semibold text-[#1d1d1f] mb-4">
+            30-Day Overview
+          </p>
+          <div className="grid grid-cols-10 gap-1.5">
+            {stats.monthData.map((day) => {
+              const intensity =
+                day.score >= 80
+                  ? 3
+                  : day.score >= 50
+                  ? 2
+                  : day.score > 0
+                  ? 1
+                  : 0;
+              const colors = [
+                "#f5f5f7",
+                "rgba(0, 113, 227, 0.2)",
+                "rgba(0, 113, 227, 0.45)",
+                "rgba(0, 113, 227, 0.75)",
+              ];
+              return (
+                <div
+                  key={day.date}
+                  className="aspect-square rounded-[4px] transition-apple"
+                  style={{ backgroundColor: colors[intensity] }}
+                  title={`${day.date}: ${day.score}%`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-end gap-1.5 mt-3">
+            <span className="text-[10px] text-[#86868b]">Less</span>
+            {["#f5f5f7", "rgba(0,113,227,0.2)", "rgba(0,113,227,0.45)", "rgba(0,113,227,0.75)"].map(
+              (c, i) => (
+                <div
+                  key={i}
+                  className="w-3 h-3 rounded-[2px]"
+                  style={{ backgroundColor: c }}
+                />
+              )
+            )}
+            <span className="text-[10px] text-[#86868b]">More</span>
+          </div>
+        </div>
+
+        {/* Per-Pillar Adherence */}
+        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-5">
+          <p className="text-[13px] font-semibold text-[#1d1d1f] mb-4">
+            Pillar Adherence (30 days)
+          </p>
+          <div className="space-y-4">
+            {stats.pillarAdherence.map((p) => {
+              const meta = PILLAR_META[p.pillar];
+              const barColor =
+                p.percentage >= 80
+                  ? "#30d158"
+                  : p.percentage >= 50
+                  ? "#ff9f0a"
+                  : "#ff3b30";
+              return (
+                <div key={p.pillar}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px]">{meta.icon}</span>
+                      <span className="text-[13px] font-medium text-[#1d1d1f]">
+                        {p.label}
+                      </span>
+                    </div>
+                    <span className="text-[13px] font-semibold" style={{ color: barColor }}>
+                      {p.percentage}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-[#f5f5f7] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${p.percentage}%`,
+                        backgroundColor: barColor,
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Summary card */}
+        <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[rgba(0,113,227,0.1)] flex items-center justify-center text-[18px]">
+              📋
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-[#1d1d1f]">
+                Protocol Summary
+              </p>
+              <p className="text-[12px] text-[#86868b]">
+                {stats.totalEnabled} active items across {PILLARS.length} pillars
+              </p>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="h-20 lg:hidden" />
     </Shell>
   );
 }

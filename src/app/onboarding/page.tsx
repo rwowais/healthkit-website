@@ -2,161 +2,194 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { quizQuestions, getRecommendation } from "@/lib/quiz";
-import { saveProfile } from "@/lib/storage";
-import { programs } from "@/lib/programs";
+import { loadState, saveState } from "@/lib/storage";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
-  const [showResult, setShowResult] = useState(false);
+  const [bedtime, setBedtime] = useState("22:30");
+  const [wakeTime, setWakeTime] = useState("06:30");
 
-  const isNameStep = step === 0;
-  const questionIndex = step - 1;
-  const currentQuestion = quizQuestions[questionIndex];
-  const totalSteps = 1 + quizQuestions.length + 1; // name + questions + result
-  const progress = showResult ? 100 : ((step + 1) / totalSteps) * 100;
-
-  function handleAnswer(value: string) {
-    const newAnswers = { ...answers, [currentQuestion.id]: value };
-    setAnswers(newAnswers);
-    if (questionIndex < quizQuestions.length - 1) {
-      setStep(step + 1);
-    } else {
-      setShowResult(true);
-    }
-  }
-
-  function handleFinish() {
-    const rec = getRecommendation(answers);
-    saveProfile({
-      name,
-      goal: answers["goal"] || "",
-      experience: answers["experience"] || "",
-      quizAnswers: answers,
-      recommendedProgram: rec.programId,
-      isPremium: false,
-    });
-    router.push("/dashboard");
-  }
-
-  if (showResult) {
-    const rec = getRecommendation(answers);
-    const program = programs.find((p) => p.id === rec.programId);
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-6">
-        <div className="max-w-lg w-full text-center">
-          <div className="w-16 h-16 rounded-full bg-[#30d158]/10 flex items-center justify-center mx-auto mb-6">
-            <span className="text-[30px]">✓</span>
-          </div>
-          <h1 className="text-[28px] font-semibold text-[#1d1d1f] tracking-tight">
-            Great, {name || "there"}!
-          </h1>
-          <p className="mt-3 text-[17px] text-[#86868b] leading-relaxed">
-            {rec.reason}
-          </p>
-          {program && (
-            <div className="mt-8 bg-[#fbfbfd] rounded-2xl p-6 text-left border border-[#d2d2d7]/40">
-              <p className="text-[11px] font-semibold text-[#0071e3] uppercase tracking-wider">
-                Recommended for you
-              </p>
-              <h3 className="mt-2 text-[21px] font-semibold text-[#1d1d1f]">
-                {program.name}
-              </h3>
-              <p className="mt-1 text-[14px] text-[#86868b]">
-                {program.tagline} · {program.duration}
-              </p>
-            </div>
-          )}
-          <button
-            onClick={handleFinish}
-            className="mt-8 text-[17px] font-medium bg-[#0071e3] text-white px-10 py-3.5 rounded-full hover:bg-[#0077ed] transition-apple"
-          >
-            Go to Dashboard
-          </button>
-          <p className="mt-4 text-[13px] text-[#86868b]">
-            You can always change your program later.
-          </p>
-        </div>
-      </div>
-    );
+  function handleComplete() {
+    const state = loadState();
+    state.settings.name = name.trim();
+    state.settings.bedtime = bedtime;
+    state.settings.wakeTime = wakeTime;
+    state.settings.completedOnboarding = true;
+    state.settings.trialStartDate = new Date().toISOString();
+    saveState(state);
+    router.push("/today");
   }
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* Progress bar */}
-      <div className="h-1 bg-[#f5f5f7]">
+      {/* Progress */}
+      <div className="w-full h-1 bg-[#f5f5f7]">
         <div
           className="h-full bg-[#0071e3] transition-all duration-500"
-          style={{ width: `${progress}%` }}
+          style={{ width: `${((step + 1) / 3) * 100}%` }}
         />
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="max-w-lg w-full">
-          {isNameStep ? (
-            <>
-              <h1 className="text-[28px] sm:text-[32px] font-semibold text-[#1d1d1f] tracking-tight">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto w-full">
+        {/* Step 0: Name */}
+        {step === 0 && (
+          <div className="w-full text-center">
+            <div className="text-5xl mb-6">👋</div>
+            <h1 className="text-[28px] font-bold text-[#1d1d1f] mb-2">
+              Welcome to Protocolize
+            </h1>
+            <p className="text-[15px] text-[#86868b] mb-10">
+              Let&apos;s set up your longevity protocol in under a minute.
+            </p>
+            <div className="mb-8">
+              <label className="text-[13px] font-medium text-[#86868b] uppercase tracking-wider block mb-3 text-left">
                 What should we call you?
-              </h1>
-              <p className="mt-2 text-[15px] text-[#86868b]">
-                This helps us personalize your experience.
-              </p>
+              </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your first name"
-                className="mt-8 w-full text-[19px] px-0 py-3 border-b-2 border-[#d2d2d7] focus:border-[#0071e3] outline-none transition-apple bg-transparent text-[#1d1d1f] placeholder:text-[#d2d2d7]"
+                className="w-full px-4 py-3.5 rounded-xl border border-[#d2d2d7] text-[17px] text-[#1d1d1f] placeholder:text-[#d2d2d7] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition-apple"
                 autoFocus
               />
+            </div>
+            <button
+              onClick={() => name.trim() && setStep(1)}
+              disabled={!name.trim()}
+              className={`w-full py-3.5 rounded-full text-[15px] font-semibold transition-apple ${
+                name.trim()
+                  ? "bg-[#0071e3] text-white hover:bg-[#0077ed]"
+                  : "bg-[#f5f5f7] text-[#d2d2d7] cursor-not-allowed"
+              }`}
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {/* Step 1: Sleep Schedule */}
+        {step === 1 && (
+          <div className="w-full text-center">
+            <div className="text-5xl mb-6">🌙</div>
+            <h1 className="text-[28px] font-bold text-[#1d1d1f] mb-2">
+              Your sleep schedule
+            </h1>
+            <p className="text-[15px] text-[#86868b] mb-10">
+              We&apos;ll use this to calculate your protocol times. You can always
+              change it later.
+            </p>
+
+            <div className="space-y-6 mb-10">
+              <div>
+                <label className="text-[13px] font-medium text-[#86868b] uppercase tracking-wider block mb-3 text-left">
+                  Bedtime
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">
+                    😴
+                  </span>
+                  <input
+                    type="time"
+                    value={bedtime}
+                    onChange={(e) => setBedtime(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-[#d2d2d7] text-[17px] text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition-apple"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[13px] font-medium text-[#86868b] uppercase tracking-wider block mb-3 text-left">
+                  Wake time
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">
+                    ☀️
+                  </span>
+                  <input
+                    type="time"
+                    value={wakeTime}
+                    onChange={(e) => setWakeTime(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-[#d2d2d7] text-[17px] text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition-apple"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
               <button
-                onClick={() => setStep(1)}
-                disabled={!name.trim()}
-                className="mt-8 text-[17px] font-medium bg-[#0071e3] text-white px-10 py-3.5 rounded-full hover:bg-[#0077ed] transition-apple disabled:opacity-30 disabled:cursor-not-allowed"
+                onClick={() => setStep(0)}
+                className="px-6 py-3.5 rounded-full text-[15px] font-semibold text-[#86868b] hover:text-[#1d1d1f] transition-apple"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setStep(2)}
+                className="flex-1 bg-[#0071e3] text-white py-3.5 rounded-full text-[15px] font-semibold hover:bg-[#0077ed] transition-apple"
               >
                 Continue
               </button>
-            </>
-          ) : (
-            <>
-              <p className="text-[13px] font-medium text-[#86868b] mb-2">
-                Question {questionIndex + 1} of {quizQuestions.length}
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Ready */}
+        {step === 2 && (
+          <div className="w-full text-center">
+            <div className="text-5xl mb-6">🚀</div>
+            <h1 className="text-[28px] font-bold text-[#1d1d1f] mb-2">
+              You&apos;re all set, {name.trim()}
+            </h1>
+            <p className="text-[15px] text-[#86868b] mb-6 leading-relaxed">
+              We&apos;ve loaded a science-backed sleep protocol to get you started.
+              You can customize everything, add your own items, or start fresh.
+            </p>
+
+            <div className="bg-[#fbfbfd] border border-[#d2d2d7]/30 rounded-2xl p-5 mb-10 text-left">
+              <p className="text-[13px] font-semibold text-[#86868b] uppercase tracking-wider mb-3">
+                Your starting protocol
               </p>
-              <h1 className="text-[28px] sm:text-[32px] font-semibold text-[#1d1d1f] tracking-tight">
-                {currentQuestion.question}
-              </h1>
-              <div className="mt-8 space-y-3">
-                {currentQuestion.options.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => handleAnswer(opt.value)}
-                    className={`w-full text-left px-5 py-4 rounded-2xl border transition-apple ${
-                      answers[currentQuestion.id] === opt.value
-                        ? "border-[#0071e3] bg-[#0071e3]/5"
-                        : "border-[#d2d2d7]/60 hover:border-[#86868b] hover:bg-[#fbfbfd]"
-                    }`}
-                  >
-                    <p className="text-[15px] font-medium text-[#1d1d1f]">{opt.label}</p>
-                    {opt.description && (
-                      <p className="mt-0.5 text-[13px] text-[#86868b]">{opt.description}</p>
-                    )}
-                  </button>
+              <div className="space-y-2">
+                {[
+                  { icon: "🌙", label: "Sleep", count: "11 items", desc: "Evening wind-down + morning routine" },
+                  { icon: "⚡", label: "Exercise", count: "9 items", desc: "Strength, cardio & mobility" },
+                  { icon: "🥗", label: "Nutrition", count: "8 items", desc: "Meal timing & guidelines" },
+                  { icon: "💊", label: "Supplements", count: "8 items", desc: "Evidence-based stacks" },
+                ].map((p) => (
+                  <div key={p.label} className="flex items-center gap-3 py-2">
+                    <span className="text-xl">{p.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-medium text-[#1d1d1f]">
+                        {p.label}
+                      </p>
+                      <p className="text-[12px] text-[#86868b]">{p.desc}</p>
+                    </div>
+                    <span className="text-[12px] text-[#86868b] shrink-0">
+                      {p.count}
+                    </span>
+                  </div>
                 ))}
               </div>
-              {step > 1 && (
-                <button
-                  onClick={() => setStep(step - 1)}
-                  className="mt-4 text-[13px] text-[#86868b] hover:text-[#1d1d1f] transition-apple"
-                >
-                  ← Back
-                </button>
-              )}
-            </>
-          )}
-        </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(1)}
+                className="px-6 py-3.5 rounded-full text-[15px] font-semibold text-[#86868b] hover:text-[#1d1d1f] transition-apple"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleComplete}
+                className="flex-1 bg-[#0071e3] text-white py-3.5 rounded-full text-[15px] font-semibold hover:bg-[#0077ed] transition-apple"
+              >
+                Let&apos;s Go
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
