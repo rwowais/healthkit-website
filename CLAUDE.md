@@ -14,7 +14,9 @@ A longevity routine web app that helps users build science-backed routines for s
 
 - **Non-technical founder.** Does not code. Build everything autonomously.
 - **Do not ask for permissions** unless absolutely necessary. Just code it.
-- **Apple-clean white design** aesthetic at all times. No dark mode. No clutter.
+- **Premium dark design (v4).** Deep blacks/charcoal, restrained accents, calm and
+  scientific. Inspiration: Oura, Whoop, Levels, Apple Health, Rise. No bright
+  saturation, no rainbow dashboards, no Tailwind-template look. Elegance over density.
 - **GitHub:** rwowais (repo: healthkit-website)
 - **Brand name:** Protocolize (renamed from "HealthKit" which is Apple-trademarked)
 - **Domain:** protocolize.com (not yet purchased)
@@ -91,23 +93,38 @@ healthkit-website/
 
 ---
 
-## Design System
+## Design System (v4 — Premium Dark)
 
-### Colors
+Full token set + reusable components live in `src/app/globals.css` and
+`src/components/ui/`. Use the design-system classes (`.card`, `.t-title`,
+`.t-eyebrow`, `.anim-rise`, etc.) and primitives (`Card`, `Button`, `RingScore`,
+`TrendArea`, `Segmented`, `Sheet`, `useToast`) — do not hardcode colors.
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--background` | `#ffffff` | Page background (always white) |
-| `--foreground` | `#1d1d1f` | Primary text |
-| `--muted` | `#86868b` | Secondary/helper text |
-| `--border` | `#d2d2d7` | Card borders, dividers |
-| `--card` | `#fbfbfd` | Card backgrounds |
-| `--card-hover` | `#f5f5f7` | Hover states |
-| `--accent` | `#0071e3` | Primary buttons, links (Apple blue) |
-| `--accent-hover` | `#0077ed` | Button hover |
-| `--success` | `#34c759` | Green (completion, streaks) |
-| `--warning` | `#ff9f0a` | Orange (partial, supplements) |
-| `--danger` | `#ff3b30` | Red (errors, low adherence) |
+### Core tokens (CSS vars)
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--bg` | `#08090B` | Page background (radial-graded) |
+| `--surface-1/2/3` | `#101216`→`#1D2128` | Card / elevated surfaces |
+| `--hairline` | `rgba(255,255,255,.055)` | Subtle borders |
+| `--text-1/2/3/4` | `#F4F5F7`→`#494D55` | Text scale (warm off-white) |
+| `--sleep` | `#8E9CF7` | Sleep (soft indigo) |
+| `--recovery` | `#57D2C4` | Recovery (muted teal) |
+| `--readiness` | `#6FA8F5` | Readiness / exercise (soft blue) |
+| `--vitality` | `#86D99C` | Nutrition / positive (subtle green) |
+| `--warm` | `#E8C99B` | Supplements / streak (warm sand) |
+| `--alert` | `#E8896B` | Sparingly: low/destructive (muted coral) |
+
+8px spacing system. Typography via `.t-*` classes. Animations: `.anim-rise`,
+`.anim-fade`, `.anim-ring` with `.d1`–`.d6` stagger delays.
+
+### Legacy (pre-v4, do not use)
+
+| Token | Hex |
+|-------|-----|
+| `--accent` | `#0071e3` |
+| `--success` | `#34c759` |
+| `--warning` | `#ff9f0a` |
 
 ### Category Colors
 

@@ -1,155 +1,212 @@
 @import "tailwindcss";
 
+/* ════════════════════════════════════════════════════════════════
+   PROTOCOLIZE — Premium Longevity OS · Dark Design System
+   ════════════════════════════════════════════════════════════════ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #1d1d1f;
-  --muted: #86868b;
-  --border: #d2d2d7;
-  --card: #fbfbfd;
-  --card-hover: #f5f5f7;
-  --accent: #0071e3;
-  --accent-hover: #0077ed;
-  --success: #34c759;
-  --warning: #ff9f0a;
-  --danger: #ff3b30;
-  --sleep: #5e5ce6;
-  --exercise: #ff453a;
-  --diet: #30d158;
-  --supplements: #ff9f0a;
+  /* ── Surfaces (deep blacks → soft elevation) ── */
+  --bg: #08090B;
+  --bg-grad-top: #0C0E11;
+  --surface-1: #101216;
+  --surface-2: #16191E;
+  --surface-3: #1D2128;
+  --hairline: rgba(255, 255, 255, 0.055);
+  --hairline-strong: rgba(255, 255, 255, 0.10);
+
+  /* ── Text (warm off-white scale) ── */
+  --text-1: #F4F5F7;
+  --text-2: #A7AAB2;
+  --text-3: #6C7079;
+  --text-4: #494D55;
+
+  /* ── Accents (sparse, meaningful) ── */
+  --sleep: #8E9CF7;       /* soft indigo */
+  --sleep-soft: rgba(142, 156, 247, 0.14);
+  --recovery: #57D2C4;    /* muted teal */
+  --recovery-soft: rgba(87, 210, 196, 0.13);
+  --readiness: #6FA8F5;   /* soft blue */
+  --readiness-soft: rgba(111, 168, 245, 0.13);
+  --vitality: #86D99C;    /* subtle green */
+  --vitality-soft: rgba(134, 217, 156, 0.13);
+  --warm: #E8C99B;        /* warm sand (supplements) */
+  --warm-soft: rgba(232, 201, 155, 0.13);
+  --alert: #E8896B;       /* muted coral, used sparingly */
+
+  /* ── Pillar mapping ── */
+  --p-sleep: var(--sleep);
+  --p-exercise: var(--readiness);
+  --p-nutrition: var(--vitality);
+  --p-supplements: var(--warm);
+
+  /* ── Radius ── */
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 26px;
+  --r-xl: 34px;
+  --r-pill: 999px;
+
+  /* ── Spacing (8px system) ── */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+
+  /* ── Easing ── */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-border: var(--border);
-  --color-card: var(--card);
-  --color-card-hover: var(--card-hover);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-sleep: var(--sleep);
+  --color-recovery: var(--recovery);
+  --color-readiness: var(--readiness);
+  --color-vitality: var(--vitality);
+  --color-warm: var(--warm);
+  --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background:
+    radial-gradient(120% 80% at 50% -10%, var(--bg-grad-top) 0%, var(--bg) 55%) fixed;
+  color: var(--text-1);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
+  font-feature-settings: "ss01", "cv01", "tnum";
 }
 
-/* Apple-style smooth scrolling */
-html {
-  scroll-behavior: smooth;
+/* ── Typography scale ───────────────────────────────────────────── */
+.t-display { font-size: 34px; line-height: 1.08; font-weight: 700; letter-spacing: -0.026em; }
+.t-title   { font-size: 26px; line-height: 1.15; font-weight: 700; letter-spacing: -0.022em; }
+.t-section { font-size: 19px; line-height: 1.25; font-weight: 600; letter-spacing: -0.017em; }
+.t-body    { font-size: 15px; line-height: 1.5;  font-weight: 400; color: var(--text-2); }
+.t-label   { font-size: 13px; line-height: 1.4;  font-weight: 500; color: var(--text-2); }
+.t-caption { font-size: 12px; line-height: 1.35; font-weight: 500; color: var(--text-3); }
+.t-eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.13em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.t-metric {
+  font-size: 56px; line-height: 1; font-weight: 700;
+  letter-spacing: -0.04em; font-variant-numeric: tabular-nums;
 }
 
-/* Custom scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #d2d2d7 transparent;
+/* ── Surfaces ───────────────────────────────────────────────────── */
+.card {
+  background: linear-gradient(180deg, var(--surface-1) 0%, rgba(16,18,22,0.7) 100%);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
 }
-
-*::-webkit-scrollbar {
-  width: 6px;
+.card-2 {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
 }
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  background: #d2d2d7;
-  border-radius: 3px;
-}
-
-/* Glass morphism utility */
 .glass {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  background: rgba(12, 14, 17, 0.72);
+  backdrop-filter: saturate(160%) blur(24px);
+  -webkit-backdrop-filter: saturate(160%) blur(24px);
+}
+.inset { box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+
+/* ── Transitions ────────────────────────────────────────────────── */
+.tr { transition: all 0.4s var(--ease); }
+.tr-fast { transition: all 0.22s var(--ease-soft); }
+.press { transition: transform 0.18s var(--ease-soft); }
+.press:active { transform: scale(0.97); }
+
+/* ── Scrollbars ─────────────────────────────────────────────────── */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Animations ─────────────────────────────────────────────────── */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-rise { animation: rise 0.6s var(--ease) both; }
+
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.anim-fade { animation: fade 0.7s var(--ease) both; }
+
+@keyframes ringDraw {
+  from { stroke-dashoffset: var(--ring-circ, 283); }
+  to   { stroke-dashoffset: var(--ring-off, 0); }
+}
+.anim-ring {
+  animation: ringDraw 1.4s var(--ease) forwards;
 }
 
-/* Smooth transitions */
-.transition-apple {
-  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+@keyframes sheetUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-sheet { animation: sheetUp 0.42s var(--ease) both; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.anim-toast { animation: toastIn 0.4s var(--ease) both; }
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+.anim-pulse { animation: pulseGlow 2.6s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--surface-1) 25%, var(--surface-2) 50%, var(--surface-1) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
 }
 
-/* Toast fade-in */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-.animate-fade-in {
-  animation: fadeInUp 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
+/* Stagger helpers */
+.d1 { animation-delay: 0.05s; }
+.d2 { animation-delay: 0.11s; }
+.d3 { animation-delay: 0.17s; }
+.d4 { animation-delay: 0.23s; }
+.d5 { animation-delay: 0.30s; }
+.d6 { animation-delay: 0.37s; }
 
-/* Checkbox spring animation */
-@keyframes checkSpring {
-  0% {
-    transform: scale(0);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  75% {
-    transform: scale(0.9);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.animate-check {
-  animation: checkSpring 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-/* Score ring stroke animation */
-@keyframes scoreRingDraw {
-  from {
-    stroke-dashoffset: var(--ring-circumference, 283);
-  }
-  to {
-    stroke-dashoffset: var(--ring-offset, 0);
-  }
-}
-.animate-score-ring {
-  animation: scoreRingDraw 1s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-}
-
-/* Modal slide-up animation */
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-slide-up {
-  animation: slideUp 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-/* Hide scrollbar utility */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/* Focus ring */
+/* ── Focus ──────────────────────────────────────────────────────── */
 *:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--readiness);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
+}
+
+input, textarea, select { font-family: inherit; }
+input::placeholder, textarea::placeholder { color: var(--text-4); }
+
+/* Time input dark styling */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
 }

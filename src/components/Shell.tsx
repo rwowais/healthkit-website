@@ -2,265 +2,214 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ToastProvider } from "@/components/ui";
 
 interface ShellProps {
   children: React.ReactNode;
 }
 
-// ── Icon Components ─────────────────────────────────────────────
+// ── Icons (thin, calm line work) ────────────────────────────────
 
-function TodayIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={active ? 2.2 : 1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="4" fill={active ? "currentColor" : "none"} />
-      <path d="M12 2v2" />
-      <path d="M12 20v2" />
-      <path d="M4.93 4.93l1.41 1.41" />
-      <path d="M17.66 17.66l1.41 1.41" />
-      <path d="M2 12h2" />
-      <path d="M20 12h2" />
-      <path d="M6.34 17.66l-1.41 1.41" />
-      <path d="M19.07 4.93l-1.41 1.41" />
-    </svg>
-  );
-}
+type IconProps = { active: boolean };
 
-function SleepIcon({ active }: { active: boolean }) {
+function HomeIcon({ active }: IconProps) {
   return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill={active ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth={active ? 0 : 1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
-
-function ExerciseIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={active ? 2.2 : 1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill={active ? "currentColor" : "none"} />
-    </svg>
-  );
-}
-
-function NutritionIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill={active ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth={active ? 0 : 1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 17 3.5s1.5 2.5-.5 6c-1.3 2.3-3.4 3.5-5.5 4.5" />
-      <path d="M11 20v-10" stroke="currentColor" strokeWidth="1.8" fill="none" />
-    </svg>
-  );
-}
-
-function SupplementsIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={active ? 2.2 : 1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect
-        x="4.5"
-        y="9"
-        width="15"
-        height="6"
-        rx="3"
-        transform="rotate(-45 12 12)"
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3.5 10.5L12 4l8.5 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-4v-6h-6v6H5A1.5 1.5 0 0 1 3.5 19v-8.5z"
+        stroke="currentColor"
+        strokeWidth={active ? 2 : 1.6}
+        strokeLinejoin="round"
         fill={active ? "currentColor" : "none"}
-      />
-      <line
-        x1="12"
-        y1="5.5"
-        x2="12"
-        y2="18.5"
-        transform="rotate(-45 12 12)"
-        strokeWidth="1.5"
-        stroke={active ? "#ffffff" : "currentColor"}
+        fillOpacity={active ? 0.16 : 0}
       />
     </svg>
   );
 }
 
-function SettingsIcon() {
+function SleepIcon({ active }: IconProps) {
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M20 13.2A8 8 0 1 1 10.8 4a6.3 6.3 0 0 0 9.2 9.2z"
+        stroke="currentColor"
+        strokeWidth={active ? 2 : 1.6}
+        strokeLinejoin="round"
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.16 : 0}
+      />
     </svg>
   );
 }
 
-function ChartIcon({ active: _active }: { active?: boolean }) {
+function RecoveryIcon({ active }: IconProps) {
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 20V10" />
-      <path d="M12 20V4" />
-      <path d="M6 20v-6" />
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3 13h3l2.5-6 4 12 2.5-6H21"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
-// ── Nav items ───────────────────────────────────────────────────
+function TrackIcon({ active }: IconProps) {
+  return (
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+      <circle
+        cx="12"
+        cy="12"
+        r="8.5"
+        stroke="currentColor"
+        strokeWidth={active ? 2 : 1.6}
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.16 : 0}
+      />
+      <path
+        d="M8.5 12l2.5 2.5 4.5-5"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
-const navItems = [
-  { href: "/today", label: "Home", Icon: TodayIcon },
-  { href: "/track", label: "Track", Icon: ExerciseIcon },
-  { href: "/progress", label: "Progress", Icon: ChartIcon },
+function TrendsIcon({ active }: IconProps) {
+  return (
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 16l5-5 3.5 3.5L20 7"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15 7h5v5"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.4 5.6l-1.4 1.4M7 17l-1.4 1.4M18.4 18.4L17 17M7 7L5.6 5.6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+const NAV = [
+  { href: "/today", label: "Home", Icon: HomeIcon },
+  { href: "/sleep", label: "Sleep", Icon: SleepIcon },
+  { href: "/recovery", label: "Recovery", Icon: RecoveryIcon },
+  { href: "/track", label: "Protocols", Icon: TrackIcon },
+  { href: "/progress", label: "Trends", Icon: TrendsIcon },
 ] as const;
-
-// ── Shell ───────────────────────────────────────────────────────
 
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
+  const isActive = (href: string) =>
+    pathname === href || pathname?.startsWith(href + "/");
 
   return (
-    <div className="min-h-screen bg-[#ffffff]">
-      {/* ── Sticky Glass Header ─────────────────────────────── */}
-      <header className="glass sticky top-0 z-50 border-b border-[#d2d2d7]/30">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          {/* Logo */}
-          <Link
-            href="/today"
-            className="text-[17px] font-semibold text-[#1d1d1f] tracking-tight"
-          >
-            Protocolize
-          </Link>
+    <ToastProvider>
+      <div className="min-h-screen">
+        {/* ── Header ──────────────────────────────────────────── */}
+        <header className="glass sticky top-0 z-50 border-b border-[var(--hairline)]">
+          <div className="mx-auto flex h-16 max-w-[600px] items-center justify-between px-6">
+            <Link href="/today" className="flex items-center gap-2.5">
+              <span
+                className="grid h-7 w-7 place-items-center rounded-[9px]"
+                style={{
+                  background:
+                    "linear-gradient(145deg, var(--sleep), var(--readiness))",
+                }}
+              >
+                <span className="h-2 w-2 rounded-full bg-[#0A0B0D]" />
+              </span>
+              <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
+                Protocolize
+              </span>
+            </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {navItems.map(({ href, label }) => {
-              const isActive = pathname === href;
+            <nav className="hidden items-center gap-1 lg:flex">
+              {NAV.map(({ href, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`tr-fast rounded-[var(--r-pill)] px-4 py-2 text-[13px] font-medium ${
+                    isActive(href)
+                      ? "bg-[var(--surface-3)] text-[var(--text-1)]"
+                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                  }`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className={`press tr-fast rounded-full p-2 ${
+                isActive("/settings")
+                  ? "text-[var(--text-1)]"
+                  : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+              }`}
+            >
+              <GearIcon />
+            </Link>
+          </div>
+        </header>
+
+        {/* ── Main ────────────────────────────────────────────── */}
+        <main className="mx-auto max-w-[600px] px-5 pb-32 pt-6 lg:pb-12">
+          {children}
+        </main>
+
+        {/* ── Mobile bottom nav ───────────────────────────────── */}
+        <nav className="glass fixed inset-x-0 bottom-0 z-50 border-t border-[var(--hairline)] pb-[env(safe-area-inset-bottom)] lg:hidden">
+          <div className="mx-auto flex h-[68px] max-w-[600px] items-center justify-around px-2">
+            {NAV.map(({ href, label, Icon }) => {
+              const active = isActive(href);
               return (
                 <Link
                   key={href}
                   href={href}
-                  className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-apple ${
-                    isActive
-                      ? "bg-[#1d1d1f] text-white"
-                      : "text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                  }`}
-                  aria-current={isActive ? "page" : undefined}
+                  className="press flex min-w-[58px] flex-col items-center gap-1.5 py-1"
+                  style={{
+                    color: active ? "var(--text-1)" : "var(--text-3)",
+                  }}
                 >
-                  {label}
+                  <Icon active={active} />
+                  <span
+                    className="text-[10px] font-medium tracking-tight"
+                    style={{ opacity: active ? 1 : 0.7 }}
+                  >
+                    {label}
+                  </span>
                 </Link>
               );
             })}
-          </nav>
-
-          {/* Right actions */}
-          <div className="flex items-center gap-3">
-            <Link
-              href="/progress"
-              className={`p-2 rounded-full transition-apple ${
-                pathname === "/progress"
-                  ? "text-[#0071e3]"
-                  : "text-[#86868b] hover:text-[#1d1d1f]"
-              }`}
-              aria-label="Progress"
-            >
-              <ChartIcon />
-            </Link>
-            <Link
-              href="/settings"
-              className={`p-2 rounded-full transition-apple ${
-                pathname === "/settings"
-                  ? "text-[#0071e3]"
-                  : "text-[#86868b] hover:text-[#1d1d1f]"
-              }`}
-              aria-label="Settings"
-            >
-              <SettingsIcon />
-            </Link>
           </div>
-        </div>
-      </header>
-
-      {/* ── Main Content ────────────────────────────────────── */}
-      <main className="max-w-2xl mx-auto px-4 py-6">{children}</main>
-
-      {/* ── Mobile Bottom Spacer ────────────────────────────── */}
-      <div className="h-24 lg:hidden" />
-
-      {/* ── Mobile Bottom Nav ───────────────────────────────── */}
-      <nav className="fixed bottom-0 inset-x-0 z-50 glass border-t border-[#d2d2d7]/30 lg:hidden pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-center justify-around h-16 max-w-2xl mx-auto px-2">
-          {navItems.map(({ href, label, Icon }) => {
-            const isActive = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] py-1 transition-apple ${
-                  isActive ? "text-[#0071e3]" : "text-[#86868b]"
-                }`}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <Icon active={isActive} />
-                <span className="text-[10px] font-medium leading-tight">
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-    </div>
+        </nav>
+      </div>
+    </ToastProvider>
   );
 }

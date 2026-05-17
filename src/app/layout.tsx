@@ -1,10 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Protocolize — Your Longevity Protocol, Simplified",
+  title: "Protocolize — Longevity Intelligence",
   description:
-    "Build science-backed routines for sleep, exercise, nutrition, and supplements. Track daily adherence and optimize your health with protocols from Huberman, Attia, and Walker.",
+    "Premium longevity, recovery, and sleep optimization. Track protocols, monitor readiness, and improve your healthspan with science-backed routines.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#08090B",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -13,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ colorScheme: "dark" }}>
       <body className="antialiased">{children}</body>
     </html>
   );

@@ -6,6 +6,7 @@ import { useAppState } from "@/hooks/useAppState";
 import { useToday } from "@/hooks/useToday";
 import { getTodayLog } from "@/lib/storage";
 import { PILLAR_META } from "@/lib/constants";
+import { Card, Eyebrow, Skeleton, useToast } from "@/components/ui";
 import type {
   Pillar,
   ProtocolItem,
@@ -14,19 +15,38 @@ import type {
   DailyLog,
 } from "@/lib/types";
 
-// ── Pillar tabs ───────────────────────────────────────────────────
+const ORDER: Pillar[] = ["sleep", "exercise", "nutrition", "supplements"];
+const COLOR: Record<string, string> = {
+  sleep: "var(--sleep)",
+  exercise: "var(--readiness)",
+  nutrition: "var(--vitality)",
+  supplements: "var(--warm)",
+};
 
-const PILLAR_ORDER: Pillar[] = ["sleep", "exercise", "nutrition", "supplements"];
-
-// ── Helpers ───────────────────────────────────────────────────────
-
-function getDayIndex(): number {
-  const jsDay = new Date().getDay();
-  return jsDay === 0 ? 6 : jsDay - 1;
+function dayIdx() {
+  const j = new Date().getDay();
+  return j === 0 ? 6 : j - 1;
 }
 
-// ── Sleep Tracker Card ────────────────────────────────────────────
+function Check({ on, color }: { on: boolean; color: string }) {
+  return (
+    <div
+      className="tr-fast grid h-7 w-7 shrink-0 place-items-center rounded-full border-2"
+      style={{
+        borderColor: on ? color : "var(--text-4)",
+        background: on ? color : "transparent",
+      }}
+    >
+      {on && (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#08090B" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      )}
+    </div>
+  );
+}
 
+// ── Sleep ─────────────────────────────────────────────────────────
 function SleepTracker({
   log,
   items,
@@ -34,86 +54,67 @@ function SleepTracker({
 }: {
   log: DailyLog;
   items: ProtocolItem[];
-  onToggle: (itemId: string) => void;
+  onToggle: (id: string) => void;
 }) {
-  const morningItems = items.filter(
+  const morning = items.filter(
     (i) => i.isEnabled && i.timingAnchor === "wake" && i.itemType === "task"
   );
-  const eveningItems = items.filter(
+  const evening = items.filter(
     (i) => i.isEnabled && i.timingAnchor === "bed" && i.itemType === "task"
   );
-  const reminders = items.filter(
-    (i) => i.isEnabled && i.itemType === "reminder"
-  );
+  const reminders = items.filter((i) => i.isEnabled && i.itemType === "reminder");
+  const done = (id: string) =>
+    log.sleepCompletions.find((c) => c.itemId === id)?.completed ?? false;
 
-  const isCompleted = (itemId: string) =>
-    log.sleepCompletions.find((c) => c.itemId === itemId)?.completed ?? false;
-
-  const renderChecklist = (sectionItems: ProtocolItem[], label: string, emoji: string) => (
-    <div className="space-y-1.5">
-      <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-wide flex items-center gap-1.5">
-        <span>{emoji}</span> {label}
-      </p>
-      {sectionItems.map((item) => {
-        const done = isCompleted(item.id);
-        return (
-          <button
-            key={item.id}
-            onClick={() => onToggle(item.id)}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-apple text-left ${
-              done
-                ? "bg-[#5e5ce6]/8 border border-[#5e5ce6]/15"
-                : "bg-white border border-[#d2d2d7]/25 hover:border-[#5e5ce6]/20"
-            }`}
-          >
-            <div
-              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-apple ${
-                done ? "border-[#5e5ce6] bg-[#5e5ce6]" : "border-[#d2d2d7]"
-              }`}
+  const section = (list: ProtocolItem[], label: string) =>
+    list.length > 0 && (
+      <div className="space-y-2.5">
+        <Eyebrow>{label}</Eyebrow>
+        {list.map((it) => {
+          const on = done(it.id);
+          return (
+            <button
+              key={it.id}
+              onClick={() => onToggle(it.id)}
+              className="press tr-fast flex w-full items-center gap-3.5 rounded-[var(--r-md)] border p-4 text-left"
+              style={{
+                borderColor: on ? "var(--sleep)" : "var(--hairline)",
+                background: on ? "var(--sleep-soft)" : "var(--surface-2)",
+              }}
             >
-              {done && (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className={`text-[14px] font-medium leading-snug transition-apple ${
-                done ? "text-[#5e5ce6]" : "text-[#1d1d1f]"
-              }`}>
-                {item.icon} {item.name}
-              </p>
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
+              <Check on={on} color="var(--sleep)" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-medium text-[var(--text-1)]">
+                  {it.icon} {it.name}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
 
   return (
-    <div className="space-y-5">
-      {/* Reminders as tips */}
+    <div className="space-y-7">
       {reminders.length > 0 && (
-        <div className="bg-[#5e5ce6]/5 border border-[#5e5ce6]/10 rounded-xl p-3.5 space-y-1.5">
-          <p className="text-[11px] font-semibold text-[#5e5ce6] uppercase tracking-wide">
-            Reminders
-          </p>
-          {reminders.map((r) => (
-            <p key={r.id} className="text-[13px] text-[#86868b] leading-relaxed">
-              {r.icon} {r.name}
-            </p>
-          ))}
+        <div className="rounded-[var(--r-md)] border border-[var(--hairline)] bg-[var(--sleep-soft)] p-4">
+          <Eyebrow color="var(--sleep)">Keep in mind</Eyebrow>
+          <div className="mt-2.5 space-y-1.5">
+            {reminders.map((r) => (
+              <p key={r.id} className="t-label">
+                {r.icon} {r.name}
+              </p>
+            ))}
+          </div>
         </div>
       )}
-
-      {morningItems.length > 0 && renderChecklist(morningItems, "Morning", "☀️")}
-      {eveningItems.length > 0 && renderChecklist(eveningItems, "Evening", "🌙")}
+      {section(morning, "Morning")}
+      {section(evening, "Evening")}
     </div>
   );
 }
 
-// ── Exercise Tracker Card ─────────────────────────────────────────
-
+// ── Exercise ──────────────────────────────────────────────────────
 function ExerciseTracker({
   log,
   items,
@@ -121,142 +122,119 @@ function ExerciseTracker({
 }: {
   log: DailyLog;
   items: ProtocolItem[];
-  onUpdate: (itemId: string, updates: Partial<ExerciseEntry>) => void;
+  onUpdate: (id: string, u: Partial<ExerciseEntry>) => void;
 }) {
-  const dayIndex = getDayIndex();
+  const di = dayIdx();
   const todayItems = items.filter(
-    (i) => i.isEnabled && i.itemType === "task" && i.daysActive[dayIndex]
+    (i) => i.isEnabled && i.itemType === "task" && i.daysActive[di]
   );
-  const reminders = items.filter(
-    (i) => i.isEnabled && i.itemType === "reminder"
-  );
-  const restDayItems = items.filter(
-    (i) => i.isEnabled && i.itemType === "task" && !i.daysActive[dayIndex]
-  );
-
-  const getEntry = (itemId: string): ExerciseEntry | undefined =>
-    log.exerciseEntries.find((e) => e.itemId === itemId);
-
-  const INTENSITY_LABELS = ["", "Light", "Moderate", "Hard"];
-  const FEELING_EMOJIS = ["", "😫", "😕", "😐", "🙂", "💪"];
+  const reminders = items.filter((i) => i.isEnabled && i.itemType === "reminder");
+  const entry = (id: string) => log.exerciseEntries.find((e) => e.itemId === id);
+  const INT = ["", "Light", "Moderate", "Hard"];
+  const FEEL = ["", "😮‍💨", "😕", "😐", "🙂", "💪"];
 
   return (
-    <div className="space-y-5">
-      {/* Reminders */}
+    <div className="space-y-7">
       {reminders.length > 0 && (
-        <div className="bg-[#ff453a]/5 border border-[#ff453a]/10 rounded-xl p-3.5 space-y-1.5">
-          <p className="text-[11px] font-semibold text-[#ff453a] uppercase tracking-wide">
-            Reminders
-          </p>
-          {reminders.map((r) => (
-            <p key={r.id} className="text-[13px] text-[#86868b] leading-relaxed">
-              {r.icon} {r.name}
-            </p>
-          ))}
+        <div className="rounded-[var(--r-md)] border border-[var(--hairline)] bg-[var(--readiness-soft)] p-4">
+          <Eyebrow color="var(--readiness)">Keep in mind</Eyebrow>
+          <div className="mt-2.5 space-y-1.5">
+            {reminders.map((r) => (
+              <p key={r.id} className="t-label">
+                {r.icon} {r.name}
+              </p>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Today's exercises */}
       {todayItems.length > 0 ? (
         <div className="space-y-3">
-          {todayItems.map((item) => {
-            const entry = getEntry(item.id);
-            const done = entry?.completed ?? false;
-
+          {todayItems.map((it) => {
+            const e = entry(it.id);
+            const on = e?.completed ?? false;
             return (
               <div
-                key={item.id}
-                className={`rounded-xl border transition-apple overflow-hidden ${
-                  done
-                    ? "bg-[#ff453a]/5 border-[#ff453a]/15"
-                    : "bg-white border-[#d2d2d7]/25"
-                }`}
+                key={it.id}
+                className="tr-fast overflow-hidden rounded-[var(--r-md)] border"
+                style={{
+                  borderColor: on ? "var(--readiness)" : "var(--hairline)",
+                  background: on ? "var(--readiness-soft)" : "var(--surface-2)",
+                }}
               >
-                {/* Main toggle row */}
                 <button
-                  onClick={() =>
-                    onUpdate(item.id, { completed: !done })
-                  }
-                  className="w-full flex items-center gap-3 p-3.5 text-left"
+                  onClick={() => onUpdate(it.id, { completed: !on })}
+                  className="press flex w-full items-center gap-3.5 p-4 text-left"
                 >
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-apple ${
-                      done ? "border-[#ff453a] bg-[#ff453a]" : "border-[#d2d2d7]"
-                    }`}
-                  >
-                    {done && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-[14px] font-medium ${done ? "text-[#ff453a]" : "text-[#1d1d1f]"}`}>
-                      {item.icon} {item.name}
+                  <Check on={on} color="var(--readiness)" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-medium text-[var(--text-1)]">
+                      {it.icon} {it.name}
                     </p>
-                    <p className="text-[12px] text-[#86868b] mt-0.5">
-                      {item.description.substring(0, 60)}...
+                    <p className="t-caption mt-0.5 line-clamp-1">
+                      {it.description}
                     </p>
                   </div>
                 </button>
-
-                {/* Mini-log (shown when completed) */}
-                {done && (
-                  <div className="px-3.5 pb-3.5 pt-0 flex items-center gap-2 flex-wrap animate-slide-up">
-                    {/* Duration */}
-                    <div className="flex items-center gap-1.5 bg-white rounded-lg border border-[#d2d2d7]/30 px-2.5 py-1.5">
-                      <span className="text-[11px] text-[#86868b]">⏱️</span>
+                {on && (
+                  <div className="anim-fade flex flex-wrap items-center gap-2 px-4 pb-4">
+                    <div className="flex items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2">
+                      <span className="text-[11px] text-[var(--text-3)]">min</span>
                       <input
                         type="number"
-                        placeholder="min"
-                        value={entry?.durationMinutes ?? ""}
-                        onChange={(e) =>
-                          onUpdate(item.id, {
-                            durationMinutes: e.target.value ? parseInt(e.target.value) : null,
+                        value={e?.durationMinutes ?? ""}
+                        onChange={(ev) =>
+                          onUpdate(it.id, {
+                            durationMinutes: ev.target.value
+                              ? parseInt(ev.target.value)
+                              : null,
                           })
                         }
-                        className="w-12 text-[13px] text-[#1d1d1f] bg-transparent outline-none"
+                        className="w-12 bg-transparent text-[14px] text-[var(--text-1)] outline-none"
                       />
                     </div>
-
-                    {/* Intensity */}
                     <div className="flex gap-1">
-                      {([1, 2, 3] as const).map((level) => (
+                      {([1, 2, 3] as const).map((lv) => (
                         <button
-                          key={level}
+                          key={lv}
                           onClick={() =>
-                            onUpdate(item.id, {
-                              intensity: entry?.intensity === level ? null : level,
+                            onUpdate(it.id, {
+                              intensity: e?.intensity === lv ? null : lv,
                             })
                           }
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-apple ${
-                            entry?.intensity === level
-                              ? "bg-[#ff453a] text-white"
-                              : "bg-white border border-[#d2d2d7]/30 text-[#86868b]"
-                          }`}
+                          className="tr-fast rounded-[var(--r-sm)] px-3 py-2 text-[12px] font-semibold"
+                          style={{
+                            background:
+                              e?.intensity === lv
+                                ? "var(--readiness)"
+                                : "var(--surface-1)",
+                            color:
+                              e?.intensity === lv ? "#08090B" : "var(--text-3)",
+                          }}
                         >
-                          {INTENSITY_LABELS[level]}
+                          {INT[lv]}
                         </button>
                       ))}
                     </div>
-
-                    {/* Feeling */}
                     <div className="flex gap-0.5">
-                      {([1, 2, 3, 4, 5] as const).map((level) => (
+                      {([1, 2, 3, 4, 5] as const).map((lv) => (
                         <button
-                          key={level}
+                          key={lv}
                           onClick={() =>
-                            onUpdate(item.id, {
-                              feeling: entry?.feeling === level ? null : level,
+                            onUpdate(it.id, {
+                              feeling: e?.feeling === lv ? null : lv,
                             })
                           }
-                          className={`w-8 h-8 rounded-lg text-[16px] flex items-center justify-center transition-apple ${
-                            entry?.feeling === level
-                              ? "bg-[#ff453a]/10 scale-110"
-                              : "opacity-40 hover:opacity-70"
-                          }`}
+                          className="tr-fast grid h-9 w-9 place-items-center rounded-[var(--r-sm)] text-[17px]"
+                          style={{
+                            background:
+                              e?.feeling === lv
+                                ? "var(--readiness-soft)"
+                                : "transparent",
+                            opacity: e?.feeling === lv ? 1 : 0.4,
+                          }}
                         >
-                          {FEELING_EMOJIS[level]}
+                          {FEEL[lv]}
                         </button>
                       ))}
                     </div>
@@ -267,95 +245,79 @@ function ExerciseTracker({
           })}
         </div>
       ) : (
-        <div className="text-center py-6">
-          <p className="text-[32px] mb-2">🧘</p>
-          <p className="text-[15px] font-medium text-[#1d1d1f]">Rest Day</p>
-          <p className="text-[13px] text-[#86868b]">No exercises scheduled</p>
-        </div>
-      )}
-
-      {/* Rest day items (dimmed) */}
-      {restDayItems.length > 0 && (
-        <div className="opacity-40 space-y-1">
-          <p className="text-[11px] font-medium text-[#86868b] uppercase tracking-wide">
-            Scheduled Other Days
+        <div className="py-12 text-center">
+          <p className="text-[34px]">🧘</p>
+          <p className="t-section mt-3 text-[var(--text-1)]">Rest Day</p>
+          <p className="t-caption mt-1">
+            Recovery is part of the protocol. Move gently.
           </p>
-          {restDayItems.map((item) => (
-            <p key={item.id} className="text-[12px] text-[#86868b]">
-              {item.icon} {item.name}
-            </p>
-          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ── Nutrition Tracker Card ────────────────────────────────────────
-
+// ── Nutrition ─────────────────────────────────────────────────────
 function NutritionTracker({
   log,
   onUpdate,
 }: {
   log: DailyLog;
-  onUpdate: (field: string, value: ScorecardAnswer) => void;
+  onUpdate: (f: string, v: ScorecardAnswer) => void;
 }) {
   const sc = log.nutritionScorecard;
-
-  const questions: { key: string; label: string; icon: string; value: ScorecardAnswer }[] = [
-    { key: "hitProteinTarget", label: "Hit protein target", icon: "🥩", value: sc.hitProteinTarget },
-    { key: "ateFruitsVeggies", label: "Ate fruits & vegetables", icon: "🥦", value: sc.ateFruitsVeggies },
-    { key: "stayedHydrated", label: "Stayed hydrated", icon: "💧", value: sc.stayedHydrated },
-    { key: "avoidedProcessedSugar", label: "Avoided processed sugar", icon: "🍬", value: sc.avoidedProcessedSugar },
-    { key: "finishedEatingOnTime", label: "Finished eating 3h before bed", icon: "🍽️", value: sc.finishedEatingOnTime },
-    { key: "minimizedAlcohol", label: "Minimized alcohol", icon: "🚫", value: sc.minimizedAlcohol },
-  ];
-
-  const answerOptions: { value: ScorecardAnswer; label: string; color: string; bg: string }[] = [
-    { value: "yes", label: "Yes", color: "#30d158", bg: "rgba(48, 209, 88, 0.1)" },
-    { value: "mostly", label: "Mostly", color: "#ff9f0a", bg: "rgba(255, 159, 10, 0.1)" },
-    { value: "no", label: "No", color: "#ff3b30", bg: "rgba(255, 59, 48, 0.1)" },
+  const qs = [
+    { k: "hitProteinTarget", l: "Hit protein target", i: "🥩" },
+    { k: "ateFruitsVeggies", l: "Ate fruits & vegetables", i: "🥦" },
+    { k: "stayedHydrated", l: "Stayed hydrated", i: "💧" },
+    { k: "avoidedProcessedSugar", l: "Avoided processed sugar", i: "🍬" },
+    { k: "finishedEatingOnTime", l: "Finished eating 3h before bed", i: "🍽️" },
+    { k: "minimizedAlcohol", l: "Minimized alcohol", i: "🚫" },
+  ] as const;
+  const opts: { v: ScorecardAnswer; l: string; c: string }[] = [
+    { v: "yes", l: "Yes", c: "var(--vitality)" },
+    { v: "mostly", l: "Mostly", c: "var(--warm)" },
+    { v: "no", l: "No", c: "var(--alert)" },
   ];
 
   return (
-    <div className="space-y-2">
-      {questions.map((q) => (
-        <div
-          key={q.key}
-          className="bg-white border border-[#d2d2d7]/25 rounded-xl p-3.5 flex items-center justify-between gap-3"
-        >
-          <p className="text-[14px] text-[#1d1d1f] font-medium flex-1">
-            {q.icon} {q.label}
-          </p>
-          <div className="flex gap-1.5 shrink-0">
-            {answerOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() =>
-                  onUpdate(q.key, q.value === opt.value ? null : opt.value)
-                }
-                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-apple"
-                style={{
-                  backgroundColor:
-                    q.value === opt.value ? opt.bg : "transparent",
-                  color: q.value === opt.value ? opt.color : "#d2d2d7",
-                  border: `1.5px solid ${
-                    q.value === opt.value ? opt.color + "30" : "#d2d2d7"
-                  }`,
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
+    <div className="space-y-2.5">
+      {qs.map((q) => {
+        const cur = sc[q.k] as ScorecardAnswer;
+        return (
+          <div
+            key={q.k}
+            className="rounded-[var(--r-md)] border border-[var(--hairline)] bg-[var(--surface-2)] p-4"
+          >
+            <p className="text-[14px] font-medium text-[var(--text-1)]">
+              {q.i} {q.l}
+            </p>
+            <div className="mt-3 flex gap-2">
+              {opts.map((o) => {
+                const on = cur === o.v;
+                return (
+                  <button
+                    key={o.v}
+                    onClick={() => onUpdate(q.k, on ? null : o.v)}
+                    className="tr-fast flex-1 rounded-[var(--r-sm)] py-2.5 text-[13px] font-semibold"
+                    style={{
+                      background: on ? o.c : "var(--surface-1)",
+                      color: on ? "#08090B" : "var(--text-3)",
+                    }}
+                  >
+                    {o.l}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-// ── Supplements Tracker Card ──────────────────────────────────────
-
+// ── Supplements ───────────────────────────────────────────────────
 function SupplementsTracker({
   log,
   items,
@@ -363,113 +325,103 @@ function SupplementsTracker({
 }: {
   log: DailyLog;
   items: ProtocolItem[];
-  onUpdate: (itemId: string, updates: { taken?: boolean; skipped?: boolean; skipReason?: string }) => void;
+  onUpdate: (
+    id: string,
+    u: { taken?: boolean; skipped?: boolean; skipReason?: string }
+  ) => void;
 }) {
-  const [expandedSkip, setExpandedSkip] = useState<string | null>(null);
-  const morningItems = items.filter(
-    (i) => i.isEnabled && i.timingAnchor === "wake"
-  );
-  const eveningItems = items.filter(
-    (i) => i.isEnabled && i.timingAnchor === "bed"
-  );
+  const [skipId, setSkipId] = useState<string | null>(null);
+  const morning = items.filter((i) => i.isEnabled && i.timingAnchor === "wake");
+  const evening = items.filter((i) => i.isEnabled && i.timingAnchor === "bed");
+  const entry = (id: string) =>
+    log.supplementEntries.find((s) => s.itemId === id);
 
-  const getEntry = (itemId: string) =>
-    log.supplementEntries.find((s) => s.itemId === itemId);
-
-  const renderItem = (item: ProtocolItem) => {
-    const entry = getEntry(item.id);
-    const taken = entry?.taken ?? false;
-    const skipped = entry?.skipped ?? false;
-
+  const renderItem = (it: ProtocolItem) => {
+    const e = entry(it.id);
+    const taken = e?.taken ?? false;
+    const skipped = e?.skipped ?? false;
     return (
       <div
-        key={item.id}
-        className={`rounded-xl border transition-apple ${
-          taken
-            ? "bg-[#ff9f0a]/5 border-[#ff9f0a]/15"
+        key={it.id}
+        className="tr-fast overflow-hidden rounded-[var(--r-md)] border"
+        style={{
+          borderColor: taken ? "var(--warm)" : "var(--hairline)",
+          background: taken
+            ? "var(--warm-soft)"
             : skipped
-            ? "bg-[#f5f5f7] border-[#d2d2d7]/20 opacity-60"
-            : "bg-white border-[#d2d2d7]/25"
-        }`}
+            ? "var(--surface-1)"
+            : "var(--surface-2)",
+          opacity: skipped ? 0.55 : 1,
+        }}
       >
-        <div className="flex items-center gap-3 p-3.5">
-          {/* Take button */}
+        <div className="flex items-center gap-3.5 p-4">
           <button
             onClick={() =>
-              onUpdate(item.id, {
-                taken: !taken,
-                skipped: false,
-                skipReason: "",
-              })
+              onUpdate(it.id, { taken: !taken, skipped: false, skipReason: "" })
             }
-            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-apple ${
-              taken ? "border-[#ff9f0a] bg-[#ff9f0a]" : "border-[#d2d2d7]"
-            }`}
+            className="press"
           >
-            {taken && (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
+            <Check on={taken} color="var(--warm)" />
           </button>
-
-          <div className="flex-1 min-w-0">
-            <p className={`text-[14px] font-medium ${taken ? "text-[#ff9f0a]" : skipped ? "text-[#86868b] line-through" : "text-[#1d1d1f]"}`}>
-              {item.icon} {item.name}
-            </p>
-          </div>
-
-          {/* Skip button */}
+          <p
+            className="flex-1 text-[15px] font-medium"
+            style={{
+              color: taken
+                ? "var(--text-1)"
+                : skipped
+                ? "var(--text-3)"
+                : "var(--text-1)",
+              textDecoration: skipped ? "line-through" : "none",
+            }}
+          >
+            {it.icon} {it.name}
+          </p>
           {!taken && (
             <button
               onClick={() => {
                 if (skipped) {
-                  onUpdate(item.id, { skipped: false, skipReason: "" });
-                  setExpandedSkip(null);
+                  onUpdate(it.id, { skipped: false, skipReason: "" });
+                  setSkipId(null);
                 } else {
-                  setExpandedSkip(expandedSkip === item.id ? null : item.id);
+                  setSkipId(skipId === it.id ? null : it.id);
                 }
               }}
-              className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-apple ${
-                skipped
-                  ? "bg-[#86868b]/10 text-[#86868b]"
-                  : "text-[#d2d2d7] hover:text-[#86868b]"
-              }`}
+              className="tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-medium"
+              style={{
+                background: skipped ? "var(--surface-3)" : "transparent",
+                color: skipped ? "var(--text-2)" : "var(--text-4)",
+              }}
             >
               {skipped ? "Skipped" : "Skip"}
             </button>
           )}
         </div>
-
-        {/* Skip reason input */}
-        {expandedSkip === item.id && !taken && (
-          <div className="px-3.5 pb-3.5 pt-0 animate-slide-up">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Why skipping? (optional)"
-                className="flex-1 px-3 py-2 rounded-lg bg-[#f5f5f7] text-[12px] text-[#1d1d1f] placeholder:text-[#d2d2d7] outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    onUpdate(item.id, {
-                      skipped: true,
-                      taken: false,
-                      skipReason: (e.target as HTMLInputElement).value,
-                    });
-                    setExpandedSkip(null);
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  onUpdate(item.id, { skipped: true, taken: false });
-                  setExpandedSkip(null);
-                }}
-                className="px-3 py-2 rounded-lg bg-[#86868b]/10 text-[12px] font-medium text-[#86868b]"
-              >
-                Skip
-              </button>
-            </div>
+        {skipId === it.id && !taken && (
+          <div className="anim-fade flex gap-2 px-4 pb-4">
+            <input
+              type="text"
+              placeholder="Reason (optional)"
+              className="flex-1 rounded-[var(--r-sm)] bg-[var(--surface-1)] px-3 py-2.5 text-[13px] text-[var(--text-1)] outline-none"
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") {
+                  onUpdate(it.id, {
+                    skipped: true,
+                    taken: false,
+                    skipReason: (ev.target as HTMLInputElement).value,
+                  });
+                  setSkipId(null);
+                }
+              }}
+            />
+            <button
+              onClick={() => {
+                onUpdate(it.id, { skipped: true, taken: false });
+                setSkipId(null);
+              }}
+              className="rounded-[var(--r-sm)] bg-[var(--surface-3)] px-4 text-[13px] font-medium text-[var(--text-2)]"
+            >
+              Skip
+            </button>
           </div>
         )}
       </div>
@@ -477,29 +429,24 @@ function SupplementsTracker({
   };
 
   return (
-    <div className="space-y-5">
-      {morningItems.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-wide">
-            🌅 Morning Stack
-          </p>
-          <div className="space-y-1.5">{morningItems.map(renderItem)}</div>
+    <div className="space-y-7">
+      {morning.length > 0 && (
+        <div className="space-y-2.5">
+          <Eyebrow>Morning Stack</Eyebrow>
+          {morning.map(renderItem)}
         </div>
       )}
-      {eveningItems.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-wide">
-            🌙 Evening Stack
-          </p>
-          <div className="space-y-1.5">{eveningItems.map(renderItem)}</div>
+      {evening.length > 0 && (
+        <div className="space-y-2.5">
+          <Eyebrow>Evening Stack</Eyebrow>
+          {evening.map(renderItem)}
         </div>
       )}
     </div>
   );
 }
 
-// ── Main Tracker Page ─────────────────────────────────────────────
-
+// ── Page ──────────────────────────────────────────────────────────
 export default function TrackPage() {
   const {
     state,
@@ -510,51 +457,41 @@ export default function TrackPage() {
     updateSupplementEntry,
   } = useAppState();
   const today = useToday();
-  const [activePillar, setActivePillar] = useState<Pillar>("sleep");
+  const toast = useToast();
+  const [active, setActive] = useState<Pillar>("sleep");
   const scrollRef = useRef<HTMLDivElement>(null);
-
   const log = useMemo(() => getTodayLog(state), [state]);
-
-  // Per-pillar progress
-  const pillarProgress = useMemo(() => {
-    const scores = log.pillarScores || { sleep: 0, exercise: 0, nutrition: 0, supplements: 0 };
-    return scores;
-  }, [log]);
-
-  const handleScrollSnap = () => {
-    if (!scrollRef.current) return;
-    const container = scrollRef.current;
-    const scrollLeft = container.scrollLeft;
-    const width = container.offsetWidth;
-    const index = Math.round(scrollLeft / width);
-    const pillar = PILLAR_ORDER[Math.min(index, PILLAR_ORDER.length - 1)];
-    if (pillar !== activePillar) {
-      setActivePillar(pillar);
-    }
+  const scores = log.pillarScores ?? {
+    sleep: 0,
+    exercise: 0,
+    nutrition: 0,
+    supplements: 0,
   };
 
-  const scrollToPillar = (pillar: Pillar) => {
-    const index = PILLAR_ORDER.indexOf(pillar);
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        left: index * scrollRef.current.offsetWidth,
-        behavior: "smooth",
-      });
-    }
-    setActivePillar(pillar);
+  const onScroll = () => {
+    const c = scrollRef.current;
+    if (!c) return;
+    const idx = Math.round(c.scrollLeft / c.offsetWidth);
+    const p = ORDER[Math.min(idx, ORDER.length - 1)];
+    if (p !== active) setActive(p);
+  };
+
+  const goTo = (p: Pillar) => {
+    const i = ORDER.indexOf(p);
+    scrollRef.current?.scrollTo({
+      left: i * scrollRef.current.offsetWidth,
+      behavior: "smooth",
+    });
+    setActive(p);
   };
 
   if (loading) {
     return (
       <Shell>
-        <div className="space-y-4 animate-pulse">
-          <div className="h-8 w-48 bg-[#f5f5f7] rounded-xl" />
-          <div className="flex gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-10 w-20 bg-[#f5f5f7] rounded-full" />
-            ))}
-          </div>
-          <div className="h-64 bg-[#f5f5f7] rounded-2xl" />
+        <div className="space-y-5">
+          <Skeleton className="h-8 w-48" rounded="rounded-full" />
+          <Skeleton className="h-12 w-full" rounded="rounded-[var(--r-pill)]" />
+          <Skeleton className="h-80 w-full" />
         </div>
       </Shell>
     );
@@ -562,144 +499,120 @@ export default function TrackPage() {
 
   return (
     <Shell>
-      <div className="space-y-4 pb-4">
-        {/* Header */}
-        <div>
-          <p className="text-[13px] font-medium text-[#86868b]">{today.displayDate}</p>
-          <h1 className="text-[28px] font-bold text-[#1d1d1f] tracking-tight">
-            Daily Tracker
-          </h1>
+      <div className="flex flex-col gap-6">
+        <div className="anim-rise">
+          <Eyebrow>{today.displayDate}</Eyebrow>
+          <h1 className="t-title mt-2 text-[var(--text-1)]">Protocols</h1>
         </div>
 
-        {/* Pillar tabs */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
-          {PILLAR_ORDER.map((pillar) => {
-            const meta = PILLAR_META[pillar];
-            const isActive = activePillar === pillar;
-            const score = pillarProgress[pillar];
+        {/* Pillar selector */}
+        <div className="anim-rise d1 flex gap-2 overflow-x-auto no-scrollbar">
+          {ORDER.map((p) => {
+            const on = active === p;
+            const s = Math.round(scores[p]);
             return (
               <button
-                key={pillar}
-                onClick={() => scrollToPillar(pillar)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-apple shrink-0 ${
-                  isActive ? "text-white" : "bg-[#f5f5f7] text-[#86868b]"
-                }`}
-                style={isActive ? { backgroundColor: meta.color } : undefined}
+                key={p}
+                onClick={() => goTo(p)}
+                className="press tr-fast flex shrink-0 items-center gap-2 rounded-[var(--r-pill)] px-4 py-2.5 text-[13px] font-semibold"
+                style={{
+                  background: on ? COLOR[p] : "var(--surface-2)",
+                  color: on ? "#08090B" : "var(--text-3)",
+                }}
               >
-                <span className="text-[14px]">{meta.icon}</span>
-                {meta.label}
-                {score > 0 && (
-                  <span
-                    className={`text-[11px] font-bold ${
-                      isActive ? "text-white/70" : "text-[#d2d2d7]"
-                    }`}
-                  >
-                    {score}%
-                  </span>
-                )}
+                <span>{PILLAR_META[p].icon}</span>
+                {PILLAR_META[p].label}
+                <span
+                  className="text-[11px] font-bold"
+                  style={{ opacity: on ? 0.6 : 0.5 }}
+                >
+                  {s}%
+                </span>
               </button>
             );
           })}
         </div>
 
-        {/* Swipeable pillar cards */}
+        {/* Swipeable cards */}
         <div
           ref={scrollRef}
-          className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar -mx-4"
-          onScroll={handleScrollSnap}
-          style={{ scrollSnapType: "x mandatory" }}
+          onScroll={onScroll}
+          className="-mx-5 flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
         >
-          {PILLAR_ORDER.map((pillar) => {
-            const meta = PILLAR_META[pillar];
-            return (
-              <div
-                key={pillar}
-                className="w-full shrink-0 snap-center px-4"
-                style={{ minWidth: "100%" }}
-              >
-                {/* Pillar card */}
-                <div
-                  className="rounded-2xl border p-5 min-h-[400px]"
-                  style={{
-                    borderColor: meta.color + "20",
-                    backgroundColor: meta.bgLight.replace("0.1", "0.03"),
-                  }}
-                >
-                  {/* Pillar header */}
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-[22px]">{meta.icon}</span>
-                      <h2 className="text-[19px] font-bold text-[#1d1d1f]">
-                        {meta.label}
-                      </h2>
-                    </div>
-                    <div
-                      className="text-[13px] font-bold px-3 py-1 rounded-full"
-                      style={{
-                        backgroundColor: meta.bgLight,
-                        color: meta.color,
-                      }}
-                    >
-                      {pillarProgress[pillar]}%
-                    </div>
+          {ORDER.map((p) => (
+            <div
+              key={p}
+              className="w-full shrink-0 snap-center px-5"
+              style={{ minWidth: "100%" }}
+            >
+              <Card pad="p-5" className="min-h-[420px]">
+                <div className="mb-6 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[24px]">{PILLAR_META[p].icon}</span>
+                    <h2 className="t-section text-[var(--text-1)]">
+                      {PILLAR_META[p].label}
+                    </h2>
                   </div>
-
-                  {/* Pillar-specific tracker */}
-                  {pillar === "sleep" && (
-                    <SleepTracker
-                      log={log}
-                      items={state.protocols.sleep}
-                      onToggle={(itemId) =>
-                        toggleSleepItem(log.date, itemId)
-                      }
-                    />
-                  )}
-                  {pillar === "exercise" && (
-                    <ExerciseTracker
-                      log={log}
-                      items={state.protocols.exercise}
-                      onUpdate={(itemId, updates) =>
-                        updateExerciseEntry(log.date, itemId, updates)
-                      }
-                    />
-                  )}
-                  {pillar === "nutrition" && (
-                    <NutritionTracker
-                      log={log}
-                      onUpdate={(field, value) =>
-                        updateNutritionScorecard(log.date, {
-                          [field]: value,
-                        })
-                      }
-                    />
-                  )}
-                  {pillar === "supplements" && (
-                    <SupplementsTracker
-                      log={log}
-                      items={state.protocols.supplements}
-                      onUpdate={(itemId, updates) =>
-                        updateSupplementEntry(log.date, itemId, updates)
-                      }
-                    />
-                  )}
+                  <span
+                    className="rounded-[var(--r-pill)] px-3 py-1.5 text-[13px] font-bold"
+                    style={{
+                      background: "var(--surface-3)",
+                      color: COLOR[p],
+                    }}
+                  >
+                    {Math.round(scores[p])}%
+                  </span>
                 </div>
-              </div>
-            );
-          })}
+
+                {p === "sleep" && (
+                  <SleepTracker
+                    log={log}
+                    items={state.protocols.sleep}
+                    onToggle={(id) => {
+                      toggleSleepItem(log.date, id);
+                    }}
+                  />
+                )}
+                {p === "exercise" && (
+                  <ExerciseTracker
+                    log={log}
+                    items={state.protocols.exercise}
+                    onUpdate={(id, u) => updateExerciseEntry(log.date, id, u)}
+                  />
+                )}
+                {p === "nutrition" && (
+                  <NutritionTracker
+                    log={log}
+                    onUpdate={(f, v) =>
+                      updateNutritionScorecard(log.date, { [f]: v })
+                    }
+                  />
+                )}
+                {p === "supplements" && (
+                  <SupplementsTracker
+                    log={log}
+                    items={state.protocols.supplements}
+                    onUpdate={(id, u) => {
+                      updateSupplementEntry(log.date, id, u);
+                      if (u.taken) toast.show("Logged");
+                    }}
+                  />
+                )}
+              </Card>
+            </div>
+          ))}
         </div>
 
-        {/* Swipe indicator dots */}
+        {/* Dots */}
         <div className="flex justify-center gap-2">
-          {PILLAR_ORDER.map((pillar) => (
+          {ORDER.map((p) => (
             <button
-              key={pillar}
-              onClick={() => scrollToPillar(pillar)}
-              className="w-2 h-2 rounded-full transition-apple"
+              key={p}
+              onClick={() => goTo(p)}
+              className="tr-fast h-1.5 rounded-full"
               style={{
-                backgroundColor:
-                  activePillar === pillar
-                    ? PILLAR_META[pillar].color
-                    : "#d2d2d7",
+                width: active === p ? 22 : 6,
+                background: active === p ? COLOR[p] : "var(--text-4)",
               }}
             />
           ))}
