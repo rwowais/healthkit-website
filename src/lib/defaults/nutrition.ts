@@ -1,3 +1,10 @@
+/**
+ * Default Nutrition Protocol Items
+ *
+ * Edit this file to add, remove, or modify default nutrition protocol items.
+ * Each item needs a unique id starting with "nutrition-default-XXX".
+ * Set itemType to "task" for active check-off items, "reminder" for guidelines.
+ */
 import type { ProtocolItem } from "../types";
 
 export const defaultNutritionProtocol: ProtocolItem[] = [
@@ -9,6 +16,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "Drink 16-24 oz of water with a pinch of sea salt upon waking. Rehydrates after 7-8 hours of sleep-induced fasting and restores electrolyte balance.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 5,
     timeOfDay: "morning",
@@ -28,6 +36,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "30-50g protein at first meal. Drives muscle protein synthesis, stabilizes blood sugar, and increases satiety for the day.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 90,
     timeOfDay: "morning",
@@ -49,6 +58,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "Another 30-50g protein at midday. Aim for 1g protein per pound of lean body mass across the day.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 330,
     timeOfDay: "afternoon",
@@ -68,6 +78,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "Include 2+ servings of non-starchy vegetables with lunch. Fiber supports gut microbiome diversity and blood sugar regulation.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 330,
     timeOfDay: "afternoon",
@@ -87,6 +98,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "Include fatty fish, chia seeds, walnuts, or take fish oil. Omega-3s reduce systemic inflammation and support brain and cardiovascular health.",
     source: "default",
+    itemType: "reminder",
     timingAnchor: "wake",
     timingOffsetMinutes: 330,
     timeOfDay: "afternoon",
@@ -108,6 +120,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "Finish dinner 3+ hours before bed. Late eating impairs sleep quality, glucose tolerance, and fat oxidation during sleep.",
     source: "default",
+    itemType: "reminder",
     timingAnchor: "bed",
     timingOffsetMinutes: -180,
     timeOfDay: "evening",
@@ -127,6 +140,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "Limit or avoid alcohol, especially within 3 hours of bed. Even 1-2 drinks fragments sleep architecture and suppresses REM sleep.",
     source: "default",
+    itemType: "reminder",
     timingAnchor: "bed",
     timingOffsetMinutes: -180,
     timeOfDay: "evening",
@@ -146,6 +160,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     description:
       "Minimize refined sugars and ultra-processed foods. Chronic high sugar intake drives insulin resistance, the root of metabolic disease.",
     source: "default",
+    itemType: "reminder",
     timingAnchor: "wake",
     timingOffsetMinutes: 0,
     timeOfDay: "morning",

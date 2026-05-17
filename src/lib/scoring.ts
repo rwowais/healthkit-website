@@ -1,93 +1,75 @@
 import { SCORE_WEIGHTS } from "./constants";
 import type { DailyLog, ProtocolItem, UserSettings } from "./types";
-import { calculateDisplayTime, deriveTimeOfDay } from "./timing";
 
 /**
  * Calculate the daily score (0-100) for a given day's log.
  *
- * Breakdown:
- * - Base: (completed / total enabled) * 80 points
- * - +5 for logging sleep data (bedtime or wake time or quality)
- * - +5 for completing all morning items
- * - +5 for completing all evening items
- * - +5 for adding at least one note (item note or day note)
+ * The score now aggregates per-pillar scores:
+ * - Sleep: % of checklist items completed
+ * - Exercise: % of exercises completed
+ * - Nutrition: scorecard answers
+ * - Supplements: % taken
+ * Plus bonuses for sleep data logging and notes.
  */
 export function calculateDailyScore(
   log: DailyLog,
-  enabledItems: ProtocolItem[],
-  settings: UserSettings
+  _enabledItems: ProtocolItem[],
+  _settings: UserSettings
 ): number {
-  if (enabledItems.length === 0) return 0;
+  // Per-pillar scores (already calculated in storage.ts recalculate)
+  const pillarScores = log.pillarScores || {
+    sleep: 0,
+    exercise: 0,
+    nutrition: 0,
+    supplements: 0,
+  };
 
-  // Base score: completion rate * 80
-  const completedCount = log.completions.filter(
-    (c) => c.completedAt !== null && !c.skipped
-  ).length;
-  const baseScore =
-    (completedCount / enabledItems.length) * SCORE_WEIGHTS.completionBase;
+  // Count active pillars (ones with items to track)
+  const activePillars: number[] = [];
+  if (log.sleepCompletions.length > 0) activePillars.push(pillarScores.sleep);
+  if (log.exerciseEntries.length > 0) activePillars.push(pillarScores.exercise);
+  // Nutrition always counts (scorecard)
+  activePillars.push(pillarScores.nutrition);
+  if (log.supplementEntries.length > 0) activePillars.push(pillarScores.supplements);
 
-  // Sleep log bonus
+  if (activePillars.length === 0) return 0;
+
+  // Base: average of active pillar scores (0-100) → scaled to 80 points
+  const avgPillar =
+    activePillars.reduce((sum, s) => sum + s, 0) / activePillars.length;
+  const baseScore = (avgPillar / 100) * SCORE_WEIGHTS.completionBase;
+
+  // Sleep log bonus (+5)
   const hasSleepData =
     log.sleepLog.actualBedtime !== null ||
     log.sleepLog.actualWakeTime !== null ||
     log.sleepLog.sleepQuality !== null;
   const sleepBonus = hasSleepData ? SCORE_WEIGHTS.sleepLogBonus : 0;
 
-  // Morning completion bonus
-  const morningItems = enabledItems.filter((item) => {
-    const time = calculateDisplayTime(item, settings);
-    return deriveTimeOfDay(time) === "morning";
-  });
-  const morningCompleted =
-    morningItems.length > 0 &&
-    morningItems.every((item) =>
-      log.completions.some(
-        (c) => c.itemId === item.id && c.completedAt !== null
-      )
-    );
-  const morningBonus = morningCompleted
-    ? SCORE_WEIGHTS.morningCompleteBonus
-    : 0;
+  // Mood/energy bonus (+5 each, combined into 10 replacing morning/evening)
+  const hasWellness = log.energyLevel !== null || log.moodLevel !== null;
+  const wellnessBonus = hasWellness ? 10 : 0;
 
-  // Evening completion bonus
-  const eveningItems = enabledItems.filter((item) => {
-    const time = calculateDisplayTime(item, settings);
-    return deriveTimeOfDay(time) === "evening";
-  });
-  const eveningCompleted =
-    eveningItems.length > 0 &&
-    eveningItems.every((item) =>
-      log.completions.some(
-        (c) => c.itemId === item.id && c.completedAt !== null
-      )
-    );
-  const eveningBonus = eveningCompleted
-    ? SCORE_WEIGHTS.eveningCompleteBonus
-    : 0;
-
-  // Note bonus: at least one item note or a day note
+  // Note bonus (+5)
   const hasNote =
     log.dayNote.trim().length > 0 ||
-    log.completions.some((c) => c.note.trim().length > 0);
+    log.nutritionScorecard.note.trim().length > 0 ||
+    log.exerciseEntries.some((e) => e.note.trim().length > 0);
   const noteBonus = hasNote ? SCORE_WEIGHTS.noteBonus : 0;
 
-  const total = baseScore + sleepBonus + morningBonus + eveningBonus + noteBonus;
+  const total = baseScore + sleepBonus + wellnessBonus + noteBonus;
   return Math.round(Math.min(100, Math.max(0, total)));
 }
 
 /**
  * Calculate the current streak: consecutive days (ending today or yesterday)
- * where score > 0 and at least one item was completed.
+ * where any tracking activity occurred.
  */
 export function calculateStreak(logs: DailyLog[]): number {
   if (logs.length === 0) return 0;
 
   const sorted = [...logs]
-    .filter(
-      (log) =>
-        log.score > 0 &&
-        log.completions.some((c) => c.completedAt !== null)
-    )
+    .filter((log) => hasAnyActivity(log))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   if (sorted.length === 0) return 0;
@@ -100,7 +82,6 @@ export function calculateStreak(logs: DailyLog[]): number {
   const todayStr = formatDateKey(today);
   const yesterdayStr = formatDateKey(yesterday);
 
-  // Streak must include today or yesterday
   if (sorted[0].date !== todayStr && sorted[0].date !== yesterdayStr) {
     return 0;
   }
@@ -122,6 +103,19 @@ export function calculateStreak(logs: DailyLog[]): number {
   }
 
   return streak;
+}
+
+/** Check if a daily log has any meaningful activity */
+function hasAnyActivity(log: DailyLog): boolean {
+  const hasSleep = log.sleepCompletions.some((c) => c.completed);
+  const hasExercise = log.exerciseEntries.some((e) => e.completed);
+  const hasNutrition = Object.values(log.nutritionScorecard).some(
+    (v) => v !== null && v !== "" && (!Array.isArray(v) || v.length > 0)
+  );
+  const hasSupplements = log.supplementEntries.some((s) => s.taken || s.skipped);
+  const hasLegacy = log.completions.some((c) => c.completedAt !== null);
+
+  return hasSleep || hasExercise || hasNutrition || hasSupplements || hasLegacy;
 }
 
 function formatDateKey(date: Date): string {

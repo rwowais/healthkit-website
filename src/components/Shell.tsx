@@ -138,7 +138,7 @@ function SettingsIcon() {
   );
 }
 
-function ChartIcon() {
+function ChartIcon({ active: _active }: { active?: boolean }) {
   return (
     <svg
       width="20"
@@ -160,11 +160,9 @@ function ChartIcon() {
 // ── Nav items ───────────────────────────────────────────────────
 
 const navItems = [
-  { href: "/today", label: "Today", Icon: TodayIcon },
-  { href: "/sleep", label: "Sleep", Icon: SleepIcon },
-  { href: "/exercise", label: "Exercise", Icon: ExerciseIcon },
-  { href: "/nutrition", label: "Nutrition", Icon: NutritionIcon },
-  { href: "/supplements", label: "Supplements", Icon: SupplementsIcon },
+  { href: "/today", label: "Home", Icon: TodayIcon },
+  { href: "/track", label: "Track", Icon: ExerciseIcon },
+  { href: "/progress", label: "Progress", Icon: ChartIcon },
 ] as const;
 
 // ── Shell ───────────────────────────────────────────────────────

@@ -3,10 +3,16 @@ import { calculateDailyScore, calculateStreak } from "./scoring";
 import type {
   AppState,
   DailyLog,
+  ExerciseEntry,
   ItemCompletion,
+  NutritionScorecard,
   Pillar,
   ProtocolItem,
+  SleepItemCompletion,
   SleepLog,
+  SupplementEntry,
+  SupplementMeta,
+  SupplementMetaMap,
   UserSettings,
 } from "./types";
 
@@ -14,6 +20,8 @@ import { defaultSleepProtocol } from "./defaults/sleep";
 import { defaultExerciseProtocol } from "./defaults/exercise";
 import { defaultNutritionProtocol } from "./defaults/nutrition";
 import { defaultSupplementsProtocol } from "./defaults/supplements";
+
+// ── Helpers ───────────────────────────────────────────────────────
 
 function getDateString(date?: Date): string {
   const d = date ?? new Date();
@@ -32,26 +40,64 @@ function createEmptySleepLog(): SleepLog {
   };
 }
 
-function createEmptyDailyLog(date: string, items: ProtocolItem[]): DailyLog {
-  const completions: ItemCompletion[] = items
+function createEmptyNutritionScorecard(): NutritionScorecard {
+  return {
+    hitProteinTarget: null,
+    ateFruitsVeggies: null,
+    stayedHydrated: null,
+    avoidedProcessedSugar: null,
+    finishedEatingOnTime: null,
+    minimizedAlcohol: null,
+    customItems: [],
+    note: "",
+  };
+}
+
+function createEmptyDailyLog(
+  date: string,
+  protocols: Record<Pillar, ProtocolItem[]>
+): DailyLog {
+  const sleepCompletions: SleepItemCompletion[] = protocols.sleep
+    .filter((item) => item.isEnabled)
+    .map((item) => ({ itemId: item.id, completed: false }));
+
+  const exerciseEntries: ExerciseEntry[] = protocols.exercise
+    .filter((item) => item.isEnabled && item.itemType === "task")
+    .map((item) => ({
+      itemId: item.id,
+      completed: false,
+      durationMinutes: null,
+      intensity: null,
+      feeling: null,
+      note: "",
+    }));
+
+  const supplementEntries: SupplementEntry[] = protocols.supplements
     .filter((item) => item.isEnabled)
     .map((item) => ({
       itemId: item.id,
-      completedAt: null,
-      note: "",
+      taken: false,
       skipped: false,
+      skipReason: "",
     }));
 
   return {
     date,
-    completions,
+    sleepCompletions,
+    exerciseEntries,
+    nutritionScorecard: createEmptyNutritionScorecard(),
+    supplementEntries,
+    completions: [], // legacy
     sleepLog: createEmptySleepLog(),
     energyLevel: null,
     moodLevel: null,
     dayNote: "",
     score: 0,
+    pillarScores: { sleep: 0, exercise: 0, nutrition: 0, supplements: 0 },
   };
 }
+
+// ── Default state ─────────────────────────────────────────────────
 
 function getDefaultSettings(): UserSettings {
   return {
@@ -67,12 +113,9 @@ function getDefaultSettings(): UserSettings {
   };
 }
 
-/**
- * Build a fresh default state with sleep protocols pre-loaded.
- */
 export function getDefaultState(): AppState {
   return {
-    version: 2,
+    version: 3,
     settings: getDefaultSettings(),
     protocols: {
       sleep: defaultSleepProtocol,
@@ -80,16 +123,32 @@ export function getDefaultState(): AppState {
       nutrition: defaultNutritionProtocol,
       supplements: defaultSupplementsProtocol,
     },
+    supplementMeta: buildDefaultSupplementMeta(defaultSupplementsProtocol),
     dailyLogs: [],
     insights: [],
     currentStreak: 0,
   };
 }
 
-/**
- * Load state from localStorage. Returns default state if nothing is stored
- * or if the stored data is invalid.
- */
+function buildDefaultSupplementMeta(
+  items: ProtocolItem[]
+): SupplementMetaMap {
+  const map: SupplementMetaMap = {};
+  for (const item of items) {
+    map[item.id] = {
+      reasonForTaking: item.description,
+      dosage: "",
+      brand: "",
+      stopped: false,
+      stoppedReason: "",
+      stoppedDate: null,
+    };
+  }
+  return map;
+}
+
+// ── Load / Save ───────────────────────────────────────────────────
+
 export function loadState(): AppState {
   if (typeof window === "undefined") return getDefaultState();
 
@@ -97,31 +156,69 @@ export function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return getDefaultState();
 
-    const parsed = JSON.parse(raw) as AppState;
-    if (parsed.version !== 2) return getDefaultState();
+    const parsed = JSON.parse(raw);
 
-    return parsed;
+    // Migrate from v2 to v3
+    if (parsed.version === 2) {
+      return migrateV2toV3(parsed);
+    }
+
+    if (parsed.version !== 3) return getDefaultState();
+    return parsed as AppState;
   } catch {
     return getDefaultState();
   }
 }
 
-/**
- * Persist state to localStorage.
- */
+function migrateV2toV3(v2: Record<string, unknown>): AppState {
+  const base = getDefaultState();
+  const v2Settings = v2.settings as Record<string, unknown> | undefined;
+  const v2Protocols = v2.protocols as Record<string, ProtocolItem[]> | undefined;
+
+  if (v2Settings) {
+    base.settings = { ...base.settings, ...(v2Settings as Partial<UserSettings>) };
+  }
+
+  // Migrate protocols — add itemType field
+  if (v2Protocols) {
+    const pillars: Pillar[] = ["sleep", "exercise", "nutrition", "supplements"];
+    for (const pillar of pillars) {
+      if (v2Protocols[pillar]) {
+        base.protocols[pillar] = v2Protocols[pillar].map((item) => ({
+          ...item,
+          itemType: item.itemType || guessItemType(item),
+        }));
+      }
+    }
+  }
+
+  base.supplementMeta = buildDefaultSupplementMeta(base.protocols.supplements);
+
+  return base;
+}
+
+/** Guess whether a v2 item is a task or reminder based on its name */
+function guessItemType(item: ProtocolItem): "task" | "reminder" {
+  const reminderKeywords = [
+    "cutoff", "no ", "limit", "minimize", "avoid", "no intense",
+  ];
+  const nameLower = item.name.toLowerCase();
+  return reminderKeywords.some((kw) => nameLower.includes(kw))
+    ? "reminder"
+    : "task";
+}
+
 export function saveState(state: AppState): void {
   if (typeof window === "undefined") return;
-
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Storage full or unavailable -- fail silently
+    // Storage full or unavailable
   }
 }
 
-/**
- * Get all enabled protocol items across all pillars.
- */
+// ── Accessors ─────────────────────────────────────────────────────
+
 function getAllEnabledItems(state: AppState): ProtocolItem[] {
   const pillars: Pillar[] = ["sleep", "exercise", "nutrition", "supplements"];
   return pillars.flatMap((p) =>
@@ -129,41 +226,82 @@ function getAllEnabledItems(state: AppState): ProtocolItem[] {
   );
 }
 
-/**
- * Get today's log from state, creating a new one if it doesn't exist.
- */
 export function getTodayLog(state: AppState): DailyLog {
   const today = getDateString();
   const existing = state.dailyLogs.find((log) => log.date === today);
   if (existing) return existing;
-
-  const enabledItems = getAllEnabledItems(state);
-  return createEmptyDailyLog(today, enabledItems);
+  return createEmptyDailyLog(today, state.protocols);
 }
 
-/**
- * Get or create a log for a specific date.
- */
 function getOrCreateLog(state: AppState, date: string): DailyLog {
   const existing = state.dailyLogs.find((log) => log.date === date);
   if (existing) return existing;
-
-  const enabledItems = getAllEnabledItems(state);
-  return createEmptyDailyLog(date, enabledItems);
+  return createEmptyDailyLog(date, state.protocols);
 }
 
-/**
- * Recalculate score for a log and update streak on state.
- */
+// ── Recalculate ───────────────────────────────────────────────────
+
 function recalculate(state: AppState, log: DailyLog): DailyLog {
   const enabledItems = getAllEnabledItems(state);
   const score = calculateDailyScore(log, enabledItems, state.settings);
-  return { ...log, score };
+
+  // Calculate per-pillar scores
+  const pillarScores = {
+    sleep: calculateSleepScore(log),
+    exercise: calculateExerciseScore(log),
+    nutrition: calculateNutritionScore(log),
+    supplements: calculateSupplementScore(log),
+  };
+
+  return { ...log, score, pillarScores };
 }
 
-/**
- * Upsert a daily log into state.
- */
+function calculateSleepScore(log: DailyLog): number {
+  const items = log.sleepCompletions;
+  if (items.length === 0) return 0;
+  const done = items.filter((i) => i.completed).length;
+  return Math.round((done / items.length) * 100);
+}
+
+function calculateExerciseScore(log: DailyLog): number {
+  const items = log.exerciseEntries;
+  if (items.length === 0) return 0;
+  const done = items.filter((i) => i.completed).length;
+  return Math.round((done / items.length) * 100);
+}
+
+function calculateNutritionScore(log: DailyLog): number {
+  const sc = log.nutritionScorecard;
+  const fields = [
+    sc.hitProteinTarget,
+    sc.ateFruitsVeggies,
+    sc.stayedHydrated,
+    sc.avoidedProcessedSugar,
+    sc.finishedEatingOnTime,
+    sc.minimizedAlcohol,
+  ];
+  const customAnswers = sc.customItems.map((i) => i.answer);
+  const all = [...fields, ...customAnswers];
+  const answered = all.filter((a) => a !== null);
+  if (answered.length === 0) return 0;
+
+  let points = 0;
+  for (const a of answered) {
+    if (a === "yes") points += 1;
+    else if (a === "mostly") points += 0.6;
+  }
+  return Math.round((points / answered.length) * 100);
+}
+
+function calculateSupplementScore(log: DailyLog): number {
+  const items = log.supplementEntries;
+  if (items.length === 0) return 0;
+  const done = items.filter((i) => i.taken).length;
+  return Math.round((done / items.length) * 100);
+}
+
+// ── Upsert ────────────────────────────────────────────────────────
+
 export function saveDailyLog(state: AppState, log: DailyLog): AppState {
   const updatedLog = recalculate(state, log);
   const existingIndex = state.dailyLogs.findIndex((l) => l.date === log.date);
@@ -174,13 +312,132 @@ export function saveDailyLog(state: AppState, log: DailyLog): AppState {
       : [...state.dailyLogs, updatedLog];
 
   const currentStreak = calculateStreak(dailyLogs);
-
   return { ...state, dailyLogs, currentStreak };
 }
 
-/**
- * Toggle the completion status of a protocol item for a given date.
- */
+// ── Sleep tracking ────────────────────────────────────────────────
+
+export function toggleSleepItem(
+  state: AppState,
+  date: string,
+  itemId: string
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const idx = log.sleepCompletions.findIndex((c) => c.itemId === itemId);
+
+  let sleepCompletions: SleepItemCompletion[];
+  if (idx >= 0) {
+    sleepCompletions = log.sleepCompletions.map((c, i) =>
+      i === idx ? { ...c, completed: !c.completed } : c
+    );
+  } else {
+    sleepCompletions = [
+      ...log.sleepCompletions,
+      { itemId, completed: true },
+    ];
+  }
+
+  return saveDailyLog(state, { ...log, sleepCompletions });
+}
+
+// ── Exercise tracking ─────────────────────────────────────────────
+
+export function updateExerciseEntry(
+  state: AppState,
+  date: string,
+  itemId: string,
+  updates: Partial<ExerciseEntry>
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const idx = log.exerciseEntries.findIndex((e) => e.itemId === itemId);
+
+  let exerciseEntries: ExerciseEntry[];
+  if (idx >= 0) {
+    exerciseEntries = log.exerciseEntries.map((e, i) =>
+      i === idx ? { ...e, ...updates } : e
+    );
+  } else {
+    exerciseEntries = [
+      ...log.exerciseEntries,
+      {
+        itemId,
+        completed: false,
+        durationMinutes: null,
+        intensity: null,
+        feeling: null,
+        note: "",
+        ...updates,
+      },
+    ];
+  }
+
+  return saveDailyLog(state, { ...log, exerciseEntries });
+}
+
+// ── Nutrition tracking ────────────────────────────────────────────
+
+export function updateNutritionScorecard(
+  state: AppState,
+  date: string,
+  updates: Partial<NutritionScorecard>
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const nutritionScorecard = { ...log.nutritionScorecard, ...updates };
+  return saveDailyLog(state, { ...log, nutritionScorecard });
+}
+
+// ── Supplement tracking ───────────────────────────────────────────
+
+export function updateSupplementEntry(
+  state: AppState,
+  date: string,
+  itemId: string,
+  updates: Partial<SupplementEntry>
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const idx = log.supplementEntries.findIndex((s) => s.itemId === itemId);
+
+  let supplementEntries: SupplementEntry[];
+  if (idx >= 0) {
+    supplementEntries = log.supplementEntries.map((s, i) =>
+      i === idx ? { ...s, ...updates } : s
+    );
+  } else {
+    supplementEntries = [
+      ...log.supplementEntries,
+      { itemId, taken: false, skipped: false, skipReason: "", ...updates },
+    ];
+  }
+
+  return saveDailyLog(state, { ...log, supplementEntries });
+}
+
+// ── Supplement meta ───────────────────────────────────────────────
+
+export function updateSupplementMeta(
+  state: AppState,
+  itemId: string,
+  updates: Partial<SupplementMeta>
+): AppState {
+  const current = state.supplementMeta[itemId] || {
+    reasonForTaking: "",
+    dosage: "",
+    brand: "",
+    stopped: false,
+    stoppedReason: "",
+    stoppedDate: null,
+  };
+  return {
+    ...state,
+    supplementMeta: {
+      ...state.supplementMeta,
+      [itemId]: { ...current, ...updates },
+    },
+  };
+}
+
+// ── Legacy compatibility ──────────────────────────────────────────
+
 export function toggleCompletion(
   state: AppState,
   date: string,
@@ -192,7 +449,6 @@ export function toggleCompletion(
   );
 
   let updatedCompletions: ItemCompletion[];
-
   if (completionIndex >= 0) {
     updatedCompletions = log.completions.map((c, i) => {
       if (i !== completionIndex) return c;
@@ -218,9 +474,6 @@ export function toggleCompletion(
   return saveDailyLog(state, updatedLog);
 }
 
-/**
- * Update the note for a specific item completion on a given date.
- */
 export function updateItemNote(
   state: AppState,
   date: string,
@@ -228,15 +481,12 @@ export function updateItemNote(
   note: string
 ): AppState {
   const log = getOrCreateLog(state, date);
-  const completionIndex = log.completions.findIndex(
-    (c) => c.itemId === itemId
-  );
+  const idx = log.completions.findIndex((c) => c.itemId === itemId);
 
   let updatedCompletions: ItemCompletion[];
-
-  if (completionIndex >= 0) {
+  if (idx >= 0) {
     updatedCompletions = log.completions.map((c, i) =>
-      i === completionIndex ? { ...c, note } : c
+      i === idx ? { ...c, note } : c
     );
   } else {
     updatedCompletions = [
@@ -245,13 +495,9 @@ export function updateItemNote(
     ];
   }
 
-  const updatedLog = { ...log, completions: updatedCompletions };
-  return saveDailyLog(state, updatedLog);
+  return saveDailyLog(state, { ...log, completions: updatedCompletions });
 }
 
-/**
- * Update sleep log fields for a given date.
- */
 export function updateSleepLog(
   state: AppState,
   date: string,
@@ -265,9 +511,6 @@ export function updateSleepLog(
   return saveDailyLog(state, updatedLog);
 }
 
-/**
- * Update energy and/or mood ratings for a given date.
- */
 export function updateDailyRatings(
   state: AppState,
   date: string,

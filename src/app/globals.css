@@ -138,6 +138,15 @@ html {
   animation: slideUp 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
+/* Hide scrollbar utility */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Focus ring */
 *:focus-visible {
   outline: 2px solid var(--accent);

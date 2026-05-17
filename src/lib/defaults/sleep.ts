@@ -1,3 +1,10 @@
+/**
+ * Default Sleep Protocol Items
+ *
+ * Edit this file to add, remove, or modify default sleep protocol items.
+ * Each item needs a unique id starting with "sleep-default-XXX".
+ * Set itemType to "task" for active check-off items, "reminder" for guidelines.
+ */
 import type { ProtocolItem } from "../types";
 
 export const defaultSleepProtocol: ProtocolItem[] = [
@@ -9,6 +16,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Get 10-30 min of sunlight within 30 min of waking. Sets your circadian clock via the suprachiasmatic nucleus, the most powerful zeitgeber for your sleep-wake cycle.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 15,
     timeOfDay: "morning",
@@ -28,6 +36,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "1-3 min cold shower. Increases dopamine and cortisol at the right time of day, promoting alertness and reinforcing the morning cortisol peak.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 30,
     timeOfDay: "morning",
@@ -47,6 +56,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Wait 90-120 min after waking for caffeine. Lets adenosine clear naturally so you avoid an afternoon crash and don't mask residual sleep pressure.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 90,
     timeOfDay: "morning",
@@ -68,6 +78,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "No caffeine after this time. Caffeine has a half-life of 5-7 hours and disrupts deep sleep architecture even when you feel you can fall asleep.",
     source: "default",
+    itemType: "reminder",
     timingAnchor: "bed",
     timingOffsetMinutes: -600,
     timeOfDay: "morning",
@@ -87,6 +98,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Finish eating 3+ hours before bed. Reduces core temperature disruption from digestion, allowing the thermoregulatory drop needed for sleep onset.",
     source: "default",
+    itemType: "reminder",
     timingAnchor: "bed",
     timingOffsetMinutes: -180,
     timeOfDay: "evening",
@@ -106,6 +118,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Switch to warm, low-positioned lighting. Overhead bright light in the evening suppresses melatonin production by up to 50%.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -120,
     timeOfDay: "evening",
@@ -125,6 +138,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "No screens or use blue-light blocking glasses. Blue light (460-480nm) is the most potent suppressor of melatonin secretion.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -60,
     timeOfDay: "evening",
@@ -144,6 +158,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Set room to 65-68°F (18-20°C). Core body temperature must drop 1-1.5°C for sleep onset; a cool room facilitates this via peripheral vasodilation.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -30,
     timeOfDay: "night",
@@ -163,6 +178,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Take 200-400mg magnesium threonate or bisglycinate. These forms cross the blood-brain barrier and activate GABA pathways to promote relaxation.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -30,
     timeOfDay: "night",
@@ -182,6 +198,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Reading, stretching, breathing exercises, or journaling. Offloads cognitive load and activates the parasympathetic nervous system for sleep readiness.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -15,
     timeOfDay: "night",
@@ -201,6 +218,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     description:
       "Consistent bedtime every night, including weekends. Anchors your circadian rhythm and maximizes alignment of sleep-dependent hormonal processes.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: 0,
     timeOfDay: "night",

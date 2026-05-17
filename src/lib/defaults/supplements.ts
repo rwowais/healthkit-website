@@ -1,3 +1,10 @@
+/**
+ * Default Supplements Protocol Items
+ *
+ * Edit this file to add, remove, or modify default supplement protocol items.
+ * Each item needs a unique id starting with "supplements-default-XXX".
+ * Set itemType to "task" for active check-off items, "reminder" for guidelines.
+ */
 import type { ProtocolItem } from "../types";
 
 export const defaultSupplementsProtocol: ProtocolItem[] = [
@@ -9,6 +16,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "2,000-5,000 IU with breakfast (fat-containing meal). Essential for immune function, bone health, and mood regulation.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 90,
     timeOfDay: "morning",
@@ -28,6 +36,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "2-4g combined EPA/DHA daily with food. Reduces systemic inflammation, supports cardiovascular and brain health.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 90,
     timeOfDay: "morning",
@@ -47,6 +56,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "5g daily with any meal. The most researched sports supplement — supports strength, power output, and cognitive function.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 90,
     timeOfDay: "morning",
@@ -66,6 +76,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "100-200mcg with breakfast. Directs calcium to bones and teeth rather than arteries. Essential companion to vitamin D3.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 90,
     timeOfDay: "morning",
@@ -87,6 +98,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "Comprehensive greens powder covering micronutrient gaps. Not a replacement for whole foods but useful nutritional insurance.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 60,
     timeOfDay: "morning",
@@ -108,6 +120,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "200-400mg before bed. Crosses the blood-brain barrier to promote relaxation, improve sleep quality, and support cognitive function.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -30,
     timeOfDay: "night",
@@ -127,6 +140,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "100-200mg before bed. Amino acid from green tea that promotes alpha brain waves and relaxation without sedation.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -30,
     timeOfDay: "night",
@@ -146,6 +160,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     description:
       "50mg before bed. A flavonoid that acts as a mild sedative by binding to GABA receptors and reducing anxiety.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -30,
     timeOfDay: "night",

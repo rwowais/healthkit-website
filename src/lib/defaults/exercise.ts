@@ -1,3 +1,10 @@
+/**
+ * Default Exercise Protocol Items
+ *
+ * Edit this file to add, remove, or modify default exercise protocol items.
+ * Each item needs a unique id starting with "exercise-default-XXX".
+ * Set itemType to "task" for active check-off items, "reminder" for guidelines.
+ */
 import type { ProtocolItem } from "../types";
 
 export const defaultExerciseProtocol: ProtocolItem[] = [
@@ -9,6 +16,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "20-30 min walk at a conversational pace. Zone 2 movement first thing accelerates cortisol clearance and primes the body for the day.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 30,
     timeOfDay: "morning",
@@ -28,6 +36,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "30-60 min at a pace where you can still hold a conversation. The foundation of metabolic health and mitochondrial function.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 120,
     timeOfDay: "morning",
@@ -47,6 +56,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "45-60 min of resistance training focused on compound lifts. Preserving muscle mass is one of the most important predictors of longevity.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 120,
     timeOfDay: "morning",
@@ -66,6 +76,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "10-15 min of dynamic stretching and joint mobility work. Maintaining range of motion is essential for injury prevention and functional longevity.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 60,
     timeOfDay: "morning",
@@ -85,6 +96,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "4x4 min high-intensity intervals at 90-95% max heart rate with 3 min recovery. The single best marker of cardiovascular fitness and longevity.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 120,
     timeOfDay: "morning",
@@ -104,6 +116,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "Farmer's carries, dead hangs, or grip training. Grip strength is independently associated with longevity and functional independence.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 150,
     timeOfDay: "morning",
@@ -123,6 +136,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "Single-leg stands, stability ball work, or proprioceptive drills. Falls are a leading cause of death over age 65 — train balance now.",
     source: "default",
+    itemType: "task",
     timingAnchor: "wake",
     timingOffsetMinutes: 75,
     timeOfDay: "morning",
@@ -144,6 +158,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "15-20 min walk after dinner. Improves post-meal glucose disposal and supports parasympathetic activation before bed.",
     source: "default",
+    itemType: "task",
     timingAnchor: "bed",
     timingOffsetMinutes: -150,
     timeOfDay: "evening",
@@ -163,6 +178,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     description:
       "Avoid vigorous exercise within 2-3 hours of bed. Late intense exercise raises core temperature and cortisol, delaying sleep onset.",
     source: "default",
+    itemType: "reminder",
     timingAnchor: "bed",
     timingOffsetMinutes: -180,
     timeOfDay: "evening",

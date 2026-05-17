@@ -95,6 +95,7 @@ function AddItemForm({ section, onAdd, onCancel }: AddItemFormProps) {
       name: name.trim(),
       description: description.trim(),
       source: "custom",
+      itemType: "task",
       timingAnchor: anchor as "wake" | "bed",
       timingOffsetMinutes: offsetMinutes,
       timeOfDay: section === "training" ? "morning" : "evening",
