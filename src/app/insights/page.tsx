@@ -7,7 +7,7 @@ import { useAppState } from "@/hooks/useAppState";
 import { derivedInsights } from "@/lib/insights";
 import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
 import { biomarkerDef, biomarkerBand } from "@/lib/biomarkers";
-import { keystone, behaviorStats } from "@/lib/intel";
+import { keystone, behaviorStats, weeklyReview } from "@/lib/intel";
 import { compileTimeline } from "@/lib/engine";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -74,6 +74,7 @@ export default function InsightsPage() {
     return out;
   }, [state.dailyLogs, state.biomarkers, streak, week]);
 
+  const review = useMemo(() => weeklyReview(state), [state]);
   const ks = useMemo(() => keystone(state), [state]);
   const topStreaks = useMemo(() => {
     return compileTimeline(state, 0)
@@ -88,7 +89,10 @@ export default function InsightsPage() {
   }, [state]);
 
   const nothing =
-    insights.length === 0 && !ks && topStreaks.length === 0;
+    insights.length === 0 &&
+    !ks &&
+    !review &&
+    topStreaks.length === 0;
 
   if (loading) {
     return (
@@ -113,6 +117,62 @@ export default function InsightsPage() {
             enough signal to be honest about it.
           </p>
         </div>
+
+        {/* Weekly review — calm narrative */}
+        {review && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="panel relative overflow-hidden p-6"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(140% 100% at 50% 0%, color-mix(in srgb, var(--readiness) 22%, transparent), transparent 62%)",
+              }}
+            />
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <Eyebrow color="var(--readiness)">Your week</Eyebrow>
+                <span className="text-[12px] font-semibold text-[var(--text-3)]">
+                  {review.statLine}
+                </span>
+              </div>
+              <p className="mt-3 text-[19px] font-bold leading-snug text-[var(--text-1)]">
+                {review.headline}
+              </p>
+              <div className="mt-4 space-y-2">
+                {review.wins.map((w) => (
+                  <div key={w} className="flex items-center gap-2.5">
+                    <span
+                      className="grid h-5 w-5 shrink-0 place-items-center rounded-full"
+                      style={{ background: "var(--surface-3)" }}
+                    >
+                      <Icon
+                        name="check"
+                        size={12}
+                        className="text-[var(--vitality)]"
+                      />
+                    </span>
+                    <span className="text-[13.5px] text-[var(--text-2)]">
+                      {w}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div
+                className="mt-5 rounded-[var(--r-md)] p-4"
+                style={{ background: "var(--surface-2)" }}
+              >
+                <Eyebrow color="var(--warm)">Next week</Eyebrow>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--text-1)]">
+                  {review.focus}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Keystone — the single behavior that matters most */}
         {ks && (

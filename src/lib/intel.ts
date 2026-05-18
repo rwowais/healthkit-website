@@ -228,6 +228,120 @@ export function packName(id: string): string {
   return packById(id)?.name ?? id;
 }
 
+// ── Weekly review (calm narrative) ────────────────────────────────
+
+export interface WeeklyReview {
+  headline: string;
+  statLine: string;
+  wins: string[];
+  focus: string;
+  delta: number | null;
+}
+
+const DOW = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+export function weeklyReview(state: AppState): WeeklyReview | null {
+  const logs = state.dailyLogs ?? [];
+  const dayList = (offset: number) => {
+    const out: DailyLog[] = [];
+    for (let i = offset; i < offset + 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const l = logs.find((x) => x.date === dateKey(d));
+      if (l) out.push(l);
+    }
+    return out;
+  };
+
+  const thisWeek = dayList(0);
+  const tracked = thisWeek.filter((l) => l.score > 0);
+  if (tracked.length < 4) return null;
+
+  const avg = (xs: number[]) =>
+    xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+  const avgThis = Math.round(avg(tracked.map((l) => l.score)));
+  const prev = dayList(7).filter((l) => l.score > 0);
+  const avgPrev = prev.length
+    ? Math.round(avg(prev.map((l) => l.score)))
+    : null;
+  const delta = avgPrev != null ? avgThis - avgPrev : null;
+
+  // best day
+  const best = [...tracked].sort((a, b) => b.score - a.score)[0];
+  const bestName = best
+    ? DOW[new Date(best.date + "T00:00:00").getDay()]
+    : null;
+
+  // most-kept behavior this week
+  const items = compileTimeline(state, 0);
+  let topTitle: string | null = null;
+  let topCount = 0;
+  for (const it of items) {
+    const c = tracked.filter(
+      (l) => l.behaviorCompletions?.[it.canonicalKey]
+    ).length;
+    if (c > topCount) {
+      topCount = c;
+      topTitle = it.title;
+    }
+  }
+
+  const wins: string[] = [];
+  wins.push(`${tracked.length} of 7 days active`);
+  if (bestName && best)
+    wins.push(`Best day was ${bestName} at ${best.score}`);
+  if (topTitle && topCount >= 3)
+    wins.push(`Kept “${topTitle}” ${topCount} days`);
+
+  // focus: weakest behavior among essentials
+  const essentials = items.filter((i) => i.leverage === 3);
+  let focusTitle: string | null = null;
+  let focusCount = 99;
+  for (const it of essentials) {
+    const c = tracked.filter(
+      (l) => l.behaviorCompletions?.[it.canonicalKey]
+    ).length;
+    if (c < focusCount) {
+      focusCount = c;
+      focusTitle = it.title;
+    }
+  }
+  const focus =
+    focusTitle && focusCount < tracked.length
+      ? `Next week, tighten one thing: “${focusTitle}”. It's your highest-leverage gap.`
+      : `Next week, hold the line. Consistency at this level compounds quietly.`;
+
+  let headline: string;
+  if (delta != null && delta >= 5)
+    headline = `A stronger week — up ${delta} points. Momentum is real.`;
+  else if (delta != null && delta <= -5)
+    headline = `A lighter week, down ${Math.abs(
+      delta
+    )}. Not a setback — a signal to simplify.`;
+  else if (avgThis >= 75)
+    headline = `A strong, steady week. This is what good looks like.`;
+  else headline = `A solid week of showing up. That's the whole game.`;
+
+  return {
+    headline,
+    statLine: `${avgThis} avg${
+      avgPrev != null ? ` · last week ${avgPrev}` : ""
+    }`,
+    wins,
+    focus,
+    delta,
+  };
+}
+
+
 /** Due-aware ordering helper for the live timeline. */
 export function dueRank(
   it: TimelineItem,

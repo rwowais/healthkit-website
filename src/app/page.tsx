@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { loadState } from "@/lib/storage";
-import { Button, Eyebrow } from "@/components/ui";
+import { Eyebrow } from "@/components/ui";
+import { Icon, type IconName } from "@/components/ui/icons";
+
+const PILLARS: { icon: IconName; label: string; accent: string }[] = [
+  { icon: "moon", label: "Sleep", accent: "var(--sleep)" },
+  { icon: "lungs", label: "Recovery", accent: "var(--recovery)" },
+  { icon: "pulse", label: "Training", accent: "var(--readiness)" },
+  { icon: "pill", label: "Supplements", accent: "var(--warm)" },
+];
 
 export default function LandingPage() {
   const router = useRouter();
@@ -11,11 +20,8 @@ export default function LandingPage() {
 
   useEffect(() => {
     const state = loadState();
-    if (state.settings.completedOnboarding) {
-      router.replace("/today");
-    } else {
-      setChecking(false);
-    }
+    if (state.settings.completedOnboarding) router.replace("/today");
+    else setChecking(false);
   }, [router]);
 
   if (checking) return null;
@@ -46,63 +52,85 @@ export default function LandingPage() {
       </header>
 
       <section className="mx-auto max-w-3xl px-6 pb-20 pt-16 text-center sm:pt-28">
-        <div
-          className="anim-rise mx-auto mb-10 grid h-44 w-44 place-items-center rounded-full"
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="relative mx-auto mb-10 grid h-44 w-44 place-items-center rounded-full"
           style={{
             background:
-              "radial-gradient(circle at 50% 40%, var(--readiness-soft), transparent 70%)",
+              "radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--readiness) 22%, transparent), transparent 70%)",
             border: "1px solid var(--hairline)",
-            boxShadow: "0 0 80px rgba(111,168,245,0.12)",
           }}
         >
           <div
-            className="h-24 w-24 rounded-full border-2"
+            className="anim-pulse h-24 w-24 rounded-full border-2"
             style={{
               borderColor: "var(--readiness)",
               borderTopColor: "transparent",
               transform: "rotate(45deg)",
             }}
           />
-        </div>
-        <Eyebrow>Longevity Intelligence</Eyebrow>
-        <h1 className="anim-rise d1 mx-auto mt-5 max-w-2xl text-[40px] font-bold leading-[1.08] tracking-tight text-[var(--text-1)] sm:text-[56px]">
-          High-end health intelligence for serious self-optimization.
-        </h1>
-        <p className="anim-rise d2 mx-auto mt-6 max-w-xl text-[17px] leading-relaxed text-[var(--text-2)]">
-          Track sleep, monitor recovery, and follow longevity protocols
-          synthesized from Attia, Huberman, and Walker — in a calm, focused
-          space built for the long game.
-        </p>
-        <div className="anim-rise d3 mt-10 flex justify-center">
-          <Button onClick={() => router.push("/onboarding")}>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.6 }}
+        >
+          <Eyebrow>Adaptive Protocol OS</Eyebrow>
+          <h1 className="mx-auto mt-5 max-w-2xl text-[40px] font-bold leading-[1.08] tracking-tight text-[var(--text-1)] sm:text-[54px]">
+            A calm, intelligent operating system for human optimization.
+          </h1>
+          <p className="mx-auto mt-6 max-w-xl text-[17px] leading-relaxed text-[var(--text-2)]">
+            Install longevity protocols, follow an adaptive daily timeline, and
+            let the system quietly reshape your day around recovery, sleep, and
+            consistency.
+          </p>
+          <button
+            onClick={() => router.push("/onboarding")}
+            className="press tr-fast mt-10 rounded-[var(--r-pill)] bg-[var(--text-1)] px-7 py-3.5 text-[15px] font-semibold text-[#08090B]"
+          >
             Begin your protocol
-          </Button>
-        </div>
+          </button>
+        </motion.div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-6 pb-24">
+      <section className="mx-auto max-w-3xl px-6 pb-28">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[
-            { icon: "🌙", label: "Sleep", c: "var(--sleep)" },
-            { icon: "❤️", label: "Recovery", c: "var(--recovery)" },
-            { icon: "🏋️", label: "Training", c: "var(--readiness)" },
-            { icon: "💊", label: "Supplements", c: "var(--warm)" },
-          ].map((p, i) => (
-            <div
+          {PILLARS.map((p, i) => (
+            <motion.div
               key={p.label}
-              className={`card anim-rise d${i + 1} p-6 text-center`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 + i * 0.06, duration: 0.5 }}
+              className="panel relative overflow-hidden p-6 text-center"
             >
-              <div className="text-[28px]">{p.icon}</div>
+              <span
+                className="ambient"
+                style={{
+                  background: `radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, ${p.accent} 20%, transparent), transparent 60%)`,
+                }}
+              />
+              <span
+                className="chip relative mx-auto h-12 w-12"
+                style={{
+                  background: `color-mix(in srgb, ${p.accent} 18%, var(--surface-3))`,
+                  color: p.accent,
+                }}
+              >
+                <Icon name={p.icon} size={22} />
+              </span>
               <p
-                className="mt-3 text-[13px] font-semibold"
-                style={{ color: p.c }}
+                className="relative mt-3.5 text-[13px] font-semibold"
+                style={{ color: p.accent }}
               >
                 {p.label}
               </p>
-            </div>
+            </motion.div>
           ))}
         </div>
-        <p className="mt-16 text-center text-[12px] text-[var(--text-4)]">
+        <p className="mt-16 text-center text-[12px] leading-relaxed text-[var(--text-4)]">
           Protocolize is an educational tool, not medical advice. Consult a
           clinician before changing your health routine.
         </p>
