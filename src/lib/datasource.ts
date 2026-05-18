@@ -25,8 +25,16 @@ class LocalDataSource implements DataSource {
   }
   async save(state: AppState): Promise<void> {
     saveState(state);
+    // Notify other live hook instances (e.g. Today while Protocols saves)
+    // so the app reacts immediately to protocol changes.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("pz:state"));
+    }
   }
 }
+
+/** Event name other instances listen to for live state propagation. */
+export const STATE_EVENT = "pz:state";
 
 /**
  * Placeholder for the future cloud implementation. Intentionally inert

@@ -58,11 +58,12 @@ export function compileTimeline(
   dayIndex: number
 ): TimelineItem[] {
   const installed = new Set(state.installedPacks ?? []);
+  const paused = new Set(state.pausedPacks ?? []);
   const overrides = state.behaviorOverrides ?? {};
   const merged = new Map<string, TimelineItem>();
 
   for (const pack of allPacks(state)) {
-    if (!installed.has(pack.id)) continue;
+    if (!installed.has(pack.id) || paused.has(pack.id)) continue;
     for (const b of pack.behaviors) {
       const ov: BehaviorOverride | undefined = overrides[b.canonicalKey];
       if (ov?.disabled) continue;

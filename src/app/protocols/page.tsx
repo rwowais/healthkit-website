@@ -9,6 +9,8 @@ import { packById } from "@/lib/packs";
 import {
   compileTimeline,
   blockLabel,
+  adapt,
+  shapeTimeline,
   type TimelineItem,
 } from "@/lib/engine";
 import BehaviorSheet from "@/components/BehaviorSheet";
@@ -33,9 +35,11 @@ export default function ProtocolsPage() {
     upsertCustomPack,
     deleteCustomPack,
     duplicatePack,
+    setPackPaused,
   } = useAppState();
   const toast = useToast();
   const [detail, setDetail] = useState<TimelineItem | null>(null);
+  const [packSheet, setPackSheet] = useState<ProtocolPack | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<{
     name: string;
@@ -60,6 +64,27 @@ export default function ProtocolsPage() {
     () => (state ? compileTimeline(state, 0) : []),
     [state]
   );
+  const adaptation = useMemo(() => adapt(state), [state]);
+  const easedSet = useMemo(
+    () =>
+      new Set(
+        shapeTimeline(timeline, adaptation.mode)
+          .filter((i) => i.muted)
+          .map((i) => i.canonicalKey)
+      ),
+    [timeline, adaptation.mode]
+  );
+  const sysStats = useMemo(() => {
+    const protocols = new Set(timeline.flatMap((i) => i.fromPacks)).size;
+    return {
+      behaviors: timeline.length,
+      protocols,
+      merged: timeline.filter((i) => i.fromPacks.length > 1).length,
+      retimed: timeline.filter((i) => i.retimed).length,
+      eased: easedSet.size,
+    };
+  }, [timeline, easedSet]);
+  const paused = new Set(state?.pausedPacks ?? []);
 
   if (loading) {
     return (
@@ -149,74 +174,79 @@ export default function ProtocolsPage() {
         <section>
           <p className="t-eyebrow mb-3 px-1">Installed</p>
           <div className="flex flex-col gap-3">
-            {installed.map((pack) => (
-              <motion.div
-                key={pack.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="panel relative overflow-hidden p-5"
-              >
-                <span
-                  className="ambient"
-                  style={{
-                    background: `radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, ${pack.accent} 20%, transparent), transparent 60%)`,
-                  }}
-                />
-                <div className="relative flex items-start gap-3.5">
+            {installed.map((pack, i) => {
+              const isPaused = paused.has(pack.id);
+              const contributes = pack.behaviors.filter((b) =>
+                timeline.some((t) => t.canonicalKey === b.canonicalKey)
+              ).length;
+              return (
+                <motion.button
+                  key={pack.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04, duration: 0.4 }}
+                  onClick={() => setPackSheet(pack)}
+                  className="press panel relative overflow-hidden p-5 text-left"
+                  style={{ opacity: isPaused ? 0.6 : 1 }}
+                >
                   <span
-                    className="chip h-12 w-12 shrink-0"
+                    className="ambient"
                     style={{
-                      background: `color-mix(in srgb, ${pack.accent} 18%, var(--surface-3))`,
-                      color: pack.accent,
+                      background: `radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, ${pack.accent} ${
+                        isPaused ? 6 : 18
+                      }%, transparent), transparent 62%)`,
                     }}
-                  >
-                    <Icon name={pack.icon as IconName} size={22} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[16px] font-bold text-[var(--text-1)]">
-                      {pack.name}
-                    </p>
-                    <p className="mt-0.5 text-[13px] text-[var(--text-2)]">
-                      {pack.tagline}
-                    </p>
-                    <p className="t-caption mt-2">
-                      {pack.behaviors.length} behaviors ·{" "}
-                      {pack.durationLabel ?? "Ongoing"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2">
-                    {pack.source !== "custom" && (
-                      <button
-                        onClick={() => {
-                          duplicatePack(pack);
-                          toast.show(`Forked "${pack.name}" — now editable`);
-                        }}
-                        className="press rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
-                        style={{
-                          background:
-                            "color-mix(in srgb, var(--readiness) 16%, var(--surface-3))",
-                          color: "var(--readiness)",
-                        }}
-                      >
-                        Customize
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        if (pack.source === "custom")
-                          deleteCustomPack(pack.id);
-                        else uninstallPack(pack.id);
-                        toast.show(`${pack.name} removed`);
+                  />
+                  <div className="relative flex items-center gap-3.5">
+                    <span
+                      className="chip h-12 w-12 shrink-0"
+                      style={{
+                        background: `color-mix(in srgb, ${pack.accent} 18%, var(--surface-3))`,
+                        color: pack.accent,
                       }}
-                      className="press rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-3)]"
-                      style={{ background: "var(--surface-3)" }}
                     >
-                      {pack.source === "custom" ? "Delete" : "Remove"}
-                    </button>
+                      <Icon name={pack.icon as IconName} size={22} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[16px] font-bold text-[var(--text-1)]">
+                        {pack.name}
+                      </p>
+                      <p className="mt-0.5 line-clamp-1 text-[13px] text-[var(--text-2)]">
+                        {pack.tagline}
+                      </p>
+                      <p className="mt-2 flex items-center gap-1.5 text-[11.5px] font-medium">
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{
+                            background: isPaused
+                              ? "var(--text-4)"
+                              : pack.accent,
+                          }}
+                        />
+                        <span
+                          style={{
+                            color: isPaused
+                              ? "var(--text-4)"
+                              : "var(--text-3)",
+                          }}
+                        >
+                          {isPaused
+                            ? "Paused"
+                            : `Active · contributing ${contributes} ${
+                                contributes === 1 ? "behavior" : "behaviors"
+                              }`}
+                        </span>
+                      </p>
+                    </div>
+                    <Icon
+                      name="chevron"
+                      size={16}
+                      className="shrink-0 text-[var(--text-4)]"
+                    />
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.button>
+              );
+            })}
             <Link
               href="/library"
               className="press tr-fast flex items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--hairline-strong)] py-4 text-[14px] font-semibold text-[var(--text-2)]"
@@ -226,16 +256,61 @@ export default function ProtocolsPage() {
           </div>
         </section>
 
-        {/* Merged behavior system */}
+        {/* Orchestrated system — the intelligence layer */}
         <section>
-          <div className="mb-3 flex items-center justify-between px-1">
-            <p className="t-eyebrow">Merged Behaviors</p>
-            <span className="t-caption">{timeline.length} total</span>
-          </div>
-          <p className="t-caption mb-4 px-1 leading-relaxed">
-            Overlapping behaviors across your installed protocols are
-            intelligently combined — no duplicates.
-          </p>
+          <p className="t-eyebrow mb-3 px-1">Your orchestrated system</p>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="panel relative mb-5 overflow-hidden p-5"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--readiness) 16%, transparent), transparent 60%)",
+              }}
+            />
+            <p className="relative text-[14px] leading-relaxed text-[var(--text-1)]">
+              {sysStats.protocols}{" "}
+              {sysStats.protocols === 1 ? "protocol" : "protocols"} resolved
+              into{" "}
+              <span className="font-semibold">
+                {sysStats.behaviors} clear behaviors
+              </span>
+              {sysStats.merged > 0 && (
+                <>
+                  {" "}
+                  — {sysStats.merged} overlapping{" "}
+                  {sysStats.merged === 1 ? "behavior" : "behaviors"} merged so
+                  you only do {sysStats.merged === 1 ? "it" : "them"} once
+                </>
+              )}
+              .
+            </p>
+            {(sysStats.retimed > 0 || sysStats.eased > 0) && (
+              <p className="relative mt-2 text-[12.5px] leading-relaxed text-[var(--text-3)]">
+                {sysStats.retimed > 0 &&
+                  `${sysStats.retimed} retimed to fit you`}
+                {sysStats.retimed > 0 && sysStats.eased > 0 && " · "}
+                {sysStats.eased > 0 &&
+                  `${sysStats.eased} eased today (${adaptation.headline.toLowerCase()})`}
+                .
+              </p>
+            )}
+            {sysStats.behaviors >= 16 && (
+              <p className="relative mt-3 flex items-start gap-2 rounded-[var(--r-md)] bg-[var(--surface-2)] p-3 text-[12.5px] leading-relaxed text-[var(--text-2)]">
+                <Icon
+                  name="info"
+                  size={13}
+                  className="mt-0.5 shrink-0 text-[var(--warm)]"
+                />
+                Your system is dense. Consistency beats volume — consider
+                pausing a protocol or letting low-energy days simplify
+                automatically. Nothing here is mandatory.
+              </p>
+            )}
+          </motion.div>
           <div className="flex flex-col gap-6">
             {BLOCKS.map((block) => {
               const items = timeline.filter((i) => i.block === block);
@@ -271,21 +346,26 @@ export default function ProtocolsPage() {
                           >
                             <p className="line-clamp-2 text-[14px] font-semibold leading-snug text-[var(--text-1)]">
                               {it.title}
-                              {it.retimed && (
-                                <span className="ml-2 text-[10px] font-bold tracking-wide text-[var(--readiness)]">
-                                  RETIMED
+                            </p>
+                            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-[var(--text-3)]">
+                              {easedSet.has(it.canonicalKey) && (
+                                <span style={{ color: "var(--warm)" }}>
+                                  Eased today
                                 </span>
                               )}
-                            </p>
-                            <p className="mt-0.5 truncate text-[12px] text-[var(--text-3)]">
                               {it.fromPacks.length > 1 ? (
-                                <span className="text-[var(--readiness)]">
-                                  Merged · {it.fromPacks.join(" + ")}
+                                <span style={{ color: "var(--readiness)" }}>
+                                  Merged from {it.fromPacks.length} protocols
                                 </span>
                               ) : (
-                                it.fromPacks[0]
+                                <span>{it.fromPacks[0]}</span>
                               )}
-                            </p>
+                              {it.retimed && (
+                                <span style={{ color: "var(--readiness)" }}>
+                                  · Retimed to fit you
+                                </span>
+                              )}
+                            </span>
                           </button>
                           <button
                             onClick={() =>
@@ -420,6 +500,142 @@ export default function ProtocolsPage() {
             Create & install
           </Button>
         </div>
+      </Sheet>
+
+      {/* Pack sheet — calm system view, soft embedded actions */}
+      <Sheet
+        open={!!packSheet}
+        onClose={() => setPackSheet(null)}
+        title={packSheet?.name}
+      >
+        {packSheet &&
+          (() => {
+            const p = packSheet;
+            const isPaused = paused.has(p.id);
+            return (
+              <div className="space-y-6">
+                <div className="flex items-start gap-3.5">
+                  <span
+                    className="chip h-12 w-12 shrink-0"
+                    style={{
+                      background: `color-mix(in srgb, ${p.accent} 18%, var(--surface-3))`,
+                      color: p.accent,
+                    }}
+                  >
+                    <Icon name={p.icon as IconName} size={22} />
+                  </span>
+                  <p className="t-body leading-relaxed text-[var(--text-1)]">
+                    {p.tagline}
+                  </p>
+                </div>
+
+                <div>
+                  <Eyebrow>What it contributes</Eyebrow>
+                  <div className="mt-3 space-y-1.5">
+                    {p.behaviors.map((b) => {
+                      const t = timeline.find(
+                        (x) => x.canonicalKey === b.canonicalKey
+                      );
+                      const merged = (t?.fromPacks.length ?? 0) > 1;
+                      return (
+                        <button
+                          key={b.canonicalKey}
+                          onClick={() => {
+                            if (t) {
+                              setPackSheet(null);
+                              setDetail(t);
+                            }
+                          }}
+                          className="row flex w-full items-center gap-3 px-3.5 py-2.5 text-left"
+                          style={{ opacity: t ? 1 : 0.5 }}
+                        >
+                          <span
+                            className="chip h-8 w-8 shrink-0"
+                            style={{
+                              background: "var(--surface-3)",
+                              color: "var(--text-2)",
+                            }}
+                          >
+                            <Icon
+                              name={b.icon as IconName}
+                              size={15}
+                              stroke={1.7}
+                            />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13.5px] font-semibold text-[var(--text-1)]">
+                              {b.title}
+                            </span>
+                            {merged && (
+                              <span className="text-[11px] text-[var(--readiness)]">
+                                Merged across {t!.fromPacks.length} protocols
+                              </span>
+                            )}
+                          </span>
+                          {t && (
+                            <Icon
+                              name="chevron"
+                              size={13}
+                              className="shrink-0 text-[var(--text-4)]"
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => {
+                      setPackPaused(p.id, !isPaused);
+                      toast.show(
+                        isPaused
+                          ? `${p.name} resumed`
+                          : `${p.name} paused — nothing lost, resume anytime`
+                      );
+                      setPackSheet(null);
+                    }}
+                    className="press tr-fast w-full rounded-[var(--r-pill)] py-3.5 text-[14px] font-semibold"
+                    style={{
+                      background: "var(--surface-3)",
+                      color: "var(--text-1)",
+                    }}
+                  >
+                    {isPaused ? "Resume protocol" : "Pause protocol"}
+                  </button>
+                  {p.source !== "custom" && (
+                    <button
+                      onClick={() => {
+                        duplicatePack(p);
+                        toast.show(`Made “${p.name}” editable`);
+                        setPackSheet(null);
+                      }}
+                      className="press tr-fast w-full rounded-[var(--r-pill)] py-3.5 text-[14px] font-semibold"
+                      style={{
+                        background:
+                          "color-mix(in srgb, var(--readiness) 14%, var(--surface-3))",
+                        color: "var(--readiness)",
+                      }}
+                    >
+                      Make it editable
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (p.source === "custom") deleteCustomPack(p.id);
+                      else uninstallPack(p.id);
+                      toast.show(`${p.name} removed from your system`);
+                      setPackSheet(null);
+                    }}
+                    className="press tr-fast w-full py-2 text-center text-[13px] font-medium text-[var(--text-3)]"
+                  >
+                    Remove from system
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
       </Sheet>
 
       <BehaviorSheet

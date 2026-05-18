@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AppState,
   ExerciseEntry,
@@ -30,8 +30,9 @@ import {
   upsertCustomPack as upsertCustomPackFn,
   deleteCustomPack as deleteCustomPackFn,
   duplicatePack as duplicatePackFn,
+  setPackPaused as setPackPausedFn,
 } from "@/lib/storage";
-import { activeDataSource } from "@/lib/datasource";
+import { activeDataSource, STATE_EVENT } from "@/lib/datasource";
 import type {
   BiomarkerEntry,
   BehaviorOverride,
@@ -41,11 +42,13 @@ import type {
 export function useAppState() {
   const [state, setState] = useState<AppState>(getDefaultState);
   const [loading, setLoading] = useState(true);
+  const lastJson = useRef<string>("");
 
   useEffect(() => {
     let alive = true;
     activeDataSource.load().then((loaded) => {
       if (!alive) return;
+      lastJson.current = JSON.stringify(loaded);
       setState(loaded);
       setLoading(false);
     });
@@ -54,11 +57,37 @@ export function useAppState() {
     };
   }, []);
 
+  // Persist — skip no-op writes (also breaks the reload→save loop).
   useEffect(() => {
-    if (!loading) {
-      void activeDataSource.save(state);
-    }
+    if (loading) return;
+    const json = JSON.stringify(state);
+    if (json === lastJson.current) return;
+    lastJson.current = json;
+    void activeDataSource.save(state);
   }, [state, loading]);
+
+  // React to changes made by another live instance / tab / on refocus,
+  // so removing or customizing a protocol updates Today immediately.
+  useEffect(() => {
+    if (loading) return;
+    const sync = () => {
+      activeDataSource.load().then((loaded) => {
+        const j = JSON.stringify(loaded);
+        if (j !== lastJson.current) {
+          lastJson.current = j;
+          setState(loaded);
+        }
+      });
+    };
+    window.addEventListener(STATE_EVENT, sync);
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      window.removeEventListener(STATE_EVENT, sync);
+      window.removeEventListener("focus", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, [loading]);
 
   // ── Sleep tracking ──────────────────────────────────────────
 
@@ -182,6 +211,9 @@ export function useAppState() {
   const duplicatePack = useCallback((source: ProtocolPack) => {
     setState((prev) => duplicatePackFn(prev, source));
   }, []);
+  const setPackPaused = useCallback((id: string, paused: boolean) => {
+    setState((prev) => setPackPausedFn(prev, id, paused));
+  }, []);
 
   return {
     state,
@@ -209,6 +241,7 @@ export function useAppState() {
     upsertCustomPack,
     deleteCustomPack,
     duplicatePack,
+    setPackPaused,
     // Config
     updateSettings,
     updateProtocols,

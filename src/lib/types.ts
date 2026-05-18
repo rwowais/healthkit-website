@@ -241,6 +241,8 @@ export interface AppState {
 
   // Protocol OS
   installedPacks: string[];
+  /** Installed but temporarily paused (reversible, non-destructive). */
+  pausedPacks: string[];
   customPacks: ProtocolPack[];
   behaviorOverrides: Record<string, BehaviorOverride>;
 }

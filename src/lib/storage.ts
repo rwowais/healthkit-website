@@ -134,6 +134,7 @@ export function getDefaultState(): AppState {
     insights: [],
     currentStreak: 0,
     installedPacks: [...DEFAULT_INSTALLED],
+    pausedPacks: [],
     customPacks: [],
     behaviorOverrides: {},
   };
@@ -155,6 +156,7 @@ function normalize(s: AppState): AppState {
       Array.isArray(s.installedPacks) && s.installedPacks.length
         ? s.installedPacks
         : [...DEFAULT_INSTALLED],
+    pausedPacks: Array.isArray(s.pausedPacks) ? s.pausedPacks : [],
     customPacks: Array.isArray(s.customPacks) ? s.customPacks : [],
     behaviorOverrides:
       s.behaviorOverrides && typeof s.behaviorOverrides === "object"
@@ -384,6 +386,21 @@ export function deleteCustomPack(state: AppState, id: string): AppState {
     customPacks: state.customPacks.filter((p) => p.id !== id),
     installedPacks: state.installedPacks.filter((p) => p !== id),
   };
+}
+
+/** Reversibly pause / resume an installed pack (non-destructive). */
+export function setPackPaused(
+  state: AppState,
+  id: string,
+  paused: boolean
+): AppState {
+  const cur = state.pausedPacks ?? [];
+  const pausedPacks = paused
+    ? cur.includes(id)
+      ? cur
+      : [...cur, id]
+    : cur.filter((p) => p !== id);
+  return { ...state, pausedPacks };
 }
 
 /** Fork a pack into an editable custom copy (installed; original removed). */

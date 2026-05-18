@@ -152,7 +152,7 @@ export const PACKS: ProtocolPack[] = [
   {
     id: "longevity-foundation",
     name: "Longevity Foundation",
-    tagline: "The non-negotiable daily base for healthspan.",
+    tagline: "Build a durable base for long-term health and energy.",
     goal: "longevity",
     accent: "var(--readiness)",
     icon: "pulse",
@@ -217,7 +217,7 @@ export const PACKS: ProtocolPack[] = [
   {
     id: "better-sleep",
     name: "Better Sleep",
-    tagline: "Engineer deep, consistent, restorative nights.",
+    tagline: "Protect deep recovery and circadian stability.",
     goal: "sleep",
     accent: "var(--sleep)",
     icon: "moon",
@@ -276,7 +276,7 @@ export const PACKS: ProtocolPack[] = [
   {
     id: "daily-essentials",
     name: "Daily Essentials",
-    tagline: "An evidence-based core supplement stack.",
+    tagline: "Close common nutrient gaps with an evidence-based core.",
     goal: "supplements",
     accent: "var(--warm)",
     icon: "pill",
@@ -322,7 +322,7 @@ export const PACKS: ProtocolPack[] = [
   {
     id: "deep-focus",
     name: "Deep Focus",
-    tagline: "Protect attention and engineer flow.",
+    tagline: "Protect attention and sustain clear, focused work.",
     goal: "focus",
     accent: "var(--readiness)",
     icon: "sparkle",
@@ -380,7 +380,7 @@ export const PACKS: ProtocolPack[] = [
   {
     id: "burnout-recovery",
     name: "Burnout Recovery",
-    tagline: "Down-regulate. Rebuild capacity gently.",
+    tagline: "Rebuild sustainable recovery capacity, gently.",
     goal: "recovery",
     accent: "var(--recovery)",
     icon: "lungs",
@@ -438,7 +438,7 @@ export const PACKS: ProtocolPack[] = [
   {
     id: "blood-sugar",
     name: "Blood Sugar Optimization",
-    tagline: "Flatten the curve. Steady energy, lower risk.",
+    tagline: "Support steady energy and lower metabolic risk.",
     goal: "metabolic",
     accent: "var(--vitality)",
     icon: "leaf",
