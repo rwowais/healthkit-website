@@ -39,7 +39,14 @@ export type IconName =
   | "plus"
   | "info"
   | "lungs"
-  | "bed";
+  | "bed"
+  | "home"
+  | "layers"
+  | "compass"
+  | "user"
+  | "bulb"
+  | "flame"
+  | "arrowRight";
 
 const P: Record<IconName, React.ReactNode> = {
   sun: (
@@ -189,6 +196,37 @@ const P: Record<IconName, React.ReactNode> = {
   lungs: (
     <path d="M12 3v9M9 12c0-2-3-2-4 1s-1 7 1 7 3-1 3-4v-4zM15 12c0-2 3-2 4 1s1 7-1 7-3-1-3-4v-4z" />
   ),
+  home: (
+    <path d="M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5" />
+  ),
+  layers: (
+    <>
+      <path d="M12 3l9 5-9 5-9-5 9-5z" />
+      <path d="M3 13l9 5 9-5M3 17l9 5 9-5" />
+    </>
+  ),
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" />
+    </>
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="9" r="3.4" />
+      <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+    </>
+  ),
+  bulb: (
+    <>
+      <path d="M9 17h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2h5c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z" />
+    </>
+  ),
+  flame: (
+    <path d="M12 3c1 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.6.8-2.8 1.6-3.6C9.4 9 9 7 12 3z" />
+  ),
+  arrowRight: <path d="M5 12h14M13 6l6 6-6 6" />,
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
   chevron: <path d="M9 6l6 6-6 6" />,
   plus: <path d="M12 5v14M5 12h14" />,

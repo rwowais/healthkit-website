@@ -145,6 +145,9 @@ export interface DailyLog {
   // Scoring
   score: number; // 0-100
   pillarScores: Record<Pillar, number>; // per-pillar 0-100
+
+  // Protocol-OS behavior tracking (canonicalKey -> done)
+  behaviorCompletions?: Record<string, boolean>;
 }
 
 // ── Insights ──────────────────────────────────────────────────────
@@ -162,6 +165,46 @@ export interface Insight {
 // ── Supplement metadata store ─────────────────────────────────────
 
 export type SupplementMetaMap = Record<string, SupplementMeta>;
+
+// ── Protocol OS: packs & behaviors ────────────────────────────────
+
+export type TimeBlock = "morning" | "afternoon" | "evening" | "anytime";
+export type BehaviorKind = "action" | "avoid" | "reminder";
+
+/** An atomic behavior. canonicalKey is the dedupe/merge identity. */
+export interface BehaviorDef {
+  canonicalKey: string;
+  title: string;
+  block: TimeBlock;
+  anchor: TimingAnchor;
+  offsetMin: number;
+  dose?: string;
+  rationale: string;
+  evidence?: string;
+  recommendedBy?: string[];
+  icon: string; // IconName from icon system
+  leverage: 1 | 2 | 3; // 3 = highest leverage
+  kind: BehaviorKind;
+  daysActive?: boolean[]; // optional per-behavior schedule
+}
+
+export interface ProtocolPack {
+  id: string;
+  name: string;
+  tagline: string;
+  goal: string;
+  accent: string; // css var token
+  icon: string;
+  behaviors: BehaviorDef[];
+  source: "official" | "custom";
+  durationLabel?: string; // e.g. "Ongoing", "4 weeks"
+}
+
+/** Per-behavior user override, keyed by canonicalKey. */
+export interface BehaviorOverride {
+  disabled?: boolean;
+  daysActive?: boolean[];
+}
 
 // ── Biomarkers ────────────────────────────────────────────────────
 
@@ -185,4 +228,9 @@ export interface AppState {
   biomarkers: BiomarkerEntry[];
   insights: Insight[];
   currentStreak: number;
+
+  // Protocol OS
+  installedPacks: string[];
+  customPacks: ProtocolPack[];
+  behaviorOverrides: Record<string, BehaviorOverride>;
 }

@@ -2,44 +2,32 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
-import { useToday } from "@/hooks/useToday";
-import { getTodayLog } from "@/lib/storage";
-import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
-import { PILLAR_META } from "@/lib/constants";
+import { getLogForDate } from "@/lib/storage";
 import {
-  readinessScore,
-  recoveryScore,
-  adherenceScore,
-  pillarScore,
-  hasAnyTracking,
-  readinessBreakdown,
-  band,
-  bandColor,
-  PILLAR_LIST,
-} from "@/lib/metrics";
-import { topInsight } from "@/lib/insights";
-import { RingScore, MiniRing } from "@/components/ui/Ring";
-import { BarWeek } from "@/components/ui/Charts";
-import { Card, Eyebrow, Skeleton, NoData, Sheet } from "@/components/ui";
+  compileTimeline,
+  adapt,
+  shapeTimeline,
+  isDone,
+  timelineProgress,
+  blockLabel,
+  type TimelineItem,
+} from "@/lib/engine";
+import { Skeleton, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
-import type { DailyLog, Pillar } from "@/lib/types";
+import type { TimeBlock } from "@/lib/types";
 
-const C: Record<Pillar, string> = {
-  sleep: "var(--sleep)",
-  exercise: "var(--readiness)",
-  nutrition: "var(--vitality)",
-  supplements: "var(--warm)",
+const MODE_ACCENT: Record<string, string> = {
+  normal: "var(--readiness)",
+  essentials: "var(--warm)",
+  recovery: "var(--recovery)",
+  primed: "var(--vitality)",
 };
-const RAIL: Record<Pillar, IconName> = {
-  sleep: "moon",
-  exercise: "pulse",
-  nutrition: "leaf",
-  supplements: "pill",
-};
+const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
 
-function fmtKey(d: Date) {
+function dateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
     2,
     "0"
@@ -51,340 +39,407 @@ function greeting() {
   if (h < 18) return "Good afternoon";
   return "Good evening";
 }
-function last7(logs: DailyLog[]) {
-  const out: { label: string; value: number; highlight?: boolean }[] = [];
-  const L = ["M", "T", "W", "T", "F", "S", "S"];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const log = logs.find((l) => l.date === fmtKey(d));
-    const ji = d.getDay();
-    out.push({
-      label: L[ji === 0 ? 6 : ji - 1],
-      value: log?.score ?? 0,
-      highlight: i === 0,
-    });
-  }
-  return out;
+function isoDayIdx() {
+  const j = new Date().getDay();
+  return j === 0 ? 6 : j - 1;
+}
+
+function Check({ on, color }: { on: boolean; color: string }) {
+  return (
+    <span
+      className="relative grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full"
+      style={{ boxShadow: on ? "none" : "inset 0 0 0 1.5px var(--text-4)" }}
+    >
+      {on && (
+        <motion.span
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute inset-0 rounded-full"
+          style={{ background: color }}
+        />
+      )}
+      {on && (
+        <svg
+          className="relative"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#08090B"
+          strokeWidth="3.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M5 12.5l4.5 4.5L19 7" />
+        </svg>
+      )}
+    </span>
+  );
 }
 
 export default function TodayPage() {
-  const { state, loading } = useAppState();
-  const today = useToday();
-  const log = useMemo(() => getTodayLog(state), [state]);
-  const streak = useMemo(
-    () => calculateStreak(state.dailyLogs),
-    [state.dailyLogs]
+  const { state, loading, toggleBehavior } = useAppState();
+  const today = useMemo(() => dateKey(new Date()), []);
+  const log = useMemo(() => getLogForDate(state, today), [state, today]);
+  const [detail, setDetail] = useState<TimelineItem | null>(null);
+
+  const adaptation = useMemo(() => adapt(state), [state]);
+  const timeline = useMemo(() => {
+    const items = compileTimeline(state, isoDayIdx());
+    return shapeTimeline(items, adaptation.mode);
+  }, [state, adaptation.mode]);
+
+  const prog = useMemo(
+    () => timelineProgress(timeline, log),
+    [timeline, log]
   );
-  const weekDays = useMemo(
-    () => weeklyActiveDays(state.dailyLogs),
-    [state.dailyLogs]
+
+  const upNext = useMemo(
+    () =>
+      timeline.find((i) => !i.muted && !isDone(log, i.canonicalKey)) ?? null,
+    [timeline, log]
   );
 
-  const [showBreakdown, setShowBreakdown] = useState(false);
-  const readiness = readinessScore(log);
-  const breakdown = useMemo(() => readinessBreakdown(log), [log]);
-  const recovery = recoveryScore(log);
-  const adherence = adherenceScore(log);
-  const sleepP = pillarScore(log, "sleep");
-  const tracked = hasAnyTracking(log);
-
-  const weekly = useMemo(() => last7(state.dailyLogs), [state.dailyLogs]);
-  const hasWeek = weekly.some((w) => w.value > 0);
-  const weekAvg = useMemo(() => {
-    const v = weekly.map((w) => w.value).filter((x) => x > 0);
-    return v.length
-      ? Math.round(v.reduce((a, b) => a + b, 0) / v.length)
-      : null;
-  }, [weekly]);
-
-  const insight = useMemo(() => {
-    if (!tracked)
-      return "Open the tracker and check off your first protocol — your readiness and trends build from here.";
-    const data = topInsight(state.dailyLogs);
-    if (data) return data;
-    if (state.dailyLogs.filter((l) => l.score > 0).length < 3)
-      return "You're getting started. After a few tracked days, this space will surface patterns specific to you.";
-    if (streak >= 7)
-      return `A ${streak}-day streak. Consistency is the strongest lever for long-term health — keep the momentum.`;
-    if (sleepP != null && sleepP < 50)
-      return "Sleep adherence is today's biggest opportunity. Protecting your wind-down compounds across every other system.";
-    if (readiness != null && readiness >= 75)
-      return "Your inputs look strong today. A good day to lean into demanding training and focused work.";
-    if (readiness != null && readiness < 45)
-      return "Readiness is on the lower side. Favor recovery — light movement, hydration, and an earlier night.";
-    return "Steady. Keep logging consistently and the insight engine will surface what's working for you.";
-  }, [tracked, state.dailyLogs, streak, sleepP, readiness]);
+  const displayDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   if (loading) {
     return (
       <Shell>
         <div className="flex flex-col gap-6">
           <Skeleton className="h-6 w-44" rounded="rounded-full" />
-          <Skeleton
-            className="mx-auto h-[220px] w-[220px]"
-            rounded="rounded-full"
-          />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-28 w-full" rounded="rounded-[var(--r-xl)]" />
+          <Skeleton className="h-40 w-full" rounded="rounded-[var(--r-xl)]" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </Shell>
     );
   }
 
+  if (timeline.length === 0) {
+    return (
+      <Shell>
+        <div className="flex flex-col gap-6">
+          <div>
+            <Eyebrow>{displayDate}</Eyebrow>
+            <h1 className="t-title mt-2 text-[var(--text-1)]">
+              {greeting()}
+              {state.settings.name ? `, ${state.settings.name}` : ""}
+            </h1>
+          </div>
+          <div className="panel flex flex-col items-center px-6 py-14 text-center">
+            <span
+              className="chip mb-5 h-14 w-14"
+              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+            >
+              <Icon name="compass" size={24} />
+            </span>
+            <p className="t-section text-[var(--text-1)]">
+              Your day is a blank canvas
+            </p>
+            <p className="t-caption mt-2 max-w-[260px] leading-relaxed">
+              Install a protocol and Protocolize will assemble an adaptive
+              daily system for you.
+            </p>
+            <Link
+              href="/library"
+              className="press tr-fast mt-6 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[14px] font-semibold text-[#08090B]"
+            >
+              Browse the Library
+            </Link>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  const accent = MODE_ACCENT[adaptation.mode];
+
   return (
     <Shell>
       <div className="flex flex-col gap-7">
-        <div className="anim-rise">
-          <Eyebrow>{today.displayDate}</Eyebrow>
+        {/* Greeting */}
+        <div>
+          <Eyebrow>{displayDate}</Eyebrow>
           <h1 className="t-title mt-2 text-[var(--text-1)]">
             {greeting()}
             {state.settings.name ? `, ${state.settings.name}` : ""}
           </h1>
         </div>
 
-        {/* Readiness hero — cold-start safe */}
-        <div className="anim-rise d1 flex flex-col items-center pt-2">
-          {readiness == null ? (
-            <Link
-              href="/track"
-              className="press flex flex-col items-center"
-            >
-              <div
-                className="grid h-[200px] w-[200px] place-items-center rounded-full"
-                style={{ border: "2px dashed var(--hairline-strong)" }}
-              >
-                <div className="text-center">
-                  <Icon
-                    name="check"
-                    size={30}
-                    className="mx-auto text-[var(--text-3)]"
-                  />
-                  <p className="t-label mt-3 text-[var(--text-2)]">
-                    Start tracking
-                  </p>
-                  <p className="t-caption mt-1">to see readiness</p>
-                </div>
-              </div>
-            </Link>
-          ) : (
-            <button
-              onClick={() => setShowBreakdown(true)}
-              className="press flex flex-col items-center"
-            >
-              <RingScore
-                value={readiness}
-                label={band(readiness)}
-                sublabel="Readiness"
-                color={bandColor(readiness)}
-              />
-              <span className="t-caption mt-3 flex items-center gap-1.5">
-                <Icon name="info" size={12} /> How this is calculated
-              </span>
-            </button>
-          )}
-          <div className="mt-6 flex items-center gap-2.5">
-            {streak > 0 ? (
-              <div className="flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--warm-soft)] px-4 py-2">
-                <Icon
-                  name="sparkle"
-                  size={14}
-                  className="text-[var(--warm)]"
-                />
-                <span className="text-[13px] font-semibold text-[var(--warm)]">
-                  {streak}-day streak
-                </span>
-              </div>
-            ) : (
-              <span className="t-caption">Begin your streak today</span>
-            )}
-            <div className="flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--surface-2)] px-4 py-2">
-              <span className="text-[13px] font-semibold text-[var(--text-2)]">
-                {weekDays}/7 this week
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tiles */}
-        <div className="anim-rise d2 grid grid-cols-3 gap-3">
-          {[
-            { k: "Sleep", v: sleepP, c: "var(--sleep)", href: "/sleep" },
-            {
-              k: "Recovery",
-              v: recovery,
-              c: "var(--recovery)",
-              href: "/recovery",
-            },
-            {
-              k: "Adherence",
-              v: adherence,
-              c: "var(--vitality)",
-              href: "/track",
-            },
-          ].map((m) => (
-            <Link key={m.k} href={m.href}>
-              <Card pad="p-4" className="h-full">
-                <p className="t-eyebrow">{m.k}</p>
-                {m.v == null ? (
-                  <>
-                    <p className="mt-3">
-                      <NoData size={28} />
-                    </p>
-                    <p className="t-caption mt-1">No data</p>
-                  </>
-                ) : (
-                  <>
-                    <p
-                      className="mt-3 text-[30px] font-bold tracking-tight"
-                      style={{
-                        color: m.c,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {Math.round(m.v)}
-                    </p>
-                    <p className="t-caption mt-0.5">{band(m.v)}</p>
-                  </>
-                )}
-              </Card>
-            </Link>
-          ))}
-        </div>
-
-        {/* Focus */}
-        <Card className="anim-rise d3 relative overflow-hidden">
+        {/* Adaptive banner — focal */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="panel relative overflow-hidden p-6"
+        >
           <span
-            className="absolute inset-y-0 left-0 w-[3px]"
+            className="ambient"
             style={{
-              background:
-                "linear-gradient(180deg, var(--sleep), var(--recovery), var(--vitality))",
+              background: `radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, ${accent} 22%, transparent), transparent 60%)`,
             }}
           />
-          <Eyebrow color="var(--text-2)">Today&apos;s Focus</Eyebrow>
-          <p className="t-body mt-3 leading-relaxed text-[var(--text-1)]">
-            {insight}
-          </p>
-        </Card>
-
-        {/* Pillar rings */}
-        <div className="anim-rise d4">
-          <div className="mb-4 flex items-end justify-between">
-            <h2 className="t-section text-[var(--text-1)]">Protocols</h2>
-            <Link href="/track" className="t-caption text-[var(--readiness)]">
-              Open tracker →
-            </Link>
+          <div className="relative">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-1.5 w-1.5 rounded-full anim-pulse"
+                style={{ background: accent }}
+              />
+              <Eyebrow color={accent}>{adaptation.headline}</Eyebrow>
+            </div>
+            <p className="t-body mt-3 leading-relaxed text-[var(--text-1)]">
+              {adaptation.tone}
+            </p>
+            <div className="mt-5 flex items-center gap-2.5">
+              <div
+                className="h-1.5 flex-1 overflow-hidden rounded-full"
+                style={{ background: "var(--surface-3)" }}
+              >
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: accent }}
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${
+                      prog.total
+                        ? Math.max(3, (prog.done / prog.total) * 100)
+                        : 0
+                    }%`,
+                  }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                />
+              </div>
+              <span className="text-[12px] font-semibold text-[var(--text-2)]">
+                {prog.done}/{prog.total}
+              </span>
+            </div>
+            {prog.essentials > 0 && (
+              <p className="t-caption mt-2">
+                {prog.essentialsDone}/{prog.essentials} high-leverage
+                essentials done — momentum over perfection.
+              </p>
+            )}
           </div>
-          <Card pad="p-5">
-            <div className="flex justify-between">
-              {PILLAR_LIST.map((p) => {
-                const v = pillarScore(log, p);
-                return (
-                  <Link
-                    key={p}
-                    href="/track"
-                    className="press flex flex-col items-center gap-2.5"
-                  >
-                    <MiniRing
-                      value={v ?? 0}
-                      color={C[p]}
-                      icon={
-                        <Icon name={RAIL[p]} size={18} stroke={1.7} />
-                      }
-                    />
-                    <div className="text-center">
-                      <p className="text-[11px] font-semibold text-[var(--text-1)]">
-                        {PILLAR_META[p].label}
-                      </p>
-                      <p
-                        className="text-[11px] font-medium"
+        </motion.div>
+
+        {/* Up next — single focal action */}
+        {upNext && (
+          <div>
+            <Eyebrow color="var(--text-3)">Up next</Eyebrow>
+            <motion.button
+              key={upNext.canonicalKey}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              onClick={() => toggleBehavior(today, upNext.canonicalKey)}
+              className="press mt-3 w-full overflow-hidden rounded-[var(--r-xl)] p-5 text-left"
+              style={{
+                background: `linear-gradient(160deg, color-mix(in srgb, ${accent} 12%, var(--surface-1)), var(--surface-1))`,
+                boxShadow: "var(--shadow-soft)",
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <span
+                  className="chip h-14 w-14 shrink-0"
+                  style={{
+                    background: `color-mix(in srgb, ${accent} 22%, var(--surface-3))`,
+                    color: accent,
+                  }}
+                >
+                  <Icon
+                    name={upNext.icon as IconName}
+                    size={26}
+                    stroke={1.7}
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[18px] font-bold text-[var(--text-1)]">
+                    {upNext.title}
+                  </p>
+                  {upNext.dose && (
+                    <p className="mt-0.5 text-[13px] text-[var(--text-2)]">
+                      {upNext.dose}
+                    </p>
+                  )}
+                </div>
+                <Check on={false} color={accent} />
+              </div>
+              <p className="mt-4 text-[13px] leading-relaxed text-[var(--text-3)]">
+                {upNext.rationale}
+              </p>
+            </motion.button>
+          </div>
+        )}
+
+        {/* Timeline by block */}
+        <div className="flex flex-col gap-7">
+          {BLOCKS.map((block) => {
+            const items = timeline.filter((i) => i.block === block);
+            if (items.length === 0) return null;
+            return (
+              <section key={block}>
+                <div className="mb-3 flex items-baseline justify-between px-1">
+                  <Eyebrow>{blockLabel(block)}</Eyebrow>
+                  <span className="text-[11px] font-medium text-[var(--text-3)]">
+                    {items.filter((i) => isDone(log, i.canonicalKey)).length}/
+                    {items.length}
+                  </span>
+                </div>
+                <div className="well space-y-1.5 p-1.5">
+                  {items.map((it) => {
+                    const done = isDone(log, it.canonicalKey);
+                    return (
+                      <div
+                        key={it.canonicalKey}
+                        className="row row-tap flex items-center"
                         style={{
-                          color: v == null ? "var(--text-4)" : C[p],
+                          opacity: it.muted ? 0.45 : 1,
+                          background: done
+                            ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, var(--surface-2)), var(--surface-1))`
+                            : undefined,
                         }}
                       >
-                        {v == null ? "—" : `${Math.round(v)}%`}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-
-        {/* Week */}
-        <div className="anim-rise d5">
-          <div className="mb-4 flex items-end justify-between">
-            <h2 className="t-section text-[var(--text-1)]">Last 7 Days</h2>
-            <Link
-              href="/progress"
-              className="t-caption text-[var(--readiness)]"
-            >
-              All trends →
-            </Link>
-          </div>
-          <Card pad="p-5">
-            {hasWeek ? (
-              <>
-                <div className="mb-5 flex items-baseline gap-2">
-                  <span
-                    className="text-[28px] font-bold tracking-tight text-[var(--text-1)]"
-                    style={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {weekAvg}
-                  </span>
-                  <span className="t-caption">avg score</span>
+                        <button
+                          onClick={() =>
+                            toggleBehavior(today, it.canonicalKey)
+                          }
+                          className="flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-3.5 text-left"
+                        >
+                          <Check
+                            on={done}
+                            color={it.muted ? "var(--text-3)" : accent}
+                          />
+                          <span
+                            className="chip h-9 w-9 shrink-0"
+                            style={{
+                              background: done
+                                ? accent
+                                : "var(--surface-3)",
+                              color: done ? "#08090B" : "var(--text-2)",
+                            }}
+                          >
+                            <Icon
+                              name={it.icon as IconName}
+                              size={17}
+                              stroke={1.7}
+                            />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className="block truncate text-[14.5px] font-semibold"
+                              style={{
+                                color: done
+                                  ? "var(--text-3)"
+                                  : "var(--text-1)",
+                              }}
+                            >
+                              {it.title}
+                            </span>
+                            <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
+                              {it.kind === "avoid" && (
+                                <Icon name="ban" size={11} />
+                              )}
+                              {it.muted
+                                ? "Eased today"
+                                : it.dose || it.fromPacks[0]}
+                              {it.fromPacks.length > 1 &&
+                                ` · +${it.fromPacks.length - 1}`}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => setDetail(it)}
+                          aria-label="Details"
+                          className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--text-2)]"
+                          style={{ marginRight: 8 }}
+                        >
+                          <Icon name="info" size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-                <BarWeek data={weekly} />
-              </>
-            ) : (
-              <div className="py-8 text-center">
-                <p className="t-caption">
-                  Your weekly rhythm will appear here once you log a few days.
-                </p>
-              </div>
-            )}
-          </Card>
+              </section>
+            );
+          })}
         </div>
       </div>
 
-      <Sheet
-        open={showBreakdown}
-        onClose={() => setShowBreakdown(false)}
-        title="How readiness is calculated"
-      >
-        <p className="t-body mb-5 leading-relaxed">
-          Readiness is a weighted blend of only the inputs you logged today —
-          nothing is assumed or filled in.
-        </p>
-        <div className="space-y-3">
-          {breakdown.map((p) => (
-            <div key={p.label}>
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="t-label text-[var(--text-1)]">
-                  {p.label}
-                </span>
-                <span className="text-[13px] font-semibold text-[var(--text-2)]">
-                  {Math.round(p.value)} · {Math.round(p.weight * 100)}%
-                </span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-3)]">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.max(2, p.weight * 100)}%`,
-                    background: "var(--readiness)",
-                  }}
-                />
+      {/* Behavior detail */}
+      {detail && (
+        <div
+          className="anim-fade fixed inset-0 z-[100] flex items-end justify-center sm:items-center"
+          style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={() => setDetail(null)}
+        >
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="glass w-full max-w-[480px] rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:rounded-[var(--r-xl)] sm:border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden" />
+            <div className="flex items-start gap-3">
+              <span
+                className="chip h-12 w-12 shrink-0"
+                style={{
+                  background: `color-mix(in srgb, ${accent} 16%, var(--surface-3))`,
+                  color: accent,
+                }}
+              >
+                <Icon name={detail.icon as IconName} size={22} />
+              </span>
+              <div>
+                <h3 className="t-section text-[var(--text-1)]">
+                  {detail.title}
+                </h3>
+                <p className="t-caption mt-1">
+                  From {detail.fromPacks.join(" · ")}
+                </p>
               </div>
             </div>
-          ))}
+            <p className="t-body mt-5 leading-relaxed text-[var(--text-1)]">
+              {detail.rationale}
+            </p>
+            {detail.evidence && (
+              <div
+                className="mt-4 rounded-[var(--r-md)] p-4"
+                style={{ background: "var(--surface-2)" }}
+              >
+                <Eyebrow color={accent}>Why this works</Eyebrow>
+                <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--text-2)]">
+                  {detail.evidence}
+                </p>
+              </div>
+            )}
+            {detail.recommendedBy && detail.recommendedBy.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {detail.recommendedBy.map((r) => (
+                  <span
+                    key={r}
+                    className="rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)]"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    {r}
+                  </span>
+                ))}
+              </div>
+            )}
+            <Link
+              href="/protocols"
+              className="press tr-fast mt-6 block w-full rounded-[var(--r-pill)] bg-[var(--surface-3)] py-3.5 text-center text-[14px] font-semibold text-[var(--text-1)]"
+            >
+              Adjust in Protocols
+            </Link>
+          </motion.div>
         </div>
-        <p className="t-caption mt-5 leading-relaxed">
-          Weights rebalance to the inputs present, so logging more makes the
-          score more complete and accurate.
-        </p>
-      </Sheet>
+      )}
     </Shell>
   );
 }

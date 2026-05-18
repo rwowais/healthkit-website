@@ -14,8 +14,6 @@ import type {
 } from "@/lib/types";
 import {
   getDefaultState,
-  loadState,
-  saveState,
   toggleSleepItem as toggleSleepItemFn,
   updateExerciseEntry as updateExerciseEntryFn,
   updateNutritionScorecard as updateNutritionScorecardFn,
@@ -25,22 +23,39 @@ import {
   updateDailyRatings as updateDailyRatingsFn,
   addBiomarker as addBiomarkerFn,
   deleteBiomarker as deleteBiomarkerFn,
+  toggleBehavior as toggleBehaviorFn,
+  installPack as installPackFn,
+  uninstallPack as uninstallPackFn,
+  setBehaviorOverride as setBehaviorOverrideFn,
+  upsertCustomPack as upsertCustomPackFn,
+  deleteCustomPack as deleteCustomPackFn,
 } from "@/lib/storage";
-import type { BiomarkerEntry } from "@/lib/types";
+import { activeDataSource } from "@/lib/datasource";
+import type {
+  BiomarkerEntry,
+  BehaviorOverride,
+  ProtocolPack,
+} from "@/lib/types";
 
 export function useAppState() {
   const [state, setState] = useState<AppState>(getDefaultState);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loaded = loadState();
-    setState(loaded);
-    setLoading(false);
+    let alive = true;
+    activeDataSource.load().then((loaded) => {
+      if (!alive) return;
+      setState(loaded);
+      setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
     if (!loading) {
-      saveState(state);
+      void activeDataSource.save(state);
     }
   }, [state, loading]);
 
@@ -140,6 +155,30 @@ export function useAppState() {
     setState((prev) => deleteBiomarkerFn(prev, id));
   }, []);
 
+  // ── Protocol OS ─────────────────────────────────────────────
+
+  const toggleBehavior = useCallback((date: string, key: string) => {
+    setState((prev) => toggleBehaviorFn(prev, date, key));
+  }, []);
+  const installPack = useCallback((id: string) => {
+    setState((prev) => installPackFn(prev, id));
+  }, []);
+  const uninstallPack = useCallback((id: string) => {
+    setState((prev) => uninstallPackFn(prev, id));
+  }, []);
+  const setBehaviorOverride = useCallback(
+    (key: string, ov: BehaviorOverride) => {
+      setState((prev) => setBehaviorOverrideFn(prev, key, ov));
+    },
+    []
+  );
+  const upsertCustomPack = useCallback((pack: ProtocolPack) => {
+    setState((prev) => upsertCustomPackFn(prev, pack));
+  }, []);
+  const deleteCustomPack = useCallback((id: string) => {
+    setState((prev) => deleteCustomPackFn(prev, id));
+  }, []);
+
   return {
     state,
     loading,
@@ -158,6 +197,13 @@ export function useAppState() {
     // Biomarkers
     addBiomarker,
     deleteBiomarker,
+    // Protocol OS
+    toggleBehavior,
+    installPack,
+    uninstallPack,
+    setBehaviorOverride,
+    upsertCustomPack,
+    deleteCustomPack,
     // Config
     updateSettings,
     updateProtocols,

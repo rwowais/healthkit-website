@@ -17,6 +17,9 @@ import type {
   UserSettings,
 } from "./types";
 
+import { DEFAULT_INSTALLED } from "./packs";
+import { compileTimeline } from "./engine";
+import type { ProtocolPack, BehaviorOverride } from "./types";
 import { defaultSleepProtocol } from "./defaults/sleep";
 import { defaultExerciseProtocol } from "./defaults/exercise";
 import { defaultNutritionProtocol } from "./defaults/nutrition";
@@ -95,6 +98,7 @@ function createEmptyDailyLog(
     dayNote: "",
     score: 0,
     pillarScores: { sleep: 0, exercise: 0, nutrition: 0, supplements: 0 },
+    behaviorCompletions: {},
   };
 }
 
@@ -129,6 +133,9 @@ export function getDefaultState(): AppState {
     biomarkers: [],
     insights: [],
     currentStreak: 0,
+    installedPacks: [...DEFAULT_INSTALLED],
+    customPacks: [],
+    behaviorOverrides: {},
   };
 }
 
@@ -144,6 +151,15 @@ function normalize(s: AppState): AppState {
     biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
     insights: Array.isArray(s.insights) ? s.insights : [],
     currentStreak: s.currentStreak ?? 0,
+    installedPacks:
+      Array.isArray(s.installedPacks) && s.installedPacks.length
+        ? s.installedPacks
+        : [...DEFAULT_INSTALLED],
+    customPacks: Array.isArray(s.customPacks) ? s.customPacks : [],
+    behaviorOverrides:
+      s.behaviorOverrides && typeof s.behaviorOverrides === "object"
+        ? s.behaviorOverrides
+        : {},
   };
 }
 
@@ -288,6 +304,86 @@ function getOrCreateLog(state: AppState, date: string): DailyLog {
 /** Public: read (or synthesize) the log for any date. */
 export function getLogForDate(state: AppState, date: string): DailyLog {
   return getOrCreateLog(state, date);
+}
+
+// ── Protocol OS: behaviors & packs ────────────────────────────────
+
+function isoDayIndex(dateStr: string): number {
+  const j = new Date(dateStr + "T00:00:00").getDay();
+  return j === 0 ? 6 : j - 1;
+}
+
+export function toggleBehavior(
+  state: AppState,
+  date: string,
+  key: string
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const bc = { ...(log.behaviorCompletions ?? {}) };
+  bc[key] = !bc[key];
+
+  const items = compileTimeline(state, isoDayIndex(date));
+  const total = items.length || 1;
+  const done = items.filter((i) => bc[i.canonicalKey]).length;
+  const score = Math.round((done / total) * 100);
+
+  const updated: DailyLog = { ...log, behaviorCompletions: bc, score };
+  const idx = state.dailyLogs.findIndex((l) => l.date === date);
+  const dailyLogs =
+    idx >= 0
+      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
+      : [...state.dailyLogs, updated];
+
+  return {
+    ...state,
+    dailyLogs,
+    currentStreak: calculateStreak(dailyLogs),
+  };
+}
+
+export function installPack(state: AppState, id: string): AppState {
+  if (state.installedPacks.includes(id)) return state;
+  return { ...state, installedPacks: [...state.installedPacks, id] };
+}
+
+export function uninstallPack(state: AppState, id: string): AppState {
+  return {
+    ...state,
+    installedPacks: state.installedPacks.filter((p) => p !== id),
+  };
+}
+
+export function setBehaviorOverride(
+  state: AppState,
+  key: string,
+  ov: BehaviorOverride
+): AppState {
+  return {
+    ...state,
+    behaviorOverrides: { ...state.behaviorOverrides, [key]: ov },
+  };
+}
+
+export function upsertCustomPack(
+  state: AppState,
+  pack: ProtocolPack
+): AppState {
+  const exists = state.customPacks.some((p) => p.id === pack.id);
+  const customPacks = exists
+    ? state.customPacks.map((p) => (p.id === pack.id ? pack : p))
+    : [...state.customPacks, pack];
+  const installedPacks = state.installedPacks.includes(pack.id)
+    ? state.installedPacks
+    : [...state.installedPacks, pack.id];
+  return { ...state, customPacks, installedPacks };
+}
+
+export function deleteCustomPack(state: AppState, id: string): AppState {
+  return {
+    ...state,
+    customPacks: state.customPacks.filter((p) => p.id !== id),
+    installedPacks: state.installedPacks.filter((p) => p !== id),
+  };
 }
 
 // ── Biomarkers ────────────────────────────────────────────────────
