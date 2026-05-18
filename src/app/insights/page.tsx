@@ -7,6 +7,8 @@ import { useAppState } from "@/hooks/useAppState";
 import { derivedInsights } from "@/lib/insights";
 import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
 import { biomarkerDef, biomarkerBand } from "@/lib/biomarkers";
+import { keystone, behaviorStats } from "@/lib/intel";
+import { compileTimeline } from "@/lib/engine";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 
@@ -72,6 +74,22 @@ export default function InsightsPage() {
     return out;
   }, [state.dailyLogs, state.biomarkers, streak, week]);
 
+  const ks = useMemo(() => keystone(state), [state]);
+  const topStreaks = useMemo(() => {
+    return compileTimeline(state, 0)
+      .map((it) => ({
+        title: it.title,
+        icon: it.icon as IconName,
+        ...behaviorStats(state, it.canonicalKey),
+      }))
+      .filter((b) => b.streak >= 3)
+      .sort((a, b) => b.streak - a.streak)
+      .slice(0, 3);
+  }, [state]);
+
+  const nothing =
+    insights.length === 0 && !ks && topStreaks.length === 0;
+
   if (loading) {
     return (
       <Shell>
@@ -96,7 +114,79 @@ export default function InsightsPage() {
           </p>
         </div>
 
-        {insights.length === 0 ? (
+        {/* Keystone — the single behavior that matters most */}
+        {ks && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="panel relative overflow-hidden p-6"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, var(--warm) 22%, transparent), transparent 60%)",
+              }}
+            />
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <Icon
+                  name="flame"
+                  size={14}
+                  className="text-[var(--warm)]"
+                />
+                <Eyebrow color="var(--warm)">Your keystone</Eyebrow>
+              </div>
+              <p className="mt-3 text-[22px] font-bold leading-snug text-[var(--text-1)]">
+                {ks.title}
+              </p>
+              <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
+                On days you do this, your overall score runs{" "}
+                <span className="font-bold text-[var(--warm)]">
+                  {ks.delta} points higher
+                </span>
+                . If you protect one behavior, make it this one.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Strongest streaks */}
+        {topStreaks.length > 0 && (
+          <div>
+            <Eyebrow>Strongest behaviors</Eyebrow>
+            <div className="well mt-3 space-y-1.5 p-1.5">
+              {topStreaks.map((b) => (
+                <div
+                  key={b.title}
+                  className="row flex items-center gap-3.5 px-3.5 py-3"
+                >
+                  <span
+                    className="chip h-9 w-9 shrink-0"
+                    style={{
+                      background: "var(--surface-3)",
+                      color: "var(--warm)",
+                    }}
+                  >
+                    <Icon name={b.icon} size={17} stroke={1.7} />
+                  </span>
+                  <span className="flex-1 truncate text-[14px] font-semibold text-[var(--text-1)]">
+                    {b.title}
+                  </span>
+                  <span
+                    className="flex shrink-0 items-center gap-1 text-[13px] font-bold"
+                    style={{ color: "var(--warm)" }}
+                  >
+                    <Icon name="flame" size={13} />
+                    {b.streak}d
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {nothing ? (
           <div className="panel">
             <EmptyState
               icon={<Icon name="bulb" size={24} />}

@@ -15,6 +15,15 @@ import {
   blockLabel,
   type TimelineItem,
 } from "@/lib/engine";
+import {
+  currentBlock,
+  resolveMinutes,
+  fmtClock,
+  behaviorStats,
+  suggestions,
+  dueRank,
+  type Suggestion,
+} from "@/lib/intel";
 import { Skeleton, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { TimeBlock } from "@/lib/types";
@@ -79,8 +88,19 @@ function Check({ on, color }: { on: boolean; color: string }) {
 }
 
 export default function TodayPage() {
-  const { state, loading, toggleBehavior, updateSleepLog, updateRatings } =
-    useAppState();
+  const {
+    state,
+    loading,
+    toggleBehavior,
+    updateSleepLog,
+    updateRatings,
+    installPack,
+    setBehaviorOverride,
+  } = useAppState();
+  const settings = state.settings;
+  const cb = useMemo(() => currentBlock(settings), [settings]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
   const today = useMemo(() => dateKey(new Date()), []);
   const log = useMemo(() => getLogForDate(state, today), [state, today]);
   const [detail, setDetail] = useState<TimelineItem | null>(null);
@@ -101,10 +121,19 @@ export default function TodayPage() {
     [timeline, log]
   );
 
-  const upNext = useMemo(
-    () =>
-      timeline.find((i) => !i.muted && !isDone(log, i.canonicalKey)) ?? null,
-    [timeline, log]
+  const upNext = useMemo(() => {
+    const candidates = timeline.filter(
+      (i) => !i.muted && !isDone(log, i.canonicalKey)
+    );
+    if (candidates.length === 0) return null;
+    return [...candidates].sort(
+      (a, b) => dueRank(a, settings) - dueRank(b, settings)
+    )[0];
+  }, [timeline, log, settings]);
+
+  const activeSuggestions = useMemo<Suggestion[]>(
+    () => suggestions(state).filter((s) => !dismissed.includes(s.id)),
+    [state, dismissed]
   );
 
   const displayDate = new Date().toLocaleDateString("en-US", {
@@ -382,94 +411,212 @@ export default function TodayPage() {
           </div>
         )}
 
-        {/* Timeline by block */}
+        {/* Adaptive suggestion — calm, dismissible */}
+        {activeSuggestions.length > 0 &&
+          (() => {
+            const sug = activeSuggestions[0];
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="card relative overflow-hidden p-5"
+              >
+                <span
+                  className="ambient"
+                  style={{
+                    background:
+                      "radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--vitality) 16%, transparent), transparent 60%)",
+                  }}
+                />
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <Icon
+                      name="bulb"
+                      size={14}
+                      className="text-[var(--vitality)]"
+                    />
+                    <Eyebrow color="var(--vitality)">Suggestion</Eyebrow>
+                  </div>
+                  <p className="mt-3 text-[15px] font-semibold text-[var(--text-1)]">
+                    {sug.title}
+                  </p>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-2)]">
+                    {sug.body}
+                  </p>
+                  <div className="mt-4 flex gap-2.5">
+                    <button
+                      onClick={() => {
+                        if (sug.action.type === "install")
+                          installPack(sug.action.packId);
+                        else if (sug.action.type === "pause")
+                          setBehaviorOverride(sug.action.key, {
+                            disabled: true,
+                          });
+                        setDismissed((d) => [...d, sug.id]);
+                      }}
+                      className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2.5 text-[13px] font-semibold text-[#08090B]"
+                    >
+                      {sug.cta}
+                    </button>
+                    <button
+                      onClick={() =>
+                        setDismissed((d) => [...d, sug.id])
+                      }
+                      className="press tr-fast rounded-[var(--r-pill)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-3)]"
+                    >
+                      Not now
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })()}
+
+        {/* Live, time-aware timeline */}
         <div className="flex flex-col gap-7">
-          {BLOCKS.map((block) => {
+          {BLOCKS.map((block, bIdx) => {
             const items = timeline.filter((i) => i.block === block);
             if (items.length === 0) return null;
+            const doneCount = items.filter((i) =>
+              isDone(log, i.canonicalKey)
+            ).length;
+            const cbIdx = BLOCKS.indexOf(cb);
+            const isCurrent = block === cb;
+            const isPast = bIdx < cbIdx;
+            const fullyDone = doneCount === items.length;
+            const collapsed =
+              isPast && fullyDone && !openBlocks[block];
+
             return (
               <section key={block}>
-                <div className="mb-3 flex items-baseline justify-between px-1">
-                  <Eyebrow>{blockLabel(block)}</Eyebrow>
-                  <span className="text-[11px] font-medium text-[var(--text-3)]">
-                    {items.filter((i) => isDone(log, i.canonicalKey)).length}/
-                    {items.length}
-                  </span>
-                </div>
-                <div className="well space-y-1.5 p-1.5">
-                  {items.map((it) => {
-                    const done = isDone(log, it.canonicalKey);
-                    return (
-                      <div
-                        key={it.canonicalKey}
-                        className="row row-tap flex items-center"
+                <button
+                  onClick={() =>
+                    setOpenBlocks((o) => ({ ...o, [block]: !o[block] }))
+                  }
+                  className="mb-3 flex w-full items-center justify-between px-1"
+                >
+                  <span className="flex items-center gap-2">
+                    <Eyebrow color={isCurrent ? accent : undefined}>
+                      {blockLabel(block)}
+                    </Eyebrow>
+                    {isCurrent && (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
                         style={{
-                          opacity: it.muted ? 0.45 : 1,
-                          background: done
-                            ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, var(--surface-2)), var(--surface-1))`
-                            : undefined,
+                          background: accent,
+                          color: "#08090B",
                         }}
                       >
-                        <button
-                          onClick={() =>
-                            toggleBehavior(today, it.canonicalKey)
-                          }
-                          className="flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-3.5 text-left"
+                        NOW
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-3)]">
+                    {doneCount}/{items.length}
+                    {collapsed && (
+                      <Icon name="chevron" size={12} className="rotate-90" />
+                    )}
+                  </span>
+                </button>
+
+                {!collapsed && (
+                  <div
+                    className="well space-y-1.5 p-1.5"
+                    style={{
+                      opacity: !isCurrent && !isPast ? 0.82 : 1,
+                    }}
+                  >
+                    {items.map((it) => {
+                      const done = isDone(log, it.canonicalKey);
+                      const t = resolveMinutes(it, settings);
+                      const st = behaviorStats(state, it.canonicalKey);
+                      return (
+                        <div
+                          key={it.canonicalKey}
+                          className="row row-tap flex items-center"
+                          style={{
+                            opacity: it.muted ? 0.45 : 1,
+                            background: done
+                              ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, var(--surface-2)), var(--surface-1))`
+                              : undefined,
+                          }}
                         >
-                          <Check
-                            on={done}
-                            color={it.muted ? "var(--text-3)" : accent}
-                          />
-                          <span
-                            className="chip h-9 w-9 shrink-0"
-                            style={{
-                              background: done
-                                ? accent
-                                : "var(--surface-3)",
-                              color: done ? "#08090B" : "var(--text-2)",
-                            }}
+                          <button
+                            onClick={() =>
+                              toggleBehavior(today, it.canonicalKey)
+                            }
+                            className="flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-3.5 text-left"
                           >
-                            <Icon
-                              name={it.icon as IconName}
-                              size={17}
-                              stroke={1.7}
+                            <Check
+                              on={done}
+                              color={it.muted ? "var(--text-3)" : accent}
                             />
-                          </span>
-                          <span className="min-w-0 flex-1">
                             <span
-                              className="block truncate text-[14.5px] font-semibold"
+                              className="chip h-9 w-9 shrink-0"
                               style={{
-                                color: done
-                                  ? "var(--text-3)"
-                                  : "var(--text-1)",
+                                background: done
+                                  ? accent
+                                  : "var(--surface-3)",
+                                color: done ? "#08090B" : "var(--text-2)",
                               }}
                             >
-                              {it.title}
+                              <Icon
+                                name={it.icon as IconName}
+                                size={17}
+                                stroke={1.7}
+                              />
                             </span>
-                            <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
-                              {it.kind === "avoid" && (
-                                <Icon name="ban" size={11} />
-                              )}
-                              {it.muted
-                                ? "Eased today"
-                                : it.dose || it.fromPacks[0]}
-                              {it.fromPacks.length > 1 &&
-                                ` · +${it.fromPacks.length - 1}`}
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-2">
+                                <span
+                                  className="truncate text-[14.5px] font-semibold"
+                                  style={{
+                                    color: done
+                                      ? "var(--text-3)"
+                                      : "var(--text-1)",
+                                  }}
+                                >
+                                  {it.title}
+                                </span>
+                                {st.streak >= 3 && !done && (
+                                  <span
+                                    className="flex shrink-0 items-center gap-0.5 text-[11px] font-bold"
+                                    style={{ color: "var(--warm)" }}
+                                  >
+                                    <Icon name="flame" size={11} />
+                                    {st.streak}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
+                                {t != null && !it.muted && (
+                                  <span className="tabular-nums">
+                                    {fmtClock(t)}
+                                  </span>
+                                )}
+                                {t != null && !it.muted && <span>·</span>}
+                                {it.kind === "avoid" && (
+                                  <Icon name="ban" size={11} />
+                                )}
+                                {it.muted
+                                  ? "Eased today"
+                                  : it.dose || it.fromPacks[0]}
+                              </span>
                             </span>
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => setDetail(it)}
-                          aria-label="Details"
-                          className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--text-2)]"
-                          style={{ marginRight: 8 }}
-                        >
-                          <Icon name="info" size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                          </button>
+                          <button
+                            onClick={() => setDetail(it)}
+                            aria-label="Details"
+                            className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--text-2)]"
+                            style={{ marginRight: 8 }}
+                          >
+                            <Icon name="info" size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
             );
           })}
