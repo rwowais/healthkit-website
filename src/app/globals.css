@@ -284,6 +284,30 @@ body {
     var(--hairline-strong) 82%, transparent);
 }
 
+/* ── Reduced motion ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .anim-rise,
+  .anim-fade,
+  .anim-sheet,
+  .anim-toast,
+  .anim-check,
+  .anim-fill,
+  .anim-ring {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    stroke-dashoffset: var(--ring-off, 0) !important;
+  }
+}
+
 /* ── Focus ──────────────────────────────────────────────────────── */
 *:focus-visible {
   outline: 2px solid var(--readiness);

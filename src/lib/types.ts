@@ -100,6 +100,8 @@ export interface UserSettings {
   notificationsEnabled: boolean;
   weekStartsOn: 0 | 1;
   completedOnboarding: boolean;
+  primaryGoal?: string;
+  disclaimerAcknowledged?: boolean;
 }
 
 // ── Legacy completion (kept for migration) ────────────────────────

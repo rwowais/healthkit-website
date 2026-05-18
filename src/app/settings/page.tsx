@@ -270,6 +270,17 @@ export default function SettingsPage() {
           </button>
         </Card>
 
+        {/* Disclaimer */}
+        <Card className="anim-rise d5">
+          <Eyebrow>Disclaimer & Privacy</Eyebrow>
+          <p className="t-caption mt-2.5 leading-relaxed">
+            Protocolize is an educational tool — not medical advice, diagnosis,
+            or treatment. Biomarker ranges are general references; interpret all
+            health data with a qualified clinician. Your data never leaves this
+            device unless you export it.
+          </p>
+        </Card>
+
         <p className="pb-2 text-center text-[11px] text-[var(--text-4)]">
           Protocolize · Longevity Intelligence ·{" "}
           {s.subscriptionStatus === "trial" ? "Trial" : "Member"}

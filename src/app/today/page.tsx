@@ -6,7 +6,7 @@ import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { useToday } from "@/hooks/useToday";
 import { getTodayLog } from "@/lib/storage";
-import { calculateStreak } from "@/lib/scoring";
+import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
 import { PILLAR_META } from "@/lib/constants";
 import {
   readinessScore,
@@ -74,6 +74,10 @@ export default function TodayPage() {
   const log = useMemo(() => getTodayLog(state), [state]);
   const streak = useMemo(
     () => calculateStreak(state.dailyLogs),
+    [state.dailyLogs]
+  );
+  const weekDays = useMemo(
+    () => weeklyActiveDays(state.dailyLogs),
     [state.dailyLogs]
   );
 
@@ -179,7 +183,7 @@ export default function TodayPage() {
               </span>
             </button>
           )}
-          <div className="mt-6">
+          <div className="mt-6 flex items-center gap-2.5">
             {streak > 0 ? (
               <div className="flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--warm-soft)] px-4 py-2">
                 <Icon
@@ -194,6 +198,11 @@ export default function TodayPage() {
             ) : (
               <span className="t-caption">Begin your streak today</span>
             )}
+            <div className="flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--surface-2)] px-4 py-2">
+              <span className="text-[13px] font-semibold text-[var(--text-2)]">
+                {weekDays}/7 this week
+              </span>
+            </div>
           </div>
         </div>
 

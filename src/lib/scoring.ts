@@ -88,6 +88,7 @@ export function calculateStreak(logs: DailyLog[]): number {
 
   let streak = 1;
   let currentDate = new Date(sorted[0].date + "T00:00:00");
+  let usedGrace = false; // forgive one missed day so a single slip
 
   for (let i = 1; i < sorted.length; i++) {
     const expectedPrev = new Date(currentDate);
@@ -97,12 +98,36 @@ export function calculateStreak(logs: DailyLog[]): number {
     if (sorted[i].date === expectedStr) {
       streak++;
       currentDate = expectedPrev;
-    } else {
-      break;
+      continue;
     }
+
+    // One-day grace: a single missing day between active days is forgiven.
+    const graceDay = new Date(expectedPrev);
+    graceDay.setDate(graceDay.getDate() - 1);
+    if (!usedGrace && sorted[i].date === formatDateKey(graceDay)) {
+      usedGrace = true;
+      streak++;
+      currentDate = graceDay;
+      continue;
+    }
+    break;
   }
 
   return streak;
+}
+
+/** Active days within the trailing 7-day window (for weekly goals). */
+export function weeklyActiveDays(logs: DailyLog[]): number {
+  const keys = new Set(
+    logs.filter((l) => hasAnyActivity(l)).map((l) => l.date)
+  );
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    if (keys.has(formatDateKey(d))) n++;
+  }
+  return n;
 }
 
 /** Check if a daily log has any meaningful activity */
