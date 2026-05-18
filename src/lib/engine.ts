@@ -380,3 +380,86 @@ export function timelineProgress(
     essentials: ess.length,
   };
 }
+
+// ── Semantic leverage labels ──────────────────────────────────────
+
+const CIRCADIAN = new Set([
+  "morning-sunlight",
+  "dim-lights",
+  "screens-off",
+  "caffeine-cutoff",
+  "wind-down",
+  "last-meal-3h",
+  "delay-caffeine",
+]);
+
+export interface LeverageTag {
+  text: string;
+  tone: "accent" | "recovery" | "sleep" | "warm" | "vitality" | "muted";
+}
+
+/**
+ * A semantic, context-aware label for a behavior — guides attention
+ * by meaning, not by a flat 1/2/3.
+ */
+export function leverageTag(
+  it: TimelineItem,
+  mode: AdaptMode,
+  opts: { isKeystone?: boolean; streak?: number } = {}
+): LeverageTag {
+  if (it.muted) return { text: "Optional today", tone: "muted" };
+  if (opts.isKeystone) return { text: "Your keystone", tone: "warm" };
+  if (mode === "recovery" && RECOVERY_PROMOTE.has(it.canonicalKey))
+    return { text: "Recovery-critical", tone: "recovery" };
+  if (CIRCADIAN.has(it.canonicalKey))
+    return { text: "Circadian anchor", tone: "sleep" };
+  if (it.leverage === 3) return { text: "Essential", tone: "accent" };
+  if ((opts.streak ?? 0) >= 3)
+    return { text: "Momentum builder", tone: "warm" };
+  if (it.leverage === 1) return { text: "Easy win", tone: "vitality" };
+  return { text: "Core", tone: "accent" };
+}
+
+// ── Adaptive Up Next message ──────────────────────────────────────
+
+const KEY_MESSAGE: Record<string, string> = {
+  "wind-down": "Your wind-down window is open — protect it.",
+  "morning-sunlight":
+    "First light is the highest-leverage move of the day.",
+  "caffeine-cutoff":
+    "Caffeine window closing — this guards tonight's deep sleep.",
+  "dim-lights": "Lower the lights now to let melatonin rise on time.",
+  "screens-off": "Screens down soon — your sleep onset depends on it.",
+  "magnesium-pm": "A small cue that tells your system the day is closing.",
+  nsdr: "Ten minutes here resets dopamine and lowers the load.",
+  "last-meal-3h": "Closing the kitchen now protects overnight repair.",
+};
+
+/** Predictive, emotionally-aware line for the focal behavior. */
+export function upNextMessage(
+  it: TimelineItem,
+  ctx: {
+    mode: AdaptMode;
+    minutesToStart: number | null; // resolved time - now
+    isKeystone?: boolean;
+  }
+): string {
+  if (ctx.isKeystone)
+    return "On the days you do this, everything else lands better.";
+  if (KEY_MESSAGE[it.canonicalKey]) return KEY_MESSAGE[it.canonicalKey];
+  if (ctx.mode === "recovery")
+    return "Recovery suggests a lower-stimulation path — this one still counts.";
+  if (ctx.mode === "rebuild")
+    return "Just this one. Re-entry is about momentum, not volume.";
+  if (
+    ctx.minutesToStart != null &&
+    ctx.minutesToStart <= 15 &&
+    ctx.minutesToStart > -45
+  )
+    return "Its ideal window is open right now.";
+  if (it.leverage === 3)
+    return "The highest-leverage move you can make right now.";
+  if (it.kind === "avoid")
+    return "A small act of restraint that pays back tonight.";
+  return it.rationale;
+}

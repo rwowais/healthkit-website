@@ -13,7 +13,11 @@ import {
   isDone,
   timelineProgress,
   blockLabel,
+  leverageTag,
+  upNextMessage,
+  getSignals,
   type TimelineItem,
+  type LeverageTag,
 } from "@/lib/engine";
 import {
   currentBlock,
@@ -39,25 +43,38 @@ const MODE_ACCENT: Record<string, string> = {
   primed: "var(--vitality)",
 };
 const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
-const LEV_LABEL: Record<number, string> = {
-  3: "Essential",
-  2: "Core",
-  1: "Supporting",
+const TONE_COLOR: Record<LeverageTag["tone"], string> = {
+  accent: "var(--readiness)",
+  recovery: "var(--recovery)",
+  sleep: "var(--sleep)",
+  warm: "var(--warm)",
+  vitality: "var(--vitality)",
+  muted: "var(--text-4)",
 };
 
-/** Calm, time-aware momentum phrase (progress over perfection). */
-function pacePhrase(done: number, total: number, cb: TimeBlock): string {
-  if (total === 0) return "";
+/** Daypart-aware ambient tint for atmospheric depth. */
+function daypartTint(cb: TimeBlock): string {
+  if (cb === "morning") return "var(--vitality)";
+  if (cb === "afternoon") return "var(--readiness)";
+  return "var(--sleep)";
+}
+
+/** Human progression phrase — no mechanical N/total. */
+function progressionPhrase(
+  done: number,
+  total: number,
+  cb: TimeBlock
+): string {
+  if (total === 0) return "Nothing scheduled";
+  if (done === total) return "Day fully closed";
   if (done === 0)
-    return "Your day is set. Start anywhere — momentum builds from one.";
-  if (done === total) return "Every behavior done. Beautifully closed.";
-  const ratio = done / total;
-  const expected =
-    cb === "morning" ? 0.3 : cb === "afternoon" ? 0.62 : 0.9;
-  if (ratio >= expected + 0.05)
-    return "Ahead of pace — you're carrying real momentum.";
-  if (ratio >= expected - 0.12) return "Right on pace. Steady and strong.";
-  return "Plenty of day left. No pressure — just the next one.";
+    return cb === "evening"
+      ? "Evening — a quiet start is still a start"
+      : "Day ahead — open and unhurried";
+  const r = done / total;
+  if (r >= 0.75) return "Strong finish in reach";
+  if (r >= 0.4) return "In flow — momentum holding";
+  return cb === "evening" ? "Winding down" : "Momentum building";
 }
 
 /** Human relative time vs now (minutes). */
@@ -165,6 +182,7 @@ export default function TodayPage() {
   const checkedIn = sleepQ != null && energy != null;
 
   const adaptation = useMemo(() => adapt(state), [state]);
+  const sig = useMemo(() => getSignals(state), [state]);
   const timeline = useMemo(() => {
     const items = compileTimeline(state, selDayIdx);
     return shapeTimeline(items, isToday ? adaptation.mode : "normal");
@@ -368,14 +386,77 @@ export default function TodayPage() {
                 className="h-1.5 w-1.5 rounded-full anim-pulse"
                 style={{ background: accent }}
               />
-              <Eyebrow color={accent}>{adaptation.headline}</Eyebrow>
+              <Eyebrow color={accent}>Operating summary</Eyebrow>
             </div>
-            <p className="t-body mt-3 leading-relaxed text-[var(--text-1)]">
+            <h2 className="t-section mt-3 text-[var(--text-1)]">
+              {adaptation.headline}
+            </h2>
+            <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
               {adaptation.tone}
             </p>
+
+            {/* Signal chips — the system's read on you */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                {
+                  k: "Recovery",
+                  v:
+                    sig.recoveryProxy == null
+                      ? "Building"
+                      : sig.recoveryProxy >= 70
+                      ? "High"
+                      : sig.recoveryProxy >= 45
+                      ? "Moderate"
+                      : "Low",
+                  c:
+                    sig.recoveryProxy == null
+                      ? "var(--text-3)"
+                      : sig.recoveryProxy >= 70
+                      ? "var(--vitality)"
+                      : sig.recoveryProxy >= 45
+                      ? "var(--readiness)"
+                      : "var(--alert)",
+                },
+                {
+                  k: "Sleep",
+                  v:
+                    sig.sleepQuality == null
+                      ? "—"
+                      : sig.sleepQuality >= 4
+                      ? "Strong"
+                      : sig.sleepQuality === 3
+                      ? "Steady"
+                      : "Light",
+                  c: "var(--sleep)",
+                },
+                {
+                  k: "Focus",
+                  v: ksItem ? ksItem.title : "Consistency",
+                  c: "var(--warm)",
+                },
+              ].map((chip) => (
+                <span
+                  key={chip.k}
+                  className="flex items-center gap-1.5 rounded-[var(--r-pill)] px-3 py-1.5"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: chip.c }}
+                  />
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                    {chip.k}
+                  </span>
+                  <span className="max-w-[120px] truncate text-[12px] font-semibold text-[var(--text-1)]">
+                    {chip.v}
+                  </span>
+                </span>
+              ))}
+            </div>
+
             <div className="mt-5">
               {prog.essentials > 0 && (
-                <div className="mb-3 flex items-center gap-1.5">
+                <div className="mb-2.5 flex items-center gap-1.5">
                   {Array.from({ length: prog.essentials }).map((_, i) => (
                     <motion.span
                       key={i}
@@ -387,25 +468,25 @@ export default function TodayPage() {
                             ? accent
                             : "var(--surface-3)",
                       }}
-                      transition={{ duration: 0.4 }}
+                      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                     />
                   ))}
                 </div>
               )}
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[12.5px] font-medium leading-snug text-[var(--text-2)]">
-                  {pacePhrase(prog.done, prog.total, cb)}
+                <p className="text-[13px] font-medium leading-snug text-[var(--text-2)]">
+                  {progressionPhrase(prog.done, prog.total, cb)}
                 </p>
-                <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--text-3)]">
-                  {prog.done}/{prog.total}
-                </span>
+                {prog.essentials > 0 && (
+                  <span className="shrink-0 text-[12px] font-semibold text-[var(--text-3)]">
+                    {prog.essentialsDone === prog.essentials
+                      ? "Essentials secured"
+                      : prog.essentialsDone === 0
+                      ? `${prog.essentials} essentials`
+                      : `${prog.essentialsDone} of ${prog.essentials} secured`}
+                  </span>
+                )}
               </div>
-              {prog.essentials > 0 && (
-                <p className="t-caption mt-1.5">
-                  {prog.essentialsDone} of {prog.essentials} essentials
-                  secured
-                </p>
-              )}
             </div>
             {adaptation.reasons.length > 0 && (
               <div className="mt-4">
@@ -443,28 +524,6 @@ export default function TodayPage() {
                 )}
               </div>
             )}
-            {isToday &&
-              ksItem &&
-              !isDone(log, ksItem.canonicalKey) && (
-                <div
-                  className="mt-4 flex items-center gap-2.5 rounded-[var(--r-md)] p-3.5"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  <Icon
-                    name="flame"
-                    size={15}
-                    className="shrink-0 text-[var(--warm)]"
-                  />
-                  <p className="text-[12.5px] leading-snug text-[var(--text-2)]">
-                    Your keystone today is{" "}
-                    <span className="font-semibold text-[var(--text-1)]">
-                      {ksItem.title}
-                    </span>
-                    {ks ? ` (+${ks.delta} on days you do it)` : ""}. If you
-                    protect one thing, make it this.
-                  </p>
-                </div>
-              )}
           </div>
         </motion.div>
         )}
@@ -589,24 +648,27 @@ export default function TodayPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
-                      style={{
-                        background:
-                          ks && upNext.canonicalKey === ks.key
-                            ? "color-mix(in srgb, var(--warm) 20%, var(--surface-3))"
-                            : "var(--surface-3)",
-                        color:
-                          ks && upNext.canonicalKey === ks.key
-                            ? "var(--warm)"
-                            : "var(--text-3)",
-                      }}
-                    >
-                      {ks && upNext.canonicalKey === ks.key
-                        ? "KEYSTONE"
-                        : (LEV_LABEL[upNext.leverage] ?? "Core").toUpperCase()}
-                    </span>
-                    <span className="text-[11px] text-[var(--text-4)]">
+                    {(() => {
+                      const isK = !!ks && upNext.canonicalKey === ks.key;
+                      const tg = leverageTag(upNext, adaptation.mode, {
+                        isKeystone: isK,
+                        streak: behaviorStats(state, upNext.canonicalKey)
+                          .streak,
+                      });
+                      const c = TONE_COLOR[tg.tone];
+                      return (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
+                          style={{
+                            background: `color-mix(in srgb, ${c} 18%, var(--surface-3))`,
+                            color: c,
+                          }}
+                        >
+                          {tg.text.toUpperCase()}
+                        </span>
+                      );
+                    })()}
+                    <span className="text-[11px] text-[var(--text-3)]">
                       {upNext.fromPacks[0]}
                       {upNext.fromPacks.length > 1 &&
                         ` +${upNext.fromPacks.length - 1}`}
@@ -623,8 +685,16 @@ export default function TodayPage() {
                 </div>
                 <Check on={false} color={accent} />
               </button>
-              <p className="relative mt-4 text-[13px] leading-relaxed text-[var(--text-3)]">
-                {upNext.rationale}
+              <p className="relative mt-4 text-[13.5px] leading-relaxed text-[var(--text-2)]">
+                {upNextMessage(upNext, {
+                  mode: adaptation.mode,
+                  minutesToStart:
+                    resolveMinutes(upNext, settings) != null
+                      ? (resolveMinutes(upNext, settings) as number) -
+                        nowMinutes()
+                      : null,
+                  isKeystone: !!ks && upNext.canonicalKey === ks.key,
+                })}
               </p>
               <div className="relative mt-4 flex items-center justify-between">
                 <span className="text-[11px] font-medium text-[var(--text-4)]">
@@ -713,13 +783,21 @@ export default function TodayPage() {
           {BLOCKS.map((block, bIdx) => {
             const items = timeline.filter((i) => i.block === block);
             if (items.length === 0) return null;
-            const doneCount = items.filter((i) =>
+            const visibleItems = items.filter((i) => !i.muted);
+            const optionalItems = items.filter((i) => i.muted);
+            const optKey = `opt:${block}`;
+            const showOpt = !!openBlocks[optKey];
+            const rendered = items.filter((i) => !i.muted || showOpt);
+            const baseItems =
+              visibleItems.length > 0 ? visibleItems : items;
+            const doneCount = baseItems.filter((i) =>
               isDone(log, i.canonicalKey)
             ).length;
             const cbIdx = BLOCKS.indexOf(cb);
             const isCurrent = block === cb;
             const isPast = bIdx < cbIdx;
-            const fullyDone = doneCount === items.length;
+            const fullyDone =
+              baseItems.length > 0 && doneCount === baseItems.length;
             const collapsed =
               isPast && fullyDone && !openBlocks[block];
 
@@ -748,7 +826,11 @@ export default function TodayPage() {
                     )}
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-3)]">
-                    {doneCount}/{items.length}
+                    {fullyDone
+                      ? "Complete"
+                      : doneCount > 0
+                      ? "In flow"
+                      : "Open"}
                     {collapsed && (
                       <Icon name="chevron" size={12} className="rotate-90" />
                     )}
@@ -762,20 +844,37 @@ export default function TodayPage() {
                       opacity: isCurrent ? 1 : isPast ? 0.6 : 0.85,
                     }}
                   >
-                    {items.length > 1 && (
-                      <span
-                        className="absolute bottom-3 top-3 w-px"
-                        style={{
-                          left: 19,
-                          background:
-                            "linear-gradient(180deg, transparent, var(--hairline-strong) 8%, var(--hairline-strong) 92%, transparent)",
-                        }}
-                      />
+                    {rendered.length > 1 && (
+                      <>
+                        <span
+                          className="absolute bottom-4 top-4 w-px"
+                          style={{
+                            left: 19,
+                            background:
+                              "linear-gradient(180deg, transparent, rgba(255,255,255,0.05) 12%, rgba(255,255,255,0.05) 88%, transparent)",
+                          }}
+                        />
+                        <motion.span
+                          className="absolute top-4 w-px"
+                          style={{ left: 19, background: accent, opacity: 0.4 }}
+                          initial={false}
+                          animate={{
+                            height: `${
+                              (doneCount / Math.max(baseItems.length, 1)) *
+                              100
+                            }%`,
+                          }}
+                          transition={{
+                            duration: 0.7,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                        />
+                      </>
                     )}
                     {(() => {
                       const now = nowMinutes();
                       let nowShown = false;
-                      return items.map((it) => {
+                      return rendered.map((it) => {
                         const done = isDone(log, it.canonicalKey);
                         const t = resolveMinutes(it, settings);
                         const st = behaviorStats(state, it.canonicalKey);
@@ -838,25 +937,28 @@ export default function TodayPage() {
                                 className="press relative z-10 grid w-10 shrink-0 place-items-center"
                               >
                                 <span
-                                  className="grid place-items-center rounded-full tr-fast"
-                                  style={{
-                                    height: lev3 ? 28 : lev1 ? 18 : 22,
-                                    width: lev3 ? 28 : lev1 ? 18 : 22,
-                                    background: done
-                                      ? tint
-                                      : "var(--bg)",
-                                    boxShadow: done
-                                      ? "none"
-                                      : `inset 0 0 0 ${
-                                          lev3 ? 2 : 1.5
-                                        }px ${
-                                          it.muted
-                                            ? "var(--text-4)"
-                                            : lev3
-                                            ? tint
-                                            : "var(--text-4)"
-                                        }`,
-                                  }}
+                                  className={`grid place-items-center rounded-full tr-fast ${
+                                    done ? "anim-node-pulse" : ""
+                                  }`}
+                                  style={
+                                    {
+                                      height: lev3 ? 26 : lev1 ? 16 : 20,
+                                      width: lev3 ? 26 : lev1 ? 16 : 20,
+                                      background: done
+                                        ? tint
+                                        : "var(--bg)",
+                                      "--pulse-c": `color-mix(in srgb, ${tint} 45%, transparent)`,
+                                      boxShadow: done
+                                        ? `0 0 10px color-mix(in srgb, ${tint} 30%, transparent)`
+                                        : `inset 0 0 0 ${
+                                            lev3 ? 1.75 : 1.5
+                                          }px ${
+                                            lev3 && !it.muted
+                                              ? `color-mix(in srgb, ${tint} 60%, var(--text-4))`
+                                              : "var(--hairline-strong)"
+                                          }`,
+                                    } as React.CSSProperties
+                                  }
                                 >
                                   {done ? (
                                     <svg
@@ -898,18 +1000,14 @@ export default function TodayPage() {
                                     : "px-3 py-2.5"
                                 }`}
                                 style={{
-                                  opacity: it.muted ? 0.5 : 1,
+                                  opacity: it.muted ? 0.55 : 1,
                                   background:
                                     lev3 && !done
-                                      ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 7%, var(--surface-2)), var(--surface-1))`
-                                      : done
-                                      ? "transparent"
-                                      : !lev1
-                                      ? "var(--surface-1)"
+                                      ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, transparent), transparent)`
                                       : "transparent",
                                   boxShadow:
                                     lev3 && !done
-                                      ? `inset 2px 0 0 ${accent}`
+                                      ? `inset 2px 0 0 color-mix(in srgb, ${accent} 70%, transparent)`
                                       : "none",
                                 }}
                               >
@@ -1006,6 +1104,31 @@ export default function TodayPage() {
                         );
                       });
                     })()}
+
+                    {optionalItems.length > 0 && (
+                      <button
+                        onClick={() =>
+                          setOpenBlocks((o) => ({
+                            ...o,
+                            [optKey]: !o[optKey],
+                          }))
+                        }
+                        className="press mt-1 flex w-full items-center gap-3 pl-10 text-left"
+                      >
+                        <span className="text-[12px] font-medium text-[var(--text-3)]">
+                          {showOpt
+                            ? "Hide optional"
+                            : `${optionalItems.length} optional today — eased to protect your focus`}
+                        </span>
+                        <Icon
+                          name="chevron"
+                          size={12}
+                          className={`text-[var(--text-4)] ${
+                            showOpt ? "-rotate-90" : "rotate-90"
+                          }`}
+                        />
+                      </button>
+                    )}
                   </div>
                 )}
               </section>
