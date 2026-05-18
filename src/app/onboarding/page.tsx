@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadState, saveState } from "@/lib/storage";
+import { packById } from "@/lib/packs";
 import { Button, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 
@@ -12,6 +13,14 @@ const GOALS: { key: string; label: string; desc: string; icon: IconName }[] = [
   { key: "body", label: "Body composition", desc: "Strength & metabolic health", icon: "dumbbell" },
   { key: "energy", label: "Daily energy", desc: "Steady focus & vitality", icon: "sparkle" },
 ];
+
+// Each goal seeds a tailored starter system.
+const GOAL_PACKS: Record<string, string[]> = {
+  longevity: ["longevity-foundation", "better-sleep"],
+  sleep: ["better-sleep", "longevity-foundation"],
+  body: ["longevity-foundation", "blood-sugar"],
+  energy: ["longevity-foundation", "deep-focus"],
+};
 
 const STEPS = 4;
 
@@ -32,9 +41,14 @@ export default function OnboardingPage() {
     state.settings.completedOnboarding = true;
     state.settings.disclaimerAcknowledged = true;
     state.settings.trialStartDate = new Date().toISOString();
+    state.installedPacks = [...(GOAL_PACKS[goal] ?? GOAL_PACKS.longevity)];
     saveState(state);
     router.push("/today");
   }
+
+  const recommended = (GOAL_PACKS[goal] ?? GOAL_PACKS.longevity)
+    .map((id) => packById(id))
+    .filter((p): p is NonNullable<typeof p> => !!p);
 
   const inputCls =
     "w-full rounded-[var(--r-md)] bg-[var(--surface-2)] px-4 py-4 text-[17px] text-[var(--text-1)] outline-none focus:ring-1 focus:ring-[var(--readiness)] tr-fast";
@@ -197,35 +211,37 @@ export default function OnboardingPage() {
               You&apos;re all set{name.trim() ? `, ${name.trim()}` : ""}
             </h1>
             <p className="t-body mt-3 leading-relaxed">
-              A science-backed protocol across four pillars is loaded. Track
-              daily, log your biomarkers, and watch your trends compound.
+              Based on your focus, these protocols are installed. They compile
+              into one adaptive daily timeline — overlapping behaviors merge
+              automatically.
             </p>
             <div className="card mt-8 p-5">
-              {[
-                { icon: "moon" as IconName, label: "Sleep" },
-                { icon: "pulse" as IconName, label: "Exercise" },
-                { icon: "leaf" as IconName, label: "Nutrition" },
-                { icon: "pill" as IconName, label: "Supplements" },
-              ].map((p, i) => (
+              {recommended.map((p, i) => (
                 <div
-                  key={p.label}
-                  className="flex items-center gap-3.5 py-3"
+                  key={p.id}
+                  className="flex items-center gap-3.5 py-3.5"
                   style={{
                     borderTop: i > 0 ? "1px solid var(--hairline)" : "none",
                   }}
                 >
                   <span
-                    className="chip h-9 w-9"
+                    className="chip h-10 w-10 shrink-0"
                     style={{
-                      background: "var(--surface-3)",
-                      color: "var(--text-2)",
+                      background: `color-mix(in srgb, ${p.accent} 16%, var(--surface-3))`,
+                      color: p.accent,
                     }}
                   >
-                    <Icon name={p.icon} size={17} />
+                    <Icon name={p.icon as IconName} size={18} />
                   </span>
-                  <p className="text-[15px] font-semibold text-[var(--text-1)]">
-                    {p.label}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-[var(--text-1)]">
+                      {p.name}
+                    </p>
+                    <p className="t-caption mt-0.5 truncate">{p.tagline}</p>
+                  </div>
+                  <span className="t-caption shrink-0">
+                    {p.behaviors.length}
+                  </span>
                 </div>
               ))}
             </div>

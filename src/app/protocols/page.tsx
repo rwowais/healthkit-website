@@ -240,7 +240,7 @@ export default function ProtocolsPage() {
                             />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[14px] font-semibold text-[var(--text-1)]">
+                            <p className="line-clamp-2 text-[14px] font-semibold leading-snug text-[var(--text-1)]">
                               {it.title}
                             </p>
                             <p className="mt-0.5 truncate text-[12px] text-[var(--text-3)]">

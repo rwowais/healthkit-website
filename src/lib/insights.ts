@@ -59,10 +59,15 @@ export function derivedInsights(logs: DailyLog[]): string[] {
     const dow = new Date(l.date + "T00:00:00").getDay();
     (byDow[dow] ??= []).push(l.score);
   }
-  const dows = Object.entries(byDow).filter(([, v]) => v.length >= 2);
-  if (dows.length >= 4) {
-    const best = dows.sort((a, b) => avg(b[1]) - avg(a[1]))[0];
-    const worst = dows.sort((a, b) => avg(a[1]) - avg(b[1]))[0];
+  // Only claim a weekday pattern with real signal: enough total history,
+  // ≥3 samples per weekday, ≥5 weekdays represented, and a large gap.
+  const dows = Object.entries(byDow)
+    .filter(([, v]) => v.length >= 3)
+    .map(([d, v]) => ({ d: +d, m: avg(v) }))
+    .sort((a, b) => b.m - a.m);
+  if (tracked.length >= 14 && dows.length >= 5) {
+    const best = dows[0];
+    const worst = dows[dows.length - 1];
     const names = [
       "Sundays",
       "Mondays",
@@ -72,11 +77,9 @@ export function derivedInsights(logs: DailyLog[]): string[] {
       "Fridays",
       "Saturdays",
     ];
-    if (avg(best[1]) - avg(worst[1]) >= 12) {
+    if (best.m - worst.m >= 15) {
       out.push(
-        `${names[+best[0]]} are your strongest days; ${
-          names[+worst[0]]
-        } your weakest. Pre-plan the weak day to smooth your week.`
+        `${names[best.d]} are your strongest days; ${names[worst.d]} your weakest. Pre-plan the weak day to smooth your week.`
       );
     }
   }

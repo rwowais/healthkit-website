@@ -95,13 +95,14 @@ export function Button({
   disabled?: boolean;
 }) {
   const base =
-    "press tr-fast inline-flex items-center justify-center gap-2 rounded-[var(--r-pill)] text-[14px] font-semibold disabled:opacity-40";
-  const styles =
-    variant === "primary"
-      ? "bg-[var(--text-1)] text-[#0A0B0D] px-6 py-3.5"
-      : variant === "soft"
-      ? "bg-[var(--surface-3)] text-[var(--text-1)] px-6 py-3.5"
-      : "border border-[var(--hairline-strong)] text-[var(--text-1)] px-6 py-3.5";
+    "press tr-fast inline-flex items-center justify-center gap-2 rounded-[var(--r-pill)] text-[14px] font-semibold";
+  const styles = disabled
+    ? "border border-[var(--hairline)] !bg-transparent text-[var(--text-4)] px-6 py-3.5 cursor-not-allowed"
+    : variant === "primary"
+    ? "bg-[var(--text-1)] text-[#0A0B0D] px-6 py-3.5"
+    : variant === "soft"
+    ? "bg-[var(--surface-3)] text-[var(--text-1)] px-6 py-3.5"
+    : "border border-[var(--hairline-strong)] text-[var(--text-1)] px-6 py-3.5";
   return (
     <button
       onClick={onClick}

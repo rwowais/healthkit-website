@@ -16,6 +16,7 @@ import type {
   TimeBlock,
 } from "./types";
 import { PACKS } from "./packs";
+import { resolveMinutes } from "./time";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
@@ -86,13 +87,18 @@ export function compileTimeline(
     }
   }
 
+  const settings = state.settings;
+  const clock = (it: TimelineItem) => {
+    const m = resolveMinutes(it, settings);
+    return m == null ? Number.MAX_SAFE_INTEGER : m;
+  };
   return [...merged.values()]
     .filter((it) => !it.daysActive || it.daysActive[dayIndex])
     .sort(
       (a, b) =>
         BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block] ||
-        b.leverage - a.leverage ||
-        a.offsetMin - b.offsetMin
+        clock(a) - clock(b) ||
+        b.leverage - a.leverage
     );
 }
 

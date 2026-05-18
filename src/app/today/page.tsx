@@ -48,10 +48,6 @@ function greeting() {
   if (h < 18) return "Good afternoon";
   return "Good evening";
 }
-function isoDayIdx() {
-  const j = new Date().getDay();
-  return j === 0 ? 6 : j - 1;
-}
 
 function Check({ on, color }: { on: boolean; color: string }) {
   return (
@@ -101,8 +97,30 @@ export default function TodayPage() {
   const cb = useMemo(() => currentBlock(settings), [settings]);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
-  const today = useMemo(() => dateKey(new Date()), []);
-  const log = useMemo(() => getLogForDate(state, today), [state, today]);
+  const [offset, setOffset] = useState(0);
+  const selectedDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    return dateKey(d);
+  }, [offset]);
+  const isToday = offset === 0;
+  const selDayIdx = useMemo(() => {
+    const j = new Date(selectedDate + "T00:00:00").getDay();
+    return j === 0 ? 6 : j - 1;
+  }, [selectedDate]);
+  const dateLabel = useMemo(() => {
+    if (offset === 0) return "Today";
+    if (offset === 1) return "Yesterday";
+    return new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }, [offset, selectedDate]);
+  const log = useMemo(
+    () => getLogForDate(state, selectedDate),
+    [state, selectedDate]
+  );
   const [detail, setDetail] = useState<TimelineItem | null>(null);
   const [showWhy, setShowWhy] = useState(false);
 
@@ -112,9 +130,9 @@ export default function TodayPage() {
 
   const adaptation = useMemo(() => adapt(state), [state]);
   const timeline = useMemo(() => {
-    const items = compileTimeline(state, isoDayIdx());
-    return shapeTimeline(items, adaptation.mode);
-  }, [state, adaptation.mode]);
+    const items = compileTimeline(state, selDayIdx);
+    return shapeTimeline(items, isToday ? adaptation.mode : "normal");
+  }, [state, adaptation.mode, selDayIdx, isToday]);
 
   const prog = useMemo(
     () => timelineProgress(timeline, log),
@@ -197,13 +215,43 @@ export default function TodayPage() {
   return (
     <Shell>
       <div className="flex flex-col gap-7">
-        {/* Greeting */}
+        {/* Greeting + date scrubber */}
         <div>
           <Eyebrow>{displayDate}</Eyebrow>
           <h1 className="t-title mt-2 text-[var(--text-1)]">
             {greeting()}
             {state.settings.name ? `, ${state.settings.name}` : ""}
           </h1>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => setOffset((o) => Math.min(o + 1, 30))}
+              aria-label="Previous day"
+              className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)]"
+              style={{ background: "var(--surface-2)" }}
+            >
+              <Icon name="chevron" size={14} className="rotate-180" />
+            </button>
+            <span className="min-w-[110px] text-center text-[13px] font-semibold text-[var(--text-2)]">
+              {dateLabel}
+            </span>
+            <button
+              onClick={() => setOffset((o) => Math.max(o - 1, 0))}
+              disabled={isToday}
+              aria-label="Next day"
+              className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)] disabled:opacity-30"
+              style={{ background: "var(--surface-2)" }}
+            >
+              <Icon name="chevron" size={14} />
+            </button>
+            {!isToday && (
+              <button
+                onClick={() => setOffset(0)}
+                className="press text-[12px] font-semibold text-[var(--readiness)]"
+              >
+                Back to today
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Adaptive banner — focal */}
@@ -299,7 +347,7 @@ export default function TodayPage() {
         </motion.div>
 
         {/* Daily check-in — feeds the adaptive engine */}
-        {!checkedIn && (
+        {isToday && !checkedIn && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -321,7 +369,7 @@ export default function TodayPage() {
                 <button
                   key={o.l}
                   onClick={() =>
-                    updateSleepLog(today, { sleepQuality: o.q })
+                    updateSleepLog(selectedDate, { sleepQuality: o.q })
                   }
                   className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
                   style={{
@@ -345,7 +393,7 @@ export default function TodayPage() {
               ].map((o) => (
                 <button
                   key={o.l}
-                  onClick={() => updateRatings(today, { energy: o.e })}
+                  onClick={() => updateRatings(selectedDate, { energy: o.e })}
                   className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
                   style={{
                     background:
@@ -363,7 +411,7 @@ export default function TodayPage() {
         )}
 
         {/* Up next — single focal action */}
-        {upNext && (
+        {isToday && upNext && (
           <div>
             <Eyebrow color="var(--text-3)">Up next</Eyebrow>
             <motion.button
@@ -371,7 +419,7 @@ export default function TodayPage() {
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              onClick={() => toggleBehavior(today, upNext.canonicalKey)}
+              onClick={() => toggleBehavior(selectedDate, upNext.canonicalKey)}
               className="press mt-3 w-full overflow-hidden rounded-[var(--r-xl)] p-5 text-left"
               style={{
                 background: `linear-gradient(160deg, color-mix(in srgb, ${accent} 12%, var(--surface-1)), var(--surface-1))`,
@@ -412,7 +460,8 @@ export default function TodayPage() {
         )}
 
         {/* Adaptive suggestion — calm, dismissible */}
-        {activeSuggestions.length > 0 &&
+        {isToday &&
+          activeSuggestions.length > 0 &&
           (() => {
             const sug = activeSuggestions[0];
             return (
@@ -523,7 +572,7 @@ export default function TodayPage() {
                   <div
                     className="well space-y-1.5 p-1.5"
                     style={{
-                      opacity: !isCurrent && !isPast ? 0.82 : 1,
+                      opacity: isCurrent ? 1 : isPast ? 0.55 : 0.82,
                     }}
                   >
                     {items.map((it) => {
@@ -543,7 +592,7 @@ export default function TodayPage() {
                         >
                           <button
                             onClick={() =>
-                              toggleBehavior(today, it.canonicalKey)
+                              toggleBehavior(selectedDate, it.canonicalKey)
                             }
                             className="flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-3.5 text-left"
                           >
@@ -569,7 +618,7 @@ export default function TodayPage() {
                             <span className="min-w-0 flex-1">
                               <span className="flex items-center gap-2">
                                 <span
-                                  className="truncate text-[14.5px] font-semibold"
+                                  className="line-clamp-2 min-w-0 text-[14.5px] font-semibold leading-snug"
                                   style={{
                                     color: done
                                       ? "var(--text-3)"
