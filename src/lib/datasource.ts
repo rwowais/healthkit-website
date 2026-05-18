@@ -8,6 +8,8 @@
  */
 import type { AppState } from "./types";
 import { loadState, saveState } from "./storage";
+import { STORAGE_KEY } from "./constants";
+import { getSupabase, supabaseEnabled, STATE_TABLE } from "./supabase";
 
 export interface DataSource {
   readonly kind: "local" | "supabase";
@@ -37,14 +39,75 @@ class LocalDataSource implements DataSource {
 export const STATE_EVENT = "pz:state";
 
 /**
- * Placeholder for the future cloud implementation. Intentionally inert
- * until a Supabase project + keys are provided by the account owner.
- *
- * class SupabaseDataSource implements DataSource {
- *   readonly kind = "supabase";
- *   readonly isCloud = true;
- *   // auth(), load() from `protocolize_state` row, save() upsert, realtime
- * }
+ * Cloud sync. Reuses storage's normalize + migration by round-tripping
+ * the cloud row through localStorage + loadState(). Safe-by-default:
+ * - no session            → behaves exactly like local
+ * - session, no cloud row → uploads local once (non-destructive migration)
+ * - session, cloud row    → cloud wins (local becomes an offline cache)
+ * Never deletes; tolerant of offline (local always written).
  */
+class SupabaseDataSource implements DataSource {
+  readonly kind = "supabase" as const;
+  readonly isCloud = true;
 
-export const activeDataSource: DataSource = new LocalDataSource();
+  async load(): Promise<AppState> {
+    const sb = getSupabase();
+    if (!sb) return loadState();
+    try {
+      const {
+        data: { user },
+      } = await sb.auth.getUser();
+      if (!user) return loadState();
+
+      const { data } = await sb
+        .from(STATE_TABLE)
+        .select("state")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (data?.state) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.state));
+        }
+        return loadState(); // normalizes + migrates the cloud payload
+      }
+
+      // First sign-in on this account: lift local data up, don't wipe.
+      const local = loadState();
+      await sb.from(STATE_TABLE).upsert({
+        user_id: user.id,
+        state: local,
+        updated_at: new Date().toISOString(),
+      });
+      return local;
+    } catch {
+      return loadState(); // offline / transient → local cache
+    }
+  }
+
+  async save(state: AppState): Promise<void> {
+    saveState(state); // offline-first cache + same-tab notify
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STATE_EVENT));
+    }
+    const sb = getSupabase();
+    if (!sb) return;
+    try {
+      const {
+        data: { user },
+      } = await sb.auth.getUser();
+      if (!user) return;
+      await sb.from(STATE_TABLE).upsert({
+        user_id: user.id,
+        state,
+        updated_at: new Date().toISOString(),
+      });
+    } catch {
+      /* offline — local cache holds; will resync on next save */
+    }
+  }
+}
+
+export const activeDataSource: DataSource = supabaseEnabled
+  ? new SupabaseDataSource()
+  : new LocalDataSource();

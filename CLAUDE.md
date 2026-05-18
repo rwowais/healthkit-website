@@ -91,7 +91,23 @@ Preferences win** (this owner wants autonomous execution, not check-ins).
 | Styling | Tailwind CSS v4 | ^4 |
 | Language | TypeScript | ^5 |
 | Fonts | Geist (sans + mono) | via next/font |
-| Storage | Browser localStorage | key: `protocolize-v3` (migrates v1/v2; DataSource layer is Supabase-ready) |
+| Storage | localStorage + optional Supabase | key: `protocolize-v3`; `SupabaseDataSource` activates only when env keys are set |
+
+### Cloud sync setup (owner action — ~3 min)
+
+The integration is built and **inert until configured** (no env = local-only,
+zero change). To enable accounts + cross-device sync:
+
+1. Create a free project at supabase.com.
+2. SQL Editor → paste & run `supabase/schema.sql`.
+3. Project Settings → API → copy **Project URL** and **anon public** key.
+4. Add both as `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   in `.env.local` and in Vercel env vars; redeploy.
+5. (Optional) Authentication → Providers → Email: keep magic link on.
+
+NEVER use the `service_role` key. On first sign-in, existing local data
+migrates up safely (cloud-empty → upload; cloud-present → cloud wins;
+nothing is deleted).
 | Hosting | Vercel | — |
 | Dev server | `next dev --webpack` | Turbopack crashes (PATH issue) |
 

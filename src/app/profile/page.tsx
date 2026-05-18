@@ -21,6 +21,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
+import SupabaseAuth from "@/components/SupabaseAuth";
 
 function Row({
   label,
@@ -284,11 +285,13 @@ export default function ProfilePage() {
           <p className="t-caption mt-2 leading-relaxed">
             Storage:{" "}
             <span className="text-[var(--text-2)]">
-              {activeDataSource.isCloud ? "Cloud" : "This device"}
+              {activeDataSource.isCloud
+                ? "Cloud sync available"
+                : "This device"}
             </span>
-            . Cloud sync & accounts are architected and ready to enable. Export
-            regularly until then.
+            . Export regularly as your own backup.
           </p>
+          <SupabaseAuth />
           <div className="mt-4 flex gap-3">
             <button
               onClick={doExport}
