@@ -23,6 +23,7 @@ import {
   suggestions,
   dueRank,
   keystone,
+  nowMinutes,
   type Suggestion,
 } from "@/lib/intel";
 import { Skeleton, Eyebrow } from "@/components/ui";
@@ -33,9 +34,42 @@ const MODE_ACCENT: Record<string, string> = {
   normal: "var(--readiness)",
   essentials: "var(--warm)",
   recovery: "var(--recovery)",
+  lighter: "var(--sleep)",
+  rebuild: "var(--recovery)",
   primed: "var(--vitality)",
 };
 const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
+const LEV_LABEL: Record<number, string> = {
+  3: "Essential",
+  2: "Core",
+  1: "Supporting",
+};
+
+/** Calm, time-aware momentum phrase (progress over perfection). */
+function pacePhrase(done: number, total: number, cb: TimeBlock): string {
+  if (total === 0) return "";
+  if (done === 0)
+    return "Your day is set. Start anywhere — momentum builds from one.";
+  if (done === total) return "Every behavior done. Beautifully closed.";
+  const ratio = done / total;
+  const expected =
+    cb === "morning" ? 0.3 : cb === "afternoon" ? 0.62 : 0.9;
+  if (ratio >= expected + 0.05)
+    return "Ahead of pace — you're carrying real momentum.";
+  if (ratio >= expected - 0.12) return "Right on pace. Steady and strong.";
+  return "Plenty of day left. No pressure — just the next one.";
+}
+
+/** Human relative time vs now (minutes). */
+function relTime(t: number | null, now: number): string {
+  if (t == null) return "Anytime";
+  const d = t - now;
+  if (d <= -90) return "Earlier — still worth it";
+  if (d <= 10) return "Now";
+  if (d < 60) return `In ${d} min`;
+  const h = Math.round(d / 60);
+  return `In ~${h}h`;
+}
 
 function dateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
@@ -96,6 +130,7 @@ export default function TodayPage() {
   } = useAppState();
   const settings = state.settings;
   const cb = useMemo(() => currentBlock(settings), [settings]);
+  const [snoozed, setSnoozed] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
   const [offset, setOffset] = useState(0);
@@ -151,13 +186,16 @@ export default function TodayPage() {
 
   const upNext = useMemo(() => {
     const candidates = timeline.filter(
-      (i) => !i.muted && !isDone(log, i.canonicalKey)
+      (i) =>
+        !i.muted &&
+        !isDone(log, i.canonicalKey) &&
+        !snoozed.includes(i.canonicalKey)
     );
     if (candidates.length === 0) return null;
     return [...candidates].sort(
       (a, b) => dueRank(a, settings) - dueRank(b, settings)
     )[0];
-  }, [timeline, log, settings]);
+  }, [timeline, log, settings, snoozed]);
 
   const activeSuggestions = useMemo<Suggestion[]>(
     () => suggestions(state).filter((s) => !dismissed.includes(s.id)),
@@ -335,35 +373,40 @@ export default function TodayPage() {
             <p className="t-body mt-3 leading-relaxed text-[var(--text-1)]">
               {adaptation.tone}
             </p>
-            <div className="mt-5 flex items-center gap-2.5">
-              <div
-                className="h-1.5 flex-1 overflow-hidden rounded-full"
-                style={{ background: "var(--surface-3)" }}
-              >
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: accent }}
-                  initial={{ width: 0 }}
-                  animate={{
-                    width: `${
-                      prog.total
-                        ? Math.max(3, (prog.done / prog.total) * 100)
-                        : 0
-                    }%`,
-                  }}
-                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                />
+            <div className="mt-5">
+              {prog.essentials > 0 && (
+                <div className="mb-3 flex items-center gap-1.5">
+                  {Array.from({ length: prog.essentials }).map((_, i) => (
+                    <motion.span
+                      key={i}
+                      className="h-1.5 flex-1 rounded-full"
+                      initial={false}
+                      animate={{
+                        backgroundColor:
+                          i < prog.essentialsDone
+                            ? accent
+                            : "var(--surface-3)",
+                      }}
+                      transition={{ duration: 0.4 }}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[12.5px] font-medium leading-snug text-[var(--text-2)]">
+                  {pacePhrase(prog.done, prog.total, cb)}
+                </p>
+                <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--text-3)]">
+                  {prog.done}/{prog.total}
+                </span>
               </div>
-              <span className="text-[12px] font-semibold text-[var(--text-2)]">
-                {prog.done}/{prog.total}
-              </span>
+              {prog.essentials > 0 && (
+                <p className="t-caption mt-1.5">
+                  {prog.essentialsDone} of {prog.essentials} essentials
+                  secured
+                </p>
+              )}
             </div>
-            {prog.essentials > 0 && (
-              <p className="t-caption mt-2">
-                {prog.essentialsDone}/{prog.essentials} high-leverage
-                essentials done — momentum over perfection.
-              </p>
-            )}
             {adaptation.reasons.length > 0 && (
               <div className="mt-4">
                 <button
@@ -490,52 +533,116 @@ export default function TodayPage() {
           </motion.div>
         )}
 
-        {/* Up next — single focal action */}
-        {isToday && upNext && (
+        {/* Up next — the single intelligent focus */}
+        {isToday && !dayComplete && upNext && (
           <div>
-            <Eyebrow color="var(--text-3)">Up next</Eyebrow>
-            <motion.button
+            <div className="mb-3 flex items-center justify-between px-1">
+              <Eyebrow color="var(--text-3)">Up next</Eyebrow>
+              <span
+                className="rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide"
+                style={{
+                  background: `color-mix(in srgb, ${accent} 16%, var(--surface-2))`,
+                  color: accent,
+                }}
+              >
+                {relTime(
+                  resolveMinutes(upNext, settings),
+                  nowMinutes()
+                ).toUpperCase()}
+              </span>
+            </div>
+            <motion.div
               key={upNext.canonicalKey}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
-              onClick={() => toggleBehavior(selectedDate, upNext.canonicalKey)}
-              className="press mt-3 w-full overflow-hidden rounded-[var(--r-xl)] p-5 text-left"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="relative overflow-hidden rounded-[var(--r-xl)] p-5"
               style={{
-                background: `linear-gradient(160deg, color-mix(in srgb, ${accent} 12%, var(--surface-1)), var(--surface-1))`,
+                background: `linear-gradient(155deg, color-mix(in srgb, ${accent} 14%, var(--surface-1)), var(--surface-1) 70%)`,
                 boxShadow: "var(--shadow-soft)",
               }}
             >
-              <div className="flex items-center gap-4">
+              <span
+                className="ambient anim-pulse"
+                style={{
+                  background: `radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, ${accent} 20%, transparent), transparent 60%)`,
+                }}
+              />
+              <button
+                onClick={() =>
+                  toggleBehavior(selectedDate, upNext.canonicalKey)
+                }
+                className="press relative flex w-full items-center gap-4 text-left"
+              >
                 <span
-                  className="chip h-14 w-14 shrink-0"
+                  className="chip h-16 w-16 shrink-0"
                   style={{
-                    background: `color-mix(in srgb, ${accent} 22%, var(--surface-3))`,
+                    background: `color-mix(in srgb, ${accent} 24%, var(--surface-3))`,
                     color: accent,
                   }}
                 >
                   <Icon
                     name={upNext.icon as IconName}
-                    size={26}
+                    size={28}
                     stroke={1.7}
                   />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[18px] font-bold text-[var(--text-1)]">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
+                      style={{
+                        background:
+                          ks && upNext.canonicalKey === ks.key
+                            ? "color-mix(in srgb, var(--warm) 20%, var(--surface-3))"
+                            : "var(--surface-3)",
+                        color:
+                          ks && upNext.canonicalKey === ks.key
+                            ? "var(--warm)"
+                            : "var(--text-3)",
+                      }}
+                    >
+                      {ks && upNext.canonicalKey === ks.key
+                        ? "KEYSTONE"
+                        : (LEV_LABEL[upNext.leverage] ?? "Core").toUpperCase()}
+                    </span>
+                    <span className="text-[11px] text-[var(--text-4)]">
+                      {upNext.fromPacks[0]}
+                      {upNext.fromPacks.length > 1 &&
+                        ` +${upNext.fromPacks.length - 1}`}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[19px] font-bold leading-tight text-[var(--text-1)]">
                     {upNext.title}
                   </p>
                   {upNext.dose && (
-                    <p className="mt-0.5 text-[13px] text-[var(--text-2)]">
+                    <p className="mt-1 text-[13px] text-[var(--text-2)]">
                       {upNext.dose}
                     </p>
                   )}
                 </div>
                 <Check on={false} color={accent} />
-              </div>
-              <p className="mt-4 text-[13px] leading-relaxed text-[var(--text-3)]">
+              </button>
+              <p className="relative mt-4 text-[13px] leading-relaxed text-[var(--text-3)]">
                 {upNext.rationale}
               </p>
-            </motion.button>
+              <div className="relative mt-4 flex items-center justify-between">
+                <span className="text-[11px] font-medium text-[var(--text-4)]">
+                  {prog.done > 0
+                    ? `${prog.done} done — keep the thread going`
+                    : "First one sets the tone"}
+                </span>
+                <button
+                  onClick={() =>
+                    setSnoozed((s) => [...s, upNext.canonicalKey])
+                  }
+                  className="press rounded-full px-3 py-1.5 text-[12px] font-semibold text-[var(--text-3)]"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  Later
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
 
@@ -650,66 +757,187 @@ export default function TodayPage() {
 
                 {!collapsed && (
                   <div
-                    className="well space-y-1.5 p-1.5"
+                    className="relative"
                     style={{
-                      opacity: isCurrent ? 1 : isPast ? 0.55 : 0.82,
+                      opacity: isCurrent ? 1 : isPast ? 0.6 : 0.85,
                     }}
                   >
-                    {items.map((it) => {
-                      const done = isDone(log, it.canonicalKey);
-                      const t = resolveMinutes(it, settings);
-                      const st = behaviorStats(state, it.canonicalKey);
-                      return (
-                        <div
-                          key={it.canonicalKey}
-                          className="row row-tap flex items-center"
-                          style={{
-                            opacity: it.muted ? 0.45 : 1,
-                            background: done
-                              ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, var(--surface-2)), var(--surface-1))`
-                              : undefined,
-                          }}
-                        >
-                          <button
-                            onClick={() =>
-                              toggleBehavior(selectedDate, it.canonicalKey)
-                            }
-                            className="flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-3.5 text-left"
-                          >
-                            <Check
-                              on={done}
-                              color={it.muted ? "var(--text-3)" : accent}
-                            />
-                            <span
-                              className="chip h-9 w-9 shrink-0"
-                              style={{
-                                background: done
-                                  ? accent
-                                  : "var(--surface-3)",
-                                color: done ? "#08090B" : "var(--text-2)",
-                              }}
-                            >
-                              <Icon
-                                name={it.icon as IconName}
-                                size={17}
-                                stroke={1.7}
-                              />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex items-center gap-2">
+                    {items.length > 1 && (
+                      <span
+                        className="absolute bottom-3 top-3 w-px"
+                        style={{
+                          left: 19,
+                          background:
+                            "linear-gradient(180deg, transparent, var(--hairline-strong) 8%, var(--hairline-strong) 92%, transparent)",
+                        }}
+                      />
+                    )}
+                    {(() => {
+                      const now = nowMinutes();
+                      let nowShown = false;
+                      return items.map((it) => {
+                        const done = isDone(log, it.canonicalKey);
+                        const t = resolveMinutes(it, settings);
+                        const st = behaviorStats(state, it.canonicalKey);
+                        const isKey = !!ks && it.canonicalKey === ks.key;
+                        const lev3 = it.leverage === 3 || isKey;
+                        const lev1 = it.leverage === 1 && !isKey;
+                        const showNow =
+                          isCurrent &&
+                          isToday &&
+                          !nowShown &&
+                          t != null &&
+                          t > now;
+                        if (showNow) nowShown = true;
+                        const tint = it.muted
+                          ? "var(--text-3)"
+                          : accent;
+
+                        return (
+                          <div key={it.canonicalKey}>
+                            {showNow && (
+                              <div className="relative flex items-center gap-3 py-1.5">
                                 <span
-                                  className="line-clamp-2 min-w-0 text-[14.5px] font-semibold leading-snug"
+                                  className="relative z-10 grid w-10 shrink-0 place-items-center"
+                                >
+                                  <span
+                                    className="h-2 w-2 rounded-full anim-pulse"
+                                    style={{
+                                      background: accent,
+                                      boxShadow: `0 0 8px ${accent}`,
+                                    }}
+                                  />
+                                </span>
+                                <span
+                                  className="text-[10px] font-bold tracking-wide"
+                                  style={{ color: accent }}
+                                >
+                                  NOW · {fmtClock(now)}
+                                </span>
+                                <span
+                                  className="h-px flex-1"
+                                  style={{ background: `${accent}40` }}
+                                />
+                              </div>
+                            )}
+
+                            <div
+                              className={`group relative flex items-stretch gap-3 ${
+                                lev1 ? "py-1" : "py-1.5"
+                              }`}
+                            >
+                              {/* Node on the spine */}
+                              <button
+                                onClick={() =>
+                                  toggleBehavior(
+                                    selectedDate,
+                                    it.canonicalKey
+                                  )
+                                }
+                                aria-label={done ? "Done" : "Mark done"}
+                                className="press relative z-10 grid w-10 shrink-0 place-items-center"
+                              >
+                                <span
+                                  className="grid place-items-center rounded-full tr-fast"
                                   style={{
-                                    color: done
-                                      ? "var(--text-3)"
-                                      : "var(--text-1)",
+                                    height: lev3 ? 28 : lev1 ? 18 : 22,
+                                    width: lev3 ? 28 : lev1 ? 18 : 22,
+                                    background: done
+                                      ? tint
+                                      : "var(--bg)",
+                                    boxShadow: done
+                                      ? "none"
+                                      : `inset 0 0 0 ${
+                                          lev3 ? 2 : 1.5
+                                        }px ${
+                                          it.muted
+                                            ? "var(--text-4)"
+                                            : lev3
+                                            ? tint
+                                            : "var(--text-4)"
+                                        }`,
                                   }}
                                 >
-                                  {it.title}
+                                  {done ? (
+                                    <svg
+                                      width={lev3 ? 14 : 11}
+                                      height={lev3 ? 14 : 11}
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="#08090B"
+                                      strokeWidth="3.4"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M5 12.5l4.5 4.5L19 7" />
+                                    </svg>
+                                  ) : lev3 ? (
+                                    <span
+                                      className="h-2 w-2 rounded-full"
+                                      style={{ background: tint }}
+                                    />
+                                  ) : null}
                                 </span>
-                                {ks &&
-                                  it.canonicalKey === ks.key &&
-                                  !done && (
+                              </button>
+
+                              {/* Content */}
+                              <button
+                                onClick={() =>
+                                  lev1
+                                    ? toggleBehavior(
+                                        selectedDate,
+                                        it.canonicalKey
+                                      )
+                                    : setDetail(it)
+                                }
+                                className={`min-w-0 flex-1 rounded-[var(--r-md)] text-left tr-fast ${
+                                  lev3 && !done
+                                    ? "px-4 py-3"
+                                    : lev1
+                                    ? "px-2 py-1.5"
+                                    : "px-3 py-2.5"
+                                }`}
+                                style={{
+                                  opacity: it.muted ? 0.5 : 1,
+                                  background:
+                                    lev3 && !done
+                                      ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 7%, var(--surface-2)), var(--surface-1))`
+                                      : done
+                                      ? "transparent"
+                                      : !lev1
+                                      ? "var(--surface-1)"
+                                      : "transparent",
+                                  boxShadow:
+                                    lev3 && !done
+                                      ? `inset 2px 0 0 ${accent}`
+                                      : "none",
+                                }}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`min-w-0 ${
+                                      lev1
+                                        ? "truncate text-[13px] font-medium"
+                                        : "line-clamp-2 font-semibold leading-snug"
+                                    } ${
+                                      lev3 && !done
+                                        ? "text-[15.5px]"
+                                        : "text-[14px]"
+                                    }`}
+                                    style={{
+                                      color: done
+                                        ? "var(--text-3)"
+                                        : lev1
+                                        ? "var(--text-2)"
+                                        : "var(--text-1)",
+                                      textDecoration: done
+                                        ? "none"
+                                        : "none",
+                                    }}
+                                  >
+                                    {it.title}
+                                  </span>
+                                  {isKey && !done && (
                                     <span
                                       className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
                                       style={{
@@ -721,43 +949,63 @@ export default function TodayPage() {
                                       KEYSTONE
                                     </span>
                                   )}
-                                {st.streak >= 3 && !done && (
-                                  <span
-                                    className="flex shrink-0 items-center gap-0.5 text-[11px] font-bold"
-                                    style={{ color: "var(--warm)" }}
-                                  >
-                                    <Icon name="flame" size={11} />
-                                    {st.streak}
-                                  </span>
+                                  {!isKey && lev3 && !done && (
+                                    <span
+                                      className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
+                                      style={{
+                                        background: "var(--surface-3)",
+                                        color: accent,
+                                      }}
+                                    >
+                                      ESSENTIAL
+                                    </span>
+                                  )}
+                                  {st.streak >= 3 && !done && (
+                                    <span
+                                      className="flex shrink-0 items-center gap-0.5 text-[11px] font-bold"
+                                      style={{ color: "var(--warm)" }}
+                                    >
+                                      <Icon name="flame" size={11} />
+                                      {st.streak}
+                                    </span>
+                                  )}
+                                </div>
+                                {!lev1 && (
+                                  <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
+                                    {t != null && !it.muted && (
+                                      <span className="tabular-nums">
+                                        {fmtClock(t)}
+                                      </span>
+                                    )}
+                                    {t != null && !it.muted && (
+                                      <span>·</span>
+                                    )}
+                                    {it.kind === "avoid" && (
+                                      <Icon name="ban" size={11} />
+                                    )}
+                                    <span className="truncate">
+                                      {it.muted
+                                        ? "Resting today"
+                                        : it.dose || it.fromPacks[0]}
+                                    </span>
+                                  </div>
                                 )}
-                              </span>
-                              <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
-                                {t != null && !it.muted && (
-                                  <span className="tabular-nums">
+                                {lev3 && !done && !it.muted && (
+                                  <p className="mt-1.5 line-clamp-1 text-[12px] leading-relaxed text-[var(--text-3)]">
+                                    {it.rationale}
+                                  </p>
+                                )}
+                                {lev1 && t != null && !it.muted && (
+                                  <span className="ml-2 text-[11px] tabular-nums text-[var(--text-4)]">
                                     {fmtClock(t)}
                                   </span>
                                 )}
-                                {t != null && !it.muted && <span>·</span>}
-                                {it.kind === "avoid" && (
-                                  <Icon name="ban" size={11} />
-                                )}
-                                {it.muted
-                                  ? "Eased today"
-                                  : it.dose || it.fromPacks[0]}
-                              </span>
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => setDetail(it)}
-                            aria-label="Details"
-                            className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--text-2)]"
-                            style={{ marginRight: 8 }}
-                          >
-                            <Icon name="info" size={16} />
-                          </button>
-                        </div>
-                      );
-                    })}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </section>
