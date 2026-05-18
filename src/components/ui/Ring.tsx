@@ -102,7 +102,7 @@ export function MiniRing({
   color?: string;
   size?: number;
   stroke?: number;
-  icon?: string;
+  icon?: React.ReactNode;
 }) {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
@@ -135,11 +135,7 @@ export function MiniRing({
           }
         />
       </svg>
-      {icon && (
-        <span className="absolute text-[20px]" style={{ lineHeight: 1 }}>
-          {icon}
-        </span>
-      )}
+      {icon && <span className="absolute" style={{ color }}>{icon}</span>}
     </div>
   );
 }

@@ -3,7 +3,9 @@
 import { useState } from "react";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
+import { clearAllData } from "@/lib/storage";
 import { PILLAR_META, PILLARS } from "@/lib/constants";
+import { Icon, type IconName } from "@/components/ui/icons";
 import {
   Card,
   Eyebrow,
@@ -116,13 +118,33 @@ export default function SettingsPage() {
             <Divider />
           </div>
           <div className="mt-1">
-            {PILLARS.map((p) => (
-              <Row key={p} label={`${PILLAR_META[p].icon} ${PILLAR_META[p].label}`}>
-                <span className="text-[14px] font-semibold text-[var(--text-2)]">
-                  {state.protocols[p].filter((i) => i.isEnabled).length}
-                </span>
-              </Row>
-            ))}
+            {PILLARS.map((p) => {
+              const ic: Record<string, IconName> = {
+                sleep: "moon",
+                exercise: "pulse",
+                nutrition: "leaf",
+                supplements: "pill",
+              };
+              return (
+                <div
+                  key={p}
+                  className="flex items-center justify-between py-3.5"
+                >
+                  <span className="flex items-center gap-2.5 t-label text-[var(--text-1)]">
+                    <Icon
+                      name={ic[p]}
+                      size={16}
+                      stroke={1.7}
+                      className="text-[var(--text-3)]"
+                    />
+                    {PILLAR_META[p].label}
+                  </span>
+                  <span className="text-[14px] font-semibold text-[var(--text-2)]">
+                    {state.protocols[p].filter((i) => i.isEnabled).length}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
@@ -197,10 +219,7 @@ export default function SettingsPage() {
           <Button
             full
             onClick={() => {
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("protocolize-v2");
-                localStorage.removeItem("protocolize-v3");
-              }
+              clearAllData();
               setConfirmReset(false);
               toast.show("Data reset");
               setTimeout(() => window.location.reload(), 800);

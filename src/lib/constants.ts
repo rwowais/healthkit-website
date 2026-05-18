@@ -98,7 +98,9 @@ export const FONT_SIZE = {
   "4xl": "2.5rem",
 } as const;
 
-export const STORAGE_KEY = "protocolize-v2";
+export const STORAGE_KEY = "protocolize-v3";
+/** Older keys we migrate from / clear on reset. */
+export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 
 export const TRIAL_DURATION_DAYS = 7;
 

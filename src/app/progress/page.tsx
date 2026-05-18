@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { calculateStreak } from "@/lib/scoring";
-import { PILLAR_META, PILLARS } from "@/lib/constants";
+import { PILLAR_META } from "@/lib/constants";
+import { pillarScore, PILLAR_LIST } from "@/lib/metrics";
 import { TrendArea, HeatStrip } from "@/components/ui/Charts";
 import {
   Card,
@@ -12,14 +13,22 @@ import {
   Segmented,
   Skeleton,
   Divider,
+  NoData,
 } from "@/components/ui";
-import type { DailyLog } from "@/lib/types";
+import { Icon, type IconName } from "@/components/ui/icons";
+import type { DailyLog, Pillar } from "@/lib/types";
 
-const PILLAR_COLOR: Record<string, string> = {
+const C: Record<Pillar, string> = {
   sleep: "var(--sleep)",
   exercise: "var(--readiness)",
   nutrition: "var(--vitality)",
   supplements: "var(--warm)",
+};
+const RAIL: Record<Pillar, IconName> = {
+  sleep: "moon",
+  exercise: "pulse",
+  nutrition: "leaf",
+  supplements: "pill",
 };
 
 function fmtKey(d: Date) {
@@ -28,7 +37,6 @@ function fmtKey(d: Date) {
     "0"
   )}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
 function range(days: number, logs: DailyLog[]) {
   const out: { date: string; log?: DailyLog }[] = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -43,12 +51,10 @@ function range(days: number, logs: DailyLog[]) {
 export default function ProgressPage() {
   const { state, loading } = useAppState();
   const [win, setWin] = useState<"7d" | "30d">("30d");
-
   const streak = useMemo(
     () => calculateStreak(state.dailyLogs),
     [state.dailyLogs]
   );
-
   const days = win === "7d" ? 7 : 30;
   const data = useMemo(
     () => range(days, state.dailyLogs),
@@ -70,28 +76,32 @@ export default function ProgressPage() {
         };
       });
   }, [data, win]);
+  const hasScoreTrend = scoreTrend.some((s) => s.value > 0);
 
-  const avgScore = useMemo(() => {
-    const v = data.map((d) => d.log?.score ?? 0).filter((x) => x > 0);
-    return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
-  }, [data]);
-
-  const trackedDays = useMemo(
+  const tracked = useMemo(
     () => data.filter((d) => (d.log?.score ?? 0) > 0).length,
     [data]
   );
-
-  const pillarAdherence = useMemo(() => {
-    return PILLARS.map((p) => {
-      const v = data
-        .map((d) => d.log?.pillarScores?.[p] ?? 0)
-        .filter((x) => x > 0);
-      const avg = v.length
-        ? Math.round(v.reduce((a, b) => a + b, 0) / v.length)
-        : 0;
-      return { pillar: p, avg };
-    });
+  const avgScore = useMemo(() => {
+    const v = data.map((d) => d.log?.score ?? 0).filter((x) => x > 0);
+    return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
   }, [data]);
+
+  const pillarAdherence = useMemo(
+    () =>
+      PILLAR_LIST.map((p) => {
+        const v = data
+          .map((d) => (d.log ? pillarScore(d.log, p) : null))
+          .filter((x): x is number => x != null && x > 0);
+        return {
+          pillar: p,
+          avg: v.length
+            ? Math.round(v.reduce((a, b) => a + b, 0) / v.length)
+            : null,
+        };
+      }),
+    [data]
+  );
 
   const heat = useMemo(
     () =>
@@ -134,24 +144,23 @@ export default function ProgressPage() {
           </div>
         </div>
 
-        {/* Headline stats */}
         <div className="anim-rise d1 grid grid-cols-3 gap-3">
           <Card pad="p-4">
             <p className="t-eyebrow">Avg Score</p>
             <p className="mt-3 text-[26px] font-bold text-[var(--text-1)]">
-              {avgScore}
+              {avgScore == null ? <NoData size={26} /> : avgScore}
             </p>
           </Card>
           <Card pad="p-4">
             <p className="t-eyebrow">Streak</p>
             <p className="mt-3 text-[26px] font-bold text-[var(--warm)]">
-              {streak}
+              {streak === 0 ? <NoData size={26} /> : streak}
             </p>
           </Card>
           <Card pad="p-4">
             <p className="t-eyebrow">Tracked</p>
             <p className="mt-3 text-[26px] font-bold text-[var(--vitality)]">
-              {trackedDays}
+              {tracked}
               <span className="text-[13px] font-medium text-[var(--text-3)]">
                 /{days}
               </span>
@@ -159,19 +168,23 @@ export default function ProgressPage() {
           </Card>
         </div>
 
-        {/* Score trend */}
         <div className="anim-rise d2">
           <h2 className="t-section mb-4 text-[var(--text-1)]">Score Trend</h2>
           <Card pad="p-5">
-            <TrendArea
-              data={scoreTrend}
-              color="var(--readiness)"
-              max={100}
-            />
+            {hasScoreTrend ? (
+              <TrendArea
+                data={scoreTrend}
+                color="var(--readiness)"
+                max={100}
+              />
+            ) : (
+              <p className="t-caption py-10 text-center">
+                Track a few days to reveal your score trend.
+              </p>
+            )}
           </Card>
         </div>
 
-        {/* Pillar adherence */}
         <div className="anim-rise d3">
           <h2 className="t-section mb-4 text-[var(--text-1)]">
             Pillar Adherence
@@ -181,23 +194,33 @@ export default function ProgressPage() {
               {pillarAdherence.map((pa, i) => (
                 <div key={pa.pillar}>
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="t-label text-[var(--text-1)]">
-                      {PILLAR_META[pa.pillar].icon}{" "}
+                    <span className="flex items-center gap-2 t-label text-[var(--text-1)]">
+                      <Icon
+                        name={RAIL[pa.pillar]}
+                        size={15}
+                        stroke={1.7}
+                        className="text-[var(--text-3)]"
+                      />
                       {PILLAR_META[pa.pillar].label}
                     </span>
                     <span
                       className="text-[14px] font-bold"
-                      style={{ color: PILLAR_COLOR[pa.pillar] }}
+                      style={{
+                        color:
+                          pa.avg == null ? "var(--text-4)" : C[pa.pillar],
+                      }}
                     >
-                      {pa.avg}%
+                      {pa.avg == null ? "—" : `${pa.avg}%`}
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-3)]">
                     <div
                       className="anim-fade h-full rounded-full"
                       style={{
-                        width: `${Math.max(2, pa.avg)}%`,
-                        background: PILLAR_COLOR[pa.pillar],
+                        width: `${
+                          pa.avg == null ? 0 : Math.max(2, pa.avg)
+                        }%`,
+                        background: C[pa.pillar],
                       }}
                     />
                   </div>
@@ -212,7 +235,6 @@ export default function ProgressPage() {
           </Card>
         </div>
 
-        {/* 30-day heat */}
         <div className="anim-rise d4">
           <h2 className="t-section mb-4 text-[var(--text-1)]">
             Consistency Map

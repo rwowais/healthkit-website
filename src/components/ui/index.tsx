@@ -269,6 +269,56 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ── Empty / cold-start state ──────────────────────────────────────
+export function EmptyState({
+  icon,
+  title,
+  body,
+  cta,
+  onCta,
+}: {
+  icon?: React.ReactNode;
+  title: string;
+  body: string;
+  cta?: string;
+  onCta?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center px-6 py-12 text-center">
+      {icon && (
+        <span
+          className="chip mb-5 h-14 w-14"
+          style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+        >
+          {icon}
+        </span>
+      )}
+      <p className="t-section text-[var(--text-1)]">{title}</p>
+      <p className="t-caption mt-2 max-w-[260px] leading-relaxed">{body}</p>
+      {cta && (
+        <button
+          onClick={onCta}
+          className="press tr-fast mt-5 rounded-[var(--r-pill)] bg-[var(--surface-3)] px-5 py-2.5 text-[13px] font-semibold text-[var(--text-1)]"
+        >
+          {cta}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** A dash placeholder for a metric with no data yet. */
+export function NoData({ size = 28 }: { size?: number }) {
+  return (
+    <span
+      className="font-bold text-[var(--text-4)]"
+      style={{ fontSize: size }}
+    >
+      —
+    </span>
+  );
+}
+
 // ── Score helpers ─────────────────────────────────────────────────
 export function scoreColor(s: number): string {
   if (s >= 80) return "var(--vitality)";

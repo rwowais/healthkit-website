@@ -1,4 +1,4 @@
-import { STORAGE_KEY } from "./constants";
+import { STORAGE_KEY, LEGACY_STORAGE_KEYS } from "./constants";
 import { calculateDailyScore, calculateStreak } from "./scoring";
 import type {
   AppState,
@@ -149,24 +149,53 @@ function buildDefaultSupplementMeta(
 
 // ── Load / Save ───────────────────────────────────────────────────
 
+function parseState(raw: string): AppState | null {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.version === 3) return parsed as AppState;
+    if (parsed?.version === 2) return migrateV2toV3(parsed);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function loadState(): AppState {
   if (typeof window === "undefined") return getDefaultState();
 
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return getDefaultState();
+  // Current key
+  const cur = localStorage.getItem(STORAGE_KEY);
+  if (cur) {
+    const s = parseState(cur);
+    if (s) return s;
+  }
 
-    const parsed = JSON.parse(raw);
-
-    // Migrate from v2 to v3
-    if (parsed.version === 2) {
-      return migrateV2toV3(parsed);
+  // Migrate from any legacy key, then persist under the current key
+  for (const key of LEGACY_STORAGE_KEYS) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    const s = parseState(raw);
+    if (s) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+      } catch {
+        /* storage full — non-fatal */
+      }
+      return s;
     }
+  }
 
-    if (parsed.version !== 3) return getDefaultState();
-    return parsed as AppState;
+  return getDefaultState();
+}
+
+/** Wipe all Protocolize data across current + legacy keys. */
+export function clearAllData(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    for (const k of LEGACY_STORAGE_KEYS) localStorage.removeItem(k);
   } catch {
-    return getDefaultState();
+    /* ignore */
   }
 }
 
