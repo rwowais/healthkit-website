@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { calculateStreak } from "@/lib/scoring";
@@ -167,6 +168,34 @@ export default function ProgressPage() {
             </p>
           </Card>
         </div>
+
+        <Link href="/biomarkers" className="anim-rise d1">
+          <Card className="press flex items-center gap-4">
+            <span
+              className="chip h-12 w-12 shrink-0"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--recovery) 16%, var(--surface-3))",
+                color: "var(--recovery)",
+              }}
+            >
+              <Icon name="pulse" size={22} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-[var(--text-1)]">
+                Biomarkers
+              </p>
+              <p className="t-caption mt-0.5">
+                Body & bloodwork — weight, HRV, ApoB, glucose & more
+              </p>
+            </div>
+            <Icon
+              name="chevron"
+              size={18}
+              className="shrink-0 text-[var(--text-3)]"
+            />
+          </Card>
+        </Link>
 
         <div className="anim-rise d2">
           <h2 className="t-section mb-4 text-[var(--text-1)]">Score Trend</h2>

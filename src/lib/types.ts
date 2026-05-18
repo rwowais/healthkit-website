@@ -161,6 +161,17 @@ export interface Insight {
 
 export type SupplementMetaMap = Record<string, SupplementMeta>;
 
+// ── Biomarkers ────────────────────────────────────────────────────
+
+/** A single dated reading for one biomarker metric. */
+export interface BiomarkerEntry {
+  id: string;
+  metric: string; // BiomarkerDef.key
+  value: number;
+  date: string; // YYYY-MM-DD
+  note?: string;
+}
+
 // ── App State ─────────────────────────────────────────────────────
 
 export interface AppState {
@@ -169,6 +180,7 @@ export interface AppState {
   protocols: Record<Pillar, ProtocolItem[]>;
   supplementMeta: SupplementMetaMap;
   dailyLogs: DailyLog[];
+  biomarkers: BiomarkerEntry[];
   insights: Insight[];
   currentStreak: number;
 }

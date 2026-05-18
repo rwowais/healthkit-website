@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
@@ -14,13 +14,15 @@ import {
   adherenceScore,
   pillarScore,
   hasAnyTracking,
+  readinessBreakdown,
   band,
   bandColor,
   PILLAR_LIST,
 } from "@/lib/metrics";
+import { topInsight } from "@/lib/insights";
 import { RingScore, MiniRing } from "@/components/ui/Ring";
 import { BarWeek } from "@/components/ui/Charts";
-import { Card, Eyebrow, Skeleton, NoData } from "@/components/ui";
+import { Card, Eyebrow, Skeleton, NoData, Sheet } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { DailyLog, Pillar } from "@/lib/types";
 
@@ -75,7 +77,9 @@ export default function TodayPage() {
     [state.dailyLogs]
   );
 
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const readiness = readinessScore(log);
+  const breakdown = useMemo(() => readinessBreakdown(log), [log]);
   const recovery = recoveryScore(log);
   const adherence = adherenceScore(log);
   const sleepP = pillarScore(log, "sleep");
@@ -93,6 +97,8 @@ export default function TodayPage() {
   const insight = useMemo(() => {
     if (!tracked)
       return "Open the tracker and check off your first protocol — your readiness and trends build from here.";
+    const data = topInsight(state.dailyLogs);
+    if (data) return data;
     if (state.dailyLogs.filter((l) => l.score > 0).length < 3)
       return "You're getting started. After a few tracked days, this space will surface patterns specific to you.";
     if (streak >= 7)
@@ -158,12 +164,20 @@ export default function TodayPage() {
               </div>
             </Link>
           ) : (
-            <RingScore
-              value={readiness}
-              label={band(readiness)}
-              sublabel="Readiness"
-              color={bandColor(readiness)}
-            />
+            <button
+              onClick={() => setShowBreakdown(true)}
+              className="press flex flex-col items-center"
+            >
+              <RingScore
+                value={readiness}
+                label={band(readiness)}
+                sublabel="Readiness"
+                color={bandColor(readiness)}
+              />
+              <span className="t-caption mt-3 flex items-center gap-1.5">
+                <Icon name="info" size={12} /> How this is calculated
+              </span>
+            </button>
           )}
           <div className="mt-6">
             {streak > 0 ? (
@@ -324,6 +338,44 @@ export default function TodayPage() {
           </Card>
         </div>
       </div>
+
+      <Sheet
+        open={showBreakdown}
+        onClose={() => setShowBreakdown(false)}
+        title="How readiness is calculated"
+      >
+        <p className="t-body mb-5 leading-relaxed">
+          Readiness is a weighted blend of only the inputs you logged today —
+          nothing is assumed or filled in.
+        </p>
+        <div className="space-y-3">
+          {breakdown.map((p) => (
+            <div key={p.label}>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="t-label text-[var(--text-1)]">
+                  {p.label}
+                </span>
+                <span className="text-[13px] font-semibold text-[var(--text-2)]">
+                  {Math.round(p.value)} · {Math.round(p.weight * 100)}%
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-3)]">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.max(2, p.weight * 100)}%`,
+                    background: "var(--readiness)",
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="t-caption mt-5 leading-relaxed">
+          Weights rebalance to the inputs present, so logging more makes the
+          score more complete and accurate.
+        </p>
+      </Sheet>
     </Shell>
   );
 }

@@ -2,6 +2,7 @@ import { STORAGE_KEY, LEGACY_STORAGE_KEYS } from "./constants";
 import { calculateDailyScore, calculateStreak } from "./scoring";
 import type {
   AppState,
+  BiomarkerEntry,
   DailyLog,
   ExerciseEntry,
   ItemCompletion,
@@ -125,8 +126,24 @@ export function getDefaultState(): AppState {
     },
     supplementMeta: buildDefaultSupplementMeta(defaultSupplementsProtocol),
     dailyLogs: [],
+    biomarkers: [],
     insights: [],
     currentStreak: 0,
+  };
+}
+
+/** Backfill any fields missing from older v3 saves (schema hardening). */
+function normalize(s: AppState): AppState {
+  const d = getDefaultState();
+  return {
+    ...s,
+    settings: { ...d.settings, ...s.settings },
+    protocols: s.protocols ?? d.protocols,
+    supplementMeta: s.supplementMeta ?? d.supplementMeta,
+    dailyLogs: Array.isArray(s.dailyLogs) ? s.dailyLogs : [],
+    biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
+    insights: Array.isArray(s.insights) ? s.insights : [],
+    currentStreak: s.currentStreak ?? 0,
   };
 }
 
@@ -152,8 +169,8 @@ function buildDefaultSupplementMeta(
 function parseState(raw: string): AppState | null {
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.version === 3) return parsed as AppState;
-    if (parsed?.version === 2) return migrateV2toV3(parsed);
+    if (parsed?.version === 3) return normalize(parsed as AppState);
+    if (parsed?.version === 2) return normalize(migrateV2toV3(parsed));
     return null;
   } catch {
     return null;
@@ -271,6 +288,35 @@ function getOrCreateLog(state: AppState, date: string): DailyLog {
 /** Public: read (or synthesize) the log for any date. */
 export function getLogForDate(state: AppState, date: string): DailyLog {
   return getOrCreateLog(state, date);
+}
+
+// ── Biomarkers ────────────────────────────────────────────────────
+
+export function addBiomarker(
+  state: AppState,
+  entry: Omit<BiomarkerEntry, "id">
+): AppState {
+  const e: BiomarkerEntry = {
+    ...entry,
+    id: `bm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  };
+  return { ...state, biomarkers: [...state.biomarkers, e] };
+}
+
+export function deleteBiomarker(state: AppState, id: string): AppState {
+  return {
+    ...state,
+    biomarkers: state.biomarkers.filter((b) => b.id !== id),
+  };
+}
+
+export function latestBiomarker(
+  state: AppState,
+  metric: string
+): BiomarkerEntry | undefined {
+  return state.biomarkers
+    .filter((b) => b.metric === metric)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
 }
 
 /** Public: full-state export / import for backup. */

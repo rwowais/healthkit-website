@@ -181,6 +181,38 @@ export function readinessScore(log: DailyLog): number | null {
   );
 }
 
+// ── Transparent breakdowns ────────────────────────────────────────
+
+export interface ScorePart {
+  label: string;
+  value: number; // 0-100 normalized contribution input
+  weight: number; // share of the score
+}
+
+export function readinessBreakdown(log: DailyLog): ScorePart[] {
+  const out: ScorePart[] = [];
+  const sp = pillarScore(log, "sleep");
+  const ad = adherenceScore(log);
+  if (sp != null) out.push({ label: "Sleep protocol", value: sp, weight: 0.3 });
+  if (ad != null)
+    out.push({ label: "Protocol adherence", value: ad, weight: 0.35 });
+  if (log.energyLevel != null)
+    out.push({
+      label: "Energy",
+      value: (log.energyLevel / 5) * 100,
+      weight: 0.2,
+    });
+  if (log.moodLevel != null)
+    out.push({
+      label: "Mood",
+      value: (log.moodLevel / 5) * 100,
+      weight: 0.15,
+    });
+  // renormalize displayed weights to present parts
+  const wSum = out.reduce((s, p) => s + p.weight, 0) || 1;
+  return out.map((p) => ({ ...p, weight: p.weight / wSum }));
+}
+
 /** Bedtime-consistency over a set of logs (0-100) or null if <2 nights. */
 export function bedtimeConsistency(logs: DailyLog[]): number | null {
   const mins = logs

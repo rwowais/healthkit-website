@@ -23,7 +23,10 @@ import {
   updateSupplementMeta as updateSupplementMetaFn,
   updateSleepLog as updateSleepLogFn,
   updateDailyRatings as updateDailyRatingsFn,
+  addBiomarker as addBiomarkerFn,
+  deleteBiomarker as deleteBiomarkerFn,
 } from "@/lib/storage";
+import type { BiomarkerEntry } from "@/lib/types";
 
 export function useAppState() {
   const [state, setState] = useState<AppState>(getDefaultState);
@@ -124,6 +127,19 @@ export function useAppState() {
     []
   );
 
+  // ── Biomarkers ──────────────────────────────────────────────
+
+  const addBiomarker = useCallback(
+    (entry: Omit<BiomarkerEntry, "id">) => {
+      setState((prev) => addBiomarkerFn(prev, entry));
+    },
+    []
+  );
+
+  const deleteBiomarker = useCallback((id: string) => {
+    setState((prev) => deleteBiomarkerFn(prev, id));
+  }, []);
+
   return {
     state,
     loading,
@@ -139,6 +155,9 @@ export function useAppState() {
     // Wellness
     updateSleepLog,
     updateRatings,
+    // Biomarkers
+    addBiomarker,
+    deleteBiomarker,
     // Config
     updateSettings,
     updateProtocols,
