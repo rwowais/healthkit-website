@@ -186,6 +186,8 @@ export interface BehaviorDef {
   leverage: 1 | 2 | 3; // 3 = highest leverage
   kind: BehaviorKind;
   daysActive?: boolean[]; // optional per-behavior schedule
+  /** Why this slot was recommended — calm, specific, one line. */
+  timingReason?: string;
 }
 
 export interface ProtocolPack {
@@ -204,6 +206,14 @@ export interface ProtocolPack {
 export interface BehaviorOverride {
   disabled?: boolean;
   daysActive?: boolean[];
+  /** User-chosen time block (overrides the recommended block). */
+  block?: TimeBlock;
+  /** User-chosen exact clock time "HH:MM" (overrides anchor math). */
+  customTime?: string;
+  /** User-edited dose / target text. */
+  dose?: string;
+  /** Personal note ("my why"). */
+  note?: string;
 }
 
 // ── Biomarkers ────────────────────────────────────────────────────

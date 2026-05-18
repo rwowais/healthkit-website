@@ -13,6 +13,8 @@ const B = (b: BehaviorDef): BehaviorDef => b;
 
 const MORNING_SUNLIGHT = B({
   canonicalKey: "morning-sunlight",
+  timingReason:
+    "Placed within ~30 min of waking — that's when light most powerfully sets your circadian clock.",
   title: "Morning sunlight",
   block: "morning",
   anchor: "wake",
@@ -30,6 +32,8 @@ const MORNING_SUNLIGHT = B({
 
 const HYDRATE_AM = B({
   canonicalKey: "hydrate-am",
+  timingReason:
+    "First thing on waking — it replaces overnight fluid loss before caffeine or food.",
   title: "Hydrate on waking",
   block: "morning",
   anchor: "wake",
@@ -43,6 +47,8 @@ const HYDRATE_AM = B({
 
 const PROTEIN_BREAKFAST = B({
   canonicalKey: "protein-breakfast",
+  timingReason:
+    "At the first meal — a protein-led start flattens the day's first glucose curve and sets satiety.",
   title: "Protein-forward first meal",
   block: "morning",
   anchor: "wake",
@@ -58,6 +64,8 @@ const PROTEIN_BREAKFAST = B({
 
 const MAGNESIUM_PM = B({
   canonicalKey: "magnesium-pm",
+  timingReason:
+    "~45 min before bed so it's already working as you fall asleep.",
   title: "Magnesium",
   block: "evening",
   anchor: "bed",
@@ -74,6 +82,8 @@ const MAGNESIUM_PM = B({
 
 const WIND_DOWN = B({
   canonicalKey: "wind-down",
+  timingReason:
+    "The last ~45 min before bed — that's the window where lowering arousal most improves sleep onset.",
   title: "Wind-down ritual",
   block: "evening",
   anchor: "bed",
@@ -89,6 +99,8 @@ const WIND_DOWN = B({
 
 const LAST_MEAL_3H = B({
   canonicalKey: "last-meal-3h",
+  timingReason:
+    "~3h before bed — closing the kitchen this early protects deep sleep and overnight repair.",
   title: "Finish eating 3h before bed",
   block: "evening",
   anchor: "bed",
@@ -102,6 +114,8 @@ const LAST_MEAL_3H = B({
 
 const CAFFEINE_CUTOFF = B({
   canonicalKey: "caffeine-cutoff",
+  timingReason:
+    "~10h before bed — caffeine's long half-life keeps eroding deep sleep well into the night.",
   title: "Caffeine cutoff",
   block: "afternoon",
   anchor: "bed",
@@ -117,6 +131,8 @@ const CAFFEINE_CUTOFF = B({
 
 const OMEGA3_AM = B({
   canonicalKey: "omega-3",
+  timingReason:
+    "With the first fat-containing meal — dietary fat markedly improves absorption.",
   title: "Omega-3 (EPA/DHA)",
   block: "morning",
   anchor: "wake",
@@ -149,6 +165,8 @@ export const PACKS: ProtocolPack[] = [
       OMEGA3_AM,
       B({
         canonicalKey: "zone2",
+        timingReason:
+          "Mid-day fits sustained aerobic work without competing with strength or sleep.",
         title: "Zone 2 movement",
         block: "afternoon",
         anchor: "wake",
@@ -163,6 +181,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "strength",
+        timingReason:
+          "Afternoon — body temperature and force output peak, which lowers injury risk.",
         title: "Strength training",
         block: "afternoon",
         anchor: "wake",
@@ -178,6 +198,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "fiber-veg",
+        timingReason:
+          "Spread across daytime meals to steady glucose through the day.",
         title: "Fiber & plants",
         block: "afternoon",
         anchor: "wake",
@@ -206,6 +228,8 @@ export const PACKS: ProtocolPack[] = [
       CAFFEINE_CUTOFF,
       B({
         canonicalKey: "dim-lights",
+        timingReason:
+          "~2h before bed — bright evening light is what most delays melatonin.",
         title: "Dim the lights",
         block: "evening",
         anchor: "bed",
@@ -219,6 +243,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "screens-off",
+        timingReason:
+          "The final stretch before bed — removes the most alerting light source.",
         title: "Screens off",
         block: "evening",
         anchor: "bed",
@@ -230,6 +256,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "cool-room",
+        timingReason:
+          "Set before bed so the room is already cool when core temperature needs to fall.",
         title: "Cool the bedroom",
         block: "evening",
         anchor: "bed",
@@ -257,6 +285,8 @@ export const PACKS: ProtocolPack[] = [
     behaviors: [
       B({
         canonicalKey: "vitamin-d3",
+        timingReason:
+          "With a morning fat-containing meal — fat aids absorption and it suits a daytime rhythm.",
         title: "Vitamin D3 + K2",
         block: "morning",
         anchor: "wake",
@@ -272,6 +302,8 @@ export const PACKS: ProtocolPack[] = [
       OMEGA3_AM,
       B({
         canonicalKey: "creatine",
+        timingReason:
+          "Anytime — for creatine, daily consistency matters far more than the clock.",
         title: "Creatine monohydrate",
         block: "anytime",
         anchor: "wake",
@@ -300,6 +332,8 @@ export const PACKS: ProtocolPack[] = [
       MORNING_SUNLIGHT,
       B({
         canonicalKey: "delay-caffeine",
+        timingReason:
+          "~90 min after waking — lets adenosine clear first and blunts the afternoon crash.",
         title: "Delay caffeine 90 min",
         block: "morning",
         anchor: "wake",
@@ -313,6 +347,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "deep-work",
+        timingReason:
+          "Late morning — peak alertness for your hardest cognitive block.",
         title: "One deep-work block",
         block: "morning",
         anchor: "wake",
@@ -326,6 +362,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "walk-break",
+        timingReason:
+          "Mid-afternoon — restores attention right as focus naturally dips.",
         title: "Mid-day walk break",
         block: "afternoon",
         anchor: "wake",
@@ -352,6 +390,8 @@ export const PACKS: ProtocolPack[] = [
       MORNING_SUNLIGHT,
       B({
         canonicalKey: "nsdr",
+        timingReason:
+          "Early afternoon — catches the post-lunch dip and resets you without harming night sleep.",
         title: "NSDR / yoga nidra",
         block: "afternoon",
         anchor: "wake",
@@ -366,6 +406,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "no-intense",
+        timingReason:
+          "Applies all day — on a depleted system, intensity deepens the hole.",
         title: "No intense training",
         block: "anytime",
         anchor: "wake",
@@ -378,6 +420,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "extra-sleep",
+        timingReason:
+          "Set at night — protecting the sleep opportunity is the recovery itself.",
         title: "Protect 8.5h sleep opportunity",
         block: "evening",
         anchor: "bed",
@@ -404,6 +448,8 @@ export const PACKS: ProtocolPack[] = [
       PROTEIN_BREAKFAST,
       B({
         canonicalKey: "veg-first",
+        timingReason:
+          "At meals — eating fiber before carbs blunts that meal's glucose spike.",
         title: "Vegetables first",
         block: "afternoon",
         anchor: "wake",
@@ -416,6 +462,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "post-meal-walk",
+        timingReason:
+          "Right after eating — muscle contraction clears glucose without insulin.",
         title: "Walk after meals",
         block: "afternoon",
         anchor: "wake",
@@ -429,6 +477,8 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "no-liquid-sugar",
+        timingReason:
+          "Any time — liquid sugar spikes fastest with the least satiety.",
         title: "No liquid sugar",
         block: "anytime",
         anchor: "wake",

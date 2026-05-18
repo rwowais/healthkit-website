@@ -23,6 +23,23 @@ export function resolveMinutes(
   return t;
 }
 
+/**
+ * Effective clock time for a (possibly retimed) timeline item:
+ * a user customTime wins; otherwise the anchor math.
+ */
+export function effectiveMinutes(
+  item: {
+    anchor: string;
+    offsetMin: number;
+    block: TimeBlock;
+    customTime?: string;
+  },
+  settings: { wakeTime: string; bedtime: string }
+): number | null {
+  if (item.customTime) return parseHM(item.customTime);
+  return resolveMinutes(item, settings);
+}
+
 export function fmtClock(min: number): string {
   const h = Math.floor(min / 60) % 24;
   const m = min % 60;

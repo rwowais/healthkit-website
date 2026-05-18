@@ -30,6 +30,7 @@ import {
   nowMinutes,
   type Suggestion,
 } from "@/lib/intel";
+import BehaviorSheet from "@/components/BehaviorSheet";
 import { Skeleton, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { TimeBlock } from "@/lib/types";
@@ -1137,76 +1138,35 @@ export default function TodayPage() {
         </div>
       </div>
 
-      {/* Behavior detail */}
-      {detail && (
-        <div
-          className="anim-fade fixed inset-0 z-[100] flex items-end justify-center sm:items-center"
-          style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={() => setDetail(null)}
-        >
-          <motion.div
-            initial={{ y: 40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="glass w-full max-w-[480px] rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:rounded-[var(--r-xl)] sm:border"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden" />
-            <div className="flex items-start gap-3">
-              <span
-                className="chip h-12 w-12 shrink-0"
-                style={{
-                  background: `color-mix(in srgb, ${accent} 16%, var(--surface-3))`,
-                  color: accent,
-                }}
-              >
-                <Icon name={detail.icon as IconName} size={22} />
-              </span>
-              <div>
-                <h3 className="t-section text-[var(--text-1)]">
-                  {detail.title}
-                </h3>
-                <p className="t-caption mt-1">
-                  From {detail.fromPacks.join(" · ")}
-                </p>
-              </div>
-            </div>
-            <p className="t-body mt-5 leading-relaxed text-[var(--text-1)]">
-              {detail.rationale}
-            </p>
-            {detail.evidence && (
-              <div
-                className="mt-4 rounded-[var(--r-md)] p-4"
-                style={{ background: "var(--surface-2)" }}
-              >
-                <Eyebrow color={accent}>Why this works</Eyebrow>
-                <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--text-2)]">
-                  {detail.evidence}
-                </p>
-              </div>
-            )}
-            {detail.recommendedBy && detail.recommendedBy.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {detail.recommendedBy.map((r) => (
-                  <span
-                    key={r}
-                    className="rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)]"
-                    style={{ background: "var(--surface-3)" }}
-                  >
-                    {r}
-                  </span>
-                ))}
-              </div>
-            )}
-            <Link
-              href="/protocols"
-              className="press tr-fast mt-6 block w-full rounded-[var(--r-pill)] bg-[var(--surface-3)] py-3.5 text-center text-[14px] font-semibold text-[var(--text-1)]"
-            >
-              Adjust in Protocols
-            </Link>
-          </motion.div>
-        </div>
-      )}
+      <BehaviorSheet
+        item={detail}
+        override={
+          detail ? state.behaviorOverrides?.[detail.canonicalKey] : undefined
+        }
+        color={accent}
+        onClose={() => setDetail(null)}
+        onChange={(next) => {
+          if (detail) setBehaviorOverride(detail.canonicalKey, next);
+        }}
+        onToggleEnabled={
+          detail
+            ? () => {
+                const cur =
+                  state.behaviorOverrides?.[detail.canonicalKey] ?? {};
+                setBehaviorOverride(detail.canonicalKey, {
+                  ...cur,
+                  disabled: !cur.disabled,
+                });
+                setDetail(null);
+              }
+            : undefined
+        }
+        isEnabled={
+          detail
+            ? !state.behaviorOverrides?.[detail.canonicalKey]?.disabled
+            : true
+        }
+      />
     </Shell>
   );
 }

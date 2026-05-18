@@ -16,12 +16,18 @@ import type {
   TimeBlock,
 } from "./types";
 import { PACKS } from "./packs";
-import { resolveMinutes } from "./time";
+import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
   muted: boolean;
+  /** User-chosen exact time, if set. */
+  customTime?: string;
+  /** The block the system recommended (before any user override). */
+  recommendedBlock: TimeBlock;
+  /** True when the user moved it off the recommended block/time. */
+  retimed: boolean;
 }
 
 const BLOCK_ORDER: Record<TimeBlock, number> = {
@@ -62,9 +68,16 @@ export function compileTimeline(
       if (ov?.disabled) continue;
       const existing = merged.get(b.canonicalKey);
       if (!existing) {
+        const retimed =
+          (!!ov?.block && ov.block !== b.block) || !!ov?.customTime;
         merged.set(b.canonicalKey, {
           ...b,
           daysActive: ov?.daysActive ?? b.daysActive,
+          dose: ov?.dose ?? b.dose,
+          block: ov?.block ?? b.block,
+          customTime: ov?.customTime,
+          recommendedBlock: b.block,
+          retimed,
           fromPacks: [pack.name],
           muted: false,
         });
@@ -90,7 +103,7 @@ export function compileTimeline(
 
   const settings = state.settings;
   const clock = (it: TimelineItem) => {
-    const m = resolveMinutes(it, settings);
+    const m = effectiveMinutes(it, settings);
     return m == null ? Number.MAX_SAFE_INTEGER : m;
   };
   return [...merged.values()]

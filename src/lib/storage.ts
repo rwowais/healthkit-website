@@ -386,6 +386,26 @@ export function deleteCustomPack(state: AppState, id: string): AppState {
   };
 }
 
+/** Fork a pack into an editable custom copy (installed; original removed). */
+export function duplicatePack(
+  state: AppState,
+  source: ProtocolPack
+): AppState {
+  const copy: ProtocolPack = {
+    ...source,
+    id: `custom-${Date.now()}`,
+    name: `${source.name} (yours)`,
+    source: "custom",
+    behaviors: source.behaviors.map((b) => ({ ...b })),
+  };
+  const customPacks = [...state.customPacks, copy];
+  const installedPacks = [
+    ...state.installedPacks.filter((p) => p !== source.id),
+    copy.id,
+  ];
+  return { ...state, customPacks, installedPacks };
+}
+
 // ── Biomarkers ────────────────────────────────────────────────────
 
 export function addBiomarker(

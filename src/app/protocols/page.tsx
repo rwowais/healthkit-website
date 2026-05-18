@@ -6,7 +6,12 @@ import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { packById } from "@/lib/packs";
-import { compileTimeline, blockLabel } from "@/lib/engine";
+import {
+  compileTimeline,
+  blockLabel,
+  type TimelineItem,
+} from "@/lib/engine";
+import BehaviorSheet from "@/components/BehaviorSheet";
 import {
   Eyebrow,
   Skeleton,
@@ -27,8 +32,10 @@ export default function ProtocolsPage() {
     setBehaviorOverride,
     upsertCustomPack,
     deleteCustomPack,
+    duplicatePack,
   } = useAppState();
   const toast = useToast();
+  const [detail, setDetail] = useState<TimelineItem | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<{
     name: string;
@@ -177,17 +184,36 @@ export default function ProtocolsPage() {
                       {pack.durationLabel ?? "Ongoing"}
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (pack.source === "custom") deleteCustomPack(pack.id);
-                      else uninstallPack(pack.id);
-                      toast.show(`${pack.name} removed`);
-                    }}
-                    className="press rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-3)]"
-                    style={{ background: "var(--surface-3)" }}
-                  >
-                    {pack.source === "custom" ? "Delete" : "Remove"}
-                  </button>
+                  <div className="flex shrink-0 flex-col gap-2">
+                    {pack.source !== "custom" && (
+                      <button
+                        onClick={() => {
+                          duplicatePack(pack);
+                          toast.show(`Forked "${pack.name}" — now editable`);
+                        }}
+                        className="press rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
+                        style={{
+                          background:
+                            "color-mix(in srgb, var(--readiness) 16%, var(--surface-3))",
+                          color: "var(--readiness)",
+                        }}
+                      >
+                        Customize
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (pack.source === "custom")
+                          deleteCustomPack(pack.id);
+                        else uninstallPack(pack.id);
+                        toast.show(`${pack.name} removed`);
+                      }}
+                      className="press rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-3)]"
+                      style={{ background: "var(--surface-3)" }}
+                    >
+                      {pack.source === "custom" ? "Delete" : "Remove"}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -239,9 +265,17 @@ export default function ProtocolsPage() {
                               stroke={1.7}
                             />
                           </span>
-                          <div className="min-w-0 flex-1">
+                          <button
+                            onClick={() => setDetail(it)}
+                            className="min-w-0 flex-1 text-left"
+                          >
                             <p className="line-clamp-2 text-[14px] font-semibold leading-snug text-[var(--text-1)]">
                               {it.title}
+                              {it.retimed && (
+                                <span className="ml-2 text-[10px] font-bold tracking-wide text-[var(--readiness)]">
+                                  RETIMED
+                                </span>
+                              )}
                             </p>
                             <p className="mt-0.5 truncate text-[12px] text-[var(--text-3)]">
                               {it.fromPacks.length > 1 ? (
@@ -252,7 +286,7 @@ export default function ProtocolsPage() {
                                 it.fromPacks[0]
                               )}
                             </p>
-                          </div>
+                          </button>
                           <button
                             onClick={() =>
                               setBehaviorOverride(it.canonicalKey, {
@@ -387,6 +421,36 @@ export default function ProtocolsPage() {
           </Button>
         </div>
       </Sheet>
+
+      <BehaviorSheet
+        item={detail}
+        override={
+          detail ? state.behaviorOverrides?.[detail.canonicalKey] : undefined
+        }
+        color="var(--readiness)"
+        onClose={() => setDetail(null)}
+        onChange={(next) => {
+          if (detail) setBehaviorOverride(detail.canonicalKey, next);
+        }}
+        onToggleEnabled={
+          detail
+            ? () => {
+                const cur =
+                  state.behaviorOverrides?.[detail.canonicalKey] ?? {};
+                setBehaviorOverride(detail.canonicalKey, {
+                  ...cur,
+                  disabled: !cur.disabled,
+                });
+                setDetail(null);
+              }
+            : undefined
+        }
+        isEnabled={
+          detail
+            ? !state.behaviorOverrides?.[detail.canonicalKey]?.disabled
+            : true
+        }
+      />
     </Shell>
   );
 }

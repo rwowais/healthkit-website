@@ -29,6 +29,7 @@ import {
   setBehaviorOverride as setBehaviorOverrideFn,
   upsertCustomPack as upsertCustomPackFn,
   deleteCustomPack as deleteCustomPackFn,
+  duplicatePack as duplicatePackFn,
 } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
 import type {
@@ -178,6 +179,9 @@ export function useAppState() {
   const deleteCustomPack = useCallback((id: string) => {
     setState((prev) => deleteCustomPackFn(prev, id));
   }, []);
+  const duplicatePack = useCallback((source: ProtocolPack) => {
+    setState((prev) => duplicatePackFn(prev, source));
+  }, []);
 
   return {
     state,
@@ -204,6 +208,7 @@ export function useAppState() {
     setBehaviorOverride,
     upsertCustomPack,
     deleteCustomPack,
+    duplicatePack,
     // Config
     updateSettings,
     updateProtocols,
