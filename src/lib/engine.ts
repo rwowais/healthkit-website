@@ -17,6 +17,7 @@ import type {
 } from "./types";
 import { PACKS } from "./packs";
 import { resolveMinutes } from "./time";
+import { biomarkerDef, biomarkerBand } from "./biomarkers";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
@@ -112,6 +113,38 @@ export interface Signals {
   gapDays: number; // days since last active before today
   eveningMissedYesterday: boolean;
   trackedDays: number;
+  bioConcern: string | null;
+  bioRecoveryFlag: boolean;
+}
+
+// Recovery-relevant markers whose "Watch" band should soften the day.
+const BIO_RECOVERY = new Set(["hrv", "restingHR", "hsCRP"]);
+
+function biomarkerConcern(state: AppState): {
+  text: string | null;
+  recovery: boolean;
+} {
+  const bms = state.biomarkers ?? [];
+  if (bms.length === 0) return { text: null, recovery: false };
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cut = `${cutoff.getFullYear()}-${String(
+    cutoff.getMonth() + 1
+  ).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+  const latest = new Map<string, number>();
+  for (const b of [...bms].sort((a, c) => a.date.localeCompare(c.date)))
+    if (b.date >= cut) latest.set(b.metric, b.value);
+  for (const [metric, value] of latest) {
+    const def = biomarkerDef(metric);
+    if (!def || def.direction === "range") continue;
+    if (biomarkerBand(def, value).label === "Watch") {
+      return {
+        text: `Recent ${def.label.toLowerCase()} (${value} ${def.unit}) is outside its optimal range`,
+        recovery: BIO_RECOVERY.has(metric),
+      };
+    }
+  }
+  return { text: null, recovery: false };
 }
 
 function logHasActivity(l: DailyLog): boolean {
@@ -180,6 +213,8 @@ export function getSignals(state: AppState): Signals {
     }
   }
 
+  const bio = biomarkerConcern(state);
+
   return {
     adherence7,
     recoveryProxy,
@@ -188,6 +223,8 @@ export function getSignals(state: AppState): Signals {
     gapDays,
     eveningMissedYesterday,
     trackedDays: recent.length,
+    bioConcern: bio.text,
+    bioRecoveryFlag: bio.recovery,
   };
 }
 
@@ -228,6 +265,7 @@ export function adapt(state: AppState): Adaptation {
         s.sleepQuality != null && s.sleepQuality <= 2
           ? "Sleep quality was low"
           : "Energy / recovery is down",
+        ...(s.bioConcern ? [s.bioConcern] : []),
       ],
     };
   }
@@ -245,6 +283,14 @@ export function adapt(state: AppState): Adaptation {
       headline: "Lighter day",
       tone: "Last night was rough. Lower the bar today — consistency beats intensity, and tonight's sleep is the priority.",
       reasons: ["You rated last night's sleep poor"],
+    };
+  }
+  if (s.bioRecoveryFlag && s.bioConcern) {
+    return {
+      mode: "lighter",
+      headline: "Ease in",
+      tone: "A recent biomarker suggests your system is under load. Keep today moderate and let recovery lead — this is data working for you.",
+      reasons: [s.bioConcern],
     };
   }
   if (s.recoveryProxy != null && s.recoveryProxy >= 78) {
@@ -267,7 +313,7 @@ export function adapt(state: AppState): Adaptation {
     mode: "normal",
     headline: "Today",
     tone: "A calm, complete day. Move through it block by block — momentum over perfection.",
-    reasons: [],
+    reasons: s.bioConcern ? [s.bioConcern] : [],
   };
 }
 

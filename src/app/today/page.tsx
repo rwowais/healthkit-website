@@ -22,6 +22,7 @@ import {
   behaviorStats,
   suggestions,
   dueRank,
+  keystone,
   type Suggestion,
 } from "@/lib/intel";
 import { Skeleton, Eyebrow } from "@/components/ui";
@@ -139,6 +140,15 @@ export default function TodayPage() {
     [timeline, log]
   );
 
+  const ks = useMemo(() => keystone(state), [state]);
+  const ksItem = useMemo(
+    () =>
+      ks ? timeline.find((i) => i.canonicalKey === ks.key) ?? null : null,
+    [ks, timeline]
+  );
+  const dayComplete =
+    isToday && prog.total > 0 && prog.done === prog.total;
+
   const upNext = useMemo(() => {
     const candidates = timeline.filter(
       (i) => !i.muted && !isDone(log, i.canonicalKey)
@@ -254,7 +264,54 @@ export default function TodayPage() {
           </div>
         </div>
 
+        {/* Day complete — calm reward */}
+        {dayComplete && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="panel relative overflow-hidden p-7 text-center"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--vitality) 26%, transparent), transparent 62%)",
+              }}
+            />
+            <div className="relative flex flex-col items-center">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{
+                  delay: 0.15,
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 14,
+                }}
+                className="chip h-16 w-16"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--vitality) 22%, var(--surface-3))",
+                  color: "var(--vitality)",
+                }}
+              >
+                <Icon name="check" size={30} stroke={2.2} />
+              </motion.span>
+              <h2 className="t-title mt-5 text-[var(--text-1)]">
+                You&apos;ve closed the day
+                {state.settings.name ? `, ${state.settings.name}` : ""}
+              </h2>
+              <p className="t-body mt-2.5 max-w-[300px] leading-relaxed">
+                Every behavior, done. This is the quiet, compounding work
+                that actually changes a healthspan. Rest well.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* Adaptive banner — focal */}
+        {!dayComplete && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -343,8 +400,31 @@ export default function TodayPage() {
                 )}
               </div>
             )}
+            {isToday &&
+              ksItem &&
+              !isDone(log, ksItem.canonicalKey) && (
+                <div
+                  className="mt-4 flex items-center gap-2.5 rounded-[var(--r-md)] p-3.5"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  <Icon
+                    name="flame"
+                    size={15}
+                    className="shrink-0 text-[var(--warm)]"
+                  />
+                  <p className="text-[12.5px] leading-snug text-[var(--text-2)]">
+                    Your keystone today is{" "}
+                    <span className="font-semibold text-[var(--text-1)]">
+                      {ksItem.title}
+                    </span>
+                    {ks ? ` (+${ks.delta} on days you do it)` : ""}. If you
+                    protect one thing, make it this.
+                  </p>
+                </div>
+              )}
           </div>
         </motion.div>
+        )}
 
         {/* Daily check-in — feeds the adaptive engine */}
         {isToday && !checkedIn && (
@@ -627,6 +707,20 @@ export default function TodayPage() {
                                 >
                                   {it.title}
                                 </span>
+                                {ks &&
+                                  it.canonicalKey === ks.key &&
+                                  !done && (
+                                    <span
+                                      className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
+                                      style={{
+                                        background:
+                                          "color-mix(in srgb, var(--warm) 18%, var(--surface-3))",
+                                        color: "var(--warm)",
+                                      }}
+                                    >
+                                      KEYSTONE
+                                    </span>
+                                  )}
                                 {st.streak >= 3 && !done && (
                                   <span
                                     className="flex shrink-0 items-center gap-0.5 text-[11px] font-bold"

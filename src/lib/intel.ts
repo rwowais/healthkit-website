@@ -151,14 +151,34 @@ export function suggestions(state: AppState): Suggestion[] {
     }
   }
 
-  // 3. Consistently strong → suggest a progression pack
+  // 3. Keystone slipping → gentle awareness (no guilt, no pause)
+  const ks = keystone(state);
+  if (
+    ks &&
+    !state.behaviorOverrides?.[ks.key]?.disabled &&
+    activeDays.length >= 5
+  ) {
+    const stat = behaviorStats(state, ks.key);
+    if (stat.last7 < Math.ceil(activeDays.length / 2)) {
+      out.push({
+        id: `sug-keystone-${ks.key}`,
+        kind: "progress",
+        title: `Your keystone is slipping`,
+        body: `On days you do “${ks.title}” your score runs ${ks.delta} points higher — but it's been light lately. Re-anchor it tomorrow.`,
+        cta: "Got it",
+        action: { type: "none" },
+      });
+    }
+  }
+
+  // 4. Consistently strong → suggest a progression pack
   const recent = [...state.dailyLogs]
     .filter((l) => l.score > 0)
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 7);
   if (
-    recent.length >= 7 &&
-    recent.reduce((a, b) => a + b.score, 0) / recent.length >= 80
+    recent.length >= 6 &&
+    recent.reduce((a, b) => a + b.score, 0) / recent.length >= 75
   ) {
     const next = PACKS.find(
       (p) =>

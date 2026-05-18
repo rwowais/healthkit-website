@@ -243,6 +243,39 @@ export default function ProfilePage() {
               />
             </button>
           </Row>
+          <p className="t-caption mt-1 leading-relaxed">
+            Reminders fire at each behavior&apos;s scheduled time while
+            Protocolize is open in a tab. Always-on background reminders
+            arrive with the native app.
+          </p>
+          {s.notificationsEnabled && (
+            <button
+              onClick={async () => {
+                if (
+                  typeof window === "undefined" ||
+                  !("Notification" in window) ||
+                  Notification.permission !== "granted"
+                ) {
+                  toast.show("Enable reminders first");
+                  return;
+                }
+                try {
+                  const reg = await navigator.serviceWorker.ready;
+                  await reg.showNotification("Protocolize", {
+                    body: "Test reminder — you're all set.",
+                    icon: "/icon.svg",
+                    tag: "pz-test",
+                  });
+                  toast.show("Test sent");
+                } catch {
+                  toast.show("Could not send");
+                }
+              }}
+              className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--surface-3)] py-3 text-[13px] font-semibold text-[var(--text-1)]"
+            >
+              Send a test reminder
+            </button>
+          )}
         </Card>
 
         {/* Data */}

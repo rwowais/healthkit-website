@@ -18,6 +18,22 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((cl) => {
+        for (const c of cl) {
+          if ("focus" in c) return c.focus();
+        }
+        return self.clients.openWindow
+          ? self.clients.openWindow("/today")
+          : undefined;
+      })
+  );
+});
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET" || !req.url.startsWith("http")) return;
