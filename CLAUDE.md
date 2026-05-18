@@ -23,6 +23,65 @@ A longevity routine web app that helps users build science-backed routines for s
 
 ---
 
+## Workflow & Operating Rules
+
+Tailored from a known-good CLAUDE.md template, reconciled with this project's
+autonomy preference. **Where these conflict with Owner Preferences, Owner
+Preferences win** (this owner wants autonomous execution, not check-ins).
+
+### Planning
+- Plan internally for any non-trivial task (3+ steps or an architectural
+  decision). Write the plan down (task list) and work it top to bottom.
+- **Do NOT pause for plan approval by default.** Surface a plan for sign-off
+  ONLY when a decision is expensive or irreversible: schema/data-model changes,
+  data loss, money, new infra/dependencies, or anything needing the owner's
+  credentials (e.g. Supabase). Otherwise just build it.
+- If something goes sideways, stop and re-plan immediately rather than pushing
+  a shaky approach forward.
+
+### Subagents
+- Use subagents liberally to keep the main context window clean.
+- Offload research, codebase exploration, and parallel analysis to subagents.
+- One focused task per subagent.
+
+### Self-improvement loop
+- After ANY correction from the owner, capture the pattern in
+  `tasks/lessons.md` and write a concrete rule that prevents the repeat.
+- Review `tasks/lessons.md` at the start of a session before non-trivial work.
+- Iterate on these lessons until the mistake stops recurring.
+
+### Verification before "done"
+- Never mark work complete without proving it: `npx tsc --noEmit` clean,
+  `npx next build` clean, and in-browser verification of the actual change
+  (preview server) for any UI/behavior change.
+- Diff behavior between intended and actual; don't trust the diff alone.
+- Ask: "would a staff engineer approve this?" before presenting.
+
+### Demand elegance (balanced)
+- For non-trivial changes, pause and ask "is there a more elegant way?"
+  before committing to an approach.
+- If a fix feels hacky, implement the clean solution instead.
+- Skip this for simple, obvious fixes — don't over-engineer.
+
+### Autonomous bug fixing
+- Given a bug report or failing build/test: just fix it. Find the root cause,
+  no temporary patches, no hand-holding. Zero context-switching for the owner.
+
+### Task management
+1. Plan first — write a checkable task list.
+2. Track progress — mark items complete as you go.
+3. Explain changes — concise high-level summary at each step.
+4. Document results — what shipped, what's verified, what's still open.
+5. Capture lessons — update `tasks/lessons.md` after corrections.
+
+### Core principles
+- **Simplicity first** — make every change as small as it can be; minimal code.
+- **No laziness** — root causes, not band-aids. Senior-developer standards.
+- **Minimal impact** — only touch what's necessary; no incidental side effects.
+- **Honesty** — state caveats, limits, and what was *not* verified plainly.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology | Version |
@@ -32,7 +91,7 @@ A longevity routine web app that helps users build science-backed routines for s
 | Styling | Tailwind CSS v4 | ^4 |
 | Language | TypeScript | ^5 |
 | Fonts | Geist (sans + mono) | via next/font |
-| Storage | Browser localStorage | key: `protocolize-v1` |
+| Storage | Browser localStorage | key: `protocolize-v3` (migrates v1/v2; DataSource layer is Supabase-ready) |
 | Hosting | Vercel | — |
 | Dev server | `next dev --webpack` | Turbopack crashes (PATH issue) |
 
