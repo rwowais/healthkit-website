@@ -79,10 +79,16 @@ function Check({ on, color }: { on: boolean; color: string }) {
 }
 
 export default function TodayPage() {
-  const { state, loading, toggleBehavior } = useAppState();
+  const { state, loading, toggleBehavior, updateSleepLog, updateRatings } =
+    useAppState();
   const today = useMemo(() => dateKey(new Date()), []);
   const log = useMemo(() => getLogForDate(state, today), [state, today]);
   const [detail, setDetail] = useState<TimelineItem | null>(null);
+  const [showWhy, setShowWhy] = useState(false);
+
+  const sleepQ = log.sleepLog?.sleepQuality ?? null;
+  const energy = log.energyLevel ?? null;
+  const checkedIn = sleepQ != null && energy != null;
 
   const adaptation = useMemo(() => adapt(state), [state]);
   const timeline = useMemo(() => {
@@ -224,8 +230,108 @@ export default function TodayPage() {
                 essentials done — momentum over perfection.
               </p>
             )}
+            {adaptation.reasons.length > 0 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowWhy((v) => !v)}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-3)]"
+                >
+                  <Icon name="info" size={12} />
+                  Why today looks like this
+                  <Icon
+                    name="chevron"
+                    size={12}
+                    className={showWhy ? "rotate-90" : ""}
+                  />
+                </button>
+                {showWhy && (
+                  <motion.ul
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="mt-2.5 space-y-1.5 overflow-hidden"
+                  >
+                    {adaptation.reasons.map((r) => (
+                      <li
+                        key={r}
+                        className="flex items-center gap-2 text-[12.5px] text-[var(--text-2)]"
+                      >
+                        <span
+                          className="h-1 w-1 rounded-full"
+                          style={{ background: accent }}
+                        />
+                        {r}
+                      </li>
+                    ))}
+                  </motion.ul>
+                )}
+              </div>
+            )}
           </div>
         </motion.div>
+
+        {/* Daily check-in — feeds the adaptive engine */}
+        {!checkedIn && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card p-5"
+          >
+            <Eyebrow>Morning check-in</Eyebrow>
+            <p className="t-caption mt-1.5">
+              Two taps. This is what makes tomorrow adapt to you.
+            </p>
+            <p className="mt-4 mb-2 text-[13px] font-medium text-[var(--text-2)]">
+              How did you sleep?
+            </p>
+            <div className="flex gap-2">
+              {[
+                { l: "Poor", q: 2 },
+                { l: "OK", q: 3 },
+                { l: "Great", q: 5 },
+              ].map((o) => (
+                <button
+                  key={o.l}
+                  onClick={() =>
+                    updateSleepLog(today, { sleepQuality: o.q })
+                  }
+                  className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
+                  style={{
+                    background:
+                      sleepQ === o.q ? "var(--sleep)" : "var(--surface-2)",
+                    color: sleepQ === o.q ? "#08090B" : "var(--text-3)",
+                  }}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+            <p className="mt-4 mb-2 text-[13px] font-medium text-[var(--text-2)]">
+              Energy right now?
+            </p>
+            <div className="flex gap-2">
+              {[
+                { l: "Low", e: 2 },
+                { l: "Steady", e: 3 },
+                { l: "High", e: 5 },
+              ].map((o) => (
+                <button
+                  key={o.l}
+                  onClick={() => updateRatings(today, { energy: o.e })}
+                  className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
+                  style={{
+                    background:
+                      energy === o.e
+                        ? "var(--readiness)"
+                        : "var(--surface-2)",
+                    color: energy === o.e ? "#08090B" : "var(--text-3)",
+                  }}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {/* Up next — single focal action */}
         {upNext && (
