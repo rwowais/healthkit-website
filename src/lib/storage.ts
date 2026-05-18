@@ -268,6 +268,20 @@ function getOrCreateLog(state: AppState, date: string): DailyLog {
   return createEmptyDailyLog(date, state.protocols);
 }
 
+/** Public: read (or synthesize) the log for any date. */
+export function getLogForDate(state: AppState, date: string): DailyLog {
+  return getOrCreateLog(state, date);
+}
+
+/** Public: full-state export / import for backup. */
+export function exportState(state: AppState): string {
+  return JSON.stringify(state, null, 2);
+}
+
+export function importState(raw: string): AppState | null {
+  return parseState(raw);
+}
+
 // ── Recalculate ───────────────────────────────────────────────────
 
 function recalculate(state: AppState, log: DailyLog): DailyLog {

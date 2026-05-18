@@ -3,11 +3,12 @@
 import { useState, useMemo, useRef } from "react";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
-import { useToday } from "@/hooks/useToday";
-import { getTodayLog } from "@/lib/storage";
+import { getLogForDate } from "@/lib/storage";
+import { pillarScore } from "@/lib/metrics";
 import { PILLAR_META } from "@/lib/constants";
 import { Skeleton, useToast } from "@/components/ui";
 import { Icon, iconForItem, type IconName } from "@/components/ui/icons";
+import ProtocolDetailSheet from "@/components/ProtocolDetailSheet";
 import type {
   Pillar,
   ProtocolItem,
@@ -154,14 +155,14 @@ function TaskRow({
   on,
   color,
   onToggle,
-  trailing,
+  onInfo,
   children,
 }: {
   item: ProtocolItem;
   on: boolean;
   color: string;
   onToggle: () => void;
-  trailing?: React.ReactNode;
+  onInfo?: () => void;
   children?: React.ReactNode;
 }) {
   return (
@@ -175,27 +176,36 @@ function TaskRow({
           : undefined
       }
     >
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-3.5 px-3.5 py-3 text-left"
-      >
-        <Check on={on} color={color} />
-        <Chip name={iconForItem(item)} color={color} on={on} />
-        <span className="min-w-0 flex-1">
-          <span
-            className="block truncate text-[14.5px] font-semibold tr-fast"
-            style={{
-              color: on ? "var(--text-2)" : "var(--text-1)",
-            }}
+      <div className="flex items-center">
+        <button
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-3.5 text-left"
+        >
+          <Check on={on} color={color} />
+          <Chip name={iconForItem(item)} color={color} on={on} />
+          <span className="min-w-0 flex-1">
+            <span
+              className="block truncate text-[14.5px] font-semibold tr-fast"
+              style={{ color: on ? "var(--text-2)" : "var(--text-1)" }}
+            >
+              {item.name}
+            </span>
+            <span className="mt-0.5 block truncate text-[12px] text-[var(--text-3)]">
+              {on ? "Completed" : item.description}
+            </span>
+          </span>
+        </button>
+        {onInfo && (
+          <button
+            onClick={onInfo}
+            aria-label="Details"
+            className="press tr-fast grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--text-2)]"
+            style={{ marginRight: 8 }}
           >
-            {item.name}
-          </span>
-          <span className="mt-0.5 block truncate text-[12px] text-[var(--text-3)]">
-            {on ? "Completed" : item.description}
-          </span>
-        </span>
-        {trailing}
-      </button>
+            <Icon name="info" size={16} />
+          </button>
+        )}
+      </div>
       {children}
     </div>
   );
@@ -206,10 +216,12 @@ function SleepTracker({
   log,
   items,
   onToggle,
+  onInfo,
 }: {
   log: DailyLog;
   items: ProtocolItem[];
   onToggle: (id: string) => void;
+  onInfo: (it: ProtocolItem) => void;
 }) {
   const morning = items.filter(
     (i) => i.isEnabled && i.timingAnchor === "wake" && i.itemType === "task"
@@ -234,6 +246,7 @@ function SleepTracker({
               on={done(it.id)}
               color={C.sleep}
               onToggle={() => onToggle(it.id)}
+              onInfo={() => onInfo(it)}
             />
           ))}
         </Group>
@@ -247,6 +260,7 @@ function SleepTracker({
               on={done(it.id)}
               color={C.sleep}
               onToggle={() => onToggle(it.id)}
+              onInfo={() => onInfo(it)}
             />
           ))}
         </Group>
@@ -261,10 +275,12 @@ function ExerciseTracker({
   log,
   items,
   onUpdate,
+  onInfo,
 }: {
   log: DailyLog;
   items: ProtocolItem[];
   onUpdate: (id: string, u: Partial<ExerciseEntry>) => void;
+  onInfo: (it: ProtocolItem) => void;
 }) {
   const di = dayIdx();
   const todayItems = items.filter(
@@ -314,6 +330,7 @@ function ExerciseTracker({
               on={on}
               color={C.exercise}
               onToggle={() => onUpdate(it.id, { completed: !on })}
+              onInfo={() => onInfo(it)}
             >
               <div className={`reveal ${on ? "reveal-open" : ""}`}>
                 <div>
@@ -498,6 +515,7 @@ function SupplementsTracker({
   log,
   items,
   onUpdate,
+  onInfo,
 }: {
   log: DailyLog;
   items: ProtocolItem[];
@@ -505,6 +523,7 @@ function SupplementsTracker({
     id: string,
     u: { taken?: boolean; skipped?: boolean; skipReason?: string }
   ) => void;
+  onInfo: (it: ProtocolItem) => void;
 }) {
   const [skipId, setSkipId] = useState<string | null>(null);
   const morning = items.filter((i) => i.isEnabled && i.timingAnchor === "wake");
@@ -571,6 +590,13 @@ function SupplementsTracker({
               {skipped ? "Skipped" : "Skip"}
             </button>
           )}
+          <button
+            onClick={() => onInfo(it)}
+            aria-label="Details"
+            className="press tr-fast grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--text-2)]"
+          >
+            <Icon name="info" size={16} />
+          </button>
         </div>
         <div className={`reveal ${skipId === it.id && !taken ? "reveal-open" : ""}`}>
           <div>
@@ -628,6 +654,13 @@ function SupplementsTracker({
 }
 
 // ── Page ──────────────────────────────────────────────────────────
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function TrackPage() {
   const {
     state,
@@ -636,22 +669,61 @@ export default function TrackPage() {
     updateExerciseEntry,
     updateNutritionScorecard,
     updateSupplementEntry,
+    updateProtocols,
   } = useAppState();
-  const today = useToday();
   const toast = useToast();
   const [active, setActive] = useState<Pillar>("sleep");
+  const [offset, setOffset] = useState(0); // days back from today
+  const [detail, setDetail] = useState<ProtocolItem | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const log = useMemo(() => getTodayLog(state), [state]);
-  const scores = log.pillarScores ?? {
-    sleep: 0,
-    exercise: 0,
-    nutrition: 0,
-    supplements: 0,
+
+  const todayKey = dateKey(new Date());
+  const selectedDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    return dateKey(d);
+  }, [offset]);
+  const isToday = offset === 0;
+  const dateLabel = useMemo(() => {
+    if (offset === 0) return "Today";
+    if (offset === 1) return "Yesterday";
+    return new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }, [offset, selectedDate]);
+
+  const log = useMemo(
+    () => getLogForDate(state, selectedDate),
+    [state, selectedDate]
+  );
+  const scores: Record<Pillar, number> = {
+    sleep: pillarScore(log, "sleep") ?? 0,
+    exercise: pillarScore(log, "exercise") ?? 0,
+    nutrition: pillarScore(log, "nutrition") ?? 0,
+    supplements: pillarScore(log, "supplements") ?? 0,
   };
   const overall = Math.round(
     ORDER.reduce((s, p) => s + scores[p], 0) / ORDER.length
   );
   const activeIdx = ORDER.indexOf(active);
+
+  const setSchedule = (item: ProtocolItem, days: boolean[]) => {
+    const list = state.protocols[item.pillar].map((i) =>
+      i.id === item.id ? { ...i, daysActive: days } : i
+    );
+    updateProtocols(item.pillar, list);
+    setDetail({ ...item, daysActive: days });
+  };
+  const toggleEnabled = (item: ProtocolItem) => {
+    const list = state.protocols[item.pillar].map((i) =>
+      i.id === item.id ? { ...i, isEnabled: !i.isEnabled } : i
+    );
+    updateProtocols(item.pillar, list);
+    setDetail(null);
+    toast.show(item.isEnabled ? "Protocol disabled" : "Protocol enabled");
+  };
 
   const onScroll = () => {
     const c = scrollRef.current;
@@ -687,8 +759,29 @@ export default function TrackPage() {
         {/* Header with focal progress */}
         <div className="anim-rise flex items-end justify-between">
           <div>
-            <p className="t-eyebrow">{today.displayDate}</p>
-            <h1 className="t-title mt-2 text-[var(--text-1)]">Protocols</h1>
+            <p className="t-eyebrow">Protocols</p>
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                onClick={() => setOffset((o) => Math.min(o + 1, 365))}
+                aria-label="Previous day"
+                className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)]"
+                style={{ background: "var(--surface-2)" }}
+              >
+                <Icon name="chevron" size={15} className="rotate-180" />
+              </button>
+              <h1 className="t-title min-w-[120px] text-center text-[var(--text-1)]">
+                {dateLabel}
+              </h1>
+              <button
+                onClick={() => setOffset((o) => Math.max(o - 1, 0))}
+                disabled={isToday}
+                aria-label="Next day"
+                className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)] disabled:opacity-30"
+                style={{ background: "var(--surface-2)" }}
+              >
+                <Icon name="chevron" size={15} />
+              </button>
+            </div>
           </div>
           <div className="relative grid h-14 w-14 place-items-center">
             <svg width="56" height="56" className="-rotate-90">
@@ -822,6 +915,7 @@ export default function TrackPage() {
                       log={log}
                       items={state.protocols.sleep}
                       onToggle={(id) => toggleSleepItem(log.date, id)}
+                      onInfo={setDetail}
                     />
                   )}
                   {p === "exercise" && (
@@ -831,6 +925,7 @@ export default function TrackPage() {
                       onUpdate={(id, u) =>
                         updateExerciseEntry(log.date, id, u)
                       }
+                      onInfo={setDetail}
                     />
                   )}
                   {p === "nutrition" && (
@@ -849,6 +944,7 @@ export default function TrackPage() {
                         updateSupplementEntry(log.date, id, u);
                         if (u.taken) toast.show("Logged");
                       }}
+                      onInfo={setDetail}
                     />
                   )}
                 </div>
@@ -872,6 +968,16 @@ export default function TrackPage() {
           ))}
         </div>
       </div>
+
+      <ProtocolDetailSheet
+        item={detail}
+        color={detail ? C[detail.pillar] : "var(--readiness)"}
+        onClose={() => setDetail(null)}
+        onScheduleChange={
+          detail ? (days) => setSchedule(detail, days) : undefined
+        }
+        onToggleEnabled={detail ? () => toggleEnabled(detail) : undefined}
+      />
     </Shell>
   );
 }

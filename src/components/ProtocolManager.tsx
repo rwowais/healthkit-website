@@ -6,7 +6,8 @@ import { useAppState } from "@/hooks/useAppState";
 import { PILLAR_META } from "@/lib/constants";
 import { Eyebrow, Skeleton, Sheet, Button, useToast } from "@/components/ui";
 import { Icon, iconForItem, type IconName } from "@/components/ui/icons";
-import type { Pillar, ProtocolItem } from "@/lib/types";
+import ProtocolDetailSheet from "@/components/ProtocolDetailSheet";
+import type { Pillar, ProtocolItem, ItemType } from "@/lib/types";
 
 const C: Record<Pillar, string> = {
   sleep: "var(--sleep)",
@@ -25,15 +26,59 @@ export default function ProtocolManager({ pillar }: { pillar: Pillar }) {
   const { state, loading, updateProtocols } = useAppState();
   const toast = useToast();
   const [detail, setDetail] = useState<ProtocolItem | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({
+    name: "",
+    description: "",
+    itemType: "task" as ItemType,
+    timingAnchor: "wake" as "wake" | "bed",
+  });
   const color = C[pillar];
   const meta = PILLAR_META[pillar];
   const items = state.protocols[pillar] ?? [];
 
+  const commit = (list: ProtocolItem[]) => updateProtocols(pillar, list);
   const toggle = (id: string) =>
-    updateProtocols(
-      pillar,
+    commit(
       items.map((i) => (i.id === id ? { ...i, isEnabled: !i.isEnabled } : i))
     );
+  const setSchedule = (item: ProtocolItem, days: boolean[]) => {
+    commit(items.map((i) => (i.id === item.id ? { ...i, daysActive: days } : i)));
+    setDetail({ ...item, daysActive: days });
+  };
+  const remove = (item: ProtocolItem) => {
+    commit(items.filter((i) => i.id !== item.id));
+    setDetail(null);
+    toast.show("Protocol removed");
+  };
+  const addCustom = () => {
+    if (!draft.name.trim()) return;
+    const item: ProtocolItem = {
+      id: `${pillar}-custom-${Date.now()}`,
+      pillar,
+      name: draft.name.trim(),
+      description: draft.description.trim() || "Custom protocol",
+      source: "custom",
+      itemType: draft.itemType,
+      timingAnchor: draft.timingAnchor,
+      timingOffsetMinutes: 0,
+      timeOfDay: draft.timingAnchor === "bed" ? "night" : "morning",
+      daysActive: [true, true, true, true, true, true, true],
+      sortOrder: items.length + 1,
+      isEnabled: true,
+      icon: "•",
+      createdAt: new Date().toISOString(),
+    };
+    commit([...items, item]);
+    setAdding(false);
+    setDraft({
+      name: "",
+      description: "",
+      itemType: "task",
+      timingAnchor: "wake",
+    });
+    toast.show("Protocol added");
+  };
 
   const tasks = items.filter((i) => i.itemType === "task");
   const reminders = items.filter((i) => i.itemType === "reminder");
@@ -50,6 +95,9 @@ export default function ProtocolManager({ pillar }: { pillar: Pillar }) {
       </Shell>
     );
   }
+
+  const inputCls =
+    "w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[15px] text-[var(--text-1)] outline-none";
 
   const renderItem = (it: ProtocolItem) => (
     <div
@@ -75,6 +123,11 @@ export default function ProtocolManager({ pillar }: { pillar: Pillar }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14.5px] font-semibold text-[var(--text-1)]">
             {it.name}
+            {it.source === "custom" && (
+              <span className="ml-2 text-[10px] font-medium text-[var(--text-4)]">
+                CUSTOM
+              </span>
+            )}
           </span>
           <span className="mt-0.5 block truncate text-[12px] text-[var(--text-3)]">
             {it.description}
@@ -100,14 +153,23 @@ export default function ProtocolManager({ pillar }: { pillar: Pillar }) {
   return (
     <Shell>
       <div className="flex flex-col gap-7">
-        <div className="anim-rise">
-          <Eyebrow color={color}>{meta.label}</Eyebrow>
-          <h1 className="t-title mt-2 text-[var(--text-1)]">
-            {meta.label} Protocols
-          </h1>
+        <div className="anim-rise flex items-end justify-between">
+          <div>
+            <Eyebrow color={color}>{meta.label}</Eyebrow>
+            <h1 className="t-title mt-2 text-[var(--text-1)]">
+              {meta.label} Protocols
+            </h1>
+          </div>
+          <button
+            onClick={() => setAdding(true)}
+            aria-label="Add protocol"
+            className="press grid h-10 w-10 place-items-center rounded-full"
+            style={{ background: "var(--surface-2)", color: "var(--text-1)" }}
+          >
+            <Icon name="plus" size={18} />
+          </button>
         </div>
 
-        {/* Summary — hero, not a generic card */}
         <div className="panel anim-rise d1 relative overflow-hidden p-6">
           <span
             className="ambient"
@@ -146,9 +208,7 @@ export default function ProtocolManager({ pillar }: { pillar: Pillar }) {
         {tasks.length > 0 && (
           <section className="anim-rise d2">
             <p className="t-eyebrow mb-3 px-1">Active Protocols</p>
-            <div className="well space-y-1.5 p-1.5">
-              {tasks.map(renderItem)}
-            </div>
+            <div className="well space-y-1.5 p-1.5">{tasks.map(renderItem)}</div>
           </section>
         )}
 
@@ -162,65 +222,112 @@ export default function ProtocolManager({ pillar }: { pillar: Pillar }) {
         )}
       </div>
 
-      <Sheet
-        open={!!detail}
+      <ProtocolDetailSheet
+        item={detail}
+        color={color}
         onClose={() => setDetail(null)}
-        title={detail?.name}
-      >
-        {detail && (
-          <div className="space-y-5">
-            <div className="flex items-center gap-3">
-              <span
-                className="chip h-12 w-12"
-                style={{
-                  background: `color-mix(in srgb, ${color} 16%, var(--surface-3))`,
-                  color,
-                }}
-              >
-                <Icon name={iconForItem(detail)} size={22} />
-              </span>
-              <p className="t-body leading-relaxed text-[var(--text-1)]">
-                {detail.description}
-              </p>
-            </div>
-            {detail.evidenceNote && (
-              <div
-                className="rounded-[var(--r-md)] p-4"
-                style={{ background: "var(--surface-2)" }}
-              >
-                <Eyebrow color={color}>Evidence</Eyebrow>
-                <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--text-2)]">
-                  {detail.evidenceNote}
-                </p>
-              </div>
-            )}
-            {detail.recommendedBy && detail.recommendedBy.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {detail.recommendedBy.map((r) => (
-                  <span
-                    key={r}
-                    className="rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)]"
-                    style={{ background: "var(--surface-3)" }}
-                  >
-                    {r}
-                  </span>
-                ))}
-              </div>
-            )}
-            <Button
-              full
-              onClick={() => {
+        onScheduleChange={
+          detail ? (days) => setSchedule(detail, days) : undefined
+        }
+        onToggleEnabled={
+          detail
+            ? () => {
                 toggle(detail.id);
                 toast.show(
                   detail.isEnabled ? "Protocol disabled" : "Protocol enabled"
                 );
                 setDetail(null);
-              }}
-            >
-              {detail.isEnabled ? "Disable protocol" : "Enable protocol"}
-            </Button>
+              }
+            : undefined
+        }
+        onDelete={detail ? () => remove(detail) : undefined}
+      />
+
+      <Sheet
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="New Protocol"
+      >
+        <div className="space-y-4">
+          <div>
+            <Eyebrow>Name</Eyebrow>
+            <input
+              autoFocus
+              value={draft.name}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, name: e.target.value }))
+              }
+              placeholder="e.g. Zone 2 cardio"
+              className={`mt-2 ${inputCls}`}
+            />
           </div>
-        )}
+          <div>
+            <Eyebrow>Description</Eyebrow>
+            <input
+              value={draft.description}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, description: e.target.value }))
+              }
+              placeholder="Optional detail"
+              className={`mt-2 ${inputCls}`}
+            />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <Eyebrow>Type</Eyebrow>
+              <div
+                className="mt-2 flex rounded-[11px] p-1"
+                style={{ background: "var(--surface-2)" }}
+              >
+                {(["task", "reminder"] as ItemType[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setDraft((d) => ({ ...d, itemType: t }))}
+                    className="flex-1 rounded-[8px] py-2 text-[13px] font-semibold capitalize tr-fast"
+                    style={{
+                      background:
+                        draft.itemType === t ? color : "transparent",
+                      color:
+                        draft.itemType === t ? "#08090B" : "var(--text-3)",
+                    }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1">
+              <Eyebrow>When</Eyebrow>
+              <div
+                className="mt-2 flex rounded-[11px] p-1"
+                style={{ background: "var(--surface-2)" }}
+              >
+                {(["wake", "bed"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() =>
+                      setDraft((d) => ({ ...d, timingAnchor: t }))
+                    }
+                    className="flex-1 rounded-[8px] py-2 text-[13px] font-semibold tr-fast"
+                    style={{
+                      background:
+                        draft.timingAnchor === t ? color : "transparent",
+                      color:
+                        draft.timingAnchor === t
+                          ? "#08090B"
+                          : "var(--text-3)",
+                    }}
+                  >
+                    {t === "wake" ? "Morning" : "Evening"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <Button full onClick={addCustom}>
+            Add protocol
+          </Button>
+        </div>
       </Sheet>
     </Shell>
   );

@@ -2,8 +2,14 @@
 
 import { useState } from "react";
 import Shell from "@/components/Shell";
+import { useRef } from "react";
 import { useAppState } from "@/hooks/useAppState";
-import { clearAllData } from "@/lib/storage";
+import {
+  clearAllData,
+  exportState,
+  importState,
+  saveState,
+} from "@/lib/storage";
 import { PILLAR_META, PILLARS } from "@/lib/constants";
 import { Icon, type IconName } from "@/components/ui/icons";
 import {
@@ -35,7 +41,56 @@ export default function SettingsPage() {
   const { state, loading, updateSettings } = useAppState();
   const toast = useToast();
   const [confirmReset, setConfirmReset] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const s = state.settings;
+
+  const toggleNotifications = async () => {
+    if (s.notificationsEnabled) {
+      updateSettings({ notificationsEnabled: false });
+      return;
+    }
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      toast.show("Notifications not supported here");
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") {
+      updateSettings({ notificationsEnabled: true });
+      toast.show("Reminders on");
+    } else {
+      toast.show("Permission denied in browser");
+    }
+  };
+
+  const doExport = () => {
+    const blob = new Blob([exportState(state)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `protocolize-backup-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.show("Backup exported");
+  };
+
+  const doImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = importState(String(reader.result));
+      if (!parsed) {
+        toast.show("Invalid backup file");
+        return;
+      }
+      saveState(parsed);
+      toast.show("Data restored");
+      setTimeout(() => window.location.reload(), 700);
+    };
+    reader.readAsText(file);
+  };
 
   if (loading) {
     return (
@@ -152,13 +207,9 @@ export default function SettingsPage() {
         <Card className="anim-rise d4">
           <Eyebrow>Preferences</Eyebrow>
           <div className="mt-2">
-            <Row label="Notifications">
+            <Row label="Protocol reminders">
               <button
-                onClick={() =>
-                  updateSettings({
-                    notificationsEnabled: !s.notificationsEnabled,
-                  })
-                }
+                onClick={toggleNotifications}
                 className="tr-fast h-7 w-12 rounded-full p-1"
                 style={{
                   background: s.notificationsEnabled
@@ -179,15 +230,41 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* Danger zone */}
+        {/* Data */}
         <Card className="anim-rise d5">
-          <Eyebrow color="var(--alert)">Data</Eyebrow>
+          <Eyebrow>Data & Backup</Eyebrow>
           <p className="t-caption mt-2">
-            Reset clears all tracking history on this device.
+            Your data lives only in this browser. Export regularly so you never
+            lose your history.
           </p>
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={doExport}
+              className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] py-3.5 text-[14px] font-semibold text-[var(--text-1)]"
+            >
+              Export
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] py-3.5 text-[14px] font-semibold text-[var(--text-1)]"
+            >
+              Import
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) doImport(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
           <button
             onClick={() => setConfirmReset(true)}
-            className="press tr-fast mt-4 w-full rounded-[var(--r-pill)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--alert)]"
+            className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--alert)]"
           >
             Reset all data
           </button>
