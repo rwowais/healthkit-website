@@ -992,6 +992,7 @@ export default function AdminHome() {
                           disabled={busy || !aiDraft.title.trim()}
                           onClick={async () => {
                             setBusy(true);
+                            setAiMsg(null);
                             const r = await createBehavior(edP.id, {
                               title: aiDraft.title,
                               block: aiDraft.block,
@@ -1007,32 +1008,43 @@ export default function AdminHome() {
                               explanation: aiDraft.explanation,
                             });
                             setBusy(false);
-                            setMsg(
-                              r.ok
-                                ? "Saved as unverified draft."
-                                : r.reason ?? "Failed"
-                            );
                             if (r.ok) {
                               setAiDraft(null);
                               setAiDesc("");
+                              setAiMsg(null);
+                              setMsg("Saved as unverified draft.");
                               reopen();
+                            } else {
+                              setAiMsg(r.reason ?? "Save failed.");
+                              console.error("[ai] save failed", r);
                             }
                           }}
                           className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
                         >
-                          Save as draft
+                          {busy ? "Saving…" : "Save as draft"}
                         </button>
                         <button
                           disabled={busy}
                           onClick={() => {
                             setAiDraft(null);
-                            setMsg(null);
+                            setAiMsg(null);
                           }}
                           className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-2.5 text-[12px] font-semibold text-[var(--text-2)]"
                         >
                           Discard
                         </button>
                       </div>
+                      {aiMsg && (
+                        <p
+                          className="rounded-[var(--r-sm)] px-3 py-2 text-[12.5px] font-medium"
+                          style={{
+                            background: "rgba(232,137,107,.12)",
+                            color: "var(--alert)",
+                          }}
+                        >
+                          {aiMsg}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
