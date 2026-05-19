@@ -1,0 +1,124 @@
+/**
+ * knowledge.ts — the runtime seam between the Protocol Intelligence CMS
+ * and the live app.
+ *
+ * Delivery model (per design): HYBRID.
+ *  - Default / offline: the built-in catalog that ships with the build
+ *    (src/lib/packs.ts) IS the v1 bundle — version-controlled, instant,
+ *    works with zero network.
+ *  - Online (optional): the app may refresh to the newest *published*
+ *    bundle (cms_publications, RLS-readable, immutable, checksummed).
+ *
+ * Authoring lives in the relational cms_* tables; a human Publish step
+ * snapshots the approved set into a denormalised bundle whose shape is
+ * exactly the runtime contract (ProtocolPack[]), so consumers never
+ * change and equivalence is provable. Inert until a bundle is published.
+ *
+ * P1 establishes + proves this seam. Nothing consumes the override yet
+ * (no publish path exists until P3) — the app stays byte-identical.
+ */
+import type { ProtocolPack } from "./types";
+import { PACKS } from "./packs";
+
+export const BUNDLE_SCHEMA = 1;
+
+export interface KnowledgeBundle {
+  schema: number;
+  /** Monotonic published version (0 = built-in default). */
+  version: number;
+  generatedAt: string;
+  protocols: ProtocolPack[];
+  /** Tunables that were hardcoded constants (thresholds etc.). */
+  config: Record<string, number | string | boolean>;
+}
+
+/** Stable, order-independent checksum for bundle integrity. */
+export function bundleChecksum(b: {
+  protocols: ProtocolPack[];
+  config: Record<string, unknown>;
+}): string {
+  const canon = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(canon);
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      return Object.keys(o)
+        .sort()
+        .reduce<Record<string, unknown>>((a, k) => {
+          a[k] = canon(o[k]);
+          return a;
+        }, {});
+    }
+    return v;
+  };
+  const s = JSON.stringify(canon({ p: b.protocols, c: b.config }));
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16);
+}
+
+/** The built-in bundle: the shipped catalog, version 0. */
+export function builtinBundle(): KnowledgeBundle {
+  return {
+    schema: BUNDLE_SCHEMA,
+    version: 0,
+    generatedAt: "builtin",
+    protocols: PACKS,
+    config: {},
+  };
+}
+
+// ── Active catalog (override-aware) ───────────────────────────────────
+let published: KnowledgeBundle | null = null;
+
+/** Validate a candidate bundle before it can replace the catalog. */
+export function isValidBundle(b: unknown): b is KnowledgeBundle {
+  if (!b || typeof b !== "object") return false;
+  const x = b as Partial<KnowledgeBundle>;
+  return (
+    x.schema === BUNDLE_SCHEMA &&
+    typeof x.version === "number" &&
+    Array.isArray(x.protocols) &&
+    x.protocols.every(
+      (p) =>
+        p &&
+        typeof p.id === "string" &&
+        Array.isArray((p as ProtocolPack).behaviors)
+    ) &&
+    !!x.config &&
+    typeof x.config === "object"
+  );
+}
+
+/**
+ * The catalog the runtime should use: a validated published bundle when
+ * one has been loaded, otherwise the built-in. Single chokepoint —
+ * P3 routes packById / engine pack access through this.
+ */
+export function activePacks(): ProtocolPack[] {
+  return published?.protocols ?? PACKS;
+}
+
+export function activeConfig(): Record<string, number | string | boolean> {
+  return published?.config ?? {};
+}
+
+export function activeBundleVersion(): number {
+  return published?.version ?? 0;
+}
+
+/**
+ * Apply a fetched published bundle (hybrid online refresh). Only a
+ * newer, structurally-valid bundle replaces the catalog; anything off
+ * is ignored and the built-in stays in force. Returns whether applied.
+ */
+export function applyPublishedBundle(b: unknown): boolean {
+  if (!isValidBundle(b)) return false;
+  if (b.version <= activeBundleVersion()) return false;
+  published = b;
+  return true;
+}
+
+/** Reset to the built-in catalog (tests / sign-out hygiene). */
+export function resetKnowledge(): void {
+  published = null;
+}
