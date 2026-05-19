@@ -133,10 +133,17 @@ create table if not exists public.cms_behaviors (
   rationale text,
   status text not null default 'draft'
     check (status in ('draft','published','archived')),
+  -- AI-drafted rows land with this TRUE. A human must clear it (in the
+  -- editor) before the behavior can ever reach a published bundle —
+  -- assembleBundleFromCMS() filters these out regardless of status.
+  ai_unverified boolean not null default false,
   version int not null default 1,
   updated_at timestamptz not null default now(),
   updated_by uuid
 );
+-- Idempotent migration for projects seeded before the AI rail existed.
+alter table public.cms_behaviors
+  add column if not exists ai_unverified boolean not null default false;
 
 create table if not exists public.cms_protocol_behaviors (
   protocol_id uuid references public.cms_protocols (id) on delete cascade,

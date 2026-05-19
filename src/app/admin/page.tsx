@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { isAdmin } from "@/lib/admin";
 import { activePacks, activeBundleVersion } from "@/lib/knowledge";
@@ -28,9 +28,20 @@ import {
   saveBehavior,
   createBehavior,
   reorderBehavior,
+  clearUnverified,
   type CmsProtocol,
   type CmsBehavior,
 } from "@/lib/cms/authoring";
+import { generateBehaviorDraft } from "@/lib/cms/ai";
+import {
+  BLOCKS,
+  ANCHORS,
+  KINDS,
+  ICONS,
+  FIELD_HELP,
+  AI_MAX_TIER,
+  type AiBehaviorDraft,
+} from "@/lib/cms/aiSchema";
 import {
   listSuggestions,
   createSuggestion,
@@ -72,6 +83,37 @@ function dk(off: number) {
     2,
     "0"
   )}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** A labelled field row with a hover/tap help tooltip (native title). */
+function Field({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  help?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 flex items-center gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+          {label}
+        </span>
+        {help && (
+          <span
+            title={help}
+            className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-[var(--surface-3)] text-[9px] font-bold text-[var(--text-3)]"
+            aria-label={help}
+          >
+            ?
+          </span>
+        )}
+      </span>
+      {children}
+    </label>
+  );
 }
 
 export default function AdminHome() {
@@ -144,6 +186,13 @@ export default function AdminHome() {
   const [nbTitle, setNbTitle] = useState("");
   const [nbBlock, setNbBlock] = useState("morning");
   const [nbLev, setNbLev] = useState(2);
+
+  // ── AI draft-an-item (server route; clamped, draft-only) ──────────
+  const [aiDesc, setAiDesc] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiDraft, setAiDraft] = useState<AiBehaviorDraft | null>(null);
+  const patchDraft = (p: Partial<AiBehaviorDraft>) =>
+    setAiDraft((d) => (d ? { ...d, ...p } : d));
 
   const sim = useMemo(() => {
     const base = getDefaultState();
@@ -604,9 +653,414 @@ export default function AdminHome() {
                   </button>
                 </div>
 
+                <div className={card} style={surf}>
+                  <Eyebrow color="var(--readiness)">
+                    Add an item with AI
+                  </Eyebrow>
+                  <p className="t-caption mt-1 leading-relaxed">
+                    Describe it in plain words — AI drafts every
+                    attribute. It lands as an <b>unverified draft</b>:
+                    evidence is capped at <b>{AI_MAX_TIER}</b> and it
+                    can&apos;t reach users until you verify it and
+                    Publish.
+                  </p>
+
+                  {!aiDraft && (
+                    <div className="mt-3 space-y-2">
+                      <input
+                        className={inp}
+                        value={aiDesc}
+                        onChange={(e) => setAiDesc(e.target.value)}
+                        placeholder="e.g. magnesium glycinate 300mg before bed"
+                      />
+                      <button
+                        disabled={aiBusy || !aiDesc.trim()}
+                        onClick={async () => {
+                          setAiBusy(true);
+                          setMsg(null);
+                          const r = await generateBehaviorDraft(aiDesc);
+                          setAiBusy(false);
+                          if (r.ok && r.draft) {
+                            setAiDraft(r.draft);
+                            setMsg(null);
+                          } else {
+                            setMsg(r.reason ?? "AI drafting failed.");
+                          }
+                        }}
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        {aiBusy ? "Drafting…" : "Generate with AI"}
+                      </button>
+                    </div>
+                  )}
+
+                  {aiDraft && (
+                    <div className="mt-4 space-y-3">
+                      <div
+                        className="rounded-[var(--r-sm)] px-3 py-2 text-[12px] font-medium"
+                        style={{
+                          background: "rgba(232,137,107,.12)",
+                          color: "var(--alert)",
+                        }}
+                      >
+                        AI-drafted — verify every field against a real
+                        source before publishing.
+                      </div>
+
+                      <Field label="Title" help={FIELD_HELP.title}>
+                        <input
+                          className={inp}
+                          value={aiDraft.title}
+                          onChange={(e) =>
+                            patchDraft({ title: e.target.value })
+                          }
+                        />
+                      </Field>
+
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Field label="Block" help={FIELD_HELP.block}>
+                            <select
+                              className={inp}
+                              value={aiDraft.block}
+                              onChange={(e) =>
+                                patchDraft({
+                                  block: e.target
+                                    .value as AiBehaviorDraft["block"],
+                                })
+                              }
+                            >
+                              {BLOCKS.map((s) => (
+                                <option key={s}>{s}</option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                        <div className="flex-1">
+                          <Field label="Anchor" help={FIELD_HELP.anchor}>
+                            <select
+                              className={inp}
+                              value={aiDraft.anchor}
+                              onChange={(e) =>
+                                patchDraft({
+                                  anchor: e.target
+                                    .value as AiBehaviorDraft["anchor"],
+                                })
+                              }
+                            >
+                              {ANCHORS.map((s) => (
+                                <option key={s}>{s}</option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Field
+                            label="Offset (min)"
+                            help={FIELD_HELP.offsetMin}
+                          >
+                            <input
+                              type="number"
+                              className={inp}
+                              value={aiDraft.offsetMin}
+                              onChange={(e) =>
+                                patchDraft({
+                                  offsetMin: Number(e.target.value),
+                                })
+                              }
+                            />
+                          </Field>
+                        </div>
+                        <div className="flex-1">
+                          <Field
+                            label="Leverage"
+                            help={FIELD_HELP.leverage}
+                          >
+                            <select
+                              className={inp}
+                              value={aiDraft.leverage}
+                              onChange={(e) =>
+                                patchDraft({
+                                  leverage: Number(
+                                    e.target.value
+                                  ) as AiBehaviorDraft["leverage"],
+                                })
+                              }
+                            >
+                              {[1, 2, 3].map((s) => (
+                                <option key={s} value={s}>
+                                  L{s}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Field label="Kind" help={FIELD_HELP.kind}>
+                            <select
+                              className={inp}
+                              value={aiDraft.kind}
+                              onChange={(e) =>
+                                patchDraft({
+                                  kind: e.target
+                                    .value as AiBehaviorDraft["kind"],
+                                })
+                              }
+                            >
+                              {KINDS.map((s) => (
+                                <option key={s}>{s}</option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                        <div className="flex-1">
+                          <Field label="Icon" help={FIELD_HELP.icon}>
+                            <select
+                              className={inp}
+                              value={aiDraft.icon}
+                              onChange={(e) =>
+                                patchDraft({ icon: e.target.value })
+                              }
+                            >
+                              {ICONS.map((s) => (
+                                <option key={s}>{s}</option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                      </div>
+
+                      <Field label="Dose" help={FIELD_HELP.dose}>
+                        <input
+                          className={inp}
+                          value={aiDraft.dose ?? ""}
+                          onChange={(e) =>
+                            patchDraft({
+                              dose: e.target.value || null,
+                            })
+                          }
+                          placeholder="e.g. 300 mg (blank if none)"
+                        />
+                      </Field>
+
+                      <Field
+                        label="Rationale"
+                        help={FIELD_HELP.rationale}
+                      >
+                        <textarea
+                          className={inp}
+                          rows={2}
+                          value={aiDraft.rationale}
+                          onChange={(e) =>
+                            patchDraft({ rationale: e.target.value })
+                          }
+                        />
+                      </Field>
+
+                      <div
+                        className="rounded-[var(--r-sm)] p-3"
+                        style={{ background: "var(--surface-3)" }}
+                      >
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                            Evidence
+                          </span>
+                          <span
+                            title={FIELD_HELP.evidenceTier}
+                            className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            style={{
+                              background: "rgba(232,137,107,.14)",
+                              color: "var(--alert)",
+                            }}
+                          >
+                            {aiDraft.evidence.tier} · capped
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          <Field
+                            label="Source"
+                            help={FIELD_HELP.evidenceSource}
+                          >
+                            <input
+                              className={inp}
+                              value={aiDraft.evidence.sourceLabel}
+                              onChange={(e) =>
+                                patchDraft({
+                                  evidence: {
+                                    ...aiDraft.evidence,
+                                    sourceLabel: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </Field>
+                          <Field
+                            label="Source URL"
+                            help={FIELD_HELP.evidenceUrl}
+                          >
+                            <input
+                              className={inp}
+                              value={aiDraft.evidence.url ?? ""}
+                              onChange={(e) =>
+                                patchDraft({
+                                  evidence: {
+                                    ...aiDraft.evidence,
+                                    url: e.target.value || null,
+                                  },
+                                })
+                              }
+                              placeholder="https://… (optional)"
+                            />
+                          </Field>
+                          <Field
+                            label="Evidence summary"
+                            help={FIELD_HELP.evidenceSummary}
+                          >
+                            <textarea
+                              className={inp}
+                              rows={2}
+                              value={aiDraft.evidence.summary}
+                              onChange={(e) =>
+                                patchDraft({
+                                  evidence: {
+                                    ...aiDraft.evidence,
+                                    summary: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </Field>
+                        </div>
+                      </div>
+
+                      <Field
+                        label="Why it matters"
+                        help={FIELD_HELP.why}
+                      >
+                        <textarea
+                          className={inp}
+                          rows={2}
+                          value={aiDraft.explanation.why}
+                          onChange={(e) =>
+                            patchDraft({
+                              explanation: {
+                                ...aiDraft.explanation,
+                                why: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </Field>
+                      <Field
+                        label="Why this timing"
+                        help={FIELD_HELP.timing}
+                      >
+                        <input
+                          className={inp}
+                          value={aiDraft.explanation.timing}
+                          onChange={(e) =>
+                            patchDraft({
+                              explanation: {
+                                ...aiDraft.explanation,
+                                timing: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </Field>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          disabled={busy || !aiDraft.title.trim()}
+                          onClick={async () => {
+                            setBusy(true);
+                            const r = await createBehavior(edP.id, {
+                              title: aiDraft.title,
+                              block: aiDraft.block,
+                              leverage: aiDraft.leverage,
+                              dose: aiDraft.dose,
+                              rationale: aiDraft.rationale,
+                              anchor: aiDraft.anchor,
+                              offsetMin: aiDraft.offsetMin,
+                              kind: aiDraft.kind,
+                              icon: aiDraft.icon,
+                              aiUnverified: true,
+                              evidence: aiDraft.evidence,
+                              explanation: aiDraft.explanation,
+                            });
+                            setBusy(false);
+                            setMsg(
+                              r.ok
+                                ? "Saved as unverified draft."
+                                : r.reason ?? "Failed"
+                            );
+                            if (r.ok) {
+                              setAiDraft(null);
+                              setAiDesc("");
+                              reopen();
+                            }
+                          }}
+                          className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                        >
+                          Save as draft
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            setAiDraft(null);
+                            setMsg(null);
+                          }}
+                          className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-2.5 text-[12px] font-semibold text-[var(--text-2)]"
+                        >
+                          Discard
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <Eyebrow>Behaviors</Eyebrow>
                 {edB.map((b, idx) => (
                   <div key={b.id} className={card} style={surf}>
+                    {b.ai_unverified && (
+                      <div
+                        className="mb-2 flex items-center justify-between gap-2 rounded-[var(--r-sm)] px-3 py-2"
+                        style={{
+                          background: "rgba(232,137,107,.12)",
+                        }}
+                      >
+                        <span className="text-[11.5px] font-semibold text-[var(--alert)]">
+                          AI-drafted — verify against source. Excluded
+                          from publish until cleared.
+                        </span>
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            const r = await clearUnverified(
+                              b.id,
+                              b.version
+                            );
+                            setBusy(false);
+                            setMsg(
+                              r.ok
+                                ? "Marked verified."
+                                : r.reason ?? "Failed"
+                            );
+                            if (r.ok) reopen();
+                          }}
+                          className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--text-1)] px-3 py-1.5 text-[11px] font-semibold text-[#08090B]"
+                        >
+                          Mark verified
+                        </button>
+                      </div>
+                    )}
                     <div className="mb-2 flex items-center justify-between">
                       <span className="t-caption">#{idx + 1}</span>
                       <span className="flex gap-1">

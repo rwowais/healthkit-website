@@ -37,7 +37,23 @@ export interface CmsBehavior {
   icon: string | null;
   rationale: string | null;
   status: string;
+  /** AI-drafted rows carry this true; a human must clear it (Mark
+   *  verified) before the row can ever reach a published bundle. */
+  ai_unverified: boolean;
   version: number;
+}
+
+/**
+ * THE publish gate for a behavior. Pure so the governance guarantee is
+ * unit-tested directly: archived rows AND any still-unverified AI draft
+ * are excluded from every assembled bundle — they can never reach users
+ * even if accidentally marked 'published'.
+ */
+export function isPublishableBehavior(b: {
+  status?: string | null;
+  ai_unverified?: boolean | null;
+}): boolean {
+  return b.status !== "archived" && b.ai_unverified !== true;
 }
 
 async function rev(
@@ -98,6 +114,9 @@ export async function importBuiltin(): Promise<{
           icon: b.icon ?? null,
           rationale: b.rationale ?? null,
           status: "published",
+          // ai_unverified intentionally omitted — the column defaults to
+          // false, so seeding stays decoupled from the migration and
+          // built-ins are never flagged as AI-drafted.
         });
     const { data: bRows, error: bErr } = await sb
       .from("cms_behaviors")
@@ -256,16 +275,39 @@ export async function saveBehavior(
   }
 }
 
-/** Create a brand-new behavior and link it to a protocol at the end. */
+export interface NewBehaviorFields {
+  title: string;
+  block: string;
+  leverage: number;
+  dose?: string | null;
+  rationale?: string;
+  anchor?: string;
+  offsetMin?: number;
+  kind?: string;
+  icon?: string;
+  /** Set true for AI-drafted rows — gates them out of publish until a
+   *  human clears it. */
+  aiUnverified?: boolean;
+  /** Optional starter evidence row (tier is already capped upstream). */
+  evidence?: {
+    tier: string;
+    sourceLabel?: string;
+    url?: string | null;
+    summary?: string;
+  };
+  /** Optional why/timing explanation rows. */
+  explanation?: { why?: string; timing?: string };
+}
+
+/**
+ * Create a brand-new behavior and link it to a protocol at the end.
+ * Accepts the full field set (used by the AI drafter) while staying
+ * backward-compatible with the minimal manual "Add behavior" form.
+ * Evidence + explanation are persisted as draft rows, best-effort.
+ */
 export async function createBehavior(
   protocolId: string,
-  fields: {
-    title: string;
-    block: string;
-    leverage: number;
-    dose?: string;
-    rationale?: string;
-  }
+  fields: NewBehaviorFields
 ): Promise<{ ok: boolean; reason?: string }> {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "Cloud not configured." };
@@ -282,21 +324,27 @@ export async function createBehavior(
         .slice(0, 32) +
       "-" +
       Date.now().toString(36).slice(-4);
+    const row: Record<string, unknown> = {
+      canonical_key: key,
+      title: fields.title.trim(),
+      block: fields.block,
+      anchor:
+        fields.anchor ?? (fields.block === "evening" ? "bed" : "wake"),
+      offset_min: fields.offsetMin ?? 0,
+      dose: fields.dose ?? null,
+      leverage: fields.leverage,
+      kind: fields.kind ?? "action",
+      icon: fields.icon ?? "sparkle",
+      rationale: fields.rationale ?? "Custom behavior.",
+      status: "draft", // never anything else on create
+    };
+    // Only write the flag when it must be TRUE (the AI path). Omitting
+    // it on the manual path lets the column default (false) apply, so
+    // manual adds work even before the ai_unverified migration is run.
+    if (fields.aiUnverified === true) row.ai_unverified = true;
     const { data: b, error: bErr } = await sb
       .from("cms_behaviors")
-      .insert({
-        canonical_key: key,
-        title: fields.title.trim(),
-        block: fields.block,
-        anchor: fields.block === "evening" ? "bed" : "wake",
-        offset_min: 0,
-        dose: fields.dose ?? null,
-        leverage: fields.leverage,
-        kind: "action",
-        icon: "sparkle",
-        rationale: fields.rationale ?? "Custom behavior.",
-        status: "draft",
-      })
+      .insert(row)
       .select("id")
       .single();
     if (bErr || !b) return { ok: false, reason: bErr?.message };
@@ -312,19 +360,88 @@ export async function createBehavior(
         position: count ?? 0,
       });
     if (lErr) return { ok: false, reason: lErr.message };
+
+    // Evidence + explanation as draft rows — best-effort, never blocks.
+    try {
+      if (fields.evidence?.tier) {
+        await sb.from("cms_evidence").insert({
+          target_type: "behavior",
+          target_ref: key,
+          tier: fields.evidence.tier,
+          source_label: fields.evidence.sourceLabel ?? null,
+          url: fields.evidence.url ?? null,
+          summary: fields.evidence.summary ?? null,
+        });
+      }
+      const ex = fields.explanation;
+      const exRows = [
+        ex?.why && { kind: "why", text: ex.why },
+        ex?.timing && { kind: "timing", text: ex.timing },
+      ].filter(Boolean) as { kind: string; text: string }[];
+      if (exRows.length)
+        await sb.from("cms_explanations").insert(
+          exRows.map((r) => ({
+            target_type: "behavior",
+            target_ref: key,
+            kind: r.kind,
+            text: r.text,
+            status: "draft",
+          }))
+        );
+    } catch {
+      /* evidence/explanation are enrichment, never block creation */
+    }
+
     await rev(
       sb,
       "behavior",
       b.id as string,
       1,
       { key, ...fields },
-      "create behavior"
+      fields.aiUnverified ? "create behavior (AI draft)" : "create behavior"
     );
     return { ok: true };
   } catch (e) {
     return {
       ok: false,
       reason: e instanceof Error ? e.message : "Create failed.",
+    };
+  }
+}
+
+/**
+ * Clear the AI-unverified flag after a human has checked the draft
+ * against its source. Versioned + audited. Only after this can the
+ * behavior be included in a published bundle.
+ */
+export async function clearUnverified(
+  behaviorId: string,
+  version: number
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  const uid = await getUserId();
+  if (!uid) return { ok: false, reason: "Sign in required." };
+  try {
+    const next = (version ?? 1) + 1;
+    const { error } = await sb
+      .from("cms_behaviors")
+      .update({ ai_unverified: false, version: next })
+      .eq("id", behaviorId);
+    if (error) return { ok: false, reason: error.message };
+    await rev(
+      sb,
+      "behavior",
+      behaviorId,
+      next,
+      { ai_unverified: false },
+      "mark verified"
+    );
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Failed.",
     };
   }
 }
@@ -390,7 +507,7 @@ export async function assembleBundleFromCMS(): Promise<
     const out: ProtocolPack[] = [];
     for (const p of prot as CmsProtocol[]) {
       const behaviors = (await getProtocolBehaviors(p.id))
-        .filter((b) => b.status !== "archived")
+        .filter(isPublishableBehavior)
         .map(
           (b): BehaviorDef =>
             ({
