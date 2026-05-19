@@ -1,6 +1,8 @@
 // Protocolize service worker — offline app shell (network-first).
-const CACHE = "protocolize-v1";
-const SHELL = ["/today", "/track", "/sleep", "/recovery", "/progress"];
+// Bump CACHE on any shipped change so stale clients (esp. iOS Safari /
+// installed PWAs) purge old assets and pick up the new build.
+const CACHE = "protocolize-v3";
+const SHELL = ["/today"];
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
