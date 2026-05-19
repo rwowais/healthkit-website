@@ -1049,9 +1049,17 @@ export async function reorderBehavior(
  * Reconstruct the runtime catalog from the CMS tables. Returns null when
  * the CMS is unseeded so Publish safely falls back to the built-in.
  */
-export async function assembleBundleFromCMS(): Promise<
-  ProtocolPack[] | null
-> {
+export interface AssembledBundle {
+  protocols: ProtocolPack[];
+  config: Record<string, number | string | boolean>;
+  insightTemplates: {
+    kind: string;
+    template: string;
+    conditions?: unknown;
+  }[];
+}
+
+export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
   const sb = getSupabase();
   if (!sb) return null;
   try {
@@ -1060,7 +1068,7 @@ export async function assembleBundleFromCMS(): Promise<
       .select("*")
       .neq("status", "archived");
     if (!prot || prot.length === 0) return null;
-    const out: ProtocolPack[] = [];
+    const protocols: ProtocolPack[] = [];
     for (const p of prot as CmsProtocol[]) {
       const behaviors = (await getProtocolBehaviors(p.id))
         .filter(isPublishableBehavior)
@@ -1079,7 +1087,7 @@ export async function assembleBundleFromCMS(): Promise<
               rationale: b.rationale ?? "",
             }) as BehaviorDef
         );
-      out.push({
+      protocols.push({
         id: p.slug,
         name: p.name,
         tagline: p.tagline ?? "",
@@ -1091,7 +1099,57 @@ export async function assembleBundleFromCMS(): Promise<
         behaviors,
       } as ProtocolPack);
     }
-    return out;
+
+    // Config overrides from cms_intelligence_config — only numeric /
+    // string / boolean values are honored (bundle.config's contract).
+    // Objects/arrays would also typecheck as jsonb but are skipped here
+    // so the bundle stays a flat dictionary of scalar tunables.
+    const config: Record<string, number | string | boolean> = {};
+    try {
+      const { data: cfgRows } = await sb
+        .from("cms_intelligence_config")
+        .select("key, value");
+      for (const row of (cfgRows ?? []) as {
+        key: string;
+        value: unknown;
+      }[]) {
+        const v = row.value;
+        if (
+          typeof v === "number" ||
+          typeof v === "string" ||
+          typeof v === "boolean"
+        )
+          config[row.key] = v;
+      }
+    } catch {
+      /* config is enrichment; assembly continues without it */
+    }
+
+    // Insight templates — only "published" status rows flow into the
+    // bundle. Drafts stay in the CMS until promoted.
+    const insightTemplates: AssembledBundle["insightTemplates"] = [];
+    try {
+      const { data: tplRows } = await sb
+        .from("cms_insight_templates")
+        .select("kind, template, conditions, status");
+      for (const row of (tplRows ?? []) as {
+        kind: string;
+        template: string;
+        conditions: unknown;
+        status: string;
+      }[]) {
+        if (row.status === "published")
+          insightTemplates.push({
+            kind: row.kind,
+            template: row.template,
+            conditions: row.conditions,
+          });
+      }
+    } catch {
+      /* templates are enrichment; assembly continues without them */
+    }
+
+    return { protocols, config, insightTemplates };
   } catch {
     return null;
   }

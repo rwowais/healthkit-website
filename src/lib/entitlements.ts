@@ -7,11 +7,27 @@
  * (>= AHA_DAYS tracked days) — if they're short, we quietly extend.
  */
 import type { AppState } from "./types";
+import { getCfgNumber } from "./knowledge";
 
+/**
+ * Source-of-truth defaults. Kept exported so the introspect surface and
+ * the Engine → Config inspector display the code defaults; ALL
+ * runtime gates now go through the `getX()` accessors below so a CMS
+ * Publish that overrides any of these takes effect without redeploying.
+ */
 export const AHA_DAYS = 6;
 export const FREE_PACKS = 3;
 export const FREE_BIOMARKERS = 3;
 export const FREE_INSIGHT_DAYS = 7;
+
+/** Runtime accessors: the published bundle wins; code default is the fallback. */
+export const getAhaDays = (): number => getCfgNumber("AHA_DAYS", AHA_DAYS);
+export const getFreePacks = (): number =>
+  getCfgNumber("FREE_PACKS", FREE_PACKS);
+export const getFreeBiomarkers = (): number =>
+  getCfgNumber("FREE_BIOMARKERS", FREE_BIOMARKERS);
+export const getFreeInsightDays = (): number =>
+  getCfgNumber("FREE_INSIGHT_DAYS", FREE_INSIGHT_DAYS);
 
 export interface Access {
   premium: boolean; // full access (paid OR active trial)
@@ -83,7 +99,7 @@ export function maybeExtendTrial(state: AppState): AppState {
   const inWindow =
     end - now < 3 * 86_400_000 && end - now > -7 * 86_400_000;
   if (!inWindow) return state;
-  if (engagedDays(state) >= AHA_DAYS) return state; // had their chance
+  if (engagedDays(state) >= getAhaDays()) return state; // had their chance
   return {
     ...state,
     settings: {

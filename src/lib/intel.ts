@@ -8,6 +8,7 @@ import type { AppState, DailyLog, TimeBlock } from "./types";
 import { compileTimeline, type TimelineItem } from "./engine";
 import { packById, PACKS } from "./packs";
 import { effectiveMinutes, nowMinutes } from "./time";
+import { getInsightTemplate, renderTemplate } from "./knowledge";
 
 export {
   resolveMinutes,
@@ -368,13 +369,23 @@ export function suggestions(state: AppState): Suggestion[] {
   ) {
     const stat = behaviorStats(state, ks.key);
     if (stat.last7 < Math.ceil(activeDays.length / 2)) {
+      const pointWord = ks.delta === 1 ? "point" : "points";
+      // CMS-overridable copy. Template variables: {title} {delta} {pointWord}.
+      // Default copy preserves the original phrasing byte-for-byte when
+      // no template is published — pure-fallback path is unchanged.
+      const tpl = getInsightTemplate(
+        "keystone-slipping",
+        `On the days you do “{title}” you keep {delta} {pointWord} more of everything else — but it's been light lately. Re-anchor it tomorrow.`
+      );
       out.push({
         id: `sug-keystone-${ks.key}`,
         kind: "progress",
         title: `Your keystone is slipping`,
-        body: `On the days you do “${ks.title}” you keep ${ks.delta} ${
-          ks.delta === 1 ? "point" : "points"
-        } more of everything else — but it's been light lately. Re-anchor it tomorrow.`,
+        body: renderTemplate(tpl, {
+          title: ks.title,
+          delta: ks.delta,
+          pointWord,
+        }),
         cta: "Got it",
         action: { type: "none" },
       });

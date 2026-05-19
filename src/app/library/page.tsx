@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
-import { getAccess, FREE_PACKS } from "@/lib/entitlements";
+import { getAccess, getFreePacks } from "@/lib/entitlements";
 import { PACKS } from "@/lib/packs";
 import { compileTimeline } from "@/lib/engine";
 import { Eyebrow, Skeleton, Button, Sheet, useToast } from "@/components/ui";
@@ -38,7 +38,8 @@ export default function LibraryPage() {
   const officialInstalledCount = (state.installedPacks ?? []).filter((id) =>
     officialPackIds.has(id)
   ).length;
-  const atFreeCap = !access.premium && officialInstalledCount >= FREE_PACKS;
+  const atFreeCap =
+    !access.premium && officialInstalledCount >= getFreePacks();
 
   return (
     <Shell>

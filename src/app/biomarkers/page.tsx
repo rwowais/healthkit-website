@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
-import { getAccess, FREE_BIOMARKERS } from "@/lib/entitlements";
+import { getAccess, getFreeBiomarkers } from "@/lib/entitlements";
 import {
   BIOMARKERS,
   biomarkerBand,
@@ -64,7 +64,7 @@ export default function BiomarkersPage() {
     if (
       !access.premium &&
       !distinct.has(open.key) &&
-      distinct.size >= FREE_BIOMARKERS
+      distinct.size >= getFreeBiomarkers()
     ) {
       setOpen(null);
       router.push("/upgrade");

@@ -22,6 +22,13 @@ import { PACKS } from "./packs";
 
 export const BUNDLE_SCHEMA = 1;
 
+/** A copy template the intelligence layer can substitute at render time. */
+export interface InsightTemplate {
+  kind: string;
+  template: string;
+  conditions?: unknown;
+}
+
 export interface KnowledgeBundle {
   schema: number;
   /** Monotonic published version (0 = built-in default). */
@@ -30,12 +37,16 @@ export interface KnowledgeBundle {
   protocols: ProtocolPack[];
   /** Tunables that were hardcoded constants (thresholds etc.). */
   config: Record<string, number | string | boolean>;
+  /** Optional — CMS-authored insight copy. Older bundles omit this; the
+   *  intelligence layer falls back to its built-in default copy. */
+  insightTemplates?: InsightTemplate[];
 }
 
 /** Stable, order-independent checksum for bundle integrity. */
 export function bundleChecksum(b: {
   protocols: ProtocolPack[];
   config: Record<string, unknown>;
+  insightTemplates?: unknown;
 }): string {
   const canon = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(canon);
@@ -50,7 +61,14 @@ export function bundleChecksum(b: {
     }
     return v;
   };
-  const s = JSON.stringify(canon({ p: b.protocols, c: b.config }));
+  // Only include `t` (insightTemplates) in the canonical form when it
+  // exists AND is non-empty — keeps backward compatibility with every
+  // bundle published before Wave D so integrity checks still pass.
+  const canonObj: Record<string, unknown> = { p: b.protocols, c: b.config };
+  if (Array.isArray(b.insightTemplates) && b.insightTemplates.length > 0) {
+    canonObj.t = b.insightTemplates;
+  }
+  const s = JSON.stringify(canon(canonObj));
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return (h >>> 0).toString(16);
@@ -104,6 +122,60 @@ export function activeConfig(): Record<string, number | string | boolean> {
 
 export function activeBundleVersion(): number {
   return published?.version ?? 0;
+}
+
+/**
+ * Typed config readers — every entitlement gate / threshold goes through
+ * these so a Publish that includes overrides actually takes effect
+ * without re-deploying code. The default is the source-of-truth fallback
+ * when no override has been published. Numbers accept stringified ints
+ * (Postgres jsonb returns "14" / 14 interchangeably depending on insert).
+ */
+export function getCfgNumber(key: string, def: number): number {
+  const v = activeConfig()[key];
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return def;
+}
+export function getCfgString(key: string, def: string): string {
+  const v = activeConfig()[key];
+  return typeof v === "string" ? v : def;
+}
+export function getCfgBool(key: string, def: boolean): boolean {
+  const v = activeConfig()[key];
+  return typeof v === "boolean" ? v : def;
+}
+
+/** Current insight templates from the active bundle (empty if none). */
+export function activeInsightTemplates(): InsightTemplate[] {
+  return published?.insightTemplates ?? [];
+}
+
+/**
+ * Look up a template by kind; return the default copy if no CMS row
+ * exists. Same fall-through contract as getCfg* — never throws, never
+ * blocks the runtime.
+ */
+export function getInsightTemplate(
+  kind: string,
+  defaultCopy: string
+): string {
+  const t = activeInsightTemplates().find((x) => x.kind === kind);
+  return t?.template ?? defaultCopy;
+}
+
+/** Minimal {var} interpolation for template copy. Missing keys → "". */
+export function renderTemplate(
+  tpl: string,
+  vars: Record<string, unknown>
+): string {
+  return tpl.replace(/\{(\w+)\}/g, (_, k) => {
+    const v = vars[k];
+    return v == null ? "" : String(v);
+  });
 }
 
 /**

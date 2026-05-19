@@ -65,8 +65,8 @@ describe.skipIf(!enabled)("CMS pipeline e2e (real staging Supabase)", () => {
 
     const assembled = await auth.assembleBundleFromCMS();
     expect(assembled).not.toBeNull();
-    expect(assembled!.length).toBeGreaterThan(0);
-    expect(assembled![0].behaviors.length).toBeGreaterThan(0);
+    expect(assembled!.protocols.length).toBeGreaterThan(0);
+    expect(assembled!.protocols[0].behaviors.length).toBeGreaterThan(0);
 
     const r = await pub.publishBundle("e2e: seed snapshot");
     // ok, OR a benign "no changes" if a prior identical bundle exists

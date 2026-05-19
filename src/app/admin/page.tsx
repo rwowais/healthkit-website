@@ -213,7 +213,7 @@ export default function AdminHome() {
         return;
       }
       const drafts = await assembleBundleFromCMS();
-      if (alive) setSimPacks(drafts ?? PACKS);
+      if (alive) setSimPacks(drafts?.protocols ?? PACKS);
     })();
     return () => {
       alive = false;

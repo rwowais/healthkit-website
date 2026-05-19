@@ -46,17 +46,21 @@ export function buildCatalogBundle(version: number): KnowledgeBundle {
  * else built-in) so the diff preview is a faithful preview.
  */
 export async function previewNextBundle(): Promise<KnowledgeBundle> {
-  const cmsPacks = await assembleBundleFromCMS();
+  const cms = await assembleBundleFromCMS();
   const version = 0; // placeholder — checksum doesn't include version
-  return cmsPacks
-    ? {
-        schema: BUNDLE_SCHEMA,
-        version,
-        generatedAt: new Date().toISOString(),
-        protocols: cmsPacks,
-        config: activeConfig(),
-      }
-    : buildCatalogBundle(version);
+  if (!cms) return buildCatalogBundle(version);
+  // Merge CMS config OVER active config so admin-published values win,
+  // but built-in defaults still flow through when the admin hasn't
+  // overridden them. Same merge applies at publish.
+  const config = { ...activeConfig(), ...cms.config };
+  return {
+    schema: BUNDLE_SCHEMA,
+    version,
+    generatedAt: new Date().toISOString(),
+    protocols: cms.protocols,
+    config,
+    insightTemplates: cms.insightTemplates,
+  };
 }
 
 /** Fetch the latest published bundle (or null if none / no cloud). */
@@ -301,14 +305,17 @@ export async function publishBundle(
   const version = (cur?.version ?? 0) + 1;
   // Assemble from the CMS authoring tables when seeded; otherwise the
   // built-in catalog (so publish still works pre-seed, byte-identical).
-  const cmsPacks = await assembleBundleFromCMS();
-  const bundle: KnowledgeBundle = cmsPacks
+  // CMS config merges OVER active config so admin overrides win while
+  // built-in defaults still flow through unchanged keys.
+  const cms = await assembleBundleFromCMS();
+  const bundle: KnowledgeBundle = cms
     ? {
         schema: BUNDLE_SCHEMA,
         version,
         generatedAt: new Date().toISOString(),
-        protocols: cmsPacks,
-        config: activeConfig(),
+        protocols: cms.protocols,
+        config: { ...activeConfig(), ...cms.config },
+        insightTemplates: cms.insightTemplates,
       }
     : buildCatalogBundle(version);
   const checksum = bundleChecksum(bundle);
