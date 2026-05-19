@@ -32,6 +32,18 @@ if (typeof g.CustomEvent === "undefined") {
   g.CustomEvent = CE;
 }
 
+// supabase-js eagerly constructs a realtime WebSocket; Node < 22 has no
+// global WebSocket. Only matters for the opt-in staging smoke; harmless
+// for the deterministic suite (which mocks supabase entirely).
+if (typeof g.WebSocket === "undefined") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    g.WebSocket = require("ws");
+  } catch {
+    /* ws not installed — staging smoke will surface a clear error */
+  }
+}
+
 const bus = new EventTarget();
 const windowStub = {
   addEventListener: bus.addEventListener.bind(bus),
@@ -47,3 +59,18 @@ g.localStorage = new MemoryStorage();
 g.__resetBrowser = () => {
   (g.localStorage as MemoryStorage).clear();
 };
+
+// Make ONLY the STAGING_* vars from the gitignored .env.local visible to
+// the (opt-in, network) staging smoke. Vitest doesn't load .env.local
+// the way Next does; the deterministic suite never reads these.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("node:fs") as typeof import("node:fs");
+  const raw = fs.readFileSync(".env.local", "utf8");
+  for (const line of raw.split("\n")) {
+    const m = line.match(/^\s*(STAGING_[A-Z_]+)\s*=\s*(.*)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
+} catch {
+  /* no .env.local — staging smoke just skips */
+}
