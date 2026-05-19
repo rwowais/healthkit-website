@@ -45,6 +45,7 @@ export default function ProtocolsPage() {
   const [detail, setDetail] = useState<TimelineItem | null>(null);
   const [packSheet, setPackSheet] = useState<ProtocolPack | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{
     name: string;
     tagline: string;
@@ -104,26 +105,54 @@ export default function ProtocolsPage() {
 
   const overrides = state.behaviorOverrides ?? {};
 
+  const closeBuilder = () => {
+    setCreating(false);
+    setEditingId(null);
+    setDraft({ name: "", tagline: "", behaviors: [] });
+  };
+
+  const openEdit = (pack: ProtocolPack) => {
+    setEditingId(pack.id);
+    setDraft({
+      name: pack.name,
+      tagline: pack.tagline,
+      behaviors: pack.behaviors.map((b) => ({ ...b })),
+    });
+    setPackSheet(null);
+    setCreating(true);
+  };
+
+  const removeDraftBehavior = (i: number) =>
+    setDraft((d) => ({
+      ...d,
+      behaviors: d.behaviors.filter((_, idx) => idx !== i),
+    }));
+
   const saveCustom = () => {
     if (!draft.name.trim() || draft.behaviors.length === 0) {
       toast.show("Add a name and at least one behavior");
       return;
     }
+    const existing = editingId
+      ? state.customPacks.find((p) => p.id === editingId)
+      : undefined;
     const pack: ProtocolPack = {
-      id: `custom-${Date.now()}`,
+      id: editingId ?? `custom-${Date.now()}`,
       name: draft.name.trim(),
       tagline: draft.tagline.trim() || "Custom protocol",
-      goal: "custom",
-      accent: "var(--readiness)",
-      icon: "sparkle",
+      goal: existing?.goal ?? "custom",
+      accent: existing?.accent ?? "var(--readiness)",
+      icon: existing?.icon ?? "sparkle",
       source: "custom",
-      durationLabel: "Custom",
+      durationLabel: existing?.durationLabel ?? "Custom",
       behaviors: draft.behaviors,
     };
     upsertCustomPack(pack);
-    setCreating(false);
-    setDraft({ name: "", tagline: "", behaviors: [] });
-    toast.show("Protocol created & installed");
+    const wasEditing = !!editingId;
+    closeBuilder();
+    toast.show(
+      wasEditing ? "Protocol updated" : "Protocol created & installed"
+    );
   };
 
   const addBehaviorToDraft = () => {
@@ -414,8 +443,8 @@ export default function ProtocolsPage() {
 
       <Sheet
         open={creating}
-        onClose={() => setCreating(false)}
-        title="Build a protocol"
+        onClose={closeBuilder}
+        title={editingId ? "Edit protocol" : "Build a protocol"}
       >
         <div className="space-y-4">
           <input
@@ -453,6 +482,13 @@ export default function ProtocolsPage() {
                     {b.title}
                   </span>
                   <span className="t-caption capitalize">{b.block}</span>
+                  <button
+                    onClick={() => removeDraftBehavior(i)}
+                    aria-label={`Remove ${b.title}`}
+                    className="press grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--alert)]"
+                  >
+                    <Icon name="ban" size={14} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -507,7 +543,7 @@ export default function ProtocolsPage() {
           </div>
 
           <Button full onClick={saveCustom}>
-            Create & install
+            {editingId ? "Save changes" : "Create & install"}
           </Button>
         </div>
       </Sheet>
@@ -596,6 +632,19 @@ export default function ProtocolsPage() {
                 </div>
 
                 <div className="space-y-2.5">
+                  {p.source === "custom" && (
+                    <button
+                      onClick={() => openEdit(p)}
+                      className="press tr-fast w-full rounded-[var(--r-pill)] py-3.5 text-[14px] font-semibold"
+                      style={{
+                        background:
+                          "color-mix(in srgb, var(--readiness) 16%, var(--surface-3))",
+                        color: "var(--readiness)",
+                      }}
+                    >
+                      Edit protocol
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setPackPaused(p.id, !isPaused);
@@ -623,7 +672,9 @@ export default function ProtocolsPage() {
                           return;
                         }
                         duplicatePack(p);
-                        toast.show(`Made “${p.name}” editable`);
+                        toast.show(
+                          `Editable copy added — open “${p.name} (yours)” to edit`
+                        );
                         setPackSheet(null);
                       }}
                       className="press tr-fast w-full rounded-[var(--r-pill)] py-3.5 text-[14px] font-semibold"

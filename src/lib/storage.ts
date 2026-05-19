@@ -152,10 +152,13 @@ const uniq = (xs: string[]): string[] => Array.from(new Set(xs));
 function normalize(s: AppState): AppState {
   const d = getDefaultState();
 
-  const installedPacks =
-    Array.isArray(s.installedPacks) && s.installedPacks.length
-      ? uniq(s.installedPacks)
-      : [...DEFAULT_INSTALLED];
+  // Honor an EXPLICIT list even when empty — a user who removed every
+  // protocol must keep zero, not have the defaults silently resurrected
+  // on the next load/sync. Only seed defaults when the field is missing
+  // or corrupt (older schema / bad payload).
+  const installedPacks = Array.isArray(s.installedPacks)
+    ? uniq(s.installedPacks)
+    : [...DEFAULT_INSTALLED];
   const pausedPacks = Array.isArray(s.pausedPacks)
     ? uniq(s.pausedPacks)
     : [];
