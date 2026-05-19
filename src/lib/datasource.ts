@@ -6,13 +6,14 @@
  * SupabaseDataSource (auth + row sync) and swap `activeDataSource` — no
  * screen or hook changes required.
  */
-import type { AppState } from "./types";
+import type { AppState, DailyLog } from "./types";
 import { loadState, saveState, SAVE_ERROR_EVENT } from "./storage";
 import { STORAGE_KEY } from "./constants";
 import {
   getSupabase,
   supabaseEnabled,
   STATE_TABLE,
+  LOGS_TABLE,
   getUserId,
 } from "./supabase";
 
@@ -169,6 +170,128 @@ class SupabaseDataSource implements DataSource {
   readonly kind = "supabase" as const;
   readonly isCloud = true;
 
+  // ── Per-day log split (Phases 0–2) ────────────────────────────────
+  // Document stays authoritative (dual-write); rows are read-merged so
+  // we never show fewer days than the document. Feature-detected: if
+  // `protocolize_logs` doesn't exist yet, every logs op is a no-op and
+  // the app behaves exactly as the single-table model. Fully reversible.
+  private logsOk: boolean | undefined; // undefined = unprobed
+  private lastDays = new Map<string, string>(); // date -> JSON(day)
+
+  private async readLogDays(
+    sb: NonNullable<ReturnType<typeof getSupabase>>,
+    userId: string
+  ): Promise<DailyLog[] | null> {
+    try {
+      const { data, error } = await sb
+        .from(LOGS_TABLE)
+        .select("log")
+        .eq("user_id", userId);
+      if (error) {
+        this.logsOk = false; // table missing / not migrated yet
+        return null;
+      }
+      this.logsOk = true;
+      return (data ?? []).map((r) => r.log as DailyLog);
+    } catch {
+      this.logsOk = false;
+      return null;
+    }
+  }
+
+  /**
+   * Reconstruct dailyLogs from per-day rows, union with the document
+   * (never lose a day), and backfill any document days missing from the
+   * table without clobbering newer rows. Returns the base state
+   * unchanged if the table isn't available.
+   */
+  private async reconcileLogs(
+    sb: NonNullable<ReturnType<typeof getSupabase>>,
+    userId: string,
+    base: AppState
+  ): Promise<AppState> {
+    const rows = await this.readLogDays(sb, userId);
+    if (rows === null) return base; // table absent → document-only
+
+    const byDate = new Map<string, DailyLog>();
+    for (const d of rows) if (d?.date) byDate.set(d.date, d);
+
+    const docDays = base.dailyLogs ?? [];
+    const missing: DailyLog[] = [];
+    for (const d of docDays) {
+      if (!byDate.has(d.date)) {
+        byDate.set(d.date, d);
+        missing.push(d);
+      }
+    }
+    if (missing.length) {
+      // Idempotent backfill: create-if-absent, never overwrite a row.
+      try {
+        await sb.from(LOGS_TABLE).upsert(
+          missing.map((d) => ({
+            user_id: userId,
+            log_date: d.date,
+            log: d,
+            updated_at: new Date().toISOString(),
+          })),
+          { onConflict: "user_id,log_date", ignoreDuplicates: true }
+        );
+      } catch {
+        /* best effort — document still authoritative */
+      }
+    }
+
+    const merged = [...byDate.values()].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+    this.lastDays = new Map(
+      merged.map((d) => [d.date, JSON.stringify(d)])
+    );
+    const result = { ...base, dailyLogs: merged };
+    saveState(result); // keep the offline cache coherent
+    return result;
+  }
+
+  /** Dual-write only the days that actually changed. */
+  private async writeChangedDays(
+    sb: NonNullable<ReturnType<typeof getSupabase>>,
+    userId: string,
+    state: AppState
+  ): Promise<void> {
+    if (this.logsOk === false) return;
+    const changed: { user_id: string; log_date: string; log: DailyLog }[] =
+      [];
+    const next = new Map<string, string>();
+    for (const d of state.dailyLogs ?? []) {
+      const json = JSON.stringify(d);
+      next.set(d.date, json);
+      if (this.lastDays.get(d.date) !== json) {
+        changed.push({ user_id: userId, log_date: d.date, log: d });
+      }
+    }
+    if (!changed.length) {
+      this.lastDays = next;
+      return;
+    }
+    try {
+      const stamped = changed.map((c) => ({
+        ...c,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await sb
+        .from(LOGS_TABLE)
+        .upsert(stamped, { onConflict: "user_id,log_date" });
+      if (error) {
+        this.logsOk = false;
+        return;
+      }
+      this.logsOk = true;
+      this.lastDays = next;
+    } catch {
+      this.logsOk = false;
+    }
+  }
+
   async load(): Promise<AppState> {
     const sb = getSupabase();
     if (!sb) return loadState();
@@ -204,7 +327,8 @@ class SupabaseDataSource implements DataSource {
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
         }
-        return loadState(); // normalizes + migrates the cloud payload
+        const norm = loadState(); // normalizes + migrates the cloud payload
+        return await this.reconcileLogs(sb, userId, norm);
       }
 
       // First sign-in on this account: lift local data up, don't wipe.
@@ -216,7 +340,7 @@ class SupabaseDataSource implements DataSource {
         updated_at: nowIso,
       });
       lastCloudUpdatedAt = nowIso;
-      return local;
+      return await this.reconcileLogs(sb, userId, local);
     } catch {
       return loadState(); // offline / transient → local cache
     }
@@ -260,6 +384,11 @@ class SupabaseDataSource implements DataSource {
       });
       if (error) throw error;
       lastCloudUpdatedAt = nowIso;
+
+      // Dual-write the changed day(s) to the per-day table. Best effort:
+      // the document write above already succeeded and stays the safety
+      // net through Phase 2, so a logs hiccup never surfaces an error.
+      await this.writeChangedDays(sb, userId, state);
     } catch {
       // Local cache still holds; tell the user the cloud copy is behind
       // rather than letting the failure pass invisibly.
@@ -285,6 +414,13 @@ class SupabaseDataSource implements DataSource {
         .eq("user_id", userId);
       if (error) throw error;
       lastCloudUpdatedAt = null;
+      // Also clear the per-day rows (best effort; ignore if absent).
+      this.lastDays.clear();
+      try {
+        await sb.from(LOGS_TABLE).delete().eq("user_id", userId);
+      } catch {
+        /* table may not exist yet — nothing to clear */
+      }
     } catch {
       if (typeof window !== "undefined") {
         window.dispatchEvent(
