@@ -29,6 +29,13 @@ import {
   type CmsProtocol,
   type CmsBehavior,
 } from "@/lib/cms/authoring";
+import {
+  listSuggestions,
+  createSuggestion,
+  approveSuggestion,
+  rejectSuggestion,
+  type Suggestion,
+} from "@/lib/cms/suggestions";
 import type { AppState, DailyLog } from "@/lib/types";
 import { Eyebrow, Skeleton } from "@/components/ui";
 
@@ -41,6 +48,7 @@ type Tab =
   | "intelligence"
   | "simulate"
   | "edit"
+  | "ai"
   | "publish";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -51,6 +59,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "intelligence", label: "Intelligence" },
   { id: "simulate", label: "Simulate" },
   { id: "edit", label: "Edit" },
+  { id: "ai", label: "AI Review" },
   { id: "publish", label: "Publish" },
 ];
 
@@ -110,7 +119,18 @@ export default function AdminHome() {
   const [edB, setEdB] = useState<CmsBehavior[]>([]);
   const loadCms = () => listCmsProtocols().then(setCmsP);
   useEffect(() => {
-    if (gate === "ok" && tab === "edit") loadCms();
+    if (gate === "ok" && (tab === "edit" || tab === "ai")) loadCms();
+  }, [gate, tab]);
+
+  // ── AI Review (constrained suggestion rail) ───────────────────────
+  const [sugs, setSugs] = useState<Suggestion[]>([]);
+  const [dProto, setDProto] = useState("");
+  const [dField, setDField] = useState("rationale");
+  const [dValue, setDValue] = useState("");
+  const [dWhy, setDWhy] = useState("");
+  const loadSugs = () => listSuggestions("pending").then(setSugs);
+  useEffect(() => {
+    if (gate === "ok" && tab === "ai") loadSugs();
   }, [gate, tab]);
   const openProto = async (p: CmsProtocol) => {
     setEdP({ ...p });
@@ -710,6 +730,159 @@ export default function AdminHome() {
                   Edits are drafts until you Publish a bundle — users see
                   nothing change until then.
                 </p>
+              </div>
+            );
+          })()}
+
+        {tab === "ai" &&
+          (() => {
+            const inp =
+              "w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none";
+            return (
+              <div className="space-y-4">
+                <div className={card} style={surf}>
+                  <Eyebrow color="var(--readiness)">
+                    Draft a suggestion
+                  </Eyebrow>
+                  <p className="t-caption mt-1">
+                    Exactly the row shape a future model submits. It only
+                    ever creates a <b>pending</b> proposal — never a live
+                    change.
+                  </p>
+                  {cmsP.length === 0 ? (
+                    <p className="mt-3 text-[12.5px] text-[var(--text-3)]">
+                      Seed the CMS in the Edit tab first.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      <select
+                        className={inp}
+                        value={dProto}
+                        onChange={(e) => setDProto(e.target.value)}
+                      >
+                        <option value="">Select a protocol…</option>
+                        {cmsP.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <select
+                          className={inp}
+                          value={dField}
+                          onChange={(e) => setDField(e.target.value)}
+                        >
+                          {["tagline", "name", "accent", "goal"].map(
+                            (f) => (
+                              <option key={f}>{f}</option>
+                            )
+                          )}
+                        </select>
+                        <input
+                          className={inp}
+                          value={dValue}
+                          onChange={(e) => setDValue(e.target.value)}
+                          placeholder="Proposed value"
+                        />
+                      </div>
+                      <input
+                        className={inp}
+                        value={dWhy}
+                        onChange={(e) => setDWhy(e.target.value)}
+                        placeholder="Rationale"
+                      />
+                      <button
+                        disabled={busy || !dProto || !dValue}
+                        onClick={async () => {
+                          setBusy(true);
+                          const r = await createSuggestion({
+                            entityType: "protocol",
+                            entityId: dProto,
+                            proposed: { [dField]: dValue },
+                            rationale: dWhy,
+                          });
+                          setBusy(false);
+                          setMsg(r.ok ? "Proposed" : r.reason ?? "Failed");
+                          if (r.ok) {
+                            setDValue("");
+                            setDWhy("");
+                            loadSugs();
+                          }
+                        }}
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        Submit suggestion
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Eyebrow>Pending review</Eyebrow>
+                  {sugs.length === 0 && (
+                    <p className="t-caption mt-2 px-1">
+                      No pending suggestions.
+                    </p>
+                  )}
+                  <div className="mt-2 space-y-2">
+                    {sugs.map((s) => (
+                      <div key={s.id} className={card} style={surf}>
+                        <p className="text-[12px] text-[var(--text-3)]">
+                          {s.entity_type} · {s.model ?? "—"}
+                        </p>
+                        <p className="mt-1 text-[13px] text-[var(--text-1)]">
+                          <code>{JSON.stringify(s.proposed)}</code>
+                        </p>
+                        {s.rationale && (
+                          <p className="mt-1 text-[12.5px] text-[var(--text-2)]">
+                            {s.rationale}
+                          </p>
+                        )}
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            disabled={busy}
+                            onClick={async () => {
+                              setBusy(true);
+                              const r = await approveSuggestion(s);
+                              setBusy(false);
+                              setMsg(
+                                r.ok
+                                  ? "Approved → draft updated (not live)"
+                                  : r.reason ?? "Failed"
+                              );
+                              loadSugs();
+                            }}
+                            className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[#08090B]"
+                          >
+                            Approve → draft
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={async () => {
+                              setBusy(true);
+                              await rejectSuggestion(s.id);
+                              setBusy(false);
+                              loadSugs();
+                            }}
+                            className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-2)]"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {msg && (
+                    <p className="mt-2 text-[12px] text-[var(--text-3)]">
+                      {msg}
+                    </p>
+                  )}
+                  <p className="t-caption mt-3">
+                    Approving writes a draft only. Nothing reaches users
+                    until you Publish a bundle.
+                  </p>
+                </div>
               </div>
             );
           })()}

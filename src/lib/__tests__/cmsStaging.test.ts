@@ -86,4 +86,54 @@ describe.skipIf(!enabled)("CMS pipeline e2e (real staging Supabase)", () => {
     const after = await pub.listPublications();
     expect(after[0].version).toBeGreaterThan(list[0].version);
   }, 60000);
+
+  it("governs AI suggestions: create → approve writes draft → reject", async () => {
+    if (!admin) return;
+    const sug = await import("@/lib/cms/suggestions");
+    const protos = await auth.listCmsProtocols();
+    expect(protos.length).toBeGreaterThan(0);
+    const target = protos[0];
+    const tag = `e2e ${Date.now()}`;
+
+    const c = await sug.createSuggestion({
+      entityType: "protocol",
+      entityId: target.id,
+      proposed: { tagline: tag },
+      rationale: "e2e governance",
+    });
+    expect(c.ok).toBe(true);
+
+    const pending = await sug.listSuggestions("pending");
+    const mine = pending.find(
+      (s) =>
+        s.entity_id === target.id &&
+        (s.proposed as { tagline?: string }).tagline === tag
+    );
+    expect(mine).toBeTruthy();
+
+    const ap = await sug.approveSuggestion(mine!);
+    expect(ap.ok).toBe(true);
+    // draft updated, NOT published — the protocol row now carries it
+    const after = await auth.listCmsProtocols();
+    expect(after.find((p) => p.id === target.id)?.tagline).toBe(tag);
+
+    // a second proposal can be cleanly rejected
+    const c2 = await sug.createSuggestion({
+      entityType: "protocol",
+      entityId: target.id,
+      proposed: { tagline: "reject me" },
+      rationale: "e2e reject",
+    });
+    expect(c2.ok).toBe(true);
+    const p2 = (await sug.listSuggestions("pending")).find(
+      (s) => (s.proposed as { tagline?: string }).tagline === "reject me"
+    );
+    expect(p2).toBeTruthy();
+    const rj = await sug.rejectSuggestion(p2!.id);
+    expect(rj.ok).toBe(true);
+    const stillPending = (await sug.listSuggestions("pending")).some(
+      (s) => s.id === p2!.id
+    );
+    expect(stillPending).toBe(false);
+  }, 60000);
 });
