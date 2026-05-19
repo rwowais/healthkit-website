@@ -485,13 +485,11 @@ export function duplicatePack(
     id: newId,
     name: `${source.name} (yours)`,
     source: "custom",
-    // Namespace the forked keys so an editable copy is fully independent —
-    // it won't merge with (or be overridden alongside) the original's
-    // behaviors if both end up installed.
-    behaviors: source.behaviors.map((b) => ({
-      ...b,
-      canonicalKey: `${newId}:${b.canonicalKey}`,
-    })),
+    // Keep the original canonicalKeys: a fork is the SAME behaviors, so
+    // it must merge by canonicalKey like every other pack. Namespacing
+    // them made the timeline show every behavior twice whenever the
+    // original (or any pack sharing those behaviors) was also installed.
+    behaviors: source.behaviors.map((b) => ({ ...b })),
   };
   const customPacks = [...state.customPacks, copy];
   const installedPacks = [

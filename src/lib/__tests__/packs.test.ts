@@ -14,6 +14,7 @@ import {
   getDefaultState,
 } from "@/lib/storage";
 import { DEFAULT_INSTALLED } from "@/lib/packs";
+import { compileTimeline } from "@/lib/engine";
 import type { AppState, ProtocolPack } from "@/lib/types";
 
 const v3 = (over: Record<string, unknown>) =>
@@ -68,7 +69,7 @@ describe("custom pack editability (bug a)", () => {
     ],
   } as unknown as ProtocolPack;
 
-  it("forks into an installed, namespaced, editable custom copy", () => {
+  it("forks into an installed editable copy that keeps canonicalKeys", () => {
     let st = getDefaultState();
     st = { ...st, installedPacks: ["better-sleep"] };
     st = duplicatePack(st, source);
@@ -78,7 +79,25 @@ describe("custom pack editability (bug a)", () => {
     expect(copy.id).not.toBe("better-sleep");
     expect(st.installedPacks).toContain(copy.id);
     expect(st.installedPacks).not.toContain("better-sleep"); // original removed
-    expect(copy.behaviors[0].canonicalKey).toContain(":"); // namespaced
+    // Same canonicalKey as the source — a fork is the same behavior and
+    // must merge, not namespace into a duplicate.
+    expect(copy.behaviors[0].canonicalKey).toBe(
+      source.behaviors[0].canonicalKey
+    );
+  });
+
+  it("fork + original both installed → behaviors merge, no duplicates", () => {
+    let st = getDefaultState();
+    st = { ...st, installedPacks: ["better-sleep"] };
+    st = duplicatePack(st, source); // original removed, fork installed
+    // User re-adds the official pack from the Library.
+    st = { ...st, installedPacks: [...st.installedPacks, "better-sleep"] };
+    // (the real official 'better-sleep' is in PACKS; merge is by key)
+    const tl = compileTimeline(st, 0);
+    const keys = tl.map((i) => i.canonicalKey);
+    expect(new Set(keys).size).toBe(keys.length); // zero duplicate behaviors
+    const windDown = tl.filter((i) => i.canonicalKey === "wind-down");
+    expect(windDown.length).toBeLessThanOrEqual(1);
   });
 
   it("editing a custom pack (same id) replaces it and stays installed", () => {
