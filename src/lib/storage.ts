@@ -17,9 +17,13 @@ import type {
   UserSettings,
 } from "./types";
 
-import { DEFAULT_INSTALLED } from "./packs";
-import { compileTimeline } from "./engine";
-import type { ProtocolPack, BehaviorOverride } from "./types";
+import { DEFAULT_INSTALLED, PACKS } from "./packs";
+import { compileTimeline, shapeTimeline, adapt } from "./engine";
+import type {
+  BehaviorOverride,
+  Insight,
+  ProtocolPack,
+} from "./types";
 import { defaultSleepProtocol } from "./defaults/sleep";
 import { defaultExerciseProtocol } from "./defaults/exercise";
 import { defaultNutritionProtocol } from "./defaults/nutrition";
@@ -141,9 +145,38 @@ export function getDefaultState(): AppState {
   };
 }
 
+const uniq = (xs: string[]): string[] => Array.from(new Set(xs));
+
 /** Backfill any fields missing from older v3 saves (schema hardening). */
 function normalize(s: AppState): AppState {
   const d = getDefaultState();
+
+  const installedPacks =
+    Array.isArray(s.installedPacks) && s.installedPacks.length
+      ? uniq(s.installedPacks)
+      : [...DEFAULT_INSTALLED];
+  const pausedPacks = Array.isArray(s.pausedPacks)
+    ? uniq(s.pausedPacks)
+    : [];
+  const customPacks = Array.isArray(s.customPacks) ? s.customPacks : [];
+
+  // Prune behaviorOverrides that no longer belong to any installed pack —
+  // uninstalling/deleting a pack must not leave orphaned overrides behind.
+  const installedSet = new Set(installedPacks);
+  const validKeys = new Set<string>();
+  for (const pack of [...PACKS, ...customPacks]) {
+    if (!installedSet.has(pack.id)) continue;
+    for (const b of pack.behaviors) validKeys.add(b.canonicalKey);
+  }
+  const rawOverrides =
+    s.behaviorOverrides && typeof s.behaviorOverrides === "object"
+      ? s.behaviorOverrides
+      : {};
+  const behaviorOverrides: Record<string, BehaviorOverride> = {};
+  for (const [k, v] of Object.entries(rawOverrides)) {
+    if (validKeys.has(k)) behaviorOverrides[k] = v;
+  }
+
   return {
     ...s,
     settings: { ...d.settings, ...s.settings },
@@ -153,16 +186,10 @@ function normalize(s: AppState): AppState {
     biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
     insights: Array.isArray(s.insights) ? s.insights : [],
     currentStreak: s.currentStreak ?? 0,
-    installedPacks:
-      Array.isArray(s.installedPacks) && s.installedPacks.length
-        ? s.installedPacks
-        : [...DEFAULT_INSTALLED],
-    pausedPacks: Array.isArray(s.pausedPacks) ? s.pausedPacks : [],
-    customPacks: Array.isArray(s.customPacks) ? s.customPacks : [],
-    behaviorOverrides:
-      s.behaviorOverrides && typeof s.behaviorOverrides === "object"
-        ? s.behaviorOverrides
-        : {},
+    installedPacks,
+    pausedPacks,
+    customPacks,
+    behaviorOverrides,
   };
 }
 
@@ -257,7 +284,21 @@ function migrateV2toV3(v2: Record<string, unknown>): AppState {
     }
   }
 
-  base.supplementMeta = buildDefaultSupplementMeta(base.protocols.supplements);
+  base.supplementMeta = {
+    ...buildDefaultSupplementMeta(base.protocols.supplements),
+    ...(v2.supplementMeta && typeof v2.supplementMeta === "object"
+      ? (v2.supplementMeta as SupplementMetaMap)
+      : {}),
+  };
+
+  // Carry forward the user's actual history — losing this on migration
+  // would silently wipe streaks, tracking and biomarkers.
+  if (Array.isArray(v2.dailyLogs)) base.dailyLogs = v2.dailyLogs as DailyLog[];
+  if (Array.isArray(v2.biomarkers))
+    base.biomarkers = v2.biomarkers as BiomarkerEntry[];
+  if (Array.isArray(v2.insights)) base.insights = v2.insights as Insight[];
+  if (typeof v2.currentStreak === "number")
+    base.currentStreak = v2.currentStreak;
 
   return base;
 }
@@ -325,9 +366,18 @@ export function toggleBehavior(
   const bc = { ...(log.behaviorCompletions ?? {}) };
   bc[key] = !bc[key];
 
-  const items = compileTimeline(state, isoDayIndex(date));
-  const total = items.length || 1;
-  const done = items.filter((i) => bc[i.canonicalKey]).length;
+  // Score over the *shaped* timeline the user actually sees — muted
+  // behaviors don't count, so the persisted score matches the on-screen
+  // progress (and "day complete") exactly. Past days render unshaped.
+  const isToday = date === getDateString();
+  const compiled = compileTimeline(state, isoDayIndex(date));
+  const shaped = shapeTimeline(
+    compiled,
+    isToday ? adapt(state).mode : "normal"
+  );
+  const active = shaped.filter((i) => !i.muted);
+  const total = active.length || 1;
+  const done = active.filter((i) => bc[i.canonicalKey]).length;
   const score = Math.round((done / total) * 100);
 
   const updated: DailyLog = { ...log, behaviorCompletions: bc, score };
@@ -409,12 +459,19 @@ export function duplicatePack(
   state: AppState,
   source: ProtocolPack
 ): AppState {
+  const newId = `custom-${Date.now()}`;
   const copy: ProtocolPack = {
     ...source,
-    id: `custom-${Date.now()}`,
+    id: newId,
     name: `${source.name} (yours)`,
     source: "custom",
-    behaviors: source.behaviors.map((b) => ({ ...b })),
+    // Namespace the forked keys so an editable copy is fully independent —
+    // it won't merge with (or be overridden alongside) the original's
+    // behaviors if both end up installed.
+    behaviors: source.behaviors.map((b) => ({
+      ...b,
+      canonicalKey: `${newId}:${b.canonicalKey}`,
+    })),
   };
   const customPacks = [...state.customPacks, copy];
   const installedPacks = [

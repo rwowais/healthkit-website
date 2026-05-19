@@ -15,6 +15,8 @@ export interface DataSource {
   readonly kind: "local" | "supabase";
   load(): Promise<AppState>;
   save(state: AppState): Promise<void>;
+  /** Wipe the off-device copy (no-op for local). */
+  clearRemote(): Promise<void>;
   /** True when this source persists off-device. */
   readonly isCloud: boolean;
 }
@@ -32,6 +34,9 @@ class LocalDataSource implements DataSource {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("pz:state"));
     }
+  }
+  async clearRemote(): Promise<void> {
+    /* nothing off-device */
   }
 }
 
@@ -104,6 +109,22 @@ class SupabaseDataSource implements DataSource {
       });
     } catch {
       /* offline — local cache holds; will resync on next save */
+    }
+  }
+
+  async clearRemote(): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) return;
+    try {
+      const {
+        data: { user },
+      } = await sb.auth.getUser();
+      if (!user) return;
+      // Drop the cloud row so a local reset isn't immediately
+      // re-hydrated from the server on the next load.
+      await sb.from(STATE_TABLE).delete().eq("user_id", user.id);
+    } catch {
+      /* offline — best effort; local is already cleared */
     }
   }
 }

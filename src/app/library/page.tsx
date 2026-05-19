@@ -31,6 +31,13 @@ export default function LibraryPage() {
   }
 
   const installedSet = new Set(state.installedPacks ?? []);
+  // Free cap applies to official library packs only — custom/forked
+  // packs and paused ones shouldn't burn a slot.
+  const officialPackIds = new Set(PACKS.map((p) => p.id));
+  const officialInstalledCount = (state.installedPacks ?? []).filter((id) =>
+    officialPackIds.has(id)
+  ).length;
+  const atFreeCap = !access.premium && officialInstalledCount >= FREE_PACKS;
 
   return (
     <Shell>
@@ -190,10 +197,7 @@ export default function LibraryPage() {
                 <Button
                   full
                   onClick={() => {
-                    if (
-                      !access.premium &&
-                      (state.installedPacks?.length ?? 0) >= FREE_PACKS
-                    ) {
+                    if (atFreeCap && !installedSet.has(open.id)) {
                       setOpen(null);
                       router.push("/upgrade");
                       return;
@@ -203,8 +207,7 @@ export default function LibraryPage() {
                     setOpen(null);
                   }}
                 >
-                  {!access.premium &&
-                  (state.installedPacks?.length ?? 0) >= FREE_PACKS
+                  {atFreeCap && !installedSet.has(open.id)
                     ? "Unlock more with Premium"
                     : "Install protocol"}
                 </Button>

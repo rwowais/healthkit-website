@@ -11,7 +11,7 @@ import {
   signInOAuth,
   supabaseEnabled,
 } from "@/lib/auth";
-import { loadState } from "@/lib/storage";
+import { activeDataSource } from "@/lib/datasource";
 import { Icon } from "@/components/ui/icons";
 
 type Mode = "signin" | "signup" | "magic" | "forgot" | "sent";
@@ -25,13 +25,20 @@ export default function AuthPage() {
   const [err, setErr] = useState<string | null>(null);
   const [sentMsg, setSentMsg] = useState("");
 
-  const afterAuth = () => {
-    const s = loadState();
+  const afterAuth = async () => {
+    // Await the active source so the cloud row is pulled before we
+    // decide where to route — a stale sync read would re-onboard a
+    // returning user (or overwrite their cloud data).
+    const s = await activeDataSource.load();
     router.push(s.settings.completedOnboarding ? "/today" : "/onboarding");
   };
 
   const submit = async () => {
     setErr(null);
+    if (mode === "signup" && password.length < 8) {
+      setErr("Use at least 8 characters for your password.");
+      return;
+    }
     setBusy(true);
     let r;
     if (mode === "signin") r = await signInEmail(email, password);
@@ -163,7 +170,8 @@ export default function AuthPage() {
                       <button
                         key={p}
                         onClick={() => oauth(p)}
-                        className="press tr-fast flex items-center justify-center gap-2 rounded-[var(--r-md)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--text-1)]"
+                        disabled={!supabaseEnabled}
+                        className="press tr-fast flex items-center justify-center gap-2 rounded-[var(--r-md)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--text-1)] disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Icon
                           name={p === "apple" ? "sparkle" : "compass"}

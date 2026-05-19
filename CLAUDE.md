@@ -2,9 +2,19 @@
 
 # Protocolize
 
-A longevity routine web app that helps users build science-backed routines for sleep, exercise, nutrition, and supplements. Users can follow structured multi-week programs or build custom routines, then track daily adherence and view progress analytics.
+An adaptive longevity operating system. Users install expert-designed
+**protocol packs** (sleep, training, focus, metabolic, recovery…) which
+merge into one de-duplicated, time-anchored daily timeline that adapts to
+recovery/adherence signals. Behaviors, biomarkers and a calm intelligence
+layer (keystone, weekly review, suggestions) sit on top.
 
-**Business model:** Freemium. Free tier = tracker + routine builder. Premium ($7/mo) = structured programs, full protocol library, workout logger, meal library.
+**Business model:** Freemium with a 14-day reverse trial (engagement-gated
+auto-extend). Free = the full habit loop + 3 protocol packs + 7-day
+insights + 3 biomarkers + local/cloud sync + export. Premium ($8.99/mo or
+$79.99/yr; $179 lifetime) unlocks the intelligence layer, the complete
+Library, biomarker-aware adaptation, and unlimited history. Stripe is
+env-gated and inert until the owner wires Payment Links. Pricing lives in
+`src/lib/billing.ts` (`PRICING`).
 
 **Inspired by:** Peter Attia, Andrew Huberman, Siim Land's "25% Program."
 
@@ -127,43 +137,47 @@ nothing is deleted).
 
 ```
 healthkit-website/
-├── CLAUDE.md                       # This file
-├── AGENTS.md                       # Next.js 16 agent rules
-├── start-dev.sh                    # Dev server launcher (sources nvm + runs next dev --webpack)
-├── package.json                    # Dependencies (next, react, tailwind, typescript)
-├── tsconfig.json
-├── next.config.ts
-├── postcss.config.mjs
-├── .eslintrc.json
+├── CLAUDE.md / AGENTS.md           # This file / Next.js 16 agent rules
+├── start-dev.sh                    # Dev launcher (sources nvm + next dev --webpack)
+├── supabase/schema.sql             # Cloud table + RLS (owner runs once)
 │
 ├── src/
-│   ├── app/                        # Next.js App Router pages (all "use client")
-│   │   ├── layout.tsx              # Root layout — Geist fonts, metadata
-│   │   ├── page.tsx                # Landing/marketing page (hero, features, pricing)
-│   │   ├── globals.css             # Design tokens, glass morphism, animations
-│   │   ├── favicon.ico
-│   │   ├── onboarding/page.tsx     # Multi-step quiz (name + 7 questions + result)
-│   │   ├── dashboard/page.tsx      # Main hub (stats, program, quick actions, protocols)
-│   │   ├── protocols/page.tsx      # Protocol library with category/difficulty/source filters
-│   │   ├── programs/page.tsx       # Program cards (Metabolic Reset, Body Recomp)
-│   │   ├── programs/[id]/page.tsx  # Program detail with phase accordion + daily plans
-│   │   ├── meals/page.tsx          # Meal library with type filters + macro bars
-│   │   ├── workout/page.tsx        # Workout logger (timer, exercises, sets, history)
-│   │   ├── tracker/page.tsx        # Daily check-in (progress ring, mood, energy, sleep, protocol checklist)
-│   │   ├── progress/page.tsx       # Analytics (streak, 7-day chart, 30-day heatmap, adherence bars)
-│   │   └── routine/page.tsx        # Routine management
+│   ├── app/                        # App Router pages (all "use client")
+│   │   ├── layout.tsx              # Root layout — fonts, providers, SW
+│   │   ├── page.tsx                # Landing/marketing
+│   │   ├── globals.css             # Design tokens, glass, animations
+│   │   ├── manifest.ts             # PWA manifest
+│   │   ├── onboarding/page.tsx     # Adaptive ~8-step system builder
+│   │   ├── auth/page.tsx           # Sign in / up / magic / forgot
+│   │   ├── auth/reset/page.tsx     # Password reset target
+│   │   ├── today/page.tsx          # The adaptive daily timeline (home)
+│   │   ├── protocols/page.tsx      # Installed system: merged behaviors
+│   │   ├── library/page.tsx        # Discover & install protocol packs
+│   │   ├── insights/page.tsx       # Intelligence layer (gated)
+│   │   ├── biomarkers/page.tsx     # Body & bloodwork tracking
+│   │   ├── profile/page.tsx        # Account, sync, data, membership
+│   │   └── upgrade/page.tsx        # Premium / pricing
 │   │
-│   ├── components/
-│   │   ├── Shell.tsx               # App shell — sticky glass header, desktop nav, mobile hamburger, mobile bottom nav
-│   │   └── ProtocolCard.tsx        # Dark card component for protocol display
+│   ├── components/                 # Shell, BehaviorSheet, PremiumGate,
+│   │   ├── ...                     #   SupabaseAuth, Reminders, ServiceWorker
+│   │   └── ui/                     # Primitives, icons, charts, toast
+│   │
+│   ├── hooks/useAppState.ts        # Single state hook (load/save/sync)
 │   │
 │   └── lib/
-│       ├── types.ts                # All TypeScript interfaces and type unions
-│       ├── storage.ts              # localStorage CRUD (key: "protocolize-v1")
-│       ├── protocols.ts            # 39 protocols across 4 categories + categoryInfo map
-│       ├── programs.ts             # 2 programs: Metabolic Reset (6wk) + Body Recomp (5wk)
-│       ├── meals.ts                # 14 meal ideas with ingredients + macros
-│       └── quiz.ts                 # 7 onboarding questions + getRecommendation() logic
+│       ├── types.ts                # All interfaces / unions
+│       ├── constants.ts            # Storage keys, score weights
+│       ├── storage.ts              # State CRUD, normalize, v2→v3 migrate
+│       ├── datasource.ts           # Local | Supabase abstraction
+│       ├── supabase.ts auth.ts     # Env-gated client + auth wrappers
+│       ├── packs.ts                # Protocol pack catalog
+│       ├── engine.ts               # compileTimeline + adapt/shapeTimeline
+│       ├── intel.ts                # keystone, weekly review, suggestions
+│       ├── time.ts timing.ts       # Schedule/time helpers
+│       ├── entitlements.ts         # Access + reverse-trial logic
+│       ├── billing.ts              # Stripe Payment Links (env-gated)
+│       ├── biomarkers.ts metrics.ts insights.ts scoring.ts
+│       └── defaults/               # Seed sleep/exercise/nutrition/supps
 ```
 
 ---
@@ -240,127 +254,62 @@ Full token set + reusable components live in `src/app/globals.css` and
 
 ## Data Architecture
 
-### localStorage Schema (key: `protocolize-v1`)
+State is one `AppState` object (see `src/lib/types.ts`) persisted under
+localStorage key **`protocolize-v3`** (legacy v1/v2 keys auto-migrate via
+`storage.ts` → `migrateV2toV3` + `normalize`). The app never touches
+storage directly — it goes through `useAppState` → `activeDataSource`
+(Local or Supabase). With Supabase env set, the cloud row is the source
+of truth (local is an offline cache); without it, behaviour is unchanged.
 
-```typescript
-interface UserRoutine {
-  profile: UserProfile;           // name, goal, experience, quizAnswers, isPremium
-  selectedProtocols: SelectedProtocol[];  // user's chosen protocols with weekly schedules
-  dailyLogs: DailyLog[];         // array of daily entries (mood, energy, sleep, completions)
-  workoutLogs: WorkoutLog[];     // array of logged workouts
-  activeProgram: {               // currently active program (or null)
-    programId: string;
-    currentWeek: number;
-    startDate: string;
-  } | null;
-  startDate: string;             // ISO date string (YYYY-MM-DD)
-}
-```
+`AppState` (abridged): `settings` (name, sleep window, tier,
+`completedOnboarding`, `premiumTrialEndsAt`), `installedPacks` /
+`pausedPacks` / `customPacks`, `behaviorOverrides`, `dailyLogs`,
+`biomarkers`, `insights`, `currentStreak`, `protocols` + `supplementMeta`
+(legacy pillars), `version: 3`.
 
 ### Key Data Patterns
 
-- **Dates:** Always `YYYY-MM-DD` ISO strings (not Date objects)
-- **Day of week:** Monday = 0, Sunday = 6 (converted from JS getDay where Sun=0)
-- **Weekly schedules:** `boolean[7]` array where index 0=Monday, 6=Sunday
-- **Protocol IDs:** Format `{category}-{number}` (e.g., `sleep-001`, `exercise-003`, `diet-007`)
-- **Program IDs:** Slug format (`metabolic-reset`, `body-recomp`)
-- **Onboarding check:** `routine.profile.goal !== ""` means onboarded
+- **Dates:** `YYYY-MM-DD` ISO strings everywhere (never Date objects).
+- **Day of week:** Monday = 0 … Sunday = 6 (converted from JS `getDay`).
+- **Behaviors merge by `canonicalKey`** across installed packs;
+  `behaviorOverrides` (timing/dose/disable) keyed by `canonicalKey`.
+  `normalize` prunes overrides for uninstalled packs; forked packs
+  namespace their keys (`<packId>:<key>`).
+- **Score = % of the *shaped* (non-muted) timeline done that day** so it
+  matches on-screen progress and "day complete".
+- **Onboarding check:** `settings.completedOnboarding === true`. `/today`
+  redirects to `/onboarding` when false (covers post-auth new accounts).
+- **Entitlements:** `getAccess(state)` — premium = paid OR active trial.
+  Reverse trial auto-extends if the user hasn't hit `AHA_DAYS`.
 
 ---
 
-## Page Details
+## Routes & Navigation
 
-### Landing Page (`/`)
-- Marketing page shown to unauthenticated users
-- Sections: Hero (gradient text), Features (4 cards), How It Works (3 steps), Pricing (Free vs $7/mo), Footer (medical disclaimer)
-- Detects onboarding status: shows "Get Started" or "Open App"
+5-tab bottom/side nav (`Shell.tsx`): **Today · Protocols · Insights ·
+Library · Profile**. Other routes: `/` (landing), `/onboarding`, `/auth`,
+`/auth/reset`, `/biomarkers`, `/upgrade`, `/manifest.webmanifest`.
 
-### Onboarding (`/onboarding`)
-- Step 0: Name input
-- Steps 1-7: Quiz questions (goal, experience, sleep, energy, metabolic signs, diet, time)
-- Result screen: Shows recommended program (Metabolic Reset or Body Recomp)
-- Progress bar: `(step + 1) / 9 * 100`, 100% on result
+- **Today** — adaptive timeline, daily check-in, Up Next, suggestions.
+- **Protocols** — installed system as merged behaviors; per-behavior edit.
+- **Library** — install/remove packs; free cap = 3 *official* packs.
+- **Insights** — keystone / weekly review / correlations (premium-gated,
+  peek-don't-hide).
+- **Biomarkers** — body & bloodwork; free cap = 3 distinct metrics.
+- **Profile** — sleep schedule, reminders, membership, export/import,
+  Supabase auth, reset (clears local **and** cloud row).
 
-### Dashboard (`/dashboard`)
-- Redirects to `/onboarding` if not completed
-- Shows: greeting with date, 4 stat cards (streak, active protocols, done today, workouts this week)
-- Active program card or recommended program
-- Quick actions: Daily Check-in, Log Workout, Meal Ideas
-- Recent protocols preview (first 5)
-- Skeleton loading state during hydration
-
-### Protocols (`/protocols`)
-- Category tabs: All, Sleep, Exercise, Diet, Supplements
-- Dropdown filters: Difficulty, Source (Attia/Huberman)
-- Protocol cards with add/remove toggle
-- Premium protocols show "Unlock with Premium" button instead of add
-- Toast notification for premium clicks
-
-### Programs (`/programs`)
-- Cards for each program with phase breakdown
-- Start Program / Currently Active buttons
-- Details link to `/programs/[id]`
-
-### Program Detail (`/programs/[id]`)
-- Phase accordion with daily plans
-- Workout templates (exercises, sets, reps, intensity, rest)
-- Nutrition guidelines per day
-
-### Meals (`/meals`)
-- Type filter tabs: All, Breakfast, Lunch, Dinner, Snack, Dessert
-- Meal cards with ingredients, macro bars (protein=blue, carbs=orange, fat=red)
-- Premium meals show blurred content with lock overlay
-
-### Workout (`/workout`)
-- Start/Finish workout with elapsed timer
-- Add exercises, manage sets (weight, reps, type)
-- Set types: warmup, working, cooldown
-- Workout history with volume calculations
-
-### Tracker (`/tracker`)
-- Date navigation (can go back, not forward past today)
-- SVG circular progress ring (% of scheduled protocols completed)
-- Mood (emoji selector), Energy (lightning bolts), Sleep (hour stepper)
-- Protocol checklist with completion toggle
-- Only shows protocols scheduled for that day of week
-
-### Progress (`/progress`)
-- Stats row: streak, active count, avg mood, avg energy, avg sleep
-- 7-day bar chart (completion %, color-coded: green=100%, blue>50%, orange>0%, gray=0)
-- 30-day heatmap (GitHub contribution style)
-- Per-protocol adherence bars (30-day lookback, green>=80%, orange>=50%, red<50%)
+Auth is hybrid: the app is fully usable as a guest; an account just adds
+cross-device sync. All auth entry points route through `/today` (the
+onboarding guard handles new vs returning).
 
 ---
 
-## Navigation
+## Status
 
-### Desktop
-- Sticky glass header with all 7 nav items inline
-- Active state: `bg-[#1d1d1f] text-white` pill
-
-### Mobile
-- **Header:** Logo + hamburger menu (contains Meals, Workout)
-- **Bottom nav (5 items):** Dashboard, Programs, Protocols, Tracker, Progress
-- Active state: blue text + blue icon
-- `aria-current="page"` on active items
-
----
-
-## Current Limitations (Phase 1 — localStorage only)
-
-- No user accounts or authentication
-- Data stored in browser only (lost if cache cleared)
-- No real premium enforcement (UI gates only, no backend check)
-- No Stripe payments integrated
-- Programs can't be switched without manual reset
-- No data export or cloud sync
-- Two programs only (Metabolic Reset + Body Recomp)
-
----
-
-## Planned Phases
-
-- **Phase 2:** Supabase (Postgres + magic link auth) — migrate from localStorage to cloud
-- **Phase 3:** Stripe subscription payments ($7/mo premium tier)
-- **Phase 4:** Legal (Terms of Service, Privacy Policy, health disclaimer)
-- **Phase 5:** Custom domain (protocolize.com) on Vercel, SEO, analytics, launch
+- ✅ Local-first + optional Supabase cloud sync (env-gated, RLS own-row).
+- ✅ Email/password + magic link + password reset; OAuth built, disabled
+  until providers configured.
+- ✅ Freemium gating + reverse-trial engine.
+- ⏳ Stripe: Payment Links env-gated, inert until the owner adds keys.
+- ⏳ Legal pages (ToS / Privacy), custom domain, analytics — not yet.

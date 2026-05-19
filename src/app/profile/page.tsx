@@ -6,12 +6,7 @@ import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess } from "@/lib/entitlements";
-import {
-  clearAllData,
-  exportState,
-  importState,
-  saveState,
-} from "@/lib/storage";
+import { clearAllData, exportState, importState } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
 import {
   Card,
@@ -103,13 +98,15 @@ export default function ProfilePage() {
 
   const doImport = (file: File) => {
     const r = new FileReader();
-    r.onload = () => {
+    r.onload = async () => {
       const parsed = importState(String(r.result));
       if (!parsed) {
         toast.show("Invalid backup file");
         return;
       }
-      saveState(parsed);
+      // Push through the active data source so a restore also lands in
+      // the cloud — otherwise the next load lets the old cloud row win.
+      await activeDataSource.save(parsed);
       toast.show("Data restored");
       setTimeout(() => window.location.reload(), 700);
     };
@@ -408,8 +405,10 @@ export default function ProfilePage() {
           </Button>
           <Button
             full
-            onClick={() => {
+            onClick={async () => {
               clearAllData();
+              // Also wipe the cloud row, or load() re-hydrates it.
+              await activeDataSource.clearRemote();
               setConfirmReset(false);
               toast.show("Data reset");
               setTimeout(() => window.location.reload(), 800);

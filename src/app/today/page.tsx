@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
@@ -21,7 +22,7 @@ import {
 } from "@/lib/engine";
 import {
   currentBlock,
-  resolveMinutes,
+  effectiveMinutes,
   fmtClock,
   behaviorStats,
   suggestions,
@@ -146,7 +147,18 @@ export default function TodayPage() {
     installPack,
     setBehaviorOverride,
   } = useAppState();
+  const router = useRouter();
   const settings = state.settings;
+
+  // Onboarding guard — a returning user lands here after auth, but a
+  // genuinely new account (cloud-loaded, no onboarding) gets sent to
+  // build their system first.
+  useEffect(() => {
+    if (!loading && !state.settings.completedOnboarding) {
+      router.replace("/onboarding");
+    }
+  }, [loading, state.settings.completedOnboarding, router]);
+
   const cb = useMemo(() => currentBlock(settings), [settings]);
   const [snoozed, setSnoozed] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -606,7 +618,7 @@ export default function TodayPage() {
                 }}
               >
                 {relTime(
-                  resolveMinutes(upNext, settings),
+                  effectiveMinutes(upNext, settings),
                   nowMinutes()
                 ).toUpperCase()}
               </span>
@@ -690,8 +702,8 @@ export default function TodayPage() {
                 {upNextMessage(upNext, {
                   mode: adaptation.mode,
                   minutesToStart:
-                    resolveMinutes(upNext, settings) != null
-                      ? (resolveMinutes(upNext, settings) as number) -
+                    effectiveMinutes(upNext, settings) != null
+                      ? (effectiveMinutes(upNext, settings) as number) -
                         nowMinutes()
                       : null,
                   isKeystone: !!ks && upNext.canonicalKey === ks.key,
@@ -877,7 +889,7 @@ export default function TodayPage() {
                       let nowShown = false;
                       return rendered.map((it) => {
                         const done = isDone(log, it.canonicalKey);
-                        const t = resolveMinutes(it, settings);
+                        const t = effectiveMinutes(it, settings);
                         const st = behaviorStats(state, it.canonicalKey);
                         const isKey = !!ks && it.canonicalKey === ks.key;
                         const lev3 = it.leverage === 3 || isKey;

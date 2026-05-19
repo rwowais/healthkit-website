@@ -42,6 +42,103 @@ const EXP: Chip[] = [
 
 const STEPS = 8;
 
+const inputCls =
+  "w-full rounded-[var(--r-md)] bg-[var(--surface-2)] px-4 py-4 text-[17px] text-[var(--text-1)] outline-none focus:ring-1 focus:ring-[var(--readiness)] tr-fast";
+
+/** Hoisted so it isn't remounted every parent render (focus/state loss). */
+function Choice({
+  chips,
+  value,
+  onPick,
+  multi = false,
+}: {
+  chips: Chip[];
+  value: string | string[];
+  onPick: (k: string) => void;
+  multi?: boolean;
+}) {
+  return (
+    <div className="mt-8 space-y-2.5">
+      {chips.map((c) => {
+        const on = multi
+          ? (value as string[]).includes(c.key)
+          : value === c.key;
+        return (
+          <button
+            key={c.key}
+            onClick={() => onPick(c.key)}
+            className="press tr-fast flex w-full items-center gap-4 rounded-[var(--r-md)] p-4 text-left"
+            style={{
+              background: on
+                ? "color-mix(in srgb, var(--readiness) 14%, var(--surface-2))"
+                : "var(--surface-2)",
+              boxShadow: on
+                ? "inset 0 0 0 1.5px var(--readiness)"
+                : "none",
+            }}
+          >
+            {c.icon && (
+              <span
+                className="chip h-10 w-10 shrink-0"
+                style={{
+                  background: on
+                    ? "var(--readiness)"
+                    : "var(--surface-3)",
+                  color: on ? "#08090B" : "var(--text-2)",
+                }}
+              >
+                <Icon name={c.icon} size={19} />
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-[var(--text-1)]">
+                {c.label}
+              </span>
+              {c.sub && (
+                <span className="mt-0.5 block text-[12.5px] text-[var(--text-3)]">
+                  {c.sub}
+                </span>
+              )}
+            </span>
+            {multi && on && (
+              <Icon
+                name="check"
+                size={16}
+                className="shrink-0 text-[var(--readiness)]"
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Nav({
+  step,
+  next,
+  onBack,
+  disabled,
+}: {
+  step: number;
+  next: () => void;
+  onBack: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="mt-10 flex items-center gap-3">
+      {step > 0 && (
+        <Button variant="ghost" onClick={onBack}>
+          Back
+        </Button>
+      )}
+      <Button full disabled={disabled} onClick={next}>
+        Continue
+      </Button>
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -117,93 +214,7 @@ export default function OnboardingPage() {
     router.push(withAccount ? "/auth" : "/today");
   }
 
-  const inputCls =
-    "w-full rounded-[var(--r-md)] bg-[var(--surface-2)] px-4 py-4 text-[17px] text-[var(--text-1)] outline-none focus:ring-1 focus:ring-[var(--readiness)] tr-fast";
-
-  const Choice = ({
-    chips,
-    value,
-    onPick,
-    multi = false,
-  }: {
-    chips: Chip[];
-    value: string | string[];
-    onPick: (k: string) => void;
-    multi?: boolean;
-  }) => (
-    <div className="mt-8 space-y-2.5">
-      {chips.map((c) => {
-        const on = multi
-          ? (value as string[]).includes(c.key)
-          : value === c.key;
-        return (
-          <button
-            key={c.key}
-            onClick={() => onPick(c.key)}
-            className="press tr-fast flex w-full items-center gap-4 rounded-[var(--r-md)] p-4 text-left"
-            style={{
-              background: on
-                ? "color-mix(in srgb, var(--readiness) 14%, var(--surface-2))"
-                : "var(--surface-2)",
-              boxShadow: on
-                ? "inset 0 0 0 1.5px var(--readiness)"
-                : "none",
-            }}
-          >
-            {c.icon && (
-              <span
-                className="chip h-10 w-10 shrink-0"
-                style={{
-                  background: on
-                    ? "var(--readiness)"
-                    : "var(--surface-3)",
-                  color: on ? "#08090B" : "var(--text-2)",
-                }}
-              >
-                <Icon name={c.icon} size={19} />
-              </span>
-            )}
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-[var(--text-1)]">
-                {c.label}
-              </span>
-              {c.sub && (
-                <span className="mt-0.5 block text-[12.5px] text-[var(--text-3)]">
-                  {c.sub}
-                </span>
-              )}
-            </span>
-            {multi && on && (
-              <Icon
-                name="check"
-                size={16}
-                className="shrink-0 text-[var(--readiness)]"
-              />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  const Nav = ({
-    next,
-    disabled,
-  }: {
-    next: () => void;
-    disabled?: boolean;
-  }) => (
-    <div className="mt-10 flex items-center gap-3">
-      {step > 0 && (
-        <Button variant="ghost" onClick={() => setStep((s) => s - 1)}>
-          Back
-        </Button>
-      )}
-      <Button full disabled={disabled} onClick={next}>
-        Continue
-      </Button>
-    </div>
-  );
+  const goBack = () => setStep((s) => s - 1);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -257,7 +268,12 @@ export default function OnboardingPage() {
                     className={`mt-3 ${inputCls}`}
                   />
                 </div>
-                <Nav next={() => setStep(1)} disabled={!name.trim()} />
+                <Nav
+                  step={step}
+                  onBack={goBack}
+                  next={() => setStep(1)}
+                  disabled={!name.trim()}
+                />
               </>
             )}
 
@@ -268,7 +284,7 @@ export default function OnboardingPage() {
                   What matters most right now?
                 </h1>
                 <Choice chips={GOALS} value={goal} onPick={setGoal} />
-                <Nav next={() => setStep(2)} />
+                <Nav step={step} onBack={goBack} next={() => setStep(2)} />
               </>
             )}
 
@@ -288,7 +304,7 @@ export default function OnboardingPage() {
                     setOverwhelm(k as "calm" | "some" | "stretched")
                   }
                 />
-                <Nav next={() => setStep(3)} />
+                <Nav step={step} onBack={goBack} next={() => setStep(3)} />
               </>
             )}
 
@@ -305,7 +321,7 @@ export default function OnboardingPage() {
                     setSleepBaseline(k as "rough" | "ok" | "solid")
                   }
                 />
-                <Nav next={() => setStep(4)} />
+                <Nav step={step} onBack={goBack} next={() => setStep(4)} />
               </>
             )}
 
@@ -328,7 +344,7 @@ export default function OnboardingPage() {
                     )
                   }
                 />
-                <Nav next={() => setStep(5)} />
+                <Nav step={step} onBack={goBack} next={() => setStep(5)} />
               </>
             )}
 
@@ -371,7 +387,7 @@ export default function OnboardingPage() {
                     />
                   </span>
                 </button>
-                <Nav next={() => setStep(6)} />
+                <Nav step={step} onBack={goBack} next={() => setStep(6)} />
               </>
             )}
 
@@ -404,7 +420,7 @@ export default function OnboardingPage() {
                     />
                   </div>
                 </div>
-                <Nav next={() => setStep(7)} />
+                <Nav step={step} onBack={goBack} next={() => setStep(7)} />
               </>
             )}
 

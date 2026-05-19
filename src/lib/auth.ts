@@ -25,7 +25,9 @@ export async function signUpEmail(
   const { data, error } = await sb.auth.signUp({
     email: email.trim(),
     password,
-    options: { emailRedirectTo: redirect("/onboarding") },
+    // Land on /today after confirming — the /today onboarding guard
+    // sends genuinely-new users into onboarding, returning users skip it.
+    options: { emailRedirectTo: redirect("/today") },
   });
   if (error) return { ok: false, error: error.message };
   // Email-confirmation on → no session yet.

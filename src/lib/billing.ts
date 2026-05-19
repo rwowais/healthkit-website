@@ -38,7 +38,7 @@ export function startCheckout(plan: Plan): { ok: boolean; reason?: string } {
 }
 
 export const PRICING = {
-  annual: { price: "$59", per: "/year", note: "Best value · ~45% off" },
+  annual: { price: "$79.99", per: "/year", note: "Best value · ~26% off" },
   monthly: { price: "$8.99", per: "/month", note: "Flexible" },
   lifetime: { price: "$179", per: "once", note: "Pay once, keep forever" },
 } as const;

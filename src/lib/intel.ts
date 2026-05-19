@@ -7,14 +7,30 @@
 import type { AppState, DailyLog } from "./types";
 import { compileTimeline, type TimelineItem } from "./engine";
 import { packById, PACKS } from "./packs";
-import { resolveMinutes, nowMinutes } from "./time";
+import { effectiveMinutes, nowMinutes } from "./time";
 
 export {
   resolveMinutes,
+  effectiveMinutes,
   fmtClock,
   nowMinutes,
   currentBlock,
 } from "./time";
+
+/**
+ * Behavior set for analytics — the union across every weekday, not just
+ * Monday. Day-of-week scheduling shouldn't make keystone / weekly review
+ * blind to behaviors that only run on, say, weekends.
+ */
+function analyticsItems(state: AppState): TimelineItem[] {
+  const map = new Map<string, TimelineItem>();
+  for (let d = 0; d < 7; d++) {
+    for (const it of compileTimeline(state, d)) {
+      if (!map.has(it.canonicalKey)) map.set(it.canonicalKey, it);
+    }
+  }
+  return [...map.values()];
+}
 
 // ── Per-behavior streaks ──────────────────────────────────────────
 
@@ -65,7 +81,7 @@ export interface Keystone {
 export function keystone(state: AppState): Keystone | null {
   const logs = state.dailyLogs.filter((l) => l.score > 0);
   if (logs.length < 6) return null;
-  const items = compileTimeline(state, 0);
+  const items = analyticsItems(state);
   let best: Keystone | null = null;
   for (const it of items) {
     const done: number[] = [];
@@ -126,7 +142,7 @@ export function suggestions(state: AppState): Suggestion[] {
   }
 
   // 2. Chronically skipped behavior → offer to pause (kills guilt)
-  const items = compileTimeline(state, 0);
+  const items = analyticsItems(state);
   const activeDays = [...state.dailyLogs]
     .filter((l) => l.score > 0)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -257,7 +273,7 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
     : null;
 
   // most-kept behavior this week
-  const items = compileTimeline(state, 0);
+  const items = analyticsItems(state);
   let topTitle: string | null = null;
   let topCount = 0;
   for (const it of items) {
@@ -323,7 +339,7 @@ export function dueRank(
   it: TimelineItem,
   settings: { wakeTime: string; bedtime: string }
 ): number {
-  const m = resolveMinutes(it, settings);
+  const m = effectiveMinutes(it, settings);
   if (m == null) return 9999; // anytime — lowest urgency
   const diff = m - nowMinutes();
   // overdue (negative) and near-future rank highest (smallest)
