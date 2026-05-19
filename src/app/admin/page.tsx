@@ -191,6 +191,7 @@ export default function AdminHome() {
   const [aiDesc, setAiDesc] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiDraft, setAiDraft] = useState<AiBehaviorDraft | null>(null);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
   const patchDraft = (p: Partial<AiBehaviorDraft>) =>
     setAiDraft((d) => (d ? { ...d, ...p } : d));
 
@@ -677,20 +678,31 @@ export default function AdminHome() {
                         disabled={aiBusy || !aiDesc.trim()}
                         onClick={async () => {
                           setAiBusy(true);
-                          setMsg(null);
+                          setAiMsg(null);
                           const r = await generateBehaviorDraft(aiDesc);
                           setAiBusy(false);
                           if (r.ok && r.draft) {
                             setAiDraft(r.draft);
-                            setMsg(null);
+                            setAiMsg(null);
                           } else {
-                            setMsg(r.reason ?? "AI drafting failed.");
+                            setAiMsg(r.reason ?? "AI drafting failed.");
                           }
                         }}
                         className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
                       >
                         {aiBusy ? "Drafting…" : "Generate with AI"}
                       </button>
+                      {aiMsg && (
+                        <p
+                          className="rounded-[var(--r-sm)] px-3 py-2 text-[12.5px] font-medium"
+                          style={{
+                            background: "rgba(232,137,107,.12)",
+                            color: "var(--alert)",
+                          }}
+                        >
+                          {aiMsg}
+                        </p>
+                      )}
                     </div>
                   )}
 

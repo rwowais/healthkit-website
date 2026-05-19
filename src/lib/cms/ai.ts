@@ -45,10 +45,24 @@ export async function generateBehaviorDraft(
     const data = (await res.json().catch(() => null)) as
       | GenerateResult
       | null;
-    if (!data)
-      return { ok: false, reason: "AI drafting failed. Try again." };
+    if (!data) {
+      // Concise diagnostic in the console so we can read the real status
+      // from DevTools when something fails in production.
+      console.error(
+        "[ai] generate non-JSON response",
+        res.status,
+        res.statusText
+      );
+      return {
+        ok: false,
+        reason: `AI drafting failed (HTTP ${res.status}). Open DevTools → Network for details.`,
+      };
+    }
+    if (!data.ok)
+      console.error("[ai] generate", res.status, data.reason);
     return data;
-  } catch {
+  } catch (e) {
+    console.error("[ai] network error", e);
     return { ok: false, reason: "Network error. Try again." };
   }
 }
