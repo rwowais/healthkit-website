@@ -90,8 +90,12 @@ export const OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
     title: { type: "string", description: "Short imperative behavior name, e.g. 'Magnesium glycinate'." },
     block: { type: "string", enum: [...BLOCKS] },
     anchor: { type: "string", enum: [...ANCHORS], description: "What the timing is relative to." },
-    offsetMin: { type: "integer", minimum: -240, maximum: 240, description: "Minutes from the anchor (negative = before)." },
-    dose: { type: ["string", "null"], description: "Dose/amount if applicable, e.g. '300 mg', else null." },
+    // Bounds are enforced by clampDraft on the server — Anthropic's
+    // structured-outputs schema does not support minimum/maximum on
+    // integer types, so don't put them here.
+    offsetMin: { type: "integer", description: "Minutes from the anchor (negative = before; typical range -240..240)." },
+    // Empty string when there's no dose. clampDraft turns "" into null.
+    dose: { type: "string", description: "Dose/amount if applicable, e.g. '300 mg', else empty string." },
     leverage: { type: "integer", enum: [1, 2, 3], description: "Impact: 3 = keystone, 1 = minor." },
     kind: { type: "string", enum: [...KINDS] },
     icon: { type: "string", enum: [...ICONS] },
@@ -103,7 +107,9 @@ export const OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
       properties: {
         tier: { type: "string", enum: [...EVIDENCE_TIERS], description: "Best-guess strength of evidence (will be capped at 'emerging')." },
         sourceLabel: { type: "string", description: "Human-readable source, e.g. 'Meta-analysis, 2021'." },
-        url: { type: ["string", "null"] },
+        // Empty string when no URL. safeUrl() in clampDraft validates
+        // and returns null for empty/non-http(s).
+        url: { type: "string", description: "Source URL, or empty string if none. Must be http(s)." },
         summary: { type: "string", description: "One line on what the evidence shows." },
       },
     },
@@ -136,9 +142,12 @@ Rules:
 - rationale: exactly one plain sentence, no hype.
 - explanation.why: the mechanism/benefit in 1–2 sentences.
 - explanation.timing: why this block/anchor/offset, 1 sentence.
-- If a real citation isn't known, set evidence.url to null and use a
+- If a real citation isn't known, set evidence.url to "" and use a
   generic sourceLabel (e.g. "General physiology literature"). Never invent
   a specific URL.
+- Set dose to "" when no dose applies (no amount/measurement).
+- offsetMin is bounded server-side; keep it in the typical -240..240
+  range (minutes from the anchor; negative = before).
 - Output must satisfy the provided JSON schema exactly.`;
 
 const clampStr = (v: unknown, max: number, fallback = ""): string => {

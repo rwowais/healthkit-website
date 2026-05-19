@@ -11,6 +11,7 @@ import {
   capTier,
   AI_MAX_TIER,
   EVIDENCE_TIERS,
+  OUTPUT_JSON_SCHEMA,
 } from "@/lib/cms/aiSchema";
 import { isPublishableBehavior } from "@/lib/cms/authoring";
 import { generateBehaviorDraft } from "@/lib/cms/ai";
@@ -107,6 +108,46 @@ describe("isPublishableBehavior — the publish gate", () => {
     expect(
       isPublishableBehavior({ status: "published", ai_unverified: true })
     ).toBe(false);
+  });
+});
+
+describe("OUTPUT_JSON_SCHEMA — Anthropic structured-outputs subset", () => {
+  // Anthropic structured outputs only honor a subset of JSON Schema.
+  // These walkers lock in the rules so a future schema change can't
+  // re-introduce keywords the API rejects (caused live 400 once).
+  const walk = (node: unknown, visit: (n: Record<string, unknown>) => void) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const c of node) walk(c, visit);
+      return;
+    }
+    const o = node as Record<string, unknown>;
+    visit(o);
+    for (const v of Object.values(o)) walk(v, visit);
+  };
+
+  it("never uses minimum/maximum on integers (unsupported)", () => {
+    walk(OUTPUT_JSON_SCHEMA, (n) => {
+      if (n.type === "integer") {
+        expect(n.minimum).toBeUndefined();
+        expect(n.maximum).toBeUndefined();
+      }
+    });
+  });
+
+  it("never uses union types like ['string','null']", () => {
+    walk(OUTPUT_JSON_SCHEMA, (n) => {
+      expect(Array.isArray(n.type)).toBe(false);
+    });
+  });
+
+  it("every object closes additionalProperties and lists required", () => {
+    walk(OUTPUT_JSON_SCHEMA, (n) => {
+      if (n.type === "object") {
+        expect(n.additionalProperties).toBe(false);
+        expect(Array.isArray(n.required)).toBe(true);
+      }
+    });
   });
 });
 
