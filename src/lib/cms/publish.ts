@@ -17,6 +17,7 @@ import {
   BUNDLE_SCHEMA,
   type KnowledgeBundle,
 } from "../knowledge";
+import type { ProtocolPack } from "../types";
 import { assembleBundleFromCMS } from "./authoring";
 
 const PUB_TABLE = "cms_publications";
@@ -36,6 +37,189 @@ export function buildCatalogBundle(version: number): KnowledgeBundle {
     generatedAt: new Date().toISOString(),
     protocols: activePacks(),
     config: activeConfig(),
+  };
+}
+
+/**
+ * Assemble the bundle that WOULD be published right now, without
+ * writing anything. Mirrors publishBundle's branch (CMS-when-seeded
+ * else built-in) so the diff preview is a faithful preview.
+ */
+export async function previewNextBundle(): Promise<KnowledgeBundle> {
+  const cmsPacks = await assembleBundleFromCMS();
+  const version = 0; // placeholder — checksum doesn't include version
+  return cmsPacks
+    ? {
+        schema: BUNDLE_SCHEMA,
+        version,
+        generatedAt: new Date().toISOString(),
+        protocols: cmsPacks,
+        config: activeConfig(),
+      }
+    : buildCatalogBundle(version);
+}
+
+/** Fetch the latest published bundle (or null if none / no cloud). */
+export async function getLatestPublishedBundle(): Promise<KnowledgeBundle | null> {
+  const r = await latest();
+  return r?.bundle ?? null;
+}
+
+// ── Pure bundle diff (testable, no I/O) ─────────────────────────────
+export interface BehaviorDiffRef {
+  protocolId: string;
+  protocolName: string;
+  canonicalKey: string;
+  title: string;
+}
+export interface BehaviorChange extends BehaviorDiffRef {
+  fields: string[]; // names of fields whose values differ
+}
+export interface BundleDiff {
+  protocolsAdded: { id: string; name: string }[];
+  protocolsRemoved: { id: string; name: string }[];
+  protocolsChanged: { id: string; name: string; fields: string[] }[];
+  behaviorsAdded: BehaviorDiffRef[];
+  behaviorsRemoved: BehaviorDiffRef[];
+  behaviorsChanged: BehaviorChange[];
+  unchanged: number;
+  hasChanges: boolean;
+}
+
+const BEHAVIOR_FIELDS: (keyof ProtocolPack["behaviors"][number])[] = [
+  "title",
+  "block",
+  "anchor",
+  "offsetMin",
+  "dose",
+  "rationale",
+  "leverage",
+  "kind",
+  "icon",
+];
+
+const PROTOCOL_FIELDS: (keyof ProtocolPack)[] = [
+  "name",
+  "tagline",
+  "goal",
+  "accent",
+  "icon",
+  "source",
+];
+
+function fieldsDiffer<T>(a: T, b: T, keys: (keyof T)[]): string[] {
+  const out: string[] = [];
+  for (const k of keys) {
+    const av = a[k] ?? null;
+    const bv = b[k] ?? null;
+    if (JSON.stringify(av) !== JSON.stringify(bv)) out.push(String(k));
+  }
+  return out;
+}
+
+/**
+ * Compute a per-behavior diff between two bundles. Pure — no I/O. Used
+ * by the Publish tab so an admin can see exactly what's about to ship
+ * before clicking the irreversible button.
+ */
+export function diffBundles(
+  prev: KnowledgeBundle | null,
+  next: KnowledgeBundle
+): BundleDiff {
+  const prevPacks = prev?.protocols ?? [];
+  const nextPacks = next.protocols ?? [];
+  const prevById = new Map(prevPacks.map((p) => [p.id, p]));
+  const nextById = new Map(nextPacks.map((p) => [p.id, p]));
+
+  const protocolsAdded: BundleDiff["protocolsAdded"] = [];
+  const protocolsRemoved: BundleDiff["protocolsRemoved"] = [];
+  const protocolsChanged: BundleDiff["protocolsChanged"] = [];
+  const behaviorsAdded: BehaviorDiffRef[] = [];
+  const behaviorsRemoved: BehaviorDiffRef[] = [];
+  const behaviorsChanged: BehaviorChange[] = [];
+  let unchanged = 0;
+
+  for (const np of nextPacks) {
+    const pp = prevById.get(np.id);
+    if (!pp) {
+      protocolsAdded.push({ id: np.id, name: np.name });
+      for (const b of np.behaviors)
+        behaviorsAdded.push({
+          protocolId: np.id,
+          protocolName: np.name,
+          canonicalKey: b.canonicalKey,
+          title: b.title,
+        });
+      continue;
+    }
+    const pFields = fieldsDiffer(pp, np, PROTOCOL_FIELDS);
+    if (pFields.length)
+      protocolsChanged.push({ id: np.id, name: np.name, fields: pFields });
+    const ppBs = new Map(pp.behaviors.map((b) => [b.canonicalKey, b]));
+    const npBs = new Map(np.behaviors.map((b) => [b.canonicalKey, b]));
+    for (const [k, nb] of npBs) {
+      const pb = ppBs.get(k);
+      if (!pb) {
+        behaviorsAdded.push({
+          protocolId: np.id,
+          protocolName: np.name,
+          canonicalKey: k,
+          title: nb.title,
+        });
+        continue;
+      }
+      const fields = fieldsDiffer(pb, nb, BEHAVIOR_FIELDS);
+      if (fields.length)
+        behaviorsChanged.push({
+          protocolId: np.id,
+          protocolName: np.name,
+          canonicalKey: k,
+          title: nb.title,
+          fields,
+        });
+      else unchanged++;
+    }
+    for (const [k, pb] of ppBs) {
+      if (!npBs.has(k))
+        behaviorsRemoved.push({
+          protocolId: np.id,
+          protocolName: np.name,
+          canonicalKey: k,
+          title: pb.title,
+        });
+    }
+  }
+  for (const pp of prevPacks) {
+    if (!nextById.has(pp.id)) {
+      protocolsRemoved.push({ id: pp.id, name: pp.name });
+      for (const b of pp.behaviors)
+        behaviorsRemoved.push({
+          protocolId: pp.id,
+          protocolName: pp.name,
+          canonicalKey: b.canonicalKey,
+          title: b.title,
+        });
+    }
+  }
+
+  const hasChanges =
+    protocolsAdded.length +
+      protocolsRemoved.length +
+      protocolsChanged.length +
+      behaviorsAdded.length +
+      behaviorsRemoved.length +
+      behaviorsChanged.length >
+    0;
+
+  return {
+    protocolsAdded,
+    protocolsRemoved,
+    protocolsChanged,
+    behaviorsAdded,
+    behaviorsRemoved,
+    behaviorsChanged,
+    unchanged,
+    hasChanges,
   };
 }
 

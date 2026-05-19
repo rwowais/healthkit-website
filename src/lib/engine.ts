@@ -55,16 +55,23 @@ function isoDayOf(dateStr: string) {
 }
 
 /** Intelligent merge: same canonicalKey → one behavior, union of context. */
+/**
+ * @param packsOverride — when provided, the simulation/timeline uses
+ * exactly these packs instead of `activePacks() + customPacks`. Used by
+ * the admin Simulate tab to preview against built-in / drafts / live
+ * without mutating module-level runtime state.
+ */
 export function compileTimeline(
   state: AppState,
-  dayIndex: number
+  dayIndex: number,
+  packsOverride?: ProtocolPack[]
 ): TimelineItem[] {
   const installed = new Set(state.installedPacks ?? []);
   const paused = new Set(state.pausedPacks ?? []);
   const overrides = state.behaviorOverrides ?? {};
   const merged = new Map<string, TimelineItem>();
 
-  for (const pack of allPacks(state)) {
+  for (const pack of packsOverride ?? allPacks(state)) {
     if (!installed.has(pack.id) || paused.has(pack.id)) continue;
     for (const b of pack.behaviors) {
       const ov: BehaviorOverride | undefined = overrides[b.canonicalKey];

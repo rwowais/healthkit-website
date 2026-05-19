@@ -19,7 +19,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import {
   SYSTEM_PROMPT,
   OUTPUT_JSON_SCHEMA,
+  OUTPUT_JSON_SCHEMA_WITH_SUGGEST,
   clampDraft,
+  clampDraftWithSuggestions,
 } from "@/lib/cms/aiSchema";
 
 export const runtime = "nodejs";
@@ -68,10 +70,37 @@ export async function POST(req: Request) {
   if (!uid) return json({ ok: false, reason: "Admin only." }, 403);
 
   let description = "";
+  let suggestProtocol = false;
+  let availableProtocols: { slug: string; name: string; tagline?: string; goal?: string }[] = [];
   try {
-    const body = (await req.json()) as { description?: unknown };
+    const body = (await req.json()) as {
+      description?: unknown;
+      suggestProtocol?: unknown;
+      availableProtocols?: unknown;
+    };
     description =
       typeof body.description === "string" ? body.description.trim() : "";
+    suggestProtocol = body.suggestProtocol === true;
+    if (Array.isArray(body.availableProtocols)) {
+      availableProtocols = (body.availableProtocols as unknown[])
+        .map((p) => p as Record<string, unknown>)
+        .filter(
+          (p) => typeof p?.slug === "string" && typeof p?.name === "string"
+        )
+        .slice(0, 30)
+        .map((p) => ({
+          slug: String(p.slug).slice(0, 64),
+          name: String(p.name).slice(0, 80),
+          tagline:
+            typeof p.tagline === "string"
+              ? p.tagline.slice(0, 160)
+              : undefined,
+          goal:
+            typeof p.goal === "string"
+              ? p.goal.slice(0, 80)
+              : undefined,
+        }));
+    }
   } catch {
     return json({ ok: false, reason: "Bad request." }, 400);
   }
@@ -79,6 +108,11 @@ export async function POST(req: Request) {
     return json({ ok: false, reason: "Describe the item first." }, 400);
   if (description.length > 500)
     description = description.slice(0, 500);
+  if (suggestProtocol && availableProtocols.length === 0)
+    return json(
+      { ok: false, reason: "No protocols available to choose from." },
+      400
+    );
 
   if (!process.env.ANTHROPIC_API_KEY)
     return json(
@@ -89,6 +123,23 @@ export async function POST(req: Request) {
       },
       501
     );
+
+  // User-turn content is built fresh per request; the system prompt is
+  // the cached, stable prefix. In suggest mode we list the available
+  // protocols at the top of the user turn so the model can pick from
+  // them — slugs are re-validated by the clamp against an allow-set.
+  const userContent = suggestProtocol
+    ? `Available protocols (pick 1–3, best first):\n${availableProtocols
+        .map(
+          (p) =>
+            `- ${p.slug} · ${p.name}${p.tagline ? ` — ${p.tagline}` : ""}${
+              p.goal ? ` (goal: ${p.goal})` : ""
+            }`
+        )
+        .join(
+          "\n"
+        )}\n\nDraft one behavior for this idea and recommend which protocol(s) it fits best: "${description}"`
+    : `Draft one behavior for this: "${description}"`;
 
   try {
     const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
@@ -102,7 +153,12 @@ export async function POST(req: Request) {
         thinking: { type: "adaptive" },
         output_config: {
           effort: "high",
-          format: { type: "json_schema", schema: OUTPUT_JSON_SCHEMA },
+          format: {
+            type: "json_schema",
+            schema: suggestProtocol
+              ? OUTPUT_JSON_SCHEMA_WITH_SUGGEST
+              : OUTPUT_JSON_SCHEMA,
+          },
         },
         system: [
           {
@@ -111,12 +167,7 @@ export async function POST(req: Request) {
             cache_control: { type: "ephemeral" },
           },
         ],
-        messages: [
-          {
-            role: "user",
-            content: `Draft one behavior for this: "${description}"`,
-          },
-        ],
+        messages: [{ role: "user", content: userContent }],
       })
       .finalMessage();
 
@@ -140,6 +191,11 @@ export async function POST(req: Request) {
     }
 
     // THE safety boundary — never trust the model's shape or claims.
+    if (suggestProtocol) {
+      const allowed = new Set(availableProtocols.map((p) => p.slug));
+      const draft = clampDraftWithSuggestions(parsed, allowed);
+      return json({ ok: true, draft });
+    }
     const draft = clampDraft(parsed);
     return json({ ok: true, draft });
   } catch (e) {

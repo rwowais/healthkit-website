@@ -188,6 +188,230 @@ export async function listCmsProtocols(): Promise<CmsProtocol[]> {
   }
 }
 
+/** Generate a URL-safe slug from a name, with a tiny suffix for uniqueness. */
+function slugifyWithSuffix(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 32);
+  return `${base || "protocol"}-${Date.now().toString(36).slice(-4)}`;
+}
+
+/** Create a brand-new protocol shell. Returns the new id. */
+export async function createProtocol(fields: {
+  name: string;
+  tagline?: string;
+  goal?: string;
+  accent?: string;
+  icon?: string;
+}): Promise<{ ok: boolean; id?: string; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  const uid = await getUserId();
+  if (!uid) return { ok: false, reason: "Sign in required." };
+  if (!fields.name.trim())
+    return { ok: false, reason: "Name required." };
+  try {
+    const slug = slugifyWithSuffix(fields.name);
+    const { data, error } = await sb
+      .from("cms_protocols")
+      .insert({
+        slug,
+        name: fields.name.trim(),
+        tagline: fields.tagline?.trim() || null,
+        goal: fields.goal?.trim() || null,
+        accent: fields.accent?.trim() || "var(--readiness)",
+        icon: fields.icon ?? "sparkle",
+        source: "custom",
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (error || !data)
+      return { ok: false, reason: error?.message ?? "Create failed." };
+    await rev(
+      sb,
+      "protocol",
+      data.id as string,
+      1,
+      { slug, ...fields },
+      "create protocol"
+    );
+    return { ok: true, id: data.id as string };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Create failed.",
+    };
+  }
+}
+
+/** Read the last N revisions of a single entity (behavior, protocol…). */
+export interface RevisionRow {
+  id: number;
+  version: number;
+  change_note: string | null;
+  author: string | null;
+  created_at: string;
+  snapshot: unknown;
+}
+export async function listRevisions(
+  entityType: string,
+  entityId: string,
+  limit = 10
+): Promise<RevisionRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_revisions")
+      .select("id, version, change_note, author, created_at, snapshot")
+      .eq("entity_type", entityType)
+      .eq("entity_id", entityId)
+      .order("version", { ascending: false })
+      .limit(limit);
+    return (data ?? []) as RevisionRow[];
+  } catch {
+    return [];
+  }
+}
+
+// ── Evidence rail ───────────────────────────────────────────────────
+export interface EvidenceRow {
+  id: string;
+  target_type: string;
+  target_ref: string;
+  tier: string;
+  source_label: string | null;
+  url: string | null;
+  summary: string | null;
+}
+export async function listEvidence(
+  targetType: string,
+  targetRef: string
+): Promise<EvidenceRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_evidence")
+      .select("id, target_type, target_ref, tier, source_label, url, summary")
+      .eq("target_type", targetType)
+      .eq("target_ref", targetRef)
+      .order("id");
+    return (data ?? []) as EvidenceRow[];
+  } catch {
+    return [];
+  }
+}
+/**
+ * Upsert-by-target: at most one evidence row per (target_type,
+ * target_ref). Find-then-(update|insert) so no schema constraint is
+ * required and existing data stays clean.
+ */
+export async function upsertEvidence(input: {
+  targetType: string;
+  targetRef: string;
+  tier: string;
+  sourceLabel?: string;
+  url?: string | null;
+  summary?: string;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { data: existing } = await sb
+      .from("cms_evidence")
+      .select("id")
+      .eq("target_type", input.targetType)
+      .eq("target_ref", input.targetRef)
+      .maybeSingle();
+    const row = {
+      target_type: input.targetType,
+      target_ref: input.targetRef,
+      tier: input.tier,
+      source_label: input.sourceLabel ?? null,
+      url: input.url ?? null,
+      summary: input.summary ?? null,
+    };
+    const { error } = existing?.id
+      ? await sb.from("cms_evidence").update(row).eq("id", existing.id)
+      : await sb.from("cms_evidence").insert(row);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Save failed.",
+    };
+  }
+}
+
+// ── Explanation rail (why / timing copy) ────────────────────────────
+export interface ExplanationRow {
+  id: string;
+  target_type: string;
+  target_ref: string;
+  kind: string;
+  text: string;
+  status: string;
+}
+export async function listExplanations(
+  targetType: string,
+  targetRef: string
+): Promise<ExplanationRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_explanations")
+      .select("id, target_type, target_ref, kind, text, status")
+      .eq("target_type", targetType)
+      .eq("target_ref", targetRef)
+      .order("kind");
+    return (data ?? []) as ExplanationRow[];
+  } catch {
+    return [];
+  }
+}
+/** Upsert-by-(target,kind): one explanation per (target, kind). */
+export async function upsertExplanation(input: {
+  targetType: string;
+  targetRef: string;
+  kind: string; // 'why' | 'timing' | 'rationale'
+  text: string;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { data: existing } = await sb
+      .from("cms_explanations")
+      .select("id")
+      .eq("target_type", input.targetType)
+      .eq("target_ref", input.targetRef)
+      .eq("kind", input.kind)
+      .maybeSingle();
+    const row = {
+      target_type: input.targetType,
+      target_ref: input.targetRef,
+      kind: input.kind,
+      text: input.text,
+      status: "draft",
+    };
+    const { error } = existing?.id
+      ? await sb.from("cms_explanations").update(row).eq("id", existing.id)
+      : await sb.from("cms_explanations").insert(row);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Save failed.",
+    };
+  }
+}
+
 export async function getProtocolBehaviors(
   protocolId: string
 ): Promise<CmsBehavior[]> {

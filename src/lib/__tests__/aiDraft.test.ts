@@ -8,13 +8,20 @@
 import { describe, it, expect } from "vitest";
 import {
   clampDraft,
+  clampDraftWithSuggestions,
   capTier,
   AI_MAX_TIER,
   EVIDENCE_TIERS,
   OUTPUT_JSON_SCHEMA,
+  OUTPUT_JSON_SCHEMA_WITH_SUGGEST,
 } from "@/lib/cms/aiSchema";
 import { isPublishableBehavior } from "@/lib/cms/authoring";
-import { generateBehaviorDraft } from "@/lib/cms/ai";
+import {
+  generateBehaviorDraft,
+  generateBehaviorDraftAndSuggestProtocol,
+} from "@/lib/cms/ai";
+import { diffBundles } from "@/lib/cms/publish";
+import type { KnowledgeBundle } from "@/lib/knowledge";
 
 describe("clampDraft — the safety boundary", () => {
   it("caps evidence tier at 'emerging' no matter what the model claims", () => {
@@ -159,5 +166,183 @@ describe("generateBehaviorDraft — safe-by-default", () => {
     const r = await generateBehaviorDraft("magnesium 300mg");
     expect(r.ok).toBe(false); // no Supabase configured in the test env
     expect(typeof r.reason).toBe("string");
+  });
+
+  it("suggest-protocol mode requires both a description and a candidate list", async () => {
+    await expect(
+      generateBehaviorDraftAndSuggestProtocol("", [])
+    ).resolves.toMatchObject({ ok: false });
+    await expect(
+      generateBehaviorDraftAndSuggestProtocol("idea", [])
+    ).resolves.toMatchObject({ ok: false });
+    const r = await generateBehaviorDraftAndSuggestProtocol("idea", [
+      { slug: "x", name: "X" },
+    ]);
+    expect(r.ok).toBe(false); // no cloud in tests
+  });
+});
+
+describe("clampDraftWithSuggestions", () => {
+  const allowed = new Set(["sleep", "focus"]);
+
+  it("filters suggestions to the allowed slug list and caps at 3", () => {
+    const raw = {
+      title: "Demo",
+      suggestedProtocols: [
+        { slug: "sleep", name: "Better Sleep", reason: "evening behavior" },
+        { slug: "phantom", name: "Made up", reason: "model hallucination" },
+        { slug: "focus", name: "Deep Focus", reason: "morning ritual" },
+        { slug: "sleep", name: "Better Sleep", reason: "dup" },
+        { slug: "sleep", name: "Better Sleep", reason: "another" },
+      ],
+    };
+    const out = clampDraftWithSuggestions(raw, allowed);
+    expect(out.suggestedProtocols.map((s) => s.slug)).toEqual([
+      "sleep",
+      "focus",
+      "sleep",
+    ]);
+    expect(out.suggestedProtocols.length).toBeLessThanOrEqual(3);
+  });
+
+  it("never lets the model smuggle an unknown slug through", () => {
+    const out = clampDraftWithSuggestions(
+      { suggestedProtocols: [{ slug: "unknown", name: "X", reason: "X" }] },
+      allowed
+    );
+    expect(out.suggestedProtocols).toEqual([]);
+  });
+
+  it("the suggest-mode schema is still in the allowed-keywords subset", () => {
+    const walk = (
+      node: unknown,
+      visit: (n: Record<string, unknown>) => void
+    ) => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        for (const c of node) walk(c, visit);
+        return;
+      }
+      const o = node as Record<string, unknown>;
+      visit(o);
+      for (const v of Object.values(o)) walk(v, visit);
+    };
+    walk(OUTPUT_JSON_SCHEMA_WITH_SUGGEST, (n) => {
+      if (n.type === "integer") {
+        expect(n.minimum).toBeUndefined();
+        expect(n.maximum).toBeUndefined();
+      }
+      expect(Array.isArray(n.type)).toBe(false);
+      if (n.type === "object") {
+        expect(n.additionalProperties).toBe(false);
+        expect(Array.isArray(n.required)).toBe(true);
+      }
+    });
+  });
+});
+
+describe("diffBundles — what's about to ship", () => {
+  const mkBundle = (
+    protocols: KnowledgeBundle["protocols"]
+  ): KnowledgeBundle => ({
+    schema: 1,
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    protocols,
+    config: {},
+  });
+  const beh = (k: string, title = k, extra = {}) =>
+    ({
+      canonicalKey: k,
+      title,
+      block: "morning",
+      anchor: "wake",
+      offsetMin: 0,
+      rationale: "x",
+      icon: "sparkle",
+      leverage: 2,
+      kind: "action",
+      ...extra,
+    }) as KnowledgeBundle["protocols"][number]["behaviors"][number];
+
+  it("detects nothing changed when bundles match", () => {
+    const a = mkBundle([
+      {
+        id: "sleep",
+        name: "Sleep",
+        tagline: "t",
+        goal: "sleep",
+        accent: "x",
+        icon: "moon",
+        source: "official",
+        behaviors: [beh("k1"), beh("k2")],
+      },
+    ]);
+    const d = diffBundles(a, a);
+    expect(d.hasChanges).toBe(false);
+    expect(d.unchanged).toBe(2);
+  });
+
+  it("classifies added / changed / removed", () => {
+    const prev = mkBundle([
+      {
+        id: "sleep",
+        name: "Sleep",
+        tagline: "t",
+        goal: "sleep",
+        accent: "x",
+        icon: "moon",
+        source: "official",
+        behaviors: [beh("k1", "Old title"), beh("k2"), beh("k3")],
+      },
+    ]);
+    const next = mkBundle([
+      {
+        id: "sleep",
+        name: "Sleep",
+        tagline: "t",
+        goal: "sleep",
+        accent: "x",
+        icon: "moon",
+        source: "official",
+        behaviors: [
+          beh("k1", "New title"), // changed
+          beh("k2"), // unchanged
+          // k3 removed
+          beh("k4"), // added
+        ],
+      },
+    ]);
+    const d = diffBundles(prev, next);
+    expect(d.hasChanges).toBe(true);
+    expect(d.behaviorsAdded.map((b) => b.canonicalKey)).toEqual(["k4"]);
+    expect(d.behaviorsRemoved.map((b) => b.canonicalKey)).toEqual(["k3"]);
+    expect(d.behaviorsChanged.map((b) => b.canonicalKey)).toEqual(["k1"]);
+    expect(d.behaviorsChanged[0].fields).toContain("title");
+    expect(d.unchanged).toBe(1);
+  });
+
+  it("detects whole protocols added or removed", () => {
+    const empty = mkBundle([]);
+    const one = mkBundle([
+      {
+        id: "p1",
+        name: "P1",
+        tagline: "t",
+        goal: "g",
+        accent: "x",
+        icon: "sparkle",
+        source: "custom",
+        behaviors: [beh("k1")],
+      },
+    ]);
+    const dAdd = diffBundles(empty, one);
+    expect(dAdd.protocolsAdded.map((p) => p.id)).toEqual(["p1"]);
+    expect(dAdd.behaviorsAdded.map((b) => b.canonicalKey)).toEqual(["k1"]);
+    const dRemove = diffBundles(one, empty);
+    expect(dRemove.protocolsRemoved.map((p) => p.id)).toEqual(["p1"]);
+    expect(dRemove.behaviorsRemoved.map((b) => b.canonicalKey)).toEqual([
+      "k1",
+    ]);
   });
 });

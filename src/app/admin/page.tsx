@@ -18,7 +18,11 @@ import {
   listPublications,
   publishBundle,
   rollbackTo,
+  previewNextBundle,
+  getLatestPublishedBundle,
+  diffBundles,
   type Publication,
+  type BundleDiff,
 } from "@/lib/cms/publish";
 import {
   importBuiltin,
@@ -27,12 +31,27 @@ import {
   saveProtocol,
   saveBehavior,
   createBehavior,
+  createProtocol,
   reorderBehavior,
   clearUnverified,
+  listRevisions,
+  listEvidence,
+  upsertEvidence,
+  listExplanations,
+  upsertExplanation,
+  assembleBundleFromCMS,
   type CmsProtocol,
   type CmsBehavior,
+  type RevisionRow,
+  type EvidenceRow,
+  type ExplanationRow,
 } from "@/lib/cms/authoring";
-import { generateBehaviorDraft } from "@/lib/cms/ai";
+import {
+  generateBehaviorDraft,
+  generateBehaviorDraftAndSuggestProtocol,
+} from "@/lib/cms/ai";
+import { PACKS } from "@/lib/packs";
+import type { ProtocolPack } from "@/lib/types";
 import {
   BLOCKS,
   ANCHORS,
@@ -41,6 +60,7 @@ import {
   FIELD_HELP,
   AI_MAX_TIER,
   type AiBehaviorDraft,
+  type AiBehaviorDraftWithSuggestions,
 } from "@/lib/cms/aiSchema";
 import {
   listSuggestions,
@@ -142,6 +162,43 @@ export default function AdminHome() {
   const [sleepQ, setSleepQ] = useState(3);
   const [energy, setEnergy] = useState(3);
   const [gap, setGap] = useState(0);
+  type SimSrc = "builtin" | "drafts" | "live";
+  const [simSrc, setSimSrc] = useState<SimSrc>("live");
+  const [simPacks, setSimPacks] = useState<ProtocolPack[]>(() =>
+    activePacks()
+  );
+  // Resolve simulation packs from the selected source. Built-in is the
+  // frozen `PACKS` constant; drafts comes from the CMS authoring tables;
+  // live is whatever the runtime is currently serving (built-in unless
+  // a newer published bundle has been adopted this session).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (simSrc === "builtin") {
+        if (alive) setSimPacks(PACKS);
+        return;
+      }
+      if (simSrc === "live") {
+        if (alive) setSimPacks(activePacks());
+        return;
+      }
+      const drafts = await assembleBundleFromCMS();
+      if (alive) setSimPacks(drafts ?? PACKS);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [simSrc, tab]);
+  // When sim source changes, default selection to the first 2 packs of
+  // that source so the picker isn't empty after a switch.
+  useEffect(() => {
+    setSel((prev) => {
+      const ids = new Set(simPacks.map((p) => p.id));
+      const stillValid = prev.filter((x) => ids.has(x));
+      if (stillValid.length > 0) return stillValid;
+      return simPacks.slice(0, 2).map((p) => p.id);
+    });
+  }, [simPacks]);
 
   // ── Publish ───────────────────────────────────────────────────────
   const [pubs, setPubs] = useState<Publication[]>([]);
@@ -157,25 +214,101 @@ export default function AdminHome() {
     if (gate === "ok") refreshPubs();
   }, [gate]);
 
+  // Bundle diff preview — assembled fresh whenever the Publish tab is
+  // opened so the admin can see exactly what would ship.
+  const [diff, setDiff] = useState<BundleDiff | null>(null);
+  const [diffBusy, setDiffBusy] = useState(false);
+  const refreshDiff = async () => {
+    setDiffBusy(true);
+    try {
+      const [prev, next] = await Promise.all([
+        getLatestPublishedBundle(),
+        previewNextBundle(),
+      ]);
+      setDiff(diffBundles(prev, next));
+    } catch {
+      setDiff(null);
+    } finally {
+      setDiffBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (gate === "ok" && tab === "publish") refreshDiff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gate, tab]);
+
   // ── Edit (relational authoring) ───────────────────────────────────
   const [cmsP, setCmsP] = useState<CmsProtocol[]>([]);
   const [edP, setEdP] = useState<CmsProtocol | null>(null);
   const [edB, setEdB] = useState<CmsBehavior[]>([]);
   const loadCms = () => listCmsProtocols().then(setCmsP);
   useEffect(() => {
-    if (gate === "ok" && (tab === "edit" || tab === "ai")) loadCms();
+    if (
+      gate === "ok" &&
+      (tab === "edit" || tab === "ai" || tab === "overview" || tab === "simulate")
+    )
+      loadCms();
+  }, [gate, tab]);
+
+  // CMS counts for the Overview "Drafts in CMS" tile.
+  const [cmsBehCount, setCmsBehCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (gate !== "ok" || tab !== "overview") return;
+    let alive = true;
+    (async () => {
+      const sb = (await import("@/lib/supabase")).getSupabase();
+      if (!sb) return;
+      try {
+        const { count } = await sb
+          .from("cms_behaviors")
+          .select("*", { count: "exact", head: true });
+        if (alive) setCmsBehCount(count ?? 0);
+      } catch {
+        /* no-op */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, [gate, tab]);
 
   // ── AI Review (constrained suggestion rail) ───────────────────────
   const [sugs, setSugs] = useState<Suggestion[]>([]);
+  const [sugStatus, setSugStatus] = useState<
+    "pending" | "approved" | "rejected"
+  >("pending");
+  const [dEntityType, setDEntityType] = useState<"protocol" | "behavior">(
+    "protocol"
+  );
   const [dProto, setDProto] = useState("");
+  const [dBehaviorId, setDBehaviorId] = useState("");
+  const [dBehaviors, setDBehaviors] = useState<CmsBehavior[]>([]);
   const [dField, setDField] = useState("rationale");
   const [dValue, setDValue] = useState("");
   const [dWhy, setDWhy] = useState("");
-  const loadSugs = () => listSuggestions("pending").then(setSugs);
+  const loadSugs = (status = sugStatus) =>
+    listSuggestions(status).then(setSugs);
   useEffect(() => {
-    if (gate === "ok" && tab === "ai") loadSugs();
-  }, [gate, tab]);
+    if (gate === "ok" && tab === "ai") loadSugs(sugStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gate, tab, sugStatus]);
+  // When the create-suggestion form switches to behavior mode, pull
+  // the protocol's behavior list so the picker is populated.
+  useEffect(() => {
+    if (dEntityType !== "behavior" || !dProto) {
+      setDBehaviors([]);
+      setDBehaviorId("");
+      return;
+    }
+    getProtocolBehaviors(dProto).then((bs) => {
+      setDBehaviors(bs);
+      setDBehaviorId(bs[0]?.id ?? "");
+    });
+  }, [dEntityType, dProto]);
+  // Default the field picker to a sensible choice for the entity.
+  useEffect(() => {
+    setDField(dEntityType === "behavior" ? "rationale" : "tagline");
+  }, [dEntityType]);
   const openProto = async (p: CmsProtocol) => {
     setEdP({ ...p });
     setEdB(await getProtocolBehaviors(p.id));
@@ -186,6 +319,87 @@ export default function AdminHome() {
   const [nbTitle, setNbTitle] = useState("");
   const [nbBlock, setNbBlock] = useState("morning");
   const [nbLev, setNbLev] = useState(2);
+
+  // Create-protocol form (inline on the All-protocols list).
+  const [newProtoOpen, setNewProtoOpen] = useState(false);
+  const [newProtoName, setNewProtoName] = useState("");
+  const [newProtoTagline, setNewProtoTagline] = useState("");
+  const [newProtoGoal, setNewProtoGoal] = useState("");
+
+  // Top-of-Edit "describe an idea — AI picks the protocol" entry point.
+  const [aiIdea, setAiIdea] = useState("");
+  const [aiIdeaBusy, setAiIdeaBusy] = useState(false);
+  const [aiIdeaResult, setAiIdeaResult] =
+    useState<AiBehaviorDraftWithSuggestions | null>(null);
+  const [aiIdeaMsg, setAiIdeaMsg] = useState<string | null>(null);
+
+  // Expandable per-behavior panels: history / evidence (one open at
+  // a time per row keeps the editor calm).
+  const [openPanel, setOpenPanel] = useState<{
+    id: string;
+    kind: "history" | "evidence";
+  } | null>(null);
+  const [historyRows, setHistoryRows] = useState<RevisionRow[]>([]);
+  const [evRow, setEvRow] = useState<EvidenceRow | null>(null);
+  const [exRows, setExRows] = useState<ExplanationRow[]>([]);
+  const togglePanel = async (
+    id: string,
+    kind: "history" | "evidence",
+    canonicalKey: string
+  ) => {
+    if (openPanel?.id === id && openPanel?.kind === kind) {
+      setOpenPanel(null);
+      return;
+    }
+    setOpenPanel({ id, kind });
+    if (kind === "history") {
+      const rows = await listRevisions("behavior", id, 12);
+      setHistoryRows(rows);
+    } else {
+      const [ev, ex] = await Promise.all([
+        listEvidence("behavior", canonicalKey),
+        listExplanations("behavior", canonicalKey),
+      ]);
+      setEvRow(ev[0] ?? null);
+      setExRows(ex);
+    }
+  };
+  const patchEv = (p: Partial<EvidenceRow>) =>
+    setEvRow((r) =>
+      r
+        ? { ...r, ...p }
+        : ({
+            id: "",
+            target_type: "behavior",
+            target_ref: "",
+            tier: "emerging",
+            source_label: null,
+            url: null,
+            summary: null,
+            ...p,
+          } as EvidenceRow)
+    );
+  const exText = (kind: string) =>
+    exRows.find((r) => r.kind === kind)?.text ?? "";
+  const setExText = (kind: string, text: string) =>
+    setExRows((rs) => {
+      const i = rs.findIndex((r) => r.kind === kind);
+      if (i === -1)
+        return [
+          ...rs,
+          {
+            id: "",
+            target_type: "behavior",
+            target_ref: "",
+            kind,
+            text,
+            status: "draft",
+          } as ExplanationRow,
+        ];
+      const n = [...rs];
+      n[i] = { ...n[i], text };
+      return n;
+    });
 
   // ── AI draft-an-item (server route; clamped, draft-only) ──────────
   const [aiDesc, setAiDesc] = useState("");
@@ -210,6 +424,18 @@ export default function AdminHome() {
       1500
     );
   };
+  // Per-row in-flight state — saving behavior #3 should NOT disable
+  // every other row's buttons. The page-wide `busy` is reserved for
+  // genuinely global actions (publish, rollback, seed-from-builtin).
+  const [savingIds, setSavingIds] = useState<Record<string, true>>({});
+  const markSavingStart = (id: string) =>
+    setSavingIds((s) => ({ ...s, [id]: true }));
+  const markSavingEnd = (id: string) =>
+    setSavingIds((s) => {
+      const n = { ...s };
+      delete n[id];
+      return n;
+    });
 
   const sim = useMemo(() => {
     const base = getDefaultState();
@@ -246,12 +472,12 @@ export default function AdminHome() {
     };
     const a = adapt(state);
     const shaped = shapeTimeline(
-      compileTimeline(state, 0),
+      compileTimeline(state, 0, simPacks),
       a.mode,
       {}
     );
     return { mode: a.mode, headline: a.headline, tone: a.tone, shaped };
-  }, [sel, sleepQ, energy, gap]);
+  }, [sel, sleepQ, energy, gap, simPacks]);
 
   if (gate === "checking")
     return (
@@ -284,9 +510,10 @@ export default function AdminHome() {
       </Eyebrow>
       <h1 className="t-title mt-2 text-[var(--text-1)]">Knowledge CMS</h1>
       <p className="t-caption mt-2 leading-relaxed">
-        Read-only inspector of the live intelligence. The app runs on the
-        built-in catalog (bundle v{activeBundleVersion()}) until a reviewed
-        bundle is published.
+        Authoring + governance for the protocol catalog. Edits live as
+        drafts until you <b>Publish</b> a bundle — the app currently
+        serves the built-in v{activeBundleVersion()} catalog unless a
+        newer published bundle exists.
       </p>
 
       <div className="no-scrollbar mt-6 flex gap-1.5 overflow-x-auto">
@@ -308,19 +535,53 @@ export default function AdminHome() {
 
       <div className="mt-6">
         {tab === "overview" && (
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { k: "Protocols", v: packs.length },
-              { k: "Behaviors", v: behaviorCount },
-              { k: "Live bundle", v: `v${activeBundleVersion()}` },
-            ].map((s) => (
-              <div key={s.k} className={card} style={surf}>
-                <p className="text-[22px] font-bold text-[var(--text-1)]">
-                  {s.v}
-                </p>
-                <p className="t-caption mt-1">{s.k}</p>
-              </div>
-            ))}
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                {
+                  k: "Live protocols",
+                  v: packs.length,
+                  hint: "Counted from the bundle currently serving users.",
+                },
+                {
+                  k: "Live behaviors",
+                  v: behaviorCount,
+                  hint: "Distinct canonical keys across the live bundle.",
+                },
+                {
+                  k: "Live bundle",
+                  v: `v${activeBundleVersion()}`,
+                  hint: "Built-in version unless a newer published bundle has been adopted this session.",
+                },
+              ].map((s) => (
+                <div
+                  key={s.k}
+                  className={card}
+                  style={surf}
+                  title={s.hint}
+                >
+                  <p className="text-[22px] font-bold text-[var(--text-1)]">
+                    {s.v}
+                  </p>
+                  <p className="t-caption mt-1">{s.k}</p>
+                </div>
+              ))}
+            </div>
+            <div
+              className="rounded-[var(--r-md)] p-4"
+              style={surf}
+              title="Total rows in the CMS authoring tables — what would be assembled into the next published bundle."
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                Drafts in CMS
+              </p>
+              <p className="mt-1 text-[14px] text-[var(--text-2)]">
+                {cmsP.length} protocol{cmsP.length === 1 ? "" : "s"} ·{" "}
+                {cmsBehCount === null ? "…" : cmsBehCount} behavior
+                {cmsBehCount === 1 ? "" : "s"} authored in the CMS
+                tables. None of these reach users until you Publish.
+              </p>
+            </div>
           </div>
         )}
 
@@ -358,11 +619,25 @@ export default function AdminHome() {
 
         {tab === "rules" && (
           <div className="space-y-4">
+            <p className="t-caption leading-relaxed">
+              Read-only inspector of the rules currently baked into the
+              engine (<code>adapt()</code> + <code>shapeTimeline()</code>).
+              Each <b>Mode</b> shows what triggers it and what users see.
+              Each <b>Rule set</b> lists the behavior keys grouped under a
+              tag (promote / demote / restraint / training / circadian).
+              These are code today; live editing arrives when the Rules
+              editor ships in Wave C.
+            </p>
             <div>
               <Eyebrow>Adaptive modes</Eyebrow>
               <div className="mt-2 space-y-2">
                 {ADAPTIVE_MODES.map((m) => (
-                  <div key={m.mode} className={card} style={surf}>
+                  <div
+                    key={m.mode}
+                    className={card}
+                    style={surf}
+                    title={`Mode "${m.mode}" — ${m.effect}`}
+                  >
                     <p className="text-[14px] font-bold capitalize text-[var(--text-1)]">
                       {m.mode}
                     </p>
@@ -380,7 +655,12 @@ export default function AdminHome() {
               <Eyebrow>Behavior rule sets</Eyebrow>
               <div className="mt-2 space-y-2">
                 {RULE_SETS.map((r) => (
-                  <div key={r.name} className={card} style={surf}>
+                  <div
+                    key={r.name}
+                    className={card}
+                    style={surf}
+                    title={`${r.name} — ${r.purpose}`}
+                  >
                     <p className="text-[14px] font-bold text-[var(--text-1)]">
                       {r.name}
                     </p>
@@ -397,11 +677,20 @@ export default function AdminHome() {
 
         {tab === "config" && (
           <div className="space-y-2">
+            <p className="t-caption leading-relaxed">
+              Runtime constants that gate trial behavior, free-tier
+              caps, and intelligence thresholds. <b>Live constant</b>{" "}
+              values come from <code>src/lib/entitlements.ts</code> and
+              are read every render; <b>documented</b> rows describe
+              behavior implemented elsewhere in the engine. CMS-backed
+              editing of these lands in Wave C.
+            </p>
             {CONFIG_ROWS.map((c) => (
               <div
                 key={c.key}
                 className="flex items-start justify-between gap-3 rounded-[var(--r-md)] p-3.5"
                 style={surf}
+                title={`${c.key} — ${c.note}`}
               >
                 <div className="min-w-0">
                   <p className="text-[13.5px] font-semibold text-[var(--text-1)]">
@@ -424,8 +713,20 @@ export default function AdminHome() {
 
         {tab === "intelligence" && (
           <div className="space-y-2">
+            <p className="t-caption leading-relaxed">
+              The kinds of insights the engine produces. Each one has a
+              <b> honesty gate</b> — the minimum sample / effect size /
+              non-circularity check it must clear before the user sees
+              it. These run in <code>src/lib/intel.ts</code>; this tab
+              is documentation only.
+            </p>
             {INTEL_KINDS.map((k) => (
-              <div key={k.name} className={card} style={surf}>
+              <div
+                key={k.name}
+                className={card}
+                style={surf}
+                title={`${k.name} — ${k.does}`}
+              >
                 <p className="text-[14px] font-bold text-[var(--text-1)]">
                   {k.name}
                 </p>
@@ -443,9 +744,52 @@ export default function AdminHome() {
         {tab === "simulate" && (
           <div className="space-y-4">
             <div className={card} style={surf}>
+              <div className="flex items-center justify-between gap-2">
+                <Eyebrow>Source</Eyebrow>
+                <span
+                  className="t-caption"
+                  title="Built-in: frozen catalog shipped in the app binary. Drafts: current CMS authoring state. Live: whatever the runtime is currently serving (Built-in unless a newer published bundle has been adopted this session)."
+                >
+                  what to simulate against ?
+                </span>
+              </div>
+              <div className="mt-2 flex gap-1.5">
+                {(
+                  [
+                    { id: "builtin", label: "Built-in" },
+                    { id: "drafts", label: "Drafts" },
+                    { id: "live", label: "Live" },
+                  ] as { id: SimSrc; label: string }[]
+                ).map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => setSimSrc(o.id)}
+                    className="press tr-fast flex-1 rounded-[var(--r-pill)] py-1.5 text-[12px] font-semibold"
+                    style={{
+                      background:
+                        simSrc === o.id
+                          ? "var(--text-1)"
+                          : "var(--surface-3)",
+                      color:
+                        simSrc === o.id ? "#08090B" : "var(--text-3)",
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <p className="t-caption mt-2 leading-relaxed">
+                {simSrc === "drafts"
+                  ? `Preview ${simPacks.length} draft protocol${simPacks.length === 1 ? "" : "s"} from the CMS — including unpublished edits. Use this to sanity-check before Publish.`
+                  : simSrc === "live"
+                    ? "Run against the bundle currently serving users (built-in unless a newer published bundle has been adopted this session)."
+                    : "Run against the frozen built-in catalog (what ships in the app binary)."}
+              </p>
+            </div>
+            <div className={card} style={surf}>
               <Eyebrow>Installed packs</Eyebrow>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {packs.map((p) => {
+                {simPacks.map((p) => {
                   const on = sel.includes(p.id);
                   return (
                     <button
@@ -584,7 +928,240 @@ export default function AdminHome() {
               );
             if (!edP)
               return (
-                <div className="space-y-1.5">
+                <div className="space-y-3">
+                  <div className={card} style={surf}>
+                    <Eyebrow color="var(--readiness)">
+                      Have an idea? AI picks the protocol
+                    </Eyebrow>
+                    <p className="t-caption mt-1 leading-relaxed">
+                      Describe a behavior in plain words — AI drafts it
+                      AND recommends which existing protocol it fits.
+                      Pick a protocol, the draft drops into its editor.
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      <input
+                        className={inp}
+                        value={aiIdea}
+                        onChange={(e) => setAiIdea(e.target.value)}
+                        placeholder="e.g. cold plunge 2 min after the workout"
+                      />
+                      <button
+                        disabled={
+                          aiIdeaBusy ||
+                          !aiIdea.trim() ||
+                          cmsP.length === 0
+                        }
+                        onClick={async () => {
+                          setAiIdeaBusy(true);
+                          setAiIdeaMsg(null);
+                          const r =
+                            await generateBehaviorDraftAndSuggestProtocol(
+                              aiIdea,
+                              cmsP.map((p) => ({
+                                slug: p.slug,
+                                name: p.name,
+                                tagline: p.tagline ?? undefined,
+                                goal: p.goal ?? undefined,
+                              }))
+                            );
+                          setAiIdeaBusy(false);
+                          if (r.ok && r.draft) {
+                            setAiIdeaResult(r.draft);
+                            setAiIdeaMsg(null);
+                          } else {
+                            setAiIdeaResult(null);
+                            setAiIdeaMsg(
+                              r.reason ?? "AI drafting failed."
+                            );
+                          }
+                        }}
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        {aiIdeaBusy
+                          ? "Drafting…"
+                          : cmsP.length === 0
+                            ? "Seed the CMS first"
+                            : "Generate + suggest protocol"}
+                      </button>
+                      {aiIdeaMsg && (
+                        <p
+                          className="rounded-[var(--r-sm)] px-3 py-2 text-[12.5px] font-medium"
+                          style={{
+                            background: "rgba(232,137,107,.12)",
+                            color: "var(--alert)",
+                          }}
+                        >
+                          {aiIdeaMsg}
+                        </p>
+                      )}
+                      {aiIdeaResult && (
+                        <div className="space-y-2 rounded-[var(--r-sm)] p-3" style={{ background: "var(--surface-3)" }}>
+                          <p className="text-[12.5px] text-[var(--text-2)]">
+                            <b>{aiIdeaResult.title}</b>{" "}
+                            <span className="text-[var(--text-3)]">
+                              ·{" "}
+                              {aiIdeaResult.dose ?? "no dose"} ·{" "}
+                              {aiIdeaResult.block} · L
+                              {aiIdeaResult.leverage}
+                            </span>
+                          </p>
+                          {aiIdeaResult.suggestedProtocols.length ===
+                          0 ? (
+                            <p className="t-caption">
+                              No matching protocol — create one above or
+                              pick from the list below.
+                            </p>
+                          ) : (
+                            <>
+                              <p className="t-caption">
+                                Open the draft inside…
+                              </p>
+                              {aiIdeaResult.suggestedProtocols.map(
+                                (s, i) => {
+                                  const target = cmsP.find(
+                                    (p) => p.slug === s.slug
+                                  );
+                                  if (!target) return null;
+                                  return (
+                                    <button
+                                      key={s.slug}
+                                      onClick={async () => {
+                                        // Strip suggestions to leave a
+                                        // plain AiBehaviorDraft for the
+                                        // in-protocol editor.
+                                        const {
+                                          suggestedProtocols: _drop,
+                                          ...rest
+                                        } = aiIdeaResult;
+                                        void _drop;
+                                        await openProto(target);
+                                        setAiDraft(
+                                          rest as AiBehaviorDraft
+                                        );
+                                        setAiDesc(aiIdea);
+                                        setAiIdeaResult(null);
+                                        setAiIdea("");
+                                      }}
+                                      className="press tr-fast row flex w-full items-start gap-3 rounded-[var(--r-sm)] p-2.5 text-left"
+                                      style={{
+                                        background: "var(--surface-2)",
+                                      }}
+                                    >
+                                      <span
+                                        className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                                        style={{
+                                          background:
+                                            i === 0
+                                              ? "var(--readiness)"
+                                              : "var(--surface-3)",
+                                          color:
+                                            i === 0
+                                              ? "#08090B"
+                                              : "var(--text-3)",
+                                        }}
+                                      >
+                                        {i + 1}
+                                      </span>
+                                      <span className="grow">
+                                        <p className="text-[13px] font-semibold text-[var(--text-1)]">
+                                          {target.name}
+                                        </p>
+                                        <p className="t-caption mt-0.5">
+                                          {s.reason}
+                                        </p>
+                                      </span>
+                                    </button>
+                                  );
+                                }
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={card} style={surf}>
+                    {!newProtoOpen ? (
+                      <button
+                        onClick={() => setNewProtoOpen(true)}
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B]"
+                      >
+                        + New protocol
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <Eyebrow color="var(--readiness)">
+                          New protocol
+                        </Eyebrow>
+                        <input
+                          className={inp}
+                          value={newProtoName}
+                          onChange={(e) =>
+                            setNewProtoName(e.target.value)
+                          }
+                          placeholder="Name (e.g. 'Migraine Resilience')"
+                        />
+                        <input
+                          className={inp}
+                          value={newProtoTagline}
+                          onChange={(e) =>
+                            setNewProtoTagline(e.target.value)
+                          }
+                          placeholder="Tagline (short, calm — one line)"
+                        />
+                        <input
+                          className={inp}
+                          value={newProtoGoal}
+                          onChange={(e) =>
+                            setNewProtoGoal(e.target.value)
+                          }
+                          placeholder="Goal slug (e.g. 'sleep', 'focus')"
+                        />
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            disabled={busy || !newProtoName.trim()}
+                            onClick={async () => {
+                              setBusy(true);
+                              const r = await createProtocol({
+                                name: newProtoName,
+                                tagline: newProtoTagline,
+                                goal: newProtoGoal,
+                              });
+                              setBusy(false);
+                              setMsg(
+                                r.ok
+                                  ? "Protocol created (draft)."
+                                  : r.reason ?? "Failed"
+                              );
+                              if (r.ok) {
+                                setNewProtoName("");
+                                setNewProtoTagline("");
+                                setNewProtoGoal("");
+                                setNewProtoOpen(false);
+                                loadCms();
+                              }
+                            }}
+                            className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                          >
+                            {busy ? "Creating…" : "Create"}
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              setNewProtoOpen(false);
+                              setNewProtoName("");
+                              setNewProtoTagline("");
+                              setNewProtoGoal("");
+                            }}
+                            className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-2 text-[12px] font-semibold text-[var(--text-2)]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {cmsP.map((p) => (
                     <button
                       key={p.id}
@@ -1051,6 +1628,10 @@ export default function AdminHome() {
                         <button
                           disabled={busy}
                           onClick={() => {
+                            const yes = window.confirm(
+                              "Discard the AI draft? All field edits in this card will be lost."
+                            );
+                            if (!yes) return;
                             setAiDraft(null);
                             setAiMsg(null);
                           }}
@@ -1089,14 +1670,14 @@ export default function AdminHome() {
                           from publish until cleared.
                         </span>
                         <button
-                          disabled={busy}
+                          disabled={savingIds[b.id]}
                           onClick={async () => {
-                            setBusy(true);
+                            markSavingStart(b.id);
                             const r = await clearUnverified(
                               b.id,
                               b.version
                             );
-                            setBusy(false);
+                            markSavingEnd(b.id);
                             if (r.ok) {
                               flashSaved(b.id);
                               setMsg(null);
@@ -1105,7 +1686,7 @@ export default function AdminHome() {
                               setMsg(r.reason ?? "Failed");
                             }
                           }}
-                          className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--text-1)] px-3 py-1.5 text-[11px] font-semibold text-[#08090B]"
+                          className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--text-1)] px-3 py-1.5 text-[11px] font-semibold text-[#08090B] disabled:opacity-40"
                         >
                           {savedIds[b.id] ? "Verified ✓" : "Mark verified"}
                         </button>
@@ -1117,18 +1698,18 @@ export default function AdminHome() {
                         {(["-1", "1"] as const).map((d) => (
                           <button
                             key={d}
-                            disabled={busy}
+                            disabled={savingIds[b.id]}
                             onClick={async () => {
-                              setBusy(true);
+                              markSavingStart(b.id);
                               await reorderBehavior(
                                 edP.id,
                                 b.id,
                                 d === "-1" ? -1 : 1
                               );
-                              setBusy(false);
+                              markSavingEnd(b.id);
                               reopen();
                             }}
-                            className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)]"
+                            className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)] disabled:opacity-40"
                             style={{ background: "var(--surface-3)" }}
                             aria-label={d === "-1" ? "Move up" : "Move down"}
                           >
@@ -1244,11 +1825,11 @@ export default function AdminHome() {
                       placeholder="Rationale"
                     />
                     <button
-                      disabled={busy}
+                      disabled={savingIds[b.id]}
                       onClick={async () => {
-                        setBusy(true);
+                        markSavingStart(b.id);
                         const r = await saveBehavior(b);
-                        setBusy(false);
+                        markSavingEnd(b.id);
                         if (r.ok) {
                           flashSaved(b.id);
                           setMsg(null);
@@ -1260,10 +1841,205 @@ export default function AdminHome() {
                     >
                       {savedIds[b.id]
                         ? "Saved ✓"
-                        : busy
+                        : savingIds[b.id]
                           ? "Saving…"
                           : "Save behavior"}
                     </button>
+
+                    <div className="mt-3 flex gap-2 border-t border-[var(--hairline)] pt-3">
+                      <button
+                        onClick={() =>
+                          togglePanel(b.id, "history", b.canonical_key)
+                        }
+                        className="press text-[11.5px] font-semibold text-[var(--text-3)]"
+                        title="Every save writes a versioned revision. This panel shows the last few."
+                      >
+                        {openPanel?.id === b.id &&
+                        openPanel?.kind === "history"
+                          ? "− Hide history"
+                          : "↻ History"}
+                      </button>
+                      <button
+                        onClick={() =>
+                          togglePanel(b.id, "evidence", b.canonical_key)
+                        }
+                        className="press text-[11.5px] font-semibold text-[var(--text-3)]"
+                        title="The cms_evidence + cms_explanations rows attached to this behavior. AI-drafted rows seed them; you can edit or add for any behavior."
+                      >
+                        {openPanel?.id === b.id &&
+                        openPanel?.kind === "evidence"
+                          ? "− Hide evidence"
+                          : "📜 Evidence"}
+                      </button>
+                    </div>
+
+                    {openPanel?.id === b.id &&
+                      openPanel.kind === "history" && (
+                        <div
+                          className="mt-2 rounded-[var(--r-sm)] p-3"
+                          style={{ background: "var(--surface-3)" }}
+                        >
+                          {historyRows.length === 0 ? (
+                            <p className="t-caption">
+                              No revision history yet.
+                            </p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {historyRows.map((r) => (
+                                <div
+                                  key={r.id}
+                                  className="flex items-baseline justify-between gap-2"
+                                  title={
+                                    typeof r.snapshot === "object"
+                                      ? JSON.stringify(r.snapshot).slice(
+                                          0,
+                                          400
+                                        )
+                                      : ""
+                                  }
+                                >
+                                  <span className="text-[12px] font-semibold text-[var(--text-2)]">
+                                    v{r.version}
+                                  </span>
+                                  <span className="grow truncate text-[11.5px] text-[var(--text-3)]">
+                                    {r.change_note ?? "—"}
+                                  </span>
+                                  <span className="text-[10.5px] text-[var(--text-4)]">
+                                    {new Date(
+                                      r.created_at
+                                    ).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                    {openPanel?.id === b.id &&
+                      openPanel.kind === "evidence" && (
+                        <div
+                          className="mt-2 space-y-2 rounded-[var(--r-sm)] p-3"
+                          style={{ background: "var(--surface-3)" }}
+                        >
+                          <div className="flex gap-2">
+                            <select
+                              className={inp}
+                              value={evRow?.tier ?? "emerging"}
+                              onChange={(e) =>
+                                patchEv({ tier: e.target.value })
+                              }
+                              title={FIELD_HELP.evidenceTier}
+                            >
+                              {[
+                                "strong",
+                                "moderate",
+                                "emerging",
+                                "anecdotal",
+                              ].map((t) => (
+                                <option key={t}>{t}</option>
+                              ))}
+                            </select>
+                            <input
+                              className={inp}
+                              value={evRow?.source_label ?? ""}
+                              onChange={(e) =>
+                                patchEv({
+                                  source_label: e.target.value || null,
+                                })
+                              }
+                              placeholder="Source (e.g. Meta-analysis, 2021)"
+                              title={FIELD_HELP.evidenceSource}
+                            />
+                          </div>
+                          <input
+                            className={inp}
+                            value={evRow?.url ?? ""}
+                            onChange={(e) =>
+                              patchEv({ url: e.target.value || null })
+                            }
+                            placeholder="Source URL (optional, http(s))"
+                            title={FIELD_HELP.evidenceUrl}
+                          />
+                          <textarea
+                            className={inp}
+                            rows={2}
+                            value={evRow?.summary ?? ""}
+                            onChange={(e) =>
+                              patchEv({
+                                summary: e.target.value || null,
+                              })
+                            }
+                            placeholder="Evidence summary"
+                            title={FIELD_HELP.evidenceSummary}
+                          />
+                          <textarea
+                            className={inp}
+                            rows={2}
+                            value={exText("why")}
+                            onChange={(e) =>
+                              setExText("why", e.target.value)
+                            }
+                            placeholder="Why it matters"
+                            title={FIELD_HELP.why}
+                          />
+                          <input
+                            className={inp}
+                            value={exText("timing")}
+                            onChange={(e) =>
+                              setExText("timing", e.target.value)
+                            }
+                            placeholder="Why this timing"
+                            title={FIELD_HELP.timing}
+                          />
+                          <button
+                            disabled={savingIds[b.id]}
+                            onClick={async () => {
+                              markSavingStart(b.id);
+                              const errors: string[] = [];
+                              const eR = await upsertEvidence({
+                                targetType: "behavior",
+                                targetRef: b.canonical_key,
+                                tier: evRow?.tier ?? "emerging",
+                                sourceLabel:
+                                  evRow?.source_label ?? undefined,
+                                url: evRow?.url ?? null,
+                                summary: evRow?.summary ?? undefined,
+                              });
+                              if (!eR.ok)
+                                errors.push(eR.reason ?? "evidence");
+                              for (const k of ["why", "timing"]) {
+                                const t = exText(k);
+                                if (!t.trim()) continue;
+                                const r = await upsertExplanation({
+                                  targetType: "behavior",
+                                  targetRef: b.canonical_key,
+                                  kind: k,
+                                  text: t,
+                                });
+                                if (!r.ok)
+                                  errors.push(r.reason ?? k);
+                              }
+                              markSavingEnd(b.id);
+                              if (errors.length === 0) {
+                                flashSaved(b.id);
+                                setMsg(null);
+                              } else {
+                                setMsg(
+                                  "Some rows failed: " + errors.join(", ")
+                                );
+                              }
+                            }}
+                            className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                          >
+                            {savedIds[b.id]
+                              ? "Saved ✓"
+                              : savingIds[b.id]
+                                ? "Saving…"
+                                : "Save evidence + explanations"}
+                          </button>
+                        </div>
+                      )}
                   </div>
                 ))}
 
@@ -1367,6 +2143,27 @@ export default function AdminHome() {
                     </p>
                   ) : (
                     <div className="mt-3 space-y-2">
+                      <div className="flex gap-1.5">
+                        {(["protocol", "behavior"] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setDEntityType(t)}
+                            className="press tr-fast flex-1 rounded-[var(--r-pill)] py-1.5 text-[11.5px] font-semibold capitalize"
+                            style={{
+                              background:
+                                dEntityType === t
+                                  ? "var(--text-1)"
+                                  : "var(--surface-3)",
+                              color:
+                                dEntityType === t
+                                  ? "#08090B"
+                                  : "var(--text-3)",
+                            }}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
                       <select
                         className={inp}
                         value={dProto}
@@ -1379,17 +2176,49 @@ export default function AdminHome() {
                           </option>
                         ))}
                       </select>
+                      {dEntityType === "behavior" && (
+                        <select
+                          className={inp}
+                          value={dBehaviorId}
+                          onChange={(e) => setDBehaviorId(e.target.value)}
+                          disabled={!dProto}
+                        >
+                          {dBehaviors.length === 0 && (
+                            <option value="">
+                              {dProto
+                                ? "(no behaviors in this protocol)"
+                                : "Pick a protocol first…"}
+                            </option>
+                          )}
+                          {dBehaviors.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.title}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <div className="flex gap-2">
                         <select
                           className={inp}
                           value={dField}
                           onChange={(e) => setDField(e.target.value)}
                         >
-                          {["tagline", "name", "accent", "goal"].map(
-                            (f) => (
-                              <option key={f}>{f}</option>
-                            )
-                          )}
+                          {(dEntityType === "behavior"
+                            ? [
+                                "title",
+                                "rationale",
+                                "dose",
+                                "block",
+                                "anchor",
+                                "offset_min",
+                                "leverage",
+                                "kind",
+                                "icon",
+                              ]
+                            : ["tagline", "name", "accent", "goal"]
+                          ).map((f) => (
+                            <option key={f}>{f}</option>
+                          ))}
                         </select>
                         <input
                           className={inp}
@@ -1405,13 +2234,30 @@ export default function AdminHome() {
                         placeholder="Rationale"
                       />
                       <button
-                        disabled={busy || !dProto || !dValue}
+                        disabled={
+                          busy ||
+                          (dEntityType === "protocol" && !dProto) ||
+                          (dEntityType === "behavior" && !dBehaviorId) ||
+                          !dValue
+                        }
                         onClick={async () => {
                           setBusy(true);
+                          const entityId =
+                            dEntityType === "behavior"
+                              ? dBehaviorId
+                              : dProto;
+                          // Coerce numeric fields server-side-friendly.
+                          const numericFields = new Set([
+                            "leverage",
+                            "offset_min",
+                          ]);
+                          const proposed = numericFields.has(dField)
+                            ? { [dField]: Number(dValue) }
+                            : { [dField]: dValue };
                           const r = await createSuggestion({
-                            entityType: "protocol",
-                            entityId: dProto,
-                            proposed: { [dField]: dValue },
+                            entityType: dEntityType,
+                            entityId,
+                            proposed,
                             rationale: dWhy,
                           });
                           setBusy(false);
@@ -1419,7 +2265,8 @@ export default function AdminHome() {
                           if (r.ok) {
                             setDValue("");
                             setDWhy("");
-                            loadSugs();
+                            setSugStatus("pending");
+                            loadSugs("pending");
                           }
                         }}
                         className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
@@ -1431,10 +2278,35 @@ export default function AdminHome() {
                 </div>
 
                 <div>
-                  <Eyebrow>Pending review</Eyebrow>
+                  <div className="flex items-center justify-between gap-2">
+                    <Eyebrow>Queue</Eyebrow>
+                    <div className="flex gap-1">
+                      {(["pending", "approved", "rejected"] as const).map(
+                        (s) => (
+                          <button
+                            key={s}
+                            onClick={() => setSugStatus(s)}
+                            className="press rounded-[var(--r-pill)] px-3 py-1 text-[11px] font-semibold capitalize"
+                            style={{
+                              background:
+                                sugStatus === s
+                                  ? "var(--text-1)"
+                                  : "var(--surface-3)",
+                              color:
+                                sugStatus === s
+                                  ? "#08090B"
+                                  : "var(--text-3)",
+                            }}
+                          >
+                            {s}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
                   {sugs.length === 0 && (
                     <p className="t-caption mt-2 px-1">
-                      No pending suggestions.
+                      No {sugStatus} suggestions.
                     </p>
                   )}
                   <div className="mt-2 space-y-2">
@@ -1501,6 +2373,92 @@ export default function AdminHome() {
 
         {tab === "publish" && (
           <div className="space-y-4">
+            <div className={card} style={surf}>
+              <div className="flex items-center justify-between gap-2">
+                <Eyebrow>What's about to ship</Eyebrow>
+                <button
+                  onClick={refreshDiff}
+                  disabled={diffBusy}
+                  className="press text-[11.5px] font-semibold text-[var(--readiness)] disabled:opacity-40"
+                  title="Re-assemble the next bundle and re-diff against the latest published one."
+                >
+                  {diffBusy ? "…" : "Refresh"}
+                </button>
+              </div>
+              {!diff ? (
+                <p className="t-caption mt-2">Loading diff…</p>
+              ) : !diff.hasChanges ? (
+                <p className="t-caption mt-2 leading-relaxed">
+                  No changes vs the latest published bundle. Publishing
+                  would be a no-op.
+                </p>
+              ) : (
+                <div className="mt-2 space-y-2 text-[12.5px]">
+                  <p
+                    className="leading-relaxed text-[var(--text-2)]"
+                    title="Counts of behavior-level changes between the latest published bundle and what would ship if you Publish now."
+                  >
+                    {[
+                      diff.behaviorsAdded.length &&
+                        `${diff.behaviorsAdded.length} added`,
+                      diff.behaviorsChanged.length &&
+                        `${diff.behaviorsChanged.length} edited`,
+                      diff.behaviorsRemoved.length &&
+                        `${diff.behaviorsRemoved.length} removed`,
+                      diff.protocolsAdded.length &&
+                        `${diff.protocolsAdded.length} new protocol${diff.protocolsAdded.length === 1 ? "" : "s"}`,
+                      diff.protocolsRemoved.length &&
+                        `${diff.protocolsRemoved.length} protocol${diff.protocolsRemoved.length === 1 ? "" : "s"} removed`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}{" "}
+                    · {diff.unchanged} unchanged
+                  </p>
+                  {diff.behaviorsAdded.slice(0, 8).map((b) => (
+                    <p
+                      key={`+${b.protocolId}/${b.canonicalKey}`}
+                      className="text-[var(--vitality)]"
+                    >
+                      + <b>{b.title}</b>{" "}
+                      <span className="text-[var(--text-3)]">
+                        in {b.protocolName}
+                      </span>
+                    </p>
+                  ))}
+                  {diff.behaviorsChanged.slice(0, 8).map((b) => (
+                    <p
+                      key={`~${b.protocolId}/${b.canonicalKey}`}
+                      className="text-[var(--warm)]"
+                    >
+                      ~ <b>{b.title}</b>{" "}
+                      <span className="text-[var(--text-3)]">
+                        in {b.protocolName} · {b.fields.join(", ")}
+                      </span>
+                    </p>
+                  ))}
+                  {diff.behaviorsRemoved.slice(0, 8).map((b) => (
+                    <p
+                      key={`-${b.protocolId}/${b.canonicalKey}`}
+                      className="text-[var(--alert)]"
+                    >
+                      − <b>{b.title}</b>{" "}
+                      <span className="text-[var(--text-3)]">
+                        in {b.protocolName}
+                      </span>
+                    </p>
+                  ))}
+                  {diff.behaviorsAdded.length +
+                    diff.behaviorsChanged.length +
+                    diff.behaviorsRemoved.length >
+                    24 && (
+                    <p className="t-caption">
+                      (showing first few; refresh for the full set)
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className={card} style={surf}>
               <Eyebrow color="var(--readiness)">
                 Current effective catalog
@@ -1575,6 +2533,10 @@ export default function AdminHome() {
                       <button
                         disabled={busy}
                         onClick={async () => {
+                          const yes = window.confirm(
+                            `Roll back to v${p.version}? This creates a NEW published version on top of history (nothing is deleted), and the app will adopt it on next refresh.`
+                          );
+                          if (!yes) return;
                           setBusy(true);
                           setMsg(null);
                           const r = await rollbackTo(p.version);

@@ -47,6 +47,12 @@ export type Anchor = (typeof ANCHORS)[number];
 export type Kind = (typeof KINDS)[number];
 export type EvidenceTier = (typeof EVIDENCE_TIERS)[number];
 
+/** When the admin asks AI to recommend a protocol too. */
+export interface AiProtocolSuggestion {
+  slug: string;
+  name: string;
+  reason: string;
+}
 export interface AiEvidence {
   tier: EvidenceTier;
   sourceLabel: string;
@@ -72,6 +78,11 @@ export interface AiBehaviorDraft {
   explanation: AiExplanation;
   /** Always true after clamp. The human-cleared flag lives in the DB. */
   aiUnverified: true;
+}
+
+/** Suggest-protocol mode: same shape + ranked candidate protocols. */
+export interface AiBehaviorDraftWithSuggestions extends AiBehaviorDraft {
+  suggestedProtocols: AiProtocolSuggestion[];
 }
 
 /**
@@ -120,6 +131,38 @@ export const OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
       properties: {
         why: { type: "string", description: "Why this behavior matters for the goal." },
         timing: { type: "string", description: "Why this time/anchor is right." },
+      },
+    },
+  },
+};
+
+/**
+ * Schema for "suggest a protocol too" mode — same as OUTPUT_JSON_SCHEMA
+ * plus a ranked list of candidate protocols. The slugs come from a list
+ * the route bakes into the user prompt; the clamp re-validates them
+ * against that list so the model can never invent a target.
+ */
+export const OUTPUT_JSON_SCHEMA_WITH_SUGGEST: Record<string, unknown> = {
+  ...OUTPUT_JSON_SCHEMA,
+  required: [
+    ...(OUTPUT_JSON_SCHEMA.required as string[]),
+    "suggestedProtocols",
+  ],
+  properties: {
+    ...(OUTPUT_JSON_SCHEMA.properties as Record<string, unknown>),
+    suggestedProtocols: {
+      type: "array",
+      description:
+        "Ranked, best fit first. 1–3 candidates from the provided protocol list.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slug", "name", "reason"],
+        properties: {
+          slug: { type: "string" },
+          name: { type: "string" },
+          reason: { type: "string" },
+        },
       },
     },
   },
@@ -246,6 +289,40 @@ export function clampDraft(raw: unknown): AiBehaviorDraft {
     },
     aiUnverified: true, // ← always; the human clears it in the editor
   };
+}
+
+/**
+ * Clamp for "suggest a protocol too" mode. Same hard guarantees as
+ * `clampDraft`, plus: filter `suggestedProtocols` to slugs the route
+ * actually offered, cap at 3, drop empties. The model cannot smuggle
+ * an unknown target through.
+ */
+export function clampDraftWithSuggestions(
+  raw: unknown,
+  allowedSlugs: ReadonlySet<string>
+): AiBehaviorDraftWithSuggestions {
+  const base = clampDraft(raw);
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const rawSugs = Array.isArray(o.suggestedProtocols)
+    ? (o.suggestedProtocols as unknown[])
+    : [];
+  const suggested: AiProtocolSuggestion[] = [];
+  for (const s of rawSugs) {
+    if (!s || typeof s !== "object") continue;
+    const r = s as Record<string, unknown>;
+    const slug = clampStr(r.slug, 64, "");
+    if (!slug || !allowedSlugs.has(slug)) continue;
+    suggested.push({
+      slug,
+      name: clampStr(r.name, 80, slug),
+      reason: clampStr(r.reason, 300, ""),
+    });
+    if (suggested.length >= 3) break;
+  }
+  return { ...base, suggestedProtocols: suggested };
 }
 
 /** Plain-English help shown as field tooltips in the editor. */
