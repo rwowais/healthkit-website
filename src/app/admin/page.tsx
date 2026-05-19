@@ -195,6 +195,22 @@ export default function AdminHome() {
   const patchDraft = (p: Partial<AiBehaviorDraft>) =>
     setAiDraft((d) => (d ? { ...d, ...p } : d));
 
+  // Per-row "Saved ✓" transient confirmation for behavior + verify
+  // actions — much clearer than the global status line buried far
+  // below the row the user clicked on.
+  const [savedIds, setSavedIds] = useState<Record<string, true>>({});
+  const flashSaved = (id: string) => {
+    setSavedIds((s) => ({ ...s, [id]: true }));
+    setTimeout(
+      () => setSavedIds((s) => {
+        const n = { ...s };
+        delete n[id];
+        return n;
+      }),
+      1500
+    );
+  };
+
   const sim = useMemo(() => {
     const base = getDefaultState();
     const logs: DailyLog[] = [];
@@ -587,15 +603,24 @@ export default function AdminHome() {
               );
             return (
               <div className="space-y-4">
-                <button
-                  onClick={() => {
-                    setEdP(null);
-                    setEdB([]);
-                  }}
-                  className="press text-[13px] font-semibold text-[var(--readiness)]"
-                >
-                  ← All protocols
-                </button>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => {
+                      setEdP(null);
+                      setEdB([]);
+                    }}
+                    className="press text-[13px] font-semibold text-[var(--readiness)]"
+                  >
+                    ← All protocols
+                  </button>
+                  <button
+                    onClick={() => setTab("publish")}
+                    title="Edits are drafts until you Publish — that's when users (and Simulate) see them."
+                    className="press tr-fast rounded-[var(--r-pill)] bg-[var(--surface-3)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--text-2)]"
+                  >
+                    → Publish to make live
+                  </button>
+                </div>
                 <div className={card} style={surf}>
                   <Eyebrow>Protocol</Eyebrow>
                   <div className="mt-2 space-y-2">
@@ -1072,16 +1097,17 @@ export default function AdminHome() {
                               b.version
                             );
                             setBusy(false);
-                            setMsg(
-                              r.ok
-                                ? "Marked verified."
-                                : r.reason ?? "Failed"
-                            );
-                            if (r.ok) reopen();
+                            if (r.ok) {
+                              flashSaved(b.id);
+                              setMsg(null);
+                              reopen();
+                            } else {
+                              setMsg(r.reason ?? "Failed");
+                            }
                           }}
                           className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--text-1)] px-3 py-1.5 text-[11px] font-semibold text-[#08090B]"
                         >
-                          Mark verified
+                          {savedIds[b.id] ? "Verified ✓" : "Mark verified"}
                         </button>
                       </div>
                     )}
@@ -1223,13 +1249,20 @@ export default function AdminHome() {
                         setBusy(true);
                         const r = await saveBehavior(b);
                         setBusy(false);
-                        setMsg(
-                          r.ok ? "Behavior saved" : r.reason ?? "Failed"
-                        );
+                        if (r.ok) {
+                          flashSaved(b.id);
+                          setMsg(null);
+                        } else {
+                          setMsg(r.reason ?? "Save failed.");
+                        }
                       }}
                       className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
                     >
-                      Save behavior
+                      {savedIds[b.id]
+                        ? "Saved ✓"
+                        : busy
+                          ? "Saving…"
+                          : "Save behavior"}
                     </button>
                   </div>
                 ))}
@@ -1298,8 +1331,16 @@ export default function AdminHome() {
                   </p>
                 )}
                 <p className="t-caption">
-                  Edits are drafts until you Publish a bundle — users see
-                  nothing change until then.
+                  Edits are drafts until you Publish a bundle — users
+                  (and the Simulate tab) see nothing change until then.
+                  When you&apos;re ready, hit{" "}
+                  <button
+                    onClick={() => setTab("publish")}
+                    className="press font-semibold text-[var(--readiness)] underline-offset-2 hover:underline"
+                  >
+                    Publish
+                  </button>
+                  .
                 </p>
               </div>
             );
