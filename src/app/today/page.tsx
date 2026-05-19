@@ -167,8 +167,42 @@ export default function TodayPage() {
   }, [loading, state.settings.completedOnboarding, router]);
 
   const cb = useMemo(() => currentBlock(settings), [settings]);
-  const [snoozed, setSnoozed] = useState<string[]>([]);
-  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  // Persist snooze/dismiss so a refresh doesn't resurrect everything the
+  // user deliberately cleared (it felt broken, not adaptive). Snooze is
+  // scoped to today; dismissed suggestions persist by id.
+  const todayKey = dateKey(new Date());
+  const readLS = (k: string): string[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      return JSON.parse(localStorage.getItem(k) || "[]");
+    } catch {
+      return [];
+    }
+  };
+  const [snoozed, setSnoozed] = useState<string[]>(() =>
+    readLS(`pz:snz:${todayKey}`)
+  );
+  const [dismissed, setDismissed] = useState<string[]>(() =>
+    readLS("pz:dsm")
+  );
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        `pz:snz:${todayKey}`,
+        JSON.stringify(snoozed)
+      );
+    } catch {
+      /* non-fatal */
+    }
+  }, [snoozed, todayKey]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("pz:dsm", JSON.stringify(dismissed));
+    } catch {
+      /* non-fatal */
+    }
+  }, [dismissed]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
   const [offset, setOffset] = useState(0);
   const selectedDate = useMemo(() => {
@@ -221,6 +255,17 @@ export default function TodayPage() {
   );
   const dayComplete =
     isToday && prog.total > 0 && prog.done === prog.total;
+
+  // Partial close: in the evening, a user who moved *some* things should
+  // be met with acknowledgement, not the same anxious "Up next" pressure.
+  // The product preaches consistency over perfection — so it must reward
+  // it, not withhold approval until 100%.
+  const partialClose =
+    isToday &&
+    !dayComplete &&
+    cb === "evening" &&
+    prog.total > 0 &&
+    prog.done > 0;
 
   const upNext = useMemo(() => {
     const candidates = timeline.filter(
@@ -399,6 +444,45 @@ export default function TodayPage() {
           </motion.div>
         )}
 
+        {/* Partial close — acknowledgement, not pressure */}
+        {partialClose && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="panel relative overflow-hidden p-7 text-center"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--warm) 22%, transparent), transparent 62%)",
+              }}
+            />
+            <div className="relative flex flex-col items-center">
+              <span
+                className="chip h-14 w-14"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--warm) 20%, var(--surface-3))",
+                  color: "var(--warm)",
+                }}
+              >
+                <Icon name="flame" size={26} />
+              </span>
+              <h2 className="t-section mt-4 text-[var(--text-1)]">
+                You moved {prog.done} thing{prog.done === 1 ? "" : "s"}{" "}
+                today
+              </h2>
+              <p className="t-body mt-2 max-w-[300px] leading-relaxed">
+                That&apos;s the compounding work — showing up beats a
+                perfect score. Anything still open is there if you want
+                it, no pressure.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* Adaptive banner — focal */}
         {!dayComplete && (
         <motion.div
@@ -416,7 +500,7 @@ export default function TodayPage() {
           <div className="relative">
             <div className="flex items-center gap-2">
               <span
-                className="h-1.5 w-1.5 rounded-full anim-pulse"
+                className="h-1.5 w-1.5 rounded-full"
                 style={{ background: accent }}
               />
               <Eyebrow color={accent}>Operating summary</Eyebrow>
@@ -440,7 +524,10 @@ export default function TodayPage() {
                       ? "High"
                       : sig.recoveryProxy >= 45
                       ? "Moderate"
-                      : "Low",
+                      : "Easing",
+                  // Never flash a red deficit on the exact day the engine
+                  // is choosing to protect the user — low recovery reads
+                  // as a calm "Easing" in the recovery hue, not an alert.
                   c:
                     sig.recoveryProxy == null
                       ? "var(--text-3)"
@@ -448,7 +535,7 @@ export default function TodayPage() {
                       ? "var(--vitality)"
                       : sig.recoveryProxy >= 45
                       ? "var(--readiness)"
-                      : "var(--alert)",
+                      : "var(--recovery)",
                 },
                 {
                   k: "Sleep",
@@ -626,7 +713,7 @@ export default function TodayPage() {
         )}
 
         {/* Up next — the single intelligent focus */}
-        {isToday && !dayComplete && upNext && (
+        {isToday && !dayComplete && !partialClose && upNext && (
           <div>
             <div className="mb-3 flex items-center justify-between px-1">
               <Eyebrow color="var(--text-3)">Up next</Eyebrow>
@@ -655,7 +742,7 @@ export default function TodayPage() {
               }}
             >
               <span
-                className="ambient anim-pulse"
+                className="ambient"
                 style={{
                   background: `radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, ${accent} 20%, transparent), transparent 60%)`,
                 }}

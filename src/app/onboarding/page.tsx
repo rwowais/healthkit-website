@@ -255,8 +255,9 @@ export default function OnboardingPage() {
                   Let&apos;s build your system.
                 </h1>
                 <p className="t-body mt-4 leading-relaxed">
-                  Six quick taps. We&apos;ll assemble an adaptive protocol
-                  tuned to you — and refine it as you go.
+                  A handful of quick questions — about a minute. We&apos;ll
+                  assemble an adaptive protocol tuned to you, then refine it
+                  as you go.
                 </p>
                 <div className="mt-9">
                   <Eyebrow>First, your name</Eyebrow>
