@@ -15,7 +15,7 @@ import type {
   ProtocolPack,
   TimeBlock,
 } from "./types";
-import { PACKS } from "./packs";
+import { activePacks } from "./knowledge";
 import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 
@@ -38,7 +38,9 @@ const BLOCK_ORDER: Record<TimeBlock, number> = {
 };
 
 function allPacks(state: AppState): ProtocolPack[] {
-  return [...PACKS, ...(state.customPacks ?? [])];
+  // Hybrid: the timeline/merge/score path serves the active catalog —
+  // a published bundle when one has been applied, else the built-in.
+  return [...activePacks(), ...(state.customPacks ?? [])];
 }
 
 function dateKey(d: Date) {

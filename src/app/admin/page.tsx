@@ -12,6 +12,14 @@ import {
 } from "@/lib/cms/introspect";
 import { getDefaultState } from "@/lib/storage";
 import { adapt, compileTimeline, shapeTimeline } from "@/lib/engine";
+import { bundleChecksum } from "@/lib/knowledge";
+import {
+  buildCatalogBundle,
+  listPublications,
+  publishBundle,
+  rollbackTo,
+  type Publication,
+} from "@/lib/cms/publish";
 import type { AppState, DailyLog } from "@/lib/types";
 import { Eyebrow, Skeleton } from "@/components/ui";
 
@@ -22,7 +30,8 @@ type Tab =
   | "rules"
   | "config"
   | "intelligence"
-  | "simulate";
+  | "simulate"
+  | "publish";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -31,6 +40,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "config", label: "Config" },
   { id: "intelligence", label: "Intelligence" },
   { id: "simulate", label: "Simulate" },
+  { id: "publish", label: "Publish" },
 ];
 
 function dk(off: number) {
@@ -68,6 +78,20 @@ export default function AdminHome() {
   const [sleepQ, setSleepQ] = useState(3);
   const [energy, setEnergy] = useState(3);
   const [gap, setGap] = useState(0);
+
+  // ── Publish ───────────────────────────────────────────────────────
+  const [pubs, setPubs] = useState<Publication[]>([]);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const liveSum = useMemo(
+    () => bundleChecksum(buildCatalogBundle(0)),
+    []
+  );
+  const refreshPubs = () => listPublications().then(setPubs);
+  useEffect(() => {
+    if (gate === "ok") refreshPubs();
+  }, [gate]);
 
   const sim = useMemo(() => {
     const base = getDefaultState();
@@ -402,6 +426,104 @@ export default function AdminHome() {
                       {it.block}
                       {it.muted ? " · eased" : ""}
                     </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        {tab === "publish" && (
+          <div className="space-y-4">
+            <div className={card} style={surf}>
+              <Eyebrow color="var(--readiness)">
+                Current effective catalog
+              </Eyebrow>
+              <p className="mt-2 text-[12.5px] text-[var(--text-2)]">
+                Checksum <code>{liveSum}</code>. Publishing snapshots this
+                into a new immutable version the app refreshes to when
+                online. Nothing here mutates production automatically.
+              </p>
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Change note (what & why)"
+                className="mt-3 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[13px] text-[var(--text-1)] outline-none"
+              />
+              <button
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setMsg(null);
+                  const r = await publishBundle(note.trim());
+                  setBusy(false);
+                  setMsg(
+                    r.ok
+                      ? `Published v${r.version} (${r.checksum})`
+                      : r.reason
+                  );
+                  if (r.ok) {
+                    setNote("");
+                    refreshPubs();
+                  }
+                }}
+                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[13px] font-semibold text-[#08090B] disabled:opacity-40"
+              >
+                {busy ? "…" : "Publish current catalog"}
+              </button>
+              {msg && (
+                <p className="mt-2 text-[12px] text-[var(--text-3)]">
+                  {msg}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Eyebrow>History (immutable)</Eyebrow>
+              <div className="mt-2 space-y-1.5">
+                {pubs.length === 0 && (
+                  <p className="t-caption px-1">
+                    No publications yet (or Supabase not configured).
+                  </p>
+                )}
+                {pubs.map((p, i) => (
+                  <div
+                    key={p.version}
+                    className="flex items-center justify-between gap-3 rounded-[var(--r-md)] p-3.5"
+                    style={surf}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-semibold text-[var(--text-1)]">
+                        v{p.version}
+                        {i === 0 && (
+                          <span className="ml-2 text-[10px] text-[var(--vitality)]">
+                            LIVE
+                          </span>
+                        )}
+                      </p>
+                      <p className="t-caption mt-0.5 truncate">
+                        {p.note ?? "—"} · {p.checksum}
+                      </p>
+                    </div>
+                    {i !== 0 && (
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          setMsg(null);
+                          const r = await rollbackTo(p.version);
+                          setBusy(false);
+                          setMsg(
+                            r.ok
+                              ? `Rolled back → v${r.version}`
+                              : r.reason
+                          );
+                          if (r.ok) refreshPubs();
+                        }}
+                        className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--surface-3)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)]"
+                      >
+                        Roll back
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

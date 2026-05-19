@@ -33,6 +33,7 @@ import {
   setPackPaused as setPackPausedFn,
 } from "@/lib/storage";
 import { activeDataSource, STATE_EVENT } from "@/lib/datasource";
+import { fetchAndApplyPublished } from "@/lib/cms/publish";
 import { maybeExtendTrial } from "@/lib/entitlements";
 import type {
   BiomarkerEntry,
@@ -69,9 +70,15 @@ export function useAppState() {
 
   useEffect(() => {
     let alive = true;
-    activeDataSource.load().then((raw) => {
-      if (!alive) return;
-      const loaded = maybeExtendTrial(raw);
+    // Hybrid CMS refresh: adopt the newest published bundle (if any)
+    // before state loads, so the timeline/merge/score serve it. Inert
+    // when offline / Supabase off / nothing published — built-in stands.
+    fetchAndApplyPublished()
+      .catch(() => false)
+      .then(() => activeDataSource.load())
+      .then((raw) => {
+        if (!alive) return;
+        const loaded = maybeExtendTrial(raw);
       // Canonical baseline off the *pre-extension* state: if a trial
       // extension was applied, state ≠ baseline → exactly one save fires
       // and the extension persists; if not, a round-trip is a fixed
