@@ -8,6 +8,8 @@ import { derivedInsights } from "@/lib/insights";
 import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
 import { biomarkerDef, biomarkerBand } from "@/lib/biomarkers";
 import { keystone, behaviorStats, weeklyReview } from "@/lib/intel";
+import { getAccess } from "@/lib/entitlements";
+import { PremiumPeek } from "@/components/PremiumGate";
 import { compileTimeline } from "@/lib/engine";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -94,6 +96,14 @@ export default function InsightsPage() {
     !review &&
     topStreaks.length === 0;
 
+  const access = getAccess(state);
+  const gated = !nothing && !access.premium;
+  const teaser = ks
+    ? `Your data has a clear pattern: "${ks.title}" is driving your best days. See the full picture with Premium.`
+    : review
+    ? `${review.headline} Your full weekly intelligence is ready.`
+    : "Your personalized intelligence is ready — unlock it with Premium.";
+
   if (loading) {
     return (
       <Shell>
@@ -118,6 +128,17 @@ export default function InsightsPage() {
           </p>
         </div>
 
+        {gated && (
+          <PremiumPeek teaser={teaser}>
+            <div className="space-y-3">
+              <div className="panel h-32" />
+              <div className="panel h-28" />
+            </div>
+          </PremiumPeek>
+        )}
+
+        {!gated && (
+          <>
         {/* Weekly review — calm narrative */}
         {review && (
           <motion.div
@@ -287,6 +308,8 @@ export default function InsightsPage() {
               </motion.div>
             ))}
           </div>
+        )}
+          </>
         )}
       </div>
     </Shell>

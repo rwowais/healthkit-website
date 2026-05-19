@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getAccess } from "@/lib/entitlements";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
@@ -37,6 +39,8 @@ export default function ProtocolsPage() {
     duplicatePack,
     setPackPaused,
   } = useAppState();
+  const router = useRouter();
+  const access = getAccess(state);
   const toast = useToast();
   const [detail, setDetail] = useState<TimelineItem | null>(null);
   const [packSheet, setPackSheet] = useState<ProtocolPack | null>(null);
@@ -161,7 +165,9 @@ export default function ProtocolsPage() {
             <h1 className="t-title mt-2 text-[var(--text-1)]">Protocols</h1>
           </div>
           <button
-            onClick={() => setCreating(true)}
+            onClick={() =>
+              access.premium ? setCreating(true) : router.push("/upgrade")
+            }
             aria-label="Create protocol"
             className="press grid h-10 w-10 place-items-center rounded-full"
             style={{ background: "var(--surface-2)", color: "var(--text-1)" }}
@@ -607,6 +613,11 @@ export default function ProtocolsPage() {
                   {p.source !== "custom" && (
                     <button
                       onClick={() => {
+                        if (!access.premium) {
+                          setPackSheet(null);
+                          router.push("/upgrade");
+                          return;
+                        }
                         duplicatePack(p);
                         toast.show(`Made “${p.name}” editable`);
                         setPackSheet(null);

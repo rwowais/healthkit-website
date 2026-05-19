@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
+import { getAccess, FREE_PACKS } from "@/lib/entitlements";
 import { PACKS } from "@/lib/packs";
 import { Eyebrow, Skeleton, Button, useToast } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -11,6 +13,8 @@ import type { ProtocolPack } from "@/lib/types";
 
 export default function LibraryPage() {
   const { state, loading, installPack, uninstallPack } = useAppState();
+  const router = useRouter();
+  const access = getAccess(state);
   const toast = useToast();
   const [open, setOpen] = useState<ProtocolPack | null>(null);
 
@@ -186,12 +190,23 @@ export default function LibraryPage() {
                 <Button
                   full
                   onClick={() => {
+                    if (
+                      !access.premium &&
+                      (state.installedPacks?.length ?? 0) >= FREE_PACKS
+                    ) {
+                      setOpen(null);
+                      router.push("/upgrade");
+                      return;
+                    }
                     installPack(open.id);
                     toast.show(`${open.name} installed`);
                     setOpen(null);
                   }}
                 >
-                  Install protocol
+                  {!access.premium &&
+                  (state.installedPacks?.length ?? 0) >= FREE_PACKS
+                    ? "Unlock more with Premium"
+                    : "Install protocol"}
                 </Button>
               )}
             </div>

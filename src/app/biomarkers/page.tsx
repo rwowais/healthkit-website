@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
+import { getAccess, FREE_BIOMARKERS } from "@/lib/entitlements";
 import {
   BIOMARKERS,
   biomarkerBand,
@@ -33,6 +35,8 @@ function todayKey() {
 
 export default function BiomarkersPage() {
   const { state, loading, addBiomarker, deleteBiomarker } = useAppState();
+  const router = useRouter();
+  const access = getAccess(state);
   const toast = useToast();
   const [open, setOpen] = useState<BiomarkerDef | null>(null);
   const [val, setVal] = useState("");
@@ -52,6 +56,19 @@ export default function BiomarkersPage() {
     const n = parseFloat(val);
     if (Number.isNaN(n)) {
       toast.show("Enter a number");
+      return;
+    }
+    // Free tier: cap distinct tracked markers.
+    const distinct = new Set(
+      (state.biomarkers ?? []).map((b) => b.metric)
+    );
+    if (
+      !access.premium &&
+      !distinct.has(open.key) &&
+      distinct.size >= FREE_BIOMARKERS
+    ) {
+      setOpen(null);
+      router.push("/upgrade");
       return;
     }
     addBiomarker({ metric: open.key, value: n, date });

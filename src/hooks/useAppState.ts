@@ -33,6 +33,7 @@ import {
   setPackPaused as setPackPausedFn,
 } from "@/lib/storage";
 import { activeDataSource, STATE_EVENT } from "@/lib/datasource";
+import { maybeExtendTrial } from "@/lib/entitlements";
 import type {
   BiomarkerEntry,
   BehaviorOverride,
@@ -46,9 +47,11 @@ export function useAppState() {
 
   useEffect(() => {
     let alive = true;
-    activeDataSource.load().then((loaded) => {
+    activeDataSource.load().then((raw) => {
       if (!alive) return;
-      lastJson.current = JSON.stringify(loaded);
+      const loaded = maybeExtendTrial(raw);
+      // Persist baseline so an extension is saved on next change.
+      lastJson.current = JSON.stringify(raw);
       setState(loaded);
       setLoading(false);
     });

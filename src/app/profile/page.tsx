@@ -2,8 +2,10 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
+import { getAccess } from "@/lib/entitlements";
 import {
   clearAllData,
   exportState,
@@ -46,6 +48,8 @@ const INTEGRATIONS: { name: string; icon: IconName }[] = [
 
 export default function ProfilePage() {
   const { state, loading, updateSettings } = useAppState();
+  const router = useRouter();
+  const access = getAccess(state);
   const toast = useToast();
   const [confirmReset, setConfirmReset] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -276,6 +280,53 @@ export default function ProfilePage() {
             >
               Send a test reminder
             </button>
+          )}
+        </Card>
+
+        {/* Membership */}
+        <Card>
+          <Eyebrow color="var(--readiness)">Membership</Eyebrow>
+          {access.paid ? (
+            <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">
+              <span className="font-semibold text-[var(--text-1)]">
+                Premium
+              </span>{" "}
+              — the full intelligence layer is on. Thank you.
+            </p>
+          ) : access.inTrial ? (
+            <>
+              <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">
+                You&apos;re on the{" "}
+                <span className="font-semibold text-[var(--text-1)]">
+                  free trial of Premium
+                </span>{" "}
+                — {access.trialDaysLeft} day
+                {access.trialDaysLeft === 1 ? "" : "s"} of full
+                intelligence left.
+              </p>
+              <button
+                onClick={() => router.push("/upgrade")}
+                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[#08090B]"
+              >
+                Keep Premium
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">
+                You&apos;re on the free plan. Your starter system stays
+                free forever — Premium unlocks the parts that learn from
+                you.
+              </p>
+              <button
+                onClick={() => router.push("/upgrade")}
+                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[#08090B]"
+              >
+                {access.trialExpired
+                  ? "Restore full intelligence"
+                  : "Explore Premium"}
+              </button>
+            </>
           )}
         </Card>
 
