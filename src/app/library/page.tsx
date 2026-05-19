@@ -7,6 +7,7 @@ import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess, FREE_PACKS } from "@/lib/entitlements";
 import { PACKS } from "@/lib/packs";
+import { compileTimeline } from "@/lib/engine";
 import { Eyebrow, Skeleton, Button, Sheet, useToast } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { ProtocolPack } from "@/lib/types";
@@ -194,9 +195,29 @@ export default function LibraryPage() {
                       router.push("/upgrade");
                       return;
                     }
+                    // Make the orchestration *felt*: if this pack
+                    // overlaps behaviors already in the system, say so
+                    // specifically — that merge is the one thing no
+                    // other app does.
+                    const activeKeys = new Set(
+                      compileTimeline(state, 0).map((i) => i.canonicalKey)
+                    );
+                    const overlap = open.behaviors.filter((b) =>
+                      activeKeys.has(b.canonicalKey)
+                    );
                     installPack(open.id);
-                    toast.show(`${open.name} installed`);
                     setOpen(null);
+                    if (overlap.length === 1) {
+                      toast.show(
+                        `${open.name} added — “${overlap[0].title}” merged with your system, you'll do it once`
+                      );
+                    } else if (overlap.length > 1) {
+                      toast.show(
+                        `${open.name} added — ${overlap.length} overlapping behaviors merged, no doubling up`
+                      );
+                    } else {
+                      toast.show(`${open.name} installed`);
+                    }
                   }}
                 >
                   {atFreeCap && !installedSet.has(open.id)

@@ -156,6 +156,116 @@ export function keystone(state: AppState): Keystone | null {
   return best ? { key: best.key, title: best.title, delta: best.delta } : null;
 }
 
+// ── Outcome reflection — "what works for YOU" ─────────────────────
+//
+// The strategic core: keystone proves a behavior predicts *other
+// behaviors*; this proves a behavior predicts how the user actually
+// *feels* (their own energy + sleep check-in). The outcome is the felt
+// signal, NOT completion, so it is inherently non-circular. Same rigor:
+// real sample, effect size, multiple-comparison guard, honest null.
+
+export interface OutcomeInsight {
+  key: string;
+  title: string;
+  dimension: "energy" | "sleep" | "overall";
+  delta: number; // points higher (0–100 felt scale) on days done
+}
+
+/** A day's felt index (0–100) from the check-in, or null if not logged. */
+function feltIndex(l: DailyLog): number | null {
+  const parts: number[] = [];
+  const e = l.energyLevel;
+  const s = l.sleepLog?.sleepQuality ?? null;
+  if (e != null) parts.push(((e - 1) / 4) * 100);
+  if (s != null) parts.push(((s - 1) / 4) * 100);
+  if (!parts.length) return null;
+  return parts.reduce((a, b) => a + b, 0) / parts.length;
+}
+
+function dimIndex(
+  l: DailyLog,
+  dim: "energy" | "sleep"
+): number | null {
+  const v = dim === "energy" ? l.energyLevel : l.sleepLog?.sleepQuality;
+  return v == null ? null : ((v - 1) / 4) * 100;
+}
+
+export function whatWorks(state: AppState): OutcomeInsight | null {
+  const logs = (state.dailyLogs ?? []).filter(
+    (l) => feltIndex(l) != null
+  );
+  if (logs.length < 10) return null;
+  const items = analyticsItems(state);
+  if (items.length < 1) return null;
+
+  const mean = (xs: number[]) =>
+    xs.reduce((a, b) => a + b, 0) / xs.length;
+  const variance = (xs: number[], m: number) =>
+    xs.length < 2
+      ? 0
+      : xs.reduce((s, v) => s + (v - m) ** 2, 0) / (xs.length - 1);
+  const cohenD = (a: number[], b: number[]) => {
+    if (a.length < 2 || b.length < 2) return 0;
+    const mA = mean(a);
+    const mB = mean(b);
+    const sd = Math.sqrt(
+      ((a.length - 1) * variance(a, mA) +
+        (b.length - 1) * variance(b, mB)) /
+        (a.length + b.length - 2)
+    );
+    return sd > 0 ? (mA - mB) / sd : mA > mB ? 99 : 0;
+  };
+
+  // Multiple-comparison guard scales with behaviors tested.
+  const dThreshold = 0.4 + 0.05 * Math.log2(Math.max(items.length, 2));
+
+  let best: (OutcomeInsight & { d: number }) | null = null;
+  for (const it of items) {
+    const k = it.canonicalKey;
+    const done: number[] = [];
+    const not: number[] = [];
+    const dimVals: Record<
+      "energy" | "sleep",
+      { done: number[]; not: number[] }
+    > = {
+      energy: { done: [], not: [] },
+      sleep: { done: [], not: [] },
+    };
+    for (const l of logs) {
+      const f = feltIndex(l)!;
+      const isDone = !!l.behaviorCompletions?.[k];
+      (isDone ? done : not).push(f);
+      for (const dim of ["energy", "sleep"] as const) {
+        const dv = dimIndex(l, dim);
+        if (dv != null) (isDone ? dimVals[dim].done : dimVals[dim].not).push(dv);
+      }
+    }
+    if (done.length < 8 || not.length < 4) continue;
+    if (mean(done) <= mean(not)) continue;
+    const d = cohenD(done, not);
+    if (d < dThreshold) continue;
+    if (best && d <= best.d) continue;
+
+    // Attribute to the dimension with the larger standardized gap, for
+    // honest copy ("your sleep" vs "your energy" vs "overall").
+    const dE = cohenD(dimVals.energy.done, dimVals.energy.not);
+    const dS = cohenD(dimVals.sleep.done, dimVals.sleep.not);
+    let dimension: OutcomeInsight["dimension"] = "overall";
+    if (dE >= dS && dE >= 0.3) dimension = "energy";
+    else if (dS > dE && dS >= 0.3) dimension = "sleep";
+    const delta = Math.max(1, Math.round(mean(done) - mean(not)));
+    best = { key: k, title: it.title, dimension, delta, d };
+  }
+  return best
+    ? {
+        key: best.key,
+        title: best.title,
+        dimension: best.dimension,
+        delta: best.delta,
+      }
+    : null;
+}
+
 // ── Adaptive suggestions ──────────────────────────────────────────
 
 export type SuggestionAction =

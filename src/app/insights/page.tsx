@@ -7,7 +7,12 @@ import { useAppState } from "@/hooks/useAppState";
 import { derivedInsights } from "@/lib/insights";
 import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
 import { biomarkerDef, biomarkerBand } from "@/lib/biomarkers";
-import { keystone, behaviorStats, weeklyReview } from "@/lib/intel";
+import {
+  keystone,
+  behaviorStats,
+  weeklyReview,
+  whatWorks,
+} from "@/lib/intel";
 import { getAccess } from "@/lib/entitlements";
 import { UpgradeCTA } from "@/components/PremiumGate";
 import { compileTimeline } from "@/lib/engine";
@@ -106,6 +111,7 @@ export default function InsightsPage() {
     [intelState]
   );
   const ks = useMemo(() => keystone(intelState), [intelState]);
+  const works = useMemo(() => whatWorks(intelState), [intelState]);
   const topStreaks = useMemo(() => {
     return compileTimeline(intelState, 0)
       .map((it) => ({
@@ -121,6 +127,7 @@ export default function InsightsPage() {
   const nothing =
     insights.length === 0 &&
     !ks &&
+    !works &&
     !review &&
     topStreaks.length === 0;
 
@@ -211,6 +218,49 @@ export default function InsightsPage() {
                   {review.focus}
                 </p>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Proven for you — outcome reflection (the strategic core) */}
+        {works && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="panel relative overflow-hidden p-6"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, var(--recovery) 22%, transparent), transparent 60%)",
+              }}
+            />
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <Icon
+                  name="pulse"
+                  size={14}
+                  className="text-[var(--recovery)]"
+                />
+                <Eyebrow color="var(--recovery)">Proven for you</Eyebrow>
+              </div>
+              <p className="mt-3 text-[22px] font-bold leading-snug text-[var(--text-1)]">
+                {works.title}
+              </p>
+              <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
+                On the days you do this, your{" "}
+                <span className="font-bold text-[var(--recovery)]">
+                  {works.dimension === "energy"
+                    ? "energy"
+                    : works.dimension === "sleep"
+                    ? "sleep"
+                    : "energy and sleep"}{" "}
+                  runs {works.delta} point
+                  {works.delta === 1 ? "" : "s"} higher
+                </span>{" "}
+                — measured from your own check-ins, not a generic claim.
+              </p>
             </div>
           </motion.div>
         )}
