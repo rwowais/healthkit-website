@@ -26,11 +26,12 @@ export default function AuthPage() {
   const [sentMsg, setSentMsg] = useState("");
 
   const afterAuth = async () => {
-    // Await the active source so the cloud row is pulled before we
-    // decide where to route — a stale sync read would re-onboard a
-    // returning user (or overwrite their cloud data).
-    const s = await activeDataSource.load();
-    router.push(s.settings.completedOnboarding ? "/today" : "/onboarding");
+    // Always route a signed-in user to /today and let its guard decide
+    // (it re-loads synced state, and the conflict prompt lives in the
+    // Shell which /onboarding doesn't render). Pull the cloud row first
+    // so the guard sees the real completedOnboarding, not local default.
+    await activeDataSource.load();
+    router.push("/today");
   };
 
   const submit = async () => {

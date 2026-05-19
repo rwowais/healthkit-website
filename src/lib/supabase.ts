@@ -41,22 +41,35 @@ export const STATE_TABLE = "protocolize_state";
 export const LOGS_TABLE = "protocolize_logs";
 
 /**
- * Cached user id. `getSession()` is local (no network) unlike
- * `getUser()`, which we were calling on *every* save. Cache + refresh
- * on auth changes so a mutation never costs a round-trip.
+ * Cached user id. `getSession()` is local (no network) so re-checking
+ * when we don't have an id is cheap. CRITICAL: we only memoize a *known*
+ * id — never a null. Caching null permanently meant a `getUserId()` call
+ * made on /auth before sign-in poisoned the cache, so the post-sign-in
+ * load() saw "no user", fell back to default local state, and routed an
+ * existing user into onboarding (then looped back to login).
  */
-let cachedUserId: string | null | undefined;
+let cachedUserId: string | null = null;
+let authListenerBound = false;
+
+export function invalidateUserId(): void {
+  cachedUserId = null;
+}
 
 export async function getUserId(): Promise<string | null> {
-  if (cachedUserId !== undefined) return cachedUserId;
   const sb = getSupabase();
-  if (!sb) return (cachedUserId = null);
+  if (!sb) return null;
+  if (!authListenerBound) {
+    authListenerBound = true;
+    sb.auth.onAuthStateChange((_e, s) => {
+      cachedUserId = s?.user?.id ?? null;
+    });
+  }
+  if (cachedUserId) return cachedUserId; // trust a known id
+  // No id yet → re-resolve from the (local) session every time, so a
+  // fresh sign-in is picked up immediately even before the auth event.
   const {
     data: { session },
   } = await sb.auth.getSession();
   cachedUserId = session?.user?.id ?? null;
-  sb.auth.onAuthStateChange((_e, s) => {
-    cachedUserId = s?.user?.id ?? null;
-  });
   return cachedUserId;
 }

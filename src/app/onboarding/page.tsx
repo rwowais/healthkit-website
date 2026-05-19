@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { loadState, saveState } from "@/lib/storage";
+import { loadState } from "@/lib/storage";
+import { activeDataSource } from "@/lib/datasource";
+import { getUserId } from "@/lib/supabase";
 import { packById } from "@/lib/packs";
 import { Button, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -189,7 +191,19 @@ export default function OnboardingPage() {
       .filter((p): p is NonNullable<typeof p> => !!p);
   }, [goal, sleepBaseline, focus, overwhelm, experience]);
 
-  function finish(withAccount: boolean) {
+  // Defense-in-depth: an already-onboarded, signed-in user must never be
+  // trapped in the questionnaire (the login-loop symptom). If the synced
+  // state says onboarding is done, leave immediately.
+  const guarded = useRef(false);
+  useEffect(() => {
+    if (guarded.current) return;
+    guarded.current = true;
+    activeDataSource.load().then((st) => {
+      if (st.settings.completedOnboarding) router.replace("/today");
+    });
+  }, [router]);
+
+  async function finish(withAccount: boolean) {
     const s = loadState();
     Object.assign(s.settings, {
       name: name.trim(),
@@ -210,8 +224,12 @@ export default function OnboardingPage() {
       ).toISOString(),
     });
     s.installedPacks = packs.map((p) => p.id);
-    saveState(s);
-    router.push(withAccount ? "/auth" : "/today");
+    await activeDataSource.save(s);
+    // If they already have a session, never send them back to /auth —
+    // that's the loop. Only unauthenticated users who chose "save &
+    // sync" go to /auth to create an account.
+    const uid = await getUserId();
+    router.push(!uid && withAccount ? "/auth" : "/today");
   }
 
   const goBack = () => setStep((s) => s - 1);
