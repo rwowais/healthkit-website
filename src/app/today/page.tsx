@@ -1115,15 +1115,20 @@ export default function TodayPage() {
                                 </span>
                               </button>
 
-                              {/* Content */}
+                              {/* Content — tapping the row completes it
+                                  (it's a checklist). Details/editing is a
+                                  deliberate secondary affordance, right. */}
                               <button
                                 onClick={() =>
-                                  lev1
-                                    ? toggleBehavior(
-                                        selectedDate,
-                                        it.canonicalKey
-                                      )
-                                    : setDetail(it)
+                                  toggleBehavior(
+                                    selectedDate,
+                                    it.canonicalKey
+                                  )
+                                }
+                                aria-label={
+                                  done
+                                    ? `${it.title} — done`
+                                    : `Mark ${it.title} done`
                                 }
                                 className={`min-w-0 flex-1 rounded-[var(--r-md)] text-left tr-fast ${
                                   lev3 && !done
@@ -1231,6 +1236,16 @@ export default function TodayPage() {
                                     {fmtClock(t)}
                                   </span>
                                 )}
+                              </button>
+
+                              {/* Details / edit — explicit, not the
+                                  accidental default tap target */}
+                              <button
+                                onClick={() => setDetail(it)}
+                                aria-label={`${it.title} details and options`}
+                                className="press grid min-h-[44px] w-9 shrink-0 place-items-center self-center text-[var(--text-4)] hover:text-[var(--text-2)]"
+                              >
+                                <Icon name="chevron" size={15} />
                               </button>
                             </div>
                           </div>
