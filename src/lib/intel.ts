@@ -4,7 +4,7 @@
  * Time anchoring, current-block awareness, per-behavior streaks,
  * keystone-habit detection, and proactive (calm) suggestions.
  */
-import type { AppState, DailyLog } from "./types";
+import type { AppState, DailyLog, TimeBlock } from "./types";
 import { compileTimeline, type TimelineItem } from "./engine";
 import { packById, PACKS } from "./packs";
 import { effectiveMinutes, nowMinutes } from "./time";
@@ -271,6 +271,7 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
 export type SuggestionAction =
   | { type: "install"; packId: string }
   | { type: "pause"; key: string }
+  | { type: "retime"; key: string; block: TimeBlock }
   | { type: "none" };
 
 export interface Suggestion {
@@ -324,14 +325,36 @@ export function suggestions(state: AppState): Suggestion[] {
         (l) => l.behaviorCompletions?.[it.canonicalKey]
       );
       if (!everDone) {
-        out.push({
-          id: `sug-pause-${it.canonicalKey}`,
-          kind: "pause",
-          title: `“${it.title}” isn't landing`,
-          body: "It's been skipped every recent day. Pausing it is not failure — it clears space for what works.",
-          cta: "Pause this behavior",
-          action: { type: "pause", key: it.canonicalKey },
-        });
+        const override = state.behaviorOverrides?.[it.canonicalKey];
+        const effectiveBlock = override?.block ?? it.block;
+        // Friction intelligence: don't just offer to pause. If the
+        // behavior is pinned to a clock slot that clearly isn't landing,
+        // first offer to RE-ENGINEER it — drop the time constraint so it
+        // can happen whenever it fits. Pause only when there's nothing
+        // left to re-time (already "anytime").
+        if (effectiveBlock !== "anytime") {
+          out.push({
+            id: `sug-retime-${it.canonicalKey}`,
+            kind: "pause",
+            title: `“${it.title}” keeps slipping at its time`,
+            body: "Its scheduled slot isn't landing. Free it from the clock — do it whenever it fits, not on a schedule.",
+            cta: "Make it anytime",
+            action: {
+              type: "retime",
+              key: it.canonicalKey,
+              block: "anytime",
+            },
+          });
+        } else {
+          out.push({
+            id: `sug-pause-${it.canonicalKey}`,
+            kind: "pause",
+            title: `“${it.title}” isn't landing`,
+            body: "It's been skipped every recent day even unscheduled. Pausing it is not failure — it clears space for what works.",
+            cta: "Pause this behavior",
+            action: { type: "pause", key: it.canonicalKey },
+          });
+        }
         break;
       }
     }

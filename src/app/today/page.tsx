@@ -12,6 +12,7 @@ import {
   compileTimeline,
   adapt,
   shapeTimeline,
+  masteredKeys,
   isDone,
   timelineProgress,
   blockLabel,
@@ -247,8 +248,9 @@ export default function TodayPage() {
     const items = compileTimeline(state, selDayIdx);
     return shapeTimeline(items, isToday ? adaptation.mode : "normal", {
       keystoneKey: ks?.key,
+      mastered: masteredKeys(state, selectedDate),
     });
-  }, [state, adaptation.mode, selDayIdx, isToday, ks]);
+  }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate]);
 
   const prog = useMemo(
     () => timelineProgress(timeline, log),
@@ -880,11 +882,17 @@ export default function TodayPage() {
                   <div className="mt-4 flex gap-2.5">
                     <button
                       onClick={() => {
-                        if (sug.action.type === "install")
-                          installPack(sug.action.packId);
-                        else if (sug.action.type === "pause")
-                          setBehaviorOverride(sug.action.key, {
+                        const a = sug.action;
+                        if (a.type === "install") installPack(a.packId);
+                        else if (a.type === "pause")
+                          setBehaviorOverride(a.key, {
+                            ...(state.behaviorOverrides?.[a.key] ?? {}),
                             disabled: true,
+                          });
+                        else if (a.type === "retime")
+                          setBehaviorOverride(a.key, {
+                            ...(state.behaviorOverrides?.[a.key] ?? {}),
+                            block: a.block,
                           });
                         setDismissed((d) => [...d, sug.id]);
                       }}

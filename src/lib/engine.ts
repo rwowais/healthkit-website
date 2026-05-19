@@ -397,11 +397,86 @@ function guaranteePerBlock(items: TimelineItem[]): TimelineItem[] {
     : items;
 }
 
+/**
+ * Periodization: behaviors mastered over a long run shouldn't keep
+ * crowding the day forever. Once a behavior has a long streak AND high
+ * recent adherence it graduates to "maintenance" — collapsed into the
+ * calm optional group most days, but resurfaced on a deterministic
+ * weekly spot-check so it isn't silently forgotten. Keeps dense,
+ * long-term systems light instead of plateauing into noise.
+ */
+function daysSinceEpoch(dayKey: string): number {
+  return Math.floor(
+    new Date(dayKey + "T00:00:00").getTime() / 86_400_000
+  );
+}
+function hashKey(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+export function masteredKeys(
+  state: AppState,
+  dayKey: string
+): Set<string> {
+  const logs = state.dailyLogs ?? [];
+  if (logs.length < 21) return new Set();
+  const byDate = new Map(logs.map((l) => [l.date, l]));
+  const out = new Set<string>();
+  const dayNum = daysSinceEpoch(dayKey);
+
+  const keys = new Set<string>();
+  for (const l of logs)
+    for (const k in l.behaviorCompletions ?? {})
+      if (l.behaviorCompletions![k]) keys.add(k);
+
+  for (const k of keys) {
+    // current streak up to (but not requiring) today
+    let streak = 0;
+    for (let i = 1; i <= 365; i++) {
+      const d = new Date(dayKey + "T00:00:00");
+      d.setDate(d.getDate() - i);
+      const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}-${String(d.getDate()).padStart(2, "0")}`;
+      if (byDate.get(dk)?.behaviorCompletions?.[k]) streak++;
+      else break;
+    }
+    if (streak < 21) continue;
+    // recent adherence over the last 30 *active* days
+    let active = 0;
+    let did = 0;
+    for (let i = 1; i <= 30; i++) {
+      const d = new Date(dayKey + "T00:00:00");
+      d.setDate(d.getDate() - i);
+      const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}-${String(d.getDate()).padStart(2, "0")}`;
+      const lg = byDate.get(dk);
+      if (!lg) continue;
+      const anyActivity =
+        lg.score > 0 ||
+        Object.values(lg.behaviorCompletions ?? {}).some(Boolean);
+      if (!anyActivity) continue;
+      active++;
+      if (lg.behaviorCompletions?.[k]) did++;
+    }
+    if (active < 14 || did / active < 0.85) continue;
+    // weekly spot-check: this key resurfaces ~1 day in 7
+    if ((dayNum + hashKey(k)) % 7 === 0) continue;
+    out.add(k);
+  }
+  return out;
+}
+
 /** Apply the adaptation: mute + reprioritize for reduced cognitive load. */
 export function shapeTimeline(
   items: TimelineItem[],
   mode: AdaptMode,
-  opts: { keystoneKey?: string } = {}
+  opts: { keystoneKey?: string; mastered?: Set<string> } = {}
 ): TimelineItem[] {
   let shaped: TimelineItem[];
 
@@ -487,6 +562,17 @@ export function shapeTimeline(
   if (restraintActive) {
     shaped = shaped.map((it) =>
       TRAINING_KEYS.has(it.canonicalKey) ? { ...it, muted: true } : it
+    );
+  }
+
+  // Graduate mastered behaviors to maintenance (collapsed) — never the
+  // keystone, which is the one thing we always keep front-and-centre.
+  if (opts.mastered && opts.mastered.size) {
+    shaped = shaped.map((it) =>
+      opts.mastered!.has(it.canonicalKey) &&
+      it.canonicalKey !== opts.keystoneKey
+        ? { ...it, muted: true }
+        : it
     );
   }
 

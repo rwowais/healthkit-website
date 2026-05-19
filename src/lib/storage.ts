@@ -18,7 +18,12 @@ import type {
 } from "./types";
 
 import { DEFAULT_INSTALLED, PACKS } from "./packs";
-import { compileTimeline, shapeTimeline, adapt } from "./engine";
+import {
+  compileTimeline,
+  shapeTimeline,
+  adapt,
+  masteredKeys,
+} from "./engine";
 import { keystone } from "./intel";
 import type {
   BehaviorOverride,
@@ -392,7 +397,10 @@ export function computeBehaviorScore(
   const shaped = shapeTimeline(
     compiled,
     isToday ? adapt(state).mode : "normal",
-    { keystoneKey: keystone(state)?.key }
+    {
+      keystoneKey: keystone(state)?.key,
+      mastered: masteredKeys(state, date),
+    }
   );
   const active = shaped.filter((i) => !i.muted);
   if (active.length === 0) return 0;

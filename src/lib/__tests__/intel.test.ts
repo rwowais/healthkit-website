@@ -5,8 +5,8 @@
  * strong, real signal is detected, not that the bar is gone.
  */
 import { describe, it, expect } from "vitest";
-import { keystone, whatWorks } from "@/lib/intel";
-import { compileTimeline } from "@/lib/engine";
+import { keystone, whatWorks, suggestions } from "@/lib/intel";
+import { compileTimeline, masteredKeys } from "@/lib/engine";
 import { getDefaultState } from "@/lib/storage";
 import type { AppState, DailyLog } from "@/lib/types";
 
@@ -127,5 +127,66 @@ describe("outcome reflection — whatWorks", () => {
       feltLog(dk(i + 1), { x: true }, null, null)
     );
     expect(whatWorks({ ...base, dailyLogs: logs })).toBeNull();
+  });
+});
+
+describe("D1 periodization — masteredKeys", () => {
+  it("graduates a long-streak high-adherence behavior to maintenance", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const K = compileTimeline(st, 0).map((i) => i.canonicalKey)[0];
+    const logs: DailyLog[] = [];
+    for (let i = 1; i <= 30; i++)
+      logs.push(log(dk(i), { [K]: true }, 80));
+    const state = { ...st, dailyLogs: logs };
+    // Across 7 consecutive days it should be mastered (muted) on most,
+    // and resurface on its weekly spot-check (absent ~1 in 7).
+    let muted = 0;
+    for (let off = 0; off < 7; off++) {
+      if (masteredKeys(state, dk(off)).has(K)) muted++;
+    }
+    expect(muted).toBeGreaterThanOrEqual(5);
+    expect(muted).toBeLessThan(7); // spot-check resurfaces it
+  });
+
+  it("does not graduate without a long streak", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const K = compileTimeline(st, 0).map((i) => i.canonicalKey)[0];
+    const logs = Array.from({ length: 25 }, (_, i) =>
+      log(dk(i + 1), i < 5 ? { [K]: true } : {}, 40)
+    );
+    expect(masteredKeys({ ...st, dailyLogs: logs }, dk(0)).has(K)).toBe(
+      false
+    );
+  });
+});
+
+describe("D2 friction intelligence — suggestions", () => {
+  it("offers to re-time a chronically skipped clock-anchored behavior", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const items = compileTimeline(st, 0);
+    const skip = items.find((i) => i.block !== "anytime")!;
+    const others = items
+      .filter((i) => i.canonicalKey !== skip.canonicalKey)
+      .map((i) => i.canonicalKey);
+    const allOthers = Object.fromEntries(others.map((o) => [o, true]));
+    const logs: DailyLog[] = [];
+    for (let i = 1; i <= 6; i++) logs.push(log(dk(i), { ...allOthers }, 60));
+    const sug = suggestions({ ...st, dailyLogs: logs });
+    const retime = sug.find((s) => s.action.type === "retime");
+    expect(retime).toBeTruthy();
+    expect(retime!.action).toMatchObject({
+      type: "retime",
+      key: skip.canonicalKey,
+      block: "anytime",
+    });
   });
 });
