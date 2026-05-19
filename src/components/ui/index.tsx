@@ -241,7 +241,7 @@ export function Sheet({
         aria-modal="true"
         aria-label={title ?? "Dialog"}
         tabIndex={-1}
-        className="anim-sheet glass w-full max-w-[480px] rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:rounded-[var(--r-xl)] sm:border"
+        className="anim-sheet glass no-scrollbar max-h-[88vh] w-full max-w-[480px] overflow-y-auto rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:max-h-[85vh] sm:rounded-[var(--r-xl)] sm:border"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden" />

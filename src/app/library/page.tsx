@@ -129,7 +129,7 @@ export default function LibraryPage() {
         title={open?.name}
       >
         {open && (
-          <div className="max-h-[70vh] overflow-y-auto no-scrollbar">
+          <div>
             <span
               className="chip h-14 w-14"
               style={{
