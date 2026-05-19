@@ -162,7 +162,19 @@ function normalize(s: AppState): AppState {
   const pausedPacks = Array.isArray(s.pausedPacks)
     ? uniq(s.pausedPacks)
     : [];
-  const customPacks = Array.isArray(s.customPacks) ? s.customPacks : [];
+  // Heal forks created before the de-namespace fix: strip a leading
+  // `custom-<digits>:` prefix off custom-pack behavior keys so an
+  // existing "(yours)" pack merges with the original instead of
+  // duplicating every behavior. Idempotent (no prefix → unchanged).
+  const customPacks = (
+    Array.isArray(s.customPacks) ? s.customPacks : []
+  ).map((p) => ({
+    ...p,
+    behaviors: (p.behaviors ?? []).map((b) => ({
+      ...b,
+      canonicalKey: b.canonicalKey.replace(/^custom-\d+:/, ""),
+    })),
+  }));
 
   // Prune behaviorOverrides that no longer belong to any installed pack —
   // uninstalling/deleting a pack must not leave orphaned overrides behind.

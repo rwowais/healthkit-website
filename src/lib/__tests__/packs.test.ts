@@ -100,6 +100,41 @@ describe("custom pack editability (bug a)", () => {
     expect(windDown.length).toBeLessThanOrEqual(1);
   });
 
+  it("heals a pre-existing namespaced fork on load (migration)", () => {
+    const raw = JSON.parse(
+      v3({
+        installedPacks: ["custom-999"],
+        customPacks: [
+          {
+            id: "custom-999",
+            name: "Longevity Foundation (yours)",
+            tagline: "t",
+            goal: "custom",
+            accent: "x",
+            icon: "pulse",
+            source: "custom",
+            durationLabel: "Custom",
+            behaviors: [
+              {
+                canonicalKey: "custom-999:hydrate-am",
+                title: "Hydrate on waking",
+                block: "morning",
+                anchor: "wake",
+                offsetMin: 0,
+                rationale: "r",
+                icon: "drop",
+                leverage: 2,
+                kind: "action",
+              },
+            ],
+          },
+        ],
+      })
+    );
+    const s = importState(JSON.stringify(raw)) as AppState;
+    expect(s.customPacks[0].behaviors[0].canonicalKey).toBe("hydrate-am");
+  });
+
   it("editing a custom pack (same id) replaces it and stays installed", () => {
     let st = getDefaultState();
     st = { ...st, installedPacks: ["better-sleep"] };
