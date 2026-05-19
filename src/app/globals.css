@@ -17,8 +17,8 @@
   /* ── Text (warm off-white scale) ── */
   --text-1: #F4F5F7;
   --text-2: #A7AAB2;
-  --text-3: #6C7079;
-  --text-4: #494D55;
+  --text-3: #8E929B; /* WCAG AA (>=4.5:1) on all surfaces for body text */
+  --text-4: #6E727B; /* tertiary/decorative — lifted from ~1.5:1 to ~3:1 */
 
   /* ── Accents (sparse, meaningful) ── */
   --sleep: #8E9CF7;       /* soft indigo */
@@ -324,7 +324,7 @@ body {
 }
 
 input, textarea, select { font-family: inherit; }
-input::placeholder, textarea::placeholder { color: var(--text-4); }
+input::placeholder, textarea::placeholder { color: var(--text-3); }
 
 /* Time input dark styling */
 input[type="time"]::-webkit-calendar-picker-indicator {

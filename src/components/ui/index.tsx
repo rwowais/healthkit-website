@@ -210,14 +210,23 @@ export function Sheet({
   title?: string;
   children: React.ReactNode;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "";
-      };
-    }
-  }, [open]);
+    if (!open) return;
+    const prevFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+      prevFocus?.focus?.();
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
   return (
@@ -227,7 +236,12 @@ export function Sheet({
       onClick={onClose}
     >
       <div
-        className="anim-sheet glass w-full max-w-[480px] rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:rounded-[var(--r-xl)] sm:border"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title ?? "Dialog"}
+        tabIndex={-1}
+        className="anim-sheet glass w-full max-w-[480px] rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:rounded-[var(--r-xl)] sm:border"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden" />

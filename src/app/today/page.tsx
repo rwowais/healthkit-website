@@ -357,7 +357,7 @@ export default function TodayPage() {
             <button
               onClick={() => setOffset((o) => Math.min(o + 1, 30))}
               aria-label="Previous day"
-              className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)]"
+              className="press grid h-11 w-11 place-items-center rounded-full text-[var(--text-3)]"
               style={{ background: "var(--surface-2)" }}
             >
               <Icon name="chevron" size={14} className="rotate-180" />
@@ -369,7 +369,7 @@ export default function TodayPage() {
               onClick={() => setOffset((o) => Math.max(o - 1, 0))}
               disabled={isToday}
               aria-label="Next day"
-              className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)] disabled:opacity-30"
+              className="press grid h-11 w-11 place-items-center rounded-full text-[var(--text-3)] disabled:opacity-30"
               style={{ background: "var(--surface-2)" }}
             >
               <Icon name="chevron" size={14} />
@@ -828,7 +828,7 @@ export default function TodayPage() {
                   onClick={() =>
                     setSnoozed((s) => [...s, upNext.canonicalKey])
                   }
-                  className="press rounded-full px-3 py-1.5 text-[12px] font-semibold text-[var(--text-3)]"
+                  className="press flex min-h-[44px] items-center rounded-full px-4 py-2.5 text-[12px] font-semibold text-[var(--text-3)]"
                   style={{ background: "var(--surface-2)" }}
                 >
                   Later
@@ -1055,8 +1055,13 @@ export default function TodayPage() {
                                     it.canonicalKey
                                   )
                                 }
-                                aria-label={done ? "Done" : "Mark done"}
-                                className="press relative z-10 grid w-10 shrink-0 place-items-center"
+                                aria-label={
+                                  done
+                                    ? `${it.title} — done`
+                                    : `Mark ${it.title} done`
+                                }
+                                aria-pressed={done}
+                                className="press relative z-10 grid min-h-[44px] w-11 shrink-0 place-items-center"
                               >
                                 <span
                                   className={`grid place-items-center rounded-full tr-fast ${

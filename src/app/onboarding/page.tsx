@@ -364,6 +364,9 @@ export default function OnboardingPage() {
                 />
                 <button
                   onClick={() => setHasWearable((v) => !v)}
+                  role="switch"
+                  aria-checked={hasWearable}
+                  aria-label="I wear an Oura, Whoop or Apple Watch"
                   className="press tr-fast mt-3 flex w-full items-center justify-between rounded-[var(--r-md)] p-4"
                   style={{ background: "var(--surface-2)" }}
                 >

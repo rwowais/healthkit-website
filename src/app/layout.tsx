@@ -22,7 +22,7 @@ export const viewport: Viewport = {
   themeColor: "#08090B",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // No maximumScale — locking zoom fails WCAG 1.4.4 for low-vision users.
   viewportFit: "cover",
 };
 

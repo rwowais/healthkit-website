@@ -228,6 +228,9 @@ export default function ProfilePage() {
           <Row label="Protocol reminders">
             <button
               onClick={toggleNotifications}
+              role="switch"
+              aria-checked={s.notificationsEnabled}
+              aria-label="Protocol reminders"
               className="tr-fast h-7 w-12 rounded-full p-1"
               style={{
                 background: s.notificationsEnabled

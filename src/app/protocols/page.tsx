@@ -386,7 +386,11 @@ export default function ProtocolsPage() {
                                 ? "var(--surface-3)"
                                 : "var(--readiness)",
                             }}
-                            aria-label={disabled ? "Enable" : "Disable"}
+                            role="switch"
+                            aria-checked={!disabled}
+                            aria-label={`${it.title} — ${
+                              disabled ? "disabled" : "enabled"
+                            }`}
                           >
                             <span
                               className="block h-5 w-5 rounded-full bg-white tr"
