@@ -34,6 +34,7 @@ import {
   createProtocol,
   reorderBehavior,
   clearUnverified,
+  getBehaviorById,
   listRevisions,
   listEvidence,
   upsertEvidence,
@@ -73,27 +74,36 @@ import type { AppState, DailyLog } from "@/lib/types";
 import { Eyebrow, Skeleton } from "@/components/ui";
 
 type Gate = "checking" | "denied" | "ok";
-type Tab =
-  | "overview"
-  | "catalog"
-  | "rules"
-  | "config"
-  | "intelligence"
-  | "simulate"
-  | "edit"
-  | "ai"
-  | "publish";
+type Tab = "home" | "content" | "engine" | "simulate" | "publish";
+type ContentMode = "author" | "review";
+type EngineSub = "rules" | "config" | "intelligence";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "catalog", label: "Catalog" },
-  { id: "rules", label: "Rules" },
-  { id: "config", label: "Config" },
-  { id: "intelligence", label: "Intelligence" },
-  { id: "simulate", label: "Simulate" },
-  { id: "edit", label: "Edit" },
-  { id: "ai", label: "AI Review" },
-  { id: "publish", label: "Publish" },
+const TABS: { id: Tab; label: string; hint: string }[] = [
+  {
+    id: "home",
+    label: "Home",
+    hint: "At-a-glance: live catalog, draft counts, what's about to ship.",
+  },
+  {
+    id: "content",
+    label: "Content",
+    hint: "Authoring workbench + AI Review queue.",
+  },
+  {
+    id: "engine",
+    label: "Engine",
+    hint: "Adaptation rules, runtime config, intelligence honesty gates.",
+  },
+  {
+    id: "simulate",
+    label: "Simulate",
+    hint: "Preview the merged daily timeline against built-in, drafts, or live.",
+  },
+  {
+    id: "publish",
+    label: "Publish",
+    hint: "Diff-before-publish + immutable history with rollback.",
+  },
 ];
 
 function dk(off: number) {
@@ -139,7 +149,9 @@ function Field({
 export default function AdminHome() {
   const router = useRouter();
   const [gate, setGate] = useState<Gate>("checking");
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("home");
+  const [contentMode, setContentMode] = useState<ContentMode>("author");
+  const [engineSub, setEngineSub] = useState<EngineSub>("rules");
 
   useEffect(() => {
     let alive = true;
@@ -245,15 +257,15 @@ export default function AdminHome() {
   useEffect(() => {
     if (
       gate === "ok" &&
-      (tab === "edit" || tab === "ai" || tab === "overview" || tab === "simulate")
+      (tab === "content" || tab === "home" || tab === "simulate")
     )
       loadCms();
   }, [gate, tab]);
 
-  // CMS counts for the Overview "Drafts in CMS" tile.
+  // CMS counts for the Home "Drafts in CMS" tile.
   const [cmsBehCount, setCmsBehCount] = useState<number | null>(null);
   useEffect(() => {
-    if (gate !== "ok" || tab !== "overview") return;
+    if (gate !== "ok" || tab !== "home") return;
     let alive = true;
     (async () => {
       const sb = (await import("@/lib/supabase")).getSupabase();
@@ -277,6 +289,41 @@ export default function AdminHome() {
   const [sugStatus, setSugStatus] = useState<
     "pending" | "approved" | "rejected"
   >("pending");
+  // For each pending suggestion, cache the current entity + the set of
+  // rejected fields. Default-include all proposed fields; admin can
+  // uncheck the ones they don't want before approving.
+  const [sugCurrent, setSugCurrent] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
+  const [sugRejected, setSugRejected] = useState<
+    Record<string, Set<string>>
+  >({});
+  // Load current entity for any pending suggestion the user can see.
+  useEffect(() => {
+    if (!sugs.length) return;
+    let alive = true;
+    (async () => {
+      const next: Record<string, Record<string, unknown>> = {};
+      for (const s of sugs) {
+        if (sugCurrent[s.id]) {
+          next[s.id] = sugCurrent[s.id];
+          continue;
+        }
+        if (s.entity_type === "protocol") {
+          const p = cmsP.find((x) => x.id === s.entity_id);
+          if (p) next[s.id] = p as unknown as Record<string, unknown>;
+        } else if (s.entity_type === "behavior") {
+          const b = await getBehaviorById(s.entity_id);
+          if (b) next[s.id] = b as unknown as Record<string, unknown>;
+        }
+      }
+      if (alive) setSugCurrent((m) => ({ ...m, ...next }));
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sugs, cmsP]);
   const [dEntityType, setDEntityType] = useState<"protocol" | "behavior">(
     "protocol"
   );
@@ -289,9 +336,10 @@ export default function AdminHome() {
   const loadSugs = (status = sugStatus) =>
     listSuggestions(status).then(setSugs);
   useEffect(() => {
-    if (gate === "ok" && tab === "ai") loadSugs(sugStatus);
+    if (gate === "ok" && tab === "content" && contentMode === "review")
+      loadSugs(sugStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gate, tab, sugStatus]);
+  }, [gate, tab, contentMode, sugStatus]);
   // When the create-suggestion form switches to behavior mode, pull
   // the protocol's behavior list so the picker is populated.
   useEffect(() => {
@@ -309,12 +357,42 @@ export default function AdminHome() {
   useEffect(() => {
     setDField(dEntityType === "behavior" ? "rationale" : "tagline");
   }, [dEntityType]);
+  // Baseline snapshot used to derive dirty state for the sticky save
+  // bar. Stored as JSON strings keyed by behavior id — cheap to compare.
+  const [edBBaseline, setEdBBaseline] = useState<Record<string, string>>(
+    {}
+  );
+  const snapBehavior = (b: CmsBehavior) =>
+    JSON.stringify({
+      title: b.title,
+      block: b.block,
+      anchor: b.anchor,
+      offset_min: b.offset_min,
+      dose: b.dose ?? null,
+      leverage: b.leverage,
+      kind: b.kind,
+      icon: b.icon ?? null,
+      rationale: b.rationale ?? null,
+      status: b.status,
+    });
+  const captureBaseline = (bs: CmsBehavior[]) =>
+    setEdBBaseline(
+      Object.fromEntries(bs.map((b) => [b.id, snapBehavior(b)]))
+    );
+  const isDirty = (b: CmsBehavior) =>
+    edBBaseline[b.id] !== undefined &&
+    snapBehavior(b) !== edBBaseline[b.id];
   const openProto = async (p: CmsProtocol) => {
     setEdP({ ...p });
-    setEdB(await getProtocolBehaviors(p.id));
+    const bs = await getProtocolBehaviors(p.id);
+    setEdB(bs);
+    captureBaseline(bs);
   };
   const reopen = async () => {
-    if (edP) setEdB(await getProtocolBehaviors(edP.id));
+    if (!edP) return;
+    const bs = await getProtocolBehaviors(edP.id);
+    setEdB(bs);
+    captureBaseline(bs);
   };
   const [nbTitle, setNbTitle] = useState("");
   const [nbBlock, setNbBlock] = useState("morning");
@@ -325,6 +403,29 @@ export default function AdminHome() {
   const [newProtoName, setNewProtoName] = useState("");
   const [newProtoTagline, setNewProtoTagline] = useState("");
   const [newProtoGoal, setNewProtoGoal] = useState("");
+
+  // ── ⌘K command palette ────────────────────────────────────────────
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState("");
+  const [paletteIdx, setPaletteIdx] = useState(0);
+  useEffect(() => {
+    if (gate !== "ok") return;
+    const onKey = (e: KeyboardEvent) => {
+      const cmdK =
+        (e.metaKey || e.ctrlKey) &&
+        (e.key === "k" || e.key === "K");
+      if (cmdK) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+        setPaletteQuery("");
+        setPaletteIdx(0);
+      } else if (e.key === "Escape" && paletteOpen) {
+        setPaletteOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [gate, paletteOpen]);
 
   // Top-of-Edit "describe an idea — AI picks the protocol" entry point.
   const [aiIdea, setAiIdea] = useState("");
@@ -521,6 +622,7 @@ export default function AdminHome() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
+            title={t.hint}
             className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-4 py-2 text-[13px] font-semibold"
             style={{
               background:
@@ -534,7 +636,7 @@ export default function AdminHome() {
       </div>
 
       <div className="mt-6">
-        {tab === "overview" && (
+        {tab === "home" && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-3">
               {[
@@ -585,8 +687,17 @@ export default function AdminHome() {
           </div>
         )}
 
-        {tab === "catalog" && (
+        {tab === "home" && (
           <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Eyebrow>Live catalog</Eyebrow>
+              <span
+                className="t-caption"
+                title="The bundle currently serving users. Edit drafts in Content; preview them in Simulate; ship them via Publish."
+              >
+                what users see right now
+              </span>
+            </div>
             {packs.map((p) => (
               <div key={p.id} className={card} style={surf}>
                 <p className="text-[15px] font-bold text-[var(--text-1)]">
@@ -617,7 +728,48 @@ export default function AdminHome() {
           </div>
         )}
 
-        {tab === "rules" && (
+        {tab === "engine" && (
+          <div className="mb-4 flex gap-1.5">
+            {(
+              [
+                {
+                  id: "rules",
+                  label: "Rules",
+                  hint: "Adaptation triggers, behavior rule sets (recovery, restraint, training, circadian).",
+                },
+                {
+                  id: "config",
+                  label: "Config",
+                  hint: "Live constants gating trial behavior, free-tier caps, and intelligence thresholds.",
+                },
+                {
+                  id: "intelligence",
+                  label: "Intelligence",
+                  hint: "The kinds of insights produced and the honesty gates each must clear.",
+                },
+              ] as { id: EngineSub; label: string; hint: string }[]
+            ).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setEngineSub(s.id)}
+                title={s.hint}
+                className="press tr-fast rounded-[var(--r-pill)] px-3.5 py-1.5 text-[12px] font-semibold"
+                style={{
+                  background:
+                    engineSub === s.id
+                      ? "var(--text-1)"
+                      : "var(--surface-2)",
+                  color:
+                    engineSub === s.id ? "#08090B" : "var(--text-3)",
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {tab === "engine" && engineSub === "rules" && (
           <div className="space-y-4">
             <p className="t-caption leading-relaxed">
               Read-only inspector of the rules currently baked into the
@@ -675,7 +827,7 @@ export default function AdminHome() {
           </div>
         )}
 
-        {tab === "config" && (
+        {tab === "engine" && engineSub === "config" && (
           <div className="space-y-2">
             <p className="t-caption leading-relaxed">
               Runtime constants that gate trial behavior, free-tier
@@ -711,7 +863,7 @@ export default function AdminHome() {
           </div>
         )}
 
-        {tab === "intelligence" && (
+        {tab === "engine" && engineSub === "intelligence" && (
           <div className="space-y-2">
             <p className="t-caption leading-relaxed">
               The kinds of insights the engine produces. Each one has a
@@ -894,7 +1046,43 @@ export default function AdminHome() {
             </div>
           </div>
         )}
-        {tab === "edit" &&
+        {tab === "content" && (
+          <div className="mb-4 flex gap-1.5">
+            {(
+              [
+                {
+                  id: "author",
+                  label: "Authoring",
+                  hint: "Edit protocols, behaviors, evidence, explanations. The AI drafter lives here.",
+                },
+                {
+                  id: "review",
+                  label: "AI Review",
+                  hint: "Pending / Approved / Rejected proposals. AI never auto-applies — every change is approved.",
+                },
+              ] as { id: ContentMode; label: string; hint: string }[]
+            ).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setContentMode(s.id)}
+                title={s.hint}
+                className="press tr-fast rounded-[var(--r-pill)] px-3.5 py-1.5 text-[12px] font-semibold"
+                style={{
+                  background:
+                    contentMode === s.id
+                      ? "var(--text-1)"
+                      : "var(--surface-2)",
+                  color:
+                    contentMode === s.id ? "#08090B" : "var(--text-3)",
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {tab === "content" && contentMode === "author" &&
           (() => {
             const inp =
               "w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none";
@@ -1693,7 +1881,16 @@ export default function AdminHome() {
                       </div>
                     )}
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="t-caption">#{idx + 1}</span>
+                      <span className="t-caption flex items-center gap-1.5">
+                        #{idx + 1}
+                        {isDirty(b) && (
+                          <span
+                            title="Unsaved changes on this behavior."
+                            className="inline-block h-1.5 w-1.5 rounded-full"
+                            style={{ background: "var(--warm)" }}
+                          />
+                        )}
+                      </span>
                       <span className="flex gap-1">
                         {(["-1", "1"] as const).map((d) => (
                           <button
@@ -1832,6 +2029,12 @@ export default function AdminHome() {
                         markSavingEnd(b.id);
                         if (r.ok) {
                           flashSaved(b.id);
+                          // Update baseline so this row stops showing
+                          // as dirty in the sticky bar / per-row dot.
+                          setEdBBaseline((m) => ({
+                            ...m,
+                            [b.id]: snapBehavior(b),
+                          }));
                           setMsg(null);
                         } else {
                           setMsg(r.reason ?? "Save failed.");
@@ -2118,11 +2321,68 @@ export default function AdminHome() {
                   </button>
                   .
                 </p>
+
+                {(() => {
+                  const dirtyList = edB.filter(isDirty);
+                  if (dirtyList.length === 0) return null;
+                  return (
+                    <div
+                      className="glass fixed bottom-4 left-1/2 z-[120] flex -translate-x-1/2 items-center gap-3 rounded-[var(--r-pill)] border border-[var(--hairline-strong)] px-4 py-2.5"
+                      style={{ minWidth: 320 }}
+                    >
+                      <span className="text-[12.5px] font-semibold text-[var(--text-1)]">
+                        {dirtyList.length} unsaved
+                      </span>
+                      <button
+                        disabled={dirtyList.some(
+                          (b) => savingIds[b.id]
+                        )}
+                        onClick={async () => {
+                          for (const b of dirtyList) {
+                            markSavingStart(b.id);
+                            const r = await saveBehavior(b);
+                            markSavingEnd(b.id);
+                            if (r.ok) {
+                              flashSaved(b.id);
+                              setEdBBaseline((m) => ({
+                                ...m,
+                                [b.id]: snapBehavior(b),
+                              }));
+                            } else {
+                              setMsg(
+                                `${b.title}: ${r.reason ?? "failed"}`
+                              );
+                              return;
+                            }
+                          }
+                        }}
+                        className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        Save all
+                      </button>
+                      <button
+                        disabled={dirtyList.some(
+                          (b) => savingIds[b.id]
+                        )}
+                        onClick={async () => {
+                          const yes = window.confirm(
+                            `Discard unsaved changes on ${dirtyList.length} behavior${dirtyList.length === 1 ? "" : "s"}? Field edits will be lost.`
+                          );
+                          if (!yes) return;
+                          await reopen();
+                        }}
+                        className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-2)] disabled:opacity-40"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
 
-        {tab === "ai" &&
+        {tab === "content" && contentMode === "review" &&
           (() => {
             const inp =
               "w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none";
@@ -2310,52 +2570,161 @@ export default function AdminHome() {
                     </p>
                   )}
                   <div className="mt-2 space-y-2">
-                    {sugs.map((s) => (
-                      <div key={s.id} className={card} style={surf}>
-                        <p className="text-[12px] text-[var(--text-3)]">
-                          {s.entity_type} · {s.model ?? "—"}
-                        </p>
-                        <p className="mt-1 text-[13px] text-[var(--text-1)]">
-                          <code>{JSON.stringify(s.proposed)}</code>
-                        </p>
-                        {s.rationale && (
-                          <p className="mt-1 text-[12.5px] text-[var(--text-2)]">
-                            {s.rationale}
+                    {sugs.map((s) => {
+                      const proposedKeys = Object.keys(s.proposed ?? {});
+                      const rejected = sugRejected[s.id] ?? new Set();
+                      const accepted = proposedKeys.filter(
+                        (k) => !rejected.has(k)
+                      );
+                      const current = sugCurrent[s.id] ?? {};
+                      const fmt = (v: unknown) =>
+                        v == null || v === ""
+                          ? "—"
+                          : typeof v === "string"
+                            ? v
+                            : JSON.stringify(v);
+                      const toggleField = (k: string) =>
+                        setSugRejected((m) => {
+                          const cur = new Set(m[s.id] ?? []);
+                          if (cur.has(k)) cur.delete(k);
+                          else cur.add(k);
+                          return { ...m, [s.id]: cur };
+                        });
+                      return (
+                        <div key={s.id} className={card} style={surf}>
+                          <p className="text-[12px] text-[var(--text-3)]">
+                            {s.entity_type} · {s.model ?? "—"}
                           </p>
-                        )}
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            disabled={busy}
-                            onClick={async () => {
-                              setBusy(true);
-                              const r = await approveSuggestion(s);
-                              setBusy(false);
-                              setMsg(
-                                r.ok
-                                  ? "Approved → draft updated (not live)"
-                                  : r.reason ?? "Failed"
+                          <div className="mt-2 space-y-1.5">
+                            {proposedKeys.length === 0 && (
+                              <p className="t-caption">
+                                Empty proposal — nothing to apply.
+                              </p>
+                            )}
+                            {proposedKeys.map((k) => {
+                              const isOn = !rejected.has(k);
+                              const cur = current[k];
+                              const next = (
+                                s.proposed as Record<string, unknown>
+                              )[k];
+                              const isPending = sugStatus === "pending";
+                              return (
+                                <div
+                                  key={k}
+                                  className="rounded-[var(--r-sm)] p-2"
+                                  style={{
+                                    background: "var(--surface-3)",
+                                    opacity: isOn ? 1 : 0.45,
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                                      {k}
+                                    </span>
+                                    {isPending && (
+                                      <button
+                                        onClick={() => toggleField(k)}
+                                        title="Toggle whether this field will be applied on Approve."
+                                        className="press text-[10.5px] font-semibold"
+                                        style={{
+                                          color: isOn
+                                            ? "var(--vitality)"
+                                            : "var(--text-3)",
+                                        }}
+                                      >
+                                        {isOn ? "✓ Accept" : "Rejected"}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 text-[12px] text-[var(--text-3)]">
+                                    Current:{" "}
+                                    <span className="text-[var(--text-2)]">
+                                      {fmt(cur)}
+                                    </span>
+                                  </p>
+                                  <p className="text-[12.5px] text-[var(--text-1)]">
+                                    →{" "}
+                                    <span className="font-semibold">
+                                      {fmt(next)}
+                                    </span>
+                                  </p>
+                                </div>
                               );
-                              loadSugs();
-                            }}
-                            className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[#08090B]"
-                          >
-                            Approve → draft
-                          </button>
-                          <button
-                            disabled={busy}
-                            onClick={async () => {
-                              setBusy(true);
-                              await rejectSuggestion(s.id);
-                              setBusy(false);
-                              loadSugs();
-                            }}
-                            className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-2)]"
-                          >
-                            Reject
-                          </button>
+                            })}
+                          </div>
+                          {s.rationale && (
+                            <p className="mt-2 text-[12px] text-[var(--text-2)]">
+                              <i>{s.rationale}</i>
+                            </p>
+                          )}
+                          {sugStatus === "pending" && (
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                disabled={busy || accepted.length === 0}
+                                onClick={async () => {
+                                  setBusy(true);
+                                  // Build a filtered suggestion with only
+                                  // the accepted fields. approveSuggestion
+                                  // merges those into the draft entity.
+                                  const filtered = {
+                                    ...s,
+                                    proposed: Object.fromEntries(
+                                      accepted.map((k) => [
+                                        k,
+                                        (
+                                          s.proposed as Record<
+                                            string,
+                                            unknown
+                                          >
+                                        )[k],
+                                      ])
+                                    ),
+                                  };
+                                  const r =
+                                    await approveSuggestion(filtered);
+                                  setBusy(false);
+                                  setMsg(
+                                    r.ok
+                                      ? `Applied ${accepted.length}/${proposedKeys.length} field${proposedKeys.length === 1 ? "" : "s"} → draft (not live)`
+                                      : r.reason ?? "Failed"
+                                  );
+                                  if (r.ok) {
+                                    setSugRejected((m) => {
+                                      const n = { ...m };
+                                      delete n[s.id];
+                                      return n;
+                                    });
+                                    loadSugs();
+                                  }
+                                }}
+                                title={
+                                  accepted.length === 0
+                                    ? "All fields rejected — nothing to apply. Reject the whole suggestion instead."
+                                    : `Apply only the ${accepted.length} accepted field${accepted.length === 1 ? "" : "s"} as a draft.`
+                                }
+                                className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                              >
+                                {accepted.length === proposedKeys.length
+                                  ? "Approve all → draft"
+                                  : `Approve ${accepted.length} → draft`}
+                              </button>
+                              <button
+                                disabled={busy}
+                                onClick={async () => {
+                                  setBusy(true);
+                                  await rejectSuggestion(s.id);
+                                  setBusy(false);
+                                  loadSugs();
+                                }}
+                                className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-2)]"
+                              >
+                                Reject all
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {msg && (
                     <p className="mt-2 text-[12px] text-[var(--text-3)]">
@@ -2563,8 +2932,264 @@ export default function AdminHome() {
 
       <p className="mt-8 text-center text-[11px] text-[var(--text-4)]">
         Protocolize · internal · build{" "}
-        {process.env.NEXT_PUBLIC_BUILD ?? "dev"}
+        {process.env.NEXT_PUBLIC_BUILD ?? "dev"} ·{" "}
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="press text-[11px] text-[var(--text-3)] hover:text-[var(--text-2)]"
+          title="Open the command palette (⌘K / Ctrl-K)"
+        >
+          ⌘K
+        </button>
       </p>
+
+      {paletteOpen &&
+        (() => {
+          // Commands are built fresh per open — cheap because the lists
+          // are small and this keeps the palette in sync with state
+          // without an effect dependency war.
+          type Cmd = {
+            id: string;
+            group: string;
+            label: string;
+            hint?: string;
+            run: () => void;
+          };
+          const cmds: Cmd[] = [
+            ...TABS.map(
+              (t): Cmd => ({
+                id: `nav:${t.id}`,
+                group: "Navigate",
+                label: `Go to ${t.label}`,
+                hint: t.hint,
+                run: () => setTab(t.id),
+              })
+            ),
+            {
+              id: "nav:content:author",
+              group: "Navigate",
+              label: "Open Content · Authoring",
+              run: () => {
+                setTab("content");
+                setContentMode("author");
+              },
+            },
+            {
+              id: "nav:content:review",
+              group: "Navigate",
+              label: "Open Content · AI Review",
+              run: () => {
+                setTab("content");
+                setContentMode("review");
+              },
+            },
+            {
+              id: "nav:engine:rules",
+              group: "Navigate",
+              label: "Open Engine · Rules",
+              run: () => {
+                setTab("engine");
+                setEngineSub("rules");
+              },
+            },
+            {
+              id: "nav:engine:config",
+              group: "Navigate",
+              label: "Open Engine · Config",
+              run: () => {
+                setTab("engine");
+                setEngineSub("config");
+              },
+            },
+            {
+              id: "nav:engine:intelligence",
+              group: "Navigate",
+              label: "Open Engine · Intelligence",
+              run: () => {
+                setTab("engine");
+                setEngineSub("intelligence");
+              },
+            },
+            {
+              id: "act:publish",
+              group: "Action",
+              label: "Publish current catalog",
+              hint: "Snapshot all drafts into a new immutable bundle.",
+              run: () => setTab("publish"),
+            },
+            {
+              id: "act:diff",
+              group: "Action",
+              label: "Refresh publish diff",
+              hint: "Re-assemble next bundle and re-diff vs latest live.",
+              run: () => {
+                setTab("publish");
+                refreshDiff();
+              },
+            },
+            {
+              id: "act:seed",
+              group: "Action",
+              label: "Seed CMS from built-in catalog",
+              hint: "Idempotent — mirrors built-in packs/behaviors into the CMS tables.",
+              run: async () => {
+                setBusy(true);
+                const r = await importBuiltin();
+                setBusy(false);
+                setMsg(r.ok ? "Seeded." : r.reason ?? "Failed");
+                if (r.ok) {
+                  setTab("content");
+                  setContentMode("author");
+                  loadCms();
+                }
+              },
+            },
+            {
+              id: "act:new-protocol",
+              group: "Action",
+              label: "Create new protocol",
+              run: () => {
+                setTab("content");
+                setContentMode("author");
+                setEdP(null);
+                setEdB([]);
+                setNewProtoOpen(true);
+              },
+            },
+            ...cmsP.map(
+              (p): Cmd => ({
+                id: `proto:${p.id}`,
+                group: "Protocols",
+                label: `Open ${p.name}`,
+                hint: `${p.status} · v${p.version}`,
+                run: async () => {
+                  setTab("content");
+                  setContentMode("author");
+                  await openProto(p);
+                },
+              })
+            ),
+          ];
+
+          const q = paletteQuery.trim().toLowerCase();
+          const filtered = q
+            ? cmds.filter(
+                (c) =>
+                  c.label.toLowerCase().includes(q) ||
+                  (c.hint?.toLowerCase().includes(q) ?? false) ||
+                  c.group.toLowerCase().includes(q)
+              )
+            : cmds;
+          const safeIdx = Math.min(
+            Math.max(0, paletteIdx),
+            Math.max(0, filtered.length - 1)
+          );
+          // Group filtered by group preserving order
+          const groups: { name: string; items: Cmd[] }[] = [];
+          for (const c of filtered) {
+            const last = groups[groups.length - 1];
+            if (last && last.name === c.group) last.items.push(c);
+            else groups.push({ name: c.group, items: [c] });
+          }
+          // Flat index → cmd
+          const flatItem = filtered[safeIdx];
+
+          return (
+            <div
+              className="anim-fade fixed inset-0 z-[150] flex items-start justify-center px-6 pt-[12vh]"
+              style={{ background: "rgba(8,9,11,0.66)" }}
+              onClick={() => setPaletteOpen(false)}
+              role="dialog"
+              aria-label="Command palette"
+            >
+              <div
+                className="glass max-h-[70vh] w-full max-w-[560px] overflow-hidden rounded-[var(--r-lg)] border border-[var(--hairline-strong)]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  autoFocus
+                  value={paletteQuery}
+                  onChange={(e) => {
+                    setPaletteQuery(e.target.value);
+                    setPaletteIdx(0);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setPaletteIdx((i) =>
+                        Math.min(i + 1, filtered.length - 1)
+                      );
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setPaletteIdx((i) => Math.max(i - 1, 0));
+                    } else if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (flatItem) {
+                        setPaletteOpen(false);
+                        flatItem.run();
+                      }
+                    }
+                  }}
+                  placeholder="Jump to a tab, protocol, or action…"
+                  className="w-full bg-transparent px-5 py-4 text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
+                />
+                <div className="max-h-[55vh] overflow-y-auto border-t border-[var(--hairline)]">
+                  {filtered.length === 0 && (
+                    <p className="px-5 py-6 text-center text-[12.5px] text-[var(--text-3)]">
+                      No matches.
+                    </p>
+                  )}
+                  {groups.map((g) => (
+                    <div key={g.name}>
+                      <p className="px-5 pt-3 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--text-4)]">
+                        {g.name}
+                      </p>
+                      {g.items.map((c) => {
+                        const i = filtered.indexOf(c);
+                        const active = i === safeIdx;
+                        return (
+                          <button
+                            key={c.id}
+                            onMouseEnter={() => setPaletteIdx(i)}
+                            onClick={() => {
+                              setPaletteOpen(false);
+                              c.run();
+                            }}
+                            className="press flex w-full items-center gap-3 px-5 py-2.5 text-left"
+                            style={{
+                              background: active
+                                ? "var(--surface-3)"
+                                : "transparent",
+                            }}
+                          >
+                            <span className="grow">
+                              <span className="block text-[13px] font-medium text-[var(--text-1)]">
+                                {c.label}
+                              </span>
+                              {c.hint && (
+                                <span className="t-caption mt-0.5 block">
+                                  {c.hint}
+                                </span>
+                              )}
+                            </span>
+                            {active && (
+                              <span className="text-[10px] text-[var(--text-3)]">
+                                ↵
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--hairline)] px-5 py-2 text-[10.5px] text-[var(--text-4)]">
+                  <span>↑↓ navigate · ↵ select · esc close</span>
+                  <span>⌘K</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

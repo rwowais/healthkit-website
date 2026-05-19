@@ -247,6 +247,24 @@ export async function createProtocol(fields: {
   }
 }
 
+/** Fetch a single behavior row by id (used by AI Review to diff). */
+export async function getBehaviorById(
+  id: string
+): Promise<CmsBehavior | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  try {
+    const { data } = await sb
+      .from("cms_behaviors")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    return (data as CmsBehavior) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Read the last N revisions of a single entity (behavior, protocol…). */
 export interface RevisionRow {
   id: number;
