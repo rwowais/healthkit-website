@@ -259,6 +259,22 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
+  // Surface save/sync failures globally instead of swallowing them.
+  useEffect(() => {
+    const onSaveError = (e: Event) => {
+      const where = (e as CustomEvent).detail;
+      show(
+        where === "local"
+          ? "This device's storage is full — data isn't being saved. Export a backup."
+          : where === "cloud-clear"
+          ? "Couldn't clear cloud data — will retry when you're back online."
+          : "Offline — changes are saved on this device and will sync later."
+      );
+    };
+    window.addEventListener("pz:save-error", onSaveError);
+    return () => window.removeEventListener("pz:save-error", onSaveError);
+  }, [show]);
+
   return (
     <ToastContext.Provider value={{ show }}>
       {children}

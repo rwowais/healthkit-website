@@ -7,7 +7,7 @@
  * screen or hook changes required.
  */
 import type { AppState } from "./types";
-import { loadState, saveState } from "./storage";
+import { loadState, saveState, SAVE_ERROR_EVENT } from "./storage";
 import { STORAGE_KEY } from "./constants";
 import { getSupabase, supabaseEnabled, STATE_TABLE } from "./supabase";
 
@@ -102,13 +102,20 @@ class SupabaseDataSource implements DataSource {
         data: { user },
       } = await sb.auth.getUser();
       if (!user) return;
-      await sb.from(STATE_TABLE).upsert({
+      const { error } = await sb.from(STATE_TABLE).upsert({
         user_id: user.id,
         state,
         updated_at: new Date().toISOString(),
       });
+      if (error) throw error;
     } catch {
-      /* offline — local cache holds; will resync on next save */
+      // Local cache still holds; tell the user the cloud copy is behind
+      // rather than letting the failure pass invisibly.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(SAVE_ERROR_EVENT, { detail: "cloud" })
+        );
+      }
     }
   }
 
@@ -122,9 +129,17 @@ class SupabaseDataSource implements DataSource {
       if (!user) return;
       // Drop the cloud row so a local reset isn't immediately
       // re-hydrated from the server on the next load.
-      await sb.from(STATE_TABLE).delete().eq("user_id", user.id);
+      const { error } = await sb
+        .from(STATE_TABLE)
+        .delete()
+        .eq("user_id", user.id);
+      if (error) throw error;
     } catch {
-      /* offline — best effort; local is already cleared */
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(SAVE_ERROR_EVENT, { detail: "cloud-clear" })
+        );
+      }
     }
   }
 }

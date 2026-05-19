@@ -177,6 +177,7 @@ export function getSignals(state: AppState): Signals {
   const y = new Date();
   y.setDate(y.getDate() - 1);
   const yLog = logs.find((l) => l.date === dateKey(y));
+  const tLog = logs.find((l) => l.date === tKey);
 
   const recent = [...logs]
     .filter((l) => l.score > 0 && l.date !== tKey)
@@ -199,8 +200,11 @@ export function getSignals(state: AppState): Signals {
     );
   }
 
-  const sleepQuality = yLog?.sleepLog?.sleepQuality ?? null;
-  const energy = yLog?.energyLevel ?? null;
+  // Prefer *today's* check-in the moment it exists — otherwise the whole
+  // adaptive read (recovery/lighter/primed) is always a full day stale.
+  const sleepQuality =
+    tLog?.sleepLog?.sleepQuality ?? yLog?.sleepLog?.sleepQuality ?? null;
+  const energy = tLog?.energyLevel ?? yLog?.energyLevel ?? null;
   let recoveryProxy: number | null = null;
   const parts: { v: number; w: number }[] = [];
   if (sleepQuality != null)

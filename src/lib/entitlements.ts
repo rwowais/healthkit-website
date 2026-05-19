@@ -21,8 +21,20 @@ export interface Access {
   trialExpired: boolean; // had a trial, now over, not paid
 }
 
-function trackedDays(state: AppState): number {
-  return (state.dailyLogs ?? []).filter((l) => l.score > 0).length;
+/**
+ * "Engaged" days, not just scored days: a check-in (sleep/energy) or any
+ * behavior completion counts. Scoring alone (`score > 0`) under-counts a
+ * user who shows up and reflects but completes nothing — they've still
+ * had a real chance at the aha, and we shouldn't paywall them early.
+ */
+function engagedDays(state: AppState): number {
+  return (state.dailyLogs ?? []).filter(
+    (l) =>
+      l.score > 0 ||
+      l.sleepLog?.sleepQuality != null ||
+      l.energyLevel != null ||
+      Object.values(l.behaviorCompletions ?? {}).some(Boolean)
+  ).length;
 }
 
 export function getAccess(state: AppState): Access {
@@ -65,9 +77,13 @@ export function maybeExtendTrial(state: AppState): AppState {
   if (tier === "premium" || !premiumTrialEndsAt) return state;
   const end = new Date(premiumTrialEndsAt).getTime();
   const now = Date.now();
-  const within3Days = end - now < 3 * 86_400_000 && end - now > -86_400_000;
-  if (!within3Days) return state;
-  if (trackedDays(state) >= AHA_DAYS) return state; // had their chance
+  // Forgiving window: from 3 days before expiry up to a week *after* —
+  // a returning user who hasn't had their aha still gets a fair runway
+  // rather than a hard paywall the moment they come back.
+  const inWindow =
+    end - now < 3 * 86_400_000 && end - now > -7 * 86_400_000;
+  if (!inWindow) return state;
+  if (engagedDays(state) >= AHA_DAYS) return state; // had their chance
   return {
     ...state,
     settings: {

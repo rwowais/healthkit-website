@@ -74,12 +74,13 @@ export function useAppState() {
   useEffect(() => {
     if (loading) return;
     const sync = () => {
-      activeDataSource.load().then((loaded) => {
-        const j = JSON.stringify(loaded);
-        if (j !== lastJson.current) {
-          lastJson.current = j;
-          setState(loaded);
-        }
+      activeDataSource.load().then((raw) => {
+        const j = JSON.stringify(raw);
+        if (j === lastJson.current) return;
+        // Keep the pre-extension baseline so an engagement-gated trial
+        // extension is persisted on the next mutation (matches initial load).
+        lastJson.current = j;
+        setState(maybeExtendTrial(raw));
       });
     };
     window.addEventListener(STATE_EVENT, sync);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -149,12 +149,19 @@ export default function TodayPage() {
   } = useAppState();
   const router = useRouter();
   const settings = state.settings;
+  const redirectedRef = useRef(false);
 
   // Onboarding guard — a returning user lands here after auth, but a
   // genuinely new account (cloud-loaded, no onboarding) gets sent to
-  // build their system first.
+  // build their system first. Fire once so a focus/visibility resync
+  // can't bounce a mid-session user back to onboarding.
   useEffect(() => {
-    if (!loading && !state.settings.completedOnboarding) {
+    if (
+      !loading &&
+      !state.settings.completedOnboarding &&
+      !redirectedRef.current
+    ) {
+      redirectedRef.current = true;
       router.replace("/onboarding");
     }
   }, [loading, state.settings.completedOnboarding, router]);

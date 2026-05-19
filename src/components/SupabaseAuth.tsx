@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase";
 import { STATE_EVENT } from "@/lib/datasource";
 import { signOut } from "@/lib/auth";
+import { clearAllData } from "@/lib/storage";
 import { Eyebrow } from "@/components/ui";
 
 /**
@@ -49,7 +50,11 @@ export default function SupabaseAuth() {
           <button
             onClick={async () => {
               await signOut();
+              // Wipe the local cache so the next person on this device
+              // can't see (or re-upload) the previous account's data.
+              clearAllData();
               setUserEmail(null);
+              if (typeof window !== "undefined") window.location.href = "/";
             }}
             className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-4 py-2 text-[13px] font-semibold text-[var(--text-3)]"
             style={{ background: "var(--surface-3)" }}

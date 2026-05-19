@@ -1,5 +1,5 @@
 import { STORAGE_KEY, LEGACY_STORAGE_KEYS } from "./constants";
-import { calculateDailyScore, calculateStreak } from "./scoring";
+import { calculateStreak } from "./scoring";
 import type {
   AppState,
   BiomarkerEntry,
@@ -314,23 +314,25 @@ function guessItemType(item: ProtocolItem): "task" | "reminder" {
     : "task";
 }
 
-export function saveState(state: AppState): void {
-  if (typeof window === "undefined") return;
+/** Event other components listen to in order to surface save failures. */
+export const SAVE_ERROR_EVENT = "pz:save-error";
+
+export function saveState(state: AppState): boolean {
+  if (typeof window === "undefined") return false;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
   } catch {
-    // Storage full or unavailable
+    // Quota exceeded / storage unavailable — don't fail silently, the
+    // user needs to know their data isn't being saved on this device.
+    window.dispatchEvent(
+      new CustomEvent(SAVE_ERROR_EVENT, { detail: "local" })
+    );
+    return false;
   }
 }
 
 // ── Accessors ─────────────────────────────────────────────────────
-
-function getAllEnabledItems(state: AppState): ProtocolItem[] {
-  const pillars: Pillar[] = ["sleep", "exercise", "nutrition", "supplements"];
-  return pillars.flatMap((p) =>
-    state.protocols[p].filter((item) => item.isEnabled)
-  );
-}
 
 export function getTodayLog(state: AppState): DailyLog {
   const today = getDateString();
@@ -357,6 +359,31 @@ function isoDayIndex(dateStr: string): number {
   return j === 0 ? 6 : j - 1;
 }
 
+/**
+ * The single source of truth for a day's score: % of the *shaped*
+ * (non-muted) behavior timeline completed. Both the behavior toggle and
+ * the legacy recalculate path use this so the check-in (or any other
+ * mutation) can never overwrite it with the dead pillar model.
+ * Past days render unshaped (mode "normal").
+ */
+export function computeBehaviorScore(
+  state: AppState,
+  date: string,
+  behaviorCompletions: Record<string, boolean>
+): number {
+  const isToday = date === getDateString();
+  const compiled = compileTimeline(state, isoDayIndex(date));
+  const shaped = shapeTimeline(
+    compiled,
+    isToday ? adapt(state).mode : "normal"
+  );
+  const active = shaped.filter((i) => !i.muted);
+  if (active.length === 0) return 0;
+  const done = active.filter((i) => behaviorCompletions[i.canonicalKey])
+    .length;
+  return Math.round((done / active.length) * 100);
+}
+
 export function toggleBehavior(
   state: AppState,
   date: string,
@@ -366,19 +393,7 @@ export function toggleBehavior(
   const bc = { ...(log.behaviorCompletions ?? {}) };
   bc[key] = !bc[key];
 
-  // Score over the *shaped* timeline the user actually sees — muted
-  // behaviors don't count, so the persisted score matches the on-screen
-  // progress (and "day complete") exactly. Past days render unshaped.
-  const isToday = date === getDateString();
-  const compiled = compileTimeline(state, isoDayIndex(date));
-  const shaped = shapeTimeline(
-    compiled,
-    isToday ? adapt(state).mode : "normal"
-  );
-  const active = shaped.filter((i) => !i.muted);
-  const total = active.length || 1;
-  const done = active.filter((i) => bc[i.canonicalKey]).length;
-  const score = Math.round((done / total) * 100);
+  const score = computeBehaviorScore(state, date, bc);
 
   const updated: DailyLog = { ...log, behaviorCompletions: bc, score };
   const idx = state.dailyLogs.findIndex((l) => l.date === date);
@@ -487,8 +502,12 @@ export function addBiomarker(
   state: AppState,
   entry: Omit<BiomarkerEntry, "id">
 ): AppState {
+  // A future-dated reading would sort as "latest" forever and poison
+  // every band/insight that reads the most recent value — clamp it.
+  const today = getDateString();
   const e: BiomarkerEntry = {
     ...entry,
+    date: entry.date && entry.date <= today ? entry.date : today,
     id: `bm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   };
   return { ...state, biomarkers: [...state.biomarkers, e] };
@@ -522,8 +541,15 @@ export function importState(raw: string): AppState | null {
 // ── Recalculate ───────────────────────────────────────────────────
 
 function recalculate(state: AppState, log: DailyLog): DailyLog {
-  const enabledItems = getAllEnabledItems(state);
-  const score = calculateDailyScore(log, enabledItems, state.settings);
+  // Unified score: the behavior timeline is the product. The legacy
+  // pillar model (calculateDailyScore) is retained only for the
+  // pillarScores breakdown; it must never drive `score` or a check-in
+  // would zero out a completed day.
+  const score = computeBehaviorScore(
+    state,
+    log.date,
+    log.behaviorCompletions ?? {}
+  );
 
   // Calculate per-pillar scores
   const pillarScores = {
