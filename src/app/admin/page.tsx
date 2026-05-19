@@ -41,11 +41,29 @@ import {
   listExplanations,
   upsertExplanation,
   assembleBundleFromCMS,
+  listAdmins,
+  addAdmin,
+  removeAdmin,
+  listAuditLog,
+  listConfigOverrides,
+  upsertConfigOverride,
+  deleteConfigOverride,
+  listInsightTemplates,
+  saveInsightTemplate,
+  deleteInsightTemplate,
+  listRecTemplates,
+  saveRecTemplate,
+  deleteRecTemplate,
   type CmsProtocol,
   type CmsBehavior,
   type RevisionRow,
   type EvidenceRow,
   type ExplanationRow,
+  type AdminRow,
+  type AuditRow,
+  type ConfigOverrideRow,
+  type InsightTemplateRow,
+  type RecTemplateRow,
 } from "@/lib/cms/authoring";
 import {
   generateBehaviorDraft,
@@ -76,7 +94,7 @@ import { Eyebrow, Skeleton } from "@/components/ui";
 type Gate = "checking" | "denied" | "ok";
 type Tab = "home" | "content" | "engine" | "simulate" | "publish";
 type ContentMode = "author" | "review";
-type EngineSub = "rules" | "config" | "intelligence";
+type EngineSub = "rules" | "config" | "intelligence" | "access";
 
 const TABS: { id: Tab; label: string; hint: string }[] = [
   {
@@ -404,6 +422,63 @@ export default function AdminHome() {
   const [newProtoTagline, setNewProtoTagline] = useState("");
   const [newProtoGoal, setNewProtoGoal] = useState("");
 
+  // ── Activity / Access / Config / Templates state ──────────────────
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [auditBusy, setAuditBusy] = useState(false);
+  const loadAudit = async () => {
+    setAuditBusy(true);
+    try {
+      setAuditRows(await listAuditLog(30));
+    } finally {
+      setAuditBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (gate === "ok" && tab === "home" && auditOpen && auditRows.length === 0)
+      loadAudit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gate, tab, auditOpen]);
+
+  const [admins, setAdmins] = useState<AdminRow[]>([]);
+  const [newAdminId, setNewAdminId] = useState("");
+  const refreshAdmins = () => listAdmins().then(setAdmins);
+  useEffect(() => {
+    if (gate === "ok" && tab === "engine" && engineSub === "access")
+      refreshAdmins();
+  }, [gate, tab, engineSub]);
+
+  const [cfgRows, setCfgRows] = useState<ConfigOverrideRow[]>([]);
+  const [cfgKey, setCfgKey] = useState("");
+  const [cfgValue, setCfgValue] = useState("");
+  const [cfgDesc, setCfgDesc] = useState("");
+  const refreshCfg = () => listConfigOverrides().then(setCfgRows);
+  useEffect(() => {
+    if (gate === "ok" && tab === "engine" && engineSub === "config")
+      refreshCfg();
+  }, [gate, tab, engineSub]);
+
+  const [insTemplates, setInsTemplates] = useState<InsightTemplateRow[]>(
+    []
+  );
+  const [recTemplates, setRecTemplates] = useState<RecTemplateRow[]>([]);
+  const [newInsKind, setNewInsKind] = useState("");
+  const [newInsTpl, setNewInsTpl] = useState("");
+  const [newRecCtx, setNewRecCtx] = useState("");
+  const [newRecCopy, setNewRecCopy] = useState("");
+  const refreshTemplates = async () => {
+    const [ins, rec] = await Promise.all([
+      listInsightTemplates(),
+      listRecTemplates(),
+    ]);
+    setInsTemplates(ins);
+    setRecTemplates(rec);
+  };
+  useEffect(() => {
+    if (gate === "ok" && tab === "engine" && engineSub === "intelligence")
+      refreshTemplates();
+  }, [gate, tab, engineSub]);
+
   // ── ⌘K command palette ────────────────────────────────────────────
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState("");
@@ -728,6 +803,59 @@ export default function AdminHome() {
           </div>
         )}
 
+        {tab === "home" && (
+          <div className={`${card} mt-3`} style={surf}>
+            <div className="flex items-center justify-between gap-2">
+              <Eyebrow>Recent admin activity</Eyebrow>
+              <button
+                onClick={() => {
+                  setAuditOpen((v) => !v);
+                  if (!auditOpen) loadAudit();
+                }}
+                title="Read-only view of cms_audit_log — every publish, rollback, suggestion approval, and verify lands here."
+                className="press text-[11.5px] font-semibold text-[var(--readiness)]"
+              >
+                {auditOpen
+                  ? "− Hide"
+                  : auditBusy
+                    ? "Loading…"
+                    : "↻ Show"}
+              </button>
+            </div>
+            {auditOpen && (
+              <div className="mt-2 space-y-1.5">
+                {auditRows.length === 0 && !auditBusy && (
+                  <p className="t-caption">
+                    No audit rows yet.
+                  </p>
+                )}
+                {auditRows.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-baseline justify-between gap-2 text-[12px]"
+                    title={
+                      typeof r.diff === "object" && r.diff
+                        ? JSON.stringify(r.diff).slice(0, 400)
+                        : ""
+                    }
+                  >
+                    <span className="grow truncate text-[var(--text-2)]">
+                      <span className="font-semibold text-[var(--text-1)]">
+                        {r.action}
+                      </span>{" "}
+                      · {r.entity_type}
+                      {r.entity_id ? ` #${r.entity_id.slice(0, 8)}` : ""}
+                    </span>
+                    <span className="text-[10.5px] text-[var(--text-4)]">
+                      {new Date(r.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === "engine" && (
           <div className="mb-4 flex gap-1.5">
             {(
@@ -745,7 +873,12 @@ export default function AdminHome() {
                 {
                   id: "intelligence",
                   label: "Intelligence",
-                  hint: "The kinds of insights produced and the honesty gates each must clear.",
+                  hint: "The kinds of insights produced and the honesty gates each must clear. Edit insight + recommendation templates here.",
+                },
+                {
+                  id: "access",
+                  label: "Access",
+                  hint: "Manage the admin allowlist (cms_admins). Adding here grants /admin access without SQL.",
                 },
               ] as { id: EngineSub; label: string; hint: string }[]
             ).map((s) => (
@@ -777,9 +910,22 @@ export default function AdminHome() {
               Each <b>Mode</b> shows what triggers it and what users see.
               Each <b>Rule set</b> lists the behavior keys grouped under a
               tag (promote / demote / restraint / training / circadian).
-              These are code today; live editing arrives when the Rules
-              editor ships in Wave C.
             </p>
+            <div
+              className="rounded-[var(--r-sm)] p-3"
+              style={{
+                background: "rgba(232,201,155,.10)",
+                color: "var(--warm)",
+              }}
+              title="Deferred deliberately — shipping an editor that the engine doesn't read would create a misleading 'I edited it, why didn't it change?' experience."
+            >
+              <p className="text-[12.5px] font-medium leading-relaxed">
+                Live editing of cms_adaptation_rules is paused until the
+                runtime is wired to read them. Editing the database now
+                wouldn&apos;t change anything users see — the engine
+                still uses the code constants above.
+              </p>
+            </div>
             <div>
               <Eyebrow>Adaptive modes</Eyebrow>
               <div className="mt-2 space-y-2">
@@ -860,6 +1006,124 @@ export default function AdminHome() {
                 </div>
               </div>
             ))}
+
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Eyebrow color="var(--readiness)">CMS overrides</Eyebrow>
+                <span
+                  className="t-caption"
+                  title="Stored in cms_intelligence_config. The Publish pipeline will include these in the bundle in a follow-up — for now the editor is here so you can author them."
+                >
+                  editor live · runtime adopts next ?
+                </span>
+              </div>
+              <p className="t-caption leading-relaxed">
+                Author key/value overrides keyed by string. JSON value
+                (e.g. <code>14</code>, <code>&quot;evening&quot;</code>,{" "}
+                <code>true</code>, or a JSON object).
+              </p>
+              <div className="space-y-1.5">
+                {cfgRows.length === 0 && (
+                  <p className="t-caption px-1">
+                    No overrides yet.
+                  </p>
+                )}
+                {cfgRows.map((c) => (
+                  <div
+                    key={c.key}
+                    className="flex items-start justify-between gap-3 rounded-[var(--r-md)] p-3"
+                    style={surf}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-[var(--text-1)]">
+                        {c.key}
+                      </p>
+                      <p className="t-caption mt-0.5 break-all">
+                        {JSON.stringify(c.value)}
+                      </p>
+                      {c.description && (
+                        <p className="t-caption mt-0.5">
+                          {c.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (
+                          !window.confirm(
+                            `Delete the override "${c.key}"?`
+                          )
+                        )
+                          return;
+                        const r = await deleteConfigOverride(c.key);
+                        if (!r.ok)
+                          setMsg(r.reason ?? "Delete failed.");
+                        refreshCfg();
+                      }}
+                      className="press text-[11px] font-semibold text-[var(--alert)]"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className={card} style={surf}>
+                <Eyebrow>Add override</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={cfgKey}
+                    onChange={(e) => setCfgKey(e.target.value)}
+                    placeholder="key (e.g. AHA_DAYS_OVERRIDE)"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <input
+                    value={cfgValue}
+                    onChange={(e) => setCfgValue(e.target.value)}
+                    placeholder='value JSON (e.g. 14 or "evening" or true)'
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <input
+                    value={cfgDesc}
+                    onChange={(e) => setCfgDesc(e.target.value)}
+                    placeholder="description (optional)"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <button
+                    disabled={busy || !cfgKey.trim() || !cfgValue.trim()}
+                    onClick={async () => {
+                      let parsed: unknown = cfgValue;
+                      try {
+                        parsed = JSON.parse(cfgValue);
+                      } catch {
+                        /* keep as raw string */
+                      }
+                      setBusy(true);
+                      const r = await upsertConfigOverride({
+                        key: cfgKey,
+                        value: parsed,
+                        description: cfgDesc || undefined,
+                      });
+                      setBusy(false);
+                      setMsg(
+                        r.ok ? "Override saved." : r.reason ?? "Failed"
+                      );
+                      if (r.ok) {
+                        setCfgKey("");
+                        setCfgValue("");
+                        setCfgDesc("");
+                        refreshCfg();
+                      }
+                    }}
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                  >
+                    {busy ? "…" : "Add / update"}
+                  </button>
+                  {msg && (
+                    <p className="t-caption">{msg}</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -890,6 +1154,342 @@ export default function AdminHome() {
                 </p>
               </div>
             ))}
+
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Eyebrow color="var(--readiness)">
+                  Insight templates
+                </Eyebrow>
+                <span
+                  className="t-caption"
+                  title="cms_insight_templates rows. The runtime adopts these in a follow-up; editing now stores them in the CMS."
+                >
+                  editor live · runtime adopts next ?
+                </span>
+              </div>
+              <p className="t-caption leading-relaxed">
+                Templated copy strings keyed by <i>kind</i> (e.g.{" "}
+                <code>keystone</code>, <code>weekly</code>). Conditions
+                (free JSON) gate when each fires.
+              </p>
+              <div className="space-y-1.5">
+                {insTemplates.length === 0 && (
+                  <p className="t-caption px-1">
+                    No insight templates yet.
+                  </p>
+                )}
+                {insTemplates.map((t) => (
+                  <div key={t.id} className={card} style={surf}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-[12.5px] font-semibold text-[var(--text-1)]">
+                        {t.kind}
+                      </p>
+                      <span className="t-caption">
+                        {t.status} · v{t.version}
+                      </span>
+                    </div>
+                    <textarea
+                      className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] text-[var(--text-1)] outline-none"
+                      rows={2}
+                      value={t.template}
+                      onChange={(e) =>
+                        setInsTemplates((rs) =>
+                          rs.map((r) =>
+                            r.id === t.id
+                              ? { ...r, template: e.target.value }
+                              : r
+                          )
+                        )
+                      }
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          const r = await saveInsightTemplate(t);
+                          setBusy(false);
+                          setMsg(
+                            r.ok ? "Saved." : r.reason ?? "Failed"
+                          );
+                          if (r.ok) refreshTemplates();
+                        }}
+                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[11.5px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        Save
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              `Delete the "${t.kind}" template?`
+                            )
+                          )
+                            return;
+                          setBusy(true);
+                          const r = await deleteInsightTemplate(t.id);
+                          setBusy(false);
+                          setMsg(
+                            r.ok ? "Deleted." : r.reason ?? "Failed"
+                          );
+                          if (r.ok) refreshTemplates();
+                        }}
+                        className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-1.5 text-[11.5px] font-semibold text-[var(--alert)] disabled:opacity-40"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className={card} style={surf}>
+                <Eyebrow>Add insight template</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={newInsKind}
+                    onChange={(e) => setNewInsKind(e.target.value)}
+                    placeholder="kind (e.g. keystone, weekly, proven)"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <textarea
+                    value={newInsTpl}
+                    onChange={(e) => setNewInsTpl(e.target.value)}
+                    rows={2}
+                    placeholder="template copy (placeholders like {behavior} are OK)"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <button
+                    disabled={
+                      busy || !newInsKind.trim() || !newInsTpl.trim()
+                    }
+                    onClick={async () => {
+                      setBusy(true);
+                      const r = await saveInsightTemplate({
+                        kind: newInsKind,
+                        template: newInsTpl,
+                      });
+                      setBusy(false);
+                      setMsg(
+                        r.ok ? "Added." : r.reason ?? "Failed"
+                      );
+                      if (r.ok) {
+                        setNewInsKind("");
+                        setNewInsTpl("");
+                        refreshTemplates();
+                      }
+                    }}
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                  >
+                    Add template
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Eyebrow color="var(--readiness)">
+                  Recommendation templates
+                </Eyebrow>
+                <span
+                  className="t-caption"
+                  title="cms_recommendation_templates rows. Runtime adoption pending."
+                >
+                  editor live · runtime adopts next ?
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {recTemplates.length === 0 && (
+                  <p className="t-caption px-1">
+                    No recommendation templates yet.
+                  </p>
+                )}
+                {recTemplates.map((t) => (
+                  <div key={t.id} className={card} style={surf}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-[12.5px] font-semibold text-[var(--text-1)]">
+                        {t.context}
+                      </p>
+                      <span className="t-caption">{t.status}</span>
+                    </div>
+                    <textarea
+                      className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] text-[var(--text-1)] outline-none"
+                      rows={2}
+                      value={t.copy}
+                      onChange={(e) =>
+                        setRecTemplates((rs) =>
+                          rs.map((r) =>
+                            r.id === t.id
+                              ? { ...r, copy: e.target.value }
+                              : r
+                          )
+                        )
+                      }
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          const r = await saveRecTemplate(t);
+                          setBusy(false);
+                          setMsg(
+                            r.ok ? "Saved." : r.reason ?? "Failed"
+                          );
+                          if (r.ok) refreshTemplates();
+                        }}
+                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[11.5px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        Save
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              `Delete the "${t.context}" template?`
+                            )
+                          )
+                            return;
+                          setBusy(true);
+                          const r = await deleteRecTemplate(t.id);
+                          setBusy(false);
+                          setMsg(
+                            r.ok ? "Deleted." : r.reason ?? "Failed"
+                          );
+                          if (r.ok) refreshTemplates();
+                        }}
+                        className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-1.5 text-[11.5px] font-semibold text-[var(--alert)] disabled:opacity-40"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className={card} style={surf}>
+                <Eyebrow>Add recommendation template</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={newRecCtx}
+                    onChange={(e) => setNewRecCtx(e.target.value)}
+                    placeholder="context (e.g. low-recovery-morning)"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <textarea
+                    value={newRecCopy}
+                    onChange={(e) => setNewRecCopy(e.target.value)}
+                    rows={2}
+                    placeholder="copy"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <button
+                    disabled={
+                      busy || !newRecCtx.trim() || !newRecCopy.trim()
+                    }
+                    onClick={async () => {
+                      setBusy(true);
+                      const r = await saveRecTemplate({
+                        context: newRecCtx,
+                        copy: newRecCopy,
+                      });
+                      setBusy(false);
+                      setMsg(
+                        r.ok ? "Added." : r.reason ?? "Failed"
+                      );
+                      if (r.ok) {
+                        setNewRecCtx("");
+                        setNewRecCopy("");
+                        refreshTemplates();
+                      }
+                    }}
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                  >
+                    Add template
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "engine" && engineSub === "access" && (
+          <div className="space-y-3">
+            <p className="t-caption leading-relaxed">
+              Manage who can reach <code>/admin</code>. Each entry is a
+              Supabase user id (uuid). The signed-in user creates their
+              account through the normal app sign-up first; you then
+              paste their uid here. Anyone in this list gets full admin
+              access — there are no sub-roles.
+            </p>
+            <div className="space-y-1.5">
+              {admins.length === 0 && (
+                <p className="t-caption px-1">
+                  No admins yet (you must already be one to see this).
+                </p>
+              )}
+              {admins.map((a) => (
+                <div
+                  key={a.user_id}
+                  className="flex items-center justify-between gap-3 rounded-[var(--r-md)] p-3"
+                  style={surf}
+                  title={`Added ${new Date(a.added_at).toLocaleString()}`}
+                >
+                  <p className="truncate font-mono text-[11.5px] text-[var(--text-2)]">
+                    {a.user_id}
+                  </p>
+                  <button
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          `Remove ${a.user_id.slice(0, 8)}… from the admin allowlist? They lose /admin access immediately.`
+                        )
+                      )
+                        return;
+                      const r = await removeAdmin(a.user_id);
+                      setMsg(
+                        r.ok ? "Removed." : r.reason ?? "Failed"
+                      );
+                      if (r.ok) refreshAdmins();
+                    }}
+                    className="press shrink-0 text-[11px] font-semibold text-[var(--alert)]"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className={card} style={surf}>
+              <Eyebrow>Add admin</Eyebrow>
+              <input
+                value={newAdminId}
+                onChange={(e) => setNewAdminId(e.target.value)}
+                placeholder="user id (uuid)"
+                className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] font-mono text-[var(--text-1)] outline-none"
+              />
+              <button
+                disabled={busy || !newAdminId.trim()}
+                onClick={async () => {
+                  setBusy(true);
+                  const r = await addAdmin(newAdminId);
+                  setBusy(false);
+                  setMsg(r.ok ? "Added." : r.reason ?? "Failed");
+                  if (r.ok) {
+                    setNewAdminId("");
+                    refreshAdmins();
+                  }
+                }}
+                className="press tr-fast mt-2 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+              >
+                {busy ? "…" : "Grant admin"}
+              </button>
+            </div>
+            <p className="t-caption leading-relaxed">
+              Tip: find a user&apos;s uid in Supabase → <b>Authentication
+              </b> → <b>Users</b> → click the user → copy the{" "}
+              <code>id</code> column.
+            </p>
           </div>
         )}
 

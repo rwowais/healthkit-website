@@ -393,6 +393,320 @@ export async function listExplanations(
     return [];
   }
 }
+// ── Admin allowlist ─────────────────────────────────────────────────
+export interface AdminRow {
+  user_id: string;
+  added_at: string;
+}
+export async function listAdmins(): Promise<AdminRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_admins")
+      .select("user_id, added_at")
+      .order("added_at");
+    return (data ?? []) as AdminRow[];
+  } catch {
+    return [];
+  }
+}
+export async function addAdmin(
+  userId: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  const id = userId.trim();
+  // Loose uuid check — Supabase will reject otherwise; this gives a
+  // nicer error than a Postgres syntax message.
+  if (!/^[0-9a-f-]{36}$/i.test(id))
+    return { ok: false, reason: "User id must be a uuid." };
+  try {
+    const { error } = await sb.from("cms_admins").insert({ user_id: id });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Add failed.",
+    };
+  }
+}
+export async function removeAdmin(
+  userId: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  // Lockout guard: never let an admin remove themselves from the UI;
+  // they'd lose access immediately and need SQL to recover.
+  const me = await getUserId();
+  if (me && me === userId)
+    return {
+      ok: false,
+      reason: "Refusing to remove yourself — you'd be locked out.",
+    };
+  try {
+    const { error } = await sb
+      .from("cms_admins")
+      .delete()
+      .eq("user_id", userId);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Remove failed.",
+    };
+  }
+}
+
+// ── Audit log (read-only) ───────────────────────────────────────────
+export interface AuditRow {
+  id: number;
+  entity_type: string;
+  entity_id: string | null;
+  action: string;
+  diff: unknown;
+  author: string | null;
+  created_at: string;
+}
+export async function listAuditLog(limit = 30): Promise<AuditRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_audit_log")
+      .select(
+        "id, entity_type, entity_id, action, diff, author, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    return (data ?? []) as AuditRow[];
+  } catch {
+    return [];
+  }
+}
+
+// ── Intelligence config (key/value, runtime adoption pending) ───────
+export interface ConfigOverrideRow {
+  key: string;
+  value: unknown;
+  description: string | null;
+}
+export async function listConfigOverrides(): Promise<ConfigOverrideRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_intelligence_config")
+      .select("key, value, description")
+      .order("key");
+    return (data ?? []) as ConfigOverrideRow[];
+  } catch {
+    return [];
+  }
+}
+export async function upsertConfigOverride(input: {
+  key: string;
+  value: unknown;
+  description?: string;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  if (!input.key.trim()) return { ok: false, reason: "Key required." };
+  try {
+    const row = {
+      key: input.key.trim(),
+      value: input.value,
+      description: input.description?.trim() || null,
+    };
+    const { error } = await sb
+      .from("cms_intelligence_config")
+      .upsert(row, { onConflict: "key" });
+    if (error) return { ok: false, reason: error.message };
+    await rev(
+      sb,
+      "config",
+      input.key.trim(),
+      1,
+      row,
+      "upsert config override"
+    );
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Save failed.",
+    };
+  }
+}
+export async function deleteConfigOverride(
+  key: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { error } = await sb
+      .from("cms_intelligence_config")
+      .delete()
+      .eq("key", key);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Delete failed.",
+    };
+  }
+}
+
+// ── Insight templates (runtime adoption pending) ───────────────────
+export interface InsightTemplateRow {
+  id: string;
+  kind: string;
+  template: string;
+  conditions: unknown;
+  status: string;
+  version: number;
+}
+export async function listInsightTemplates(): Promise<
+  InsightTemplateRow[]
+> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_insight_templates")
+      .select("id, kind, template, conditions, status, version")
+      .order("kind");
+    return (data ?? []) as InsightTemplateRow[];
+  } catch {
+    return [];
+  }
+}
+export async function saveInsightTemplate(
+  t: Partial<InsightTemplateRow> & {
+    kind: string;
+    template: string;
+  }
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  if (!t.kind.trim() || !t.template.trim())
+    return { ok: false, reason: "Kind + template required." };
+  try {
+    const row = {
+      kind: t.kind.trim(),
+      template: t.template,
+      conditions: t.conditions ?? {},
+      status: t.status ?? "draft",
+      version: ((t.version as number | undefined) ?? 0) + 1,
+    };
+    const { error } = t.id
+      ? await sb
+          .from("cms_insight_templates")
+          .update(row)
+          .eq("id", t.id)
+      : await sb.from("cms_insight_templates").insert(row);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Save failed.",
+    };
+  }
+}
+export async function deleteInsightTemplate(
+  id: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { error } = await sb
+      .from("cms_insight_templates")
+      .delete()
+      .eq("id", id);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Delete failed.",
+    };
+  }
+}
+
+// ── Recommendation templates (runtime adoption pending) ────────────
+export interface RecTemplateRow {
+  id: string;
+  context: string;
+  copy: string;
+  variables: unknown;
+  status: string;
+}
+export async function listRecTemplates(): Promise<RecTemplateRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_recommendation_templates")
+      .select("id, context, copy, variables, status")
+      .order("context");
+    return (data ?? []) as RecTemplateRow[];
+  } catch {
+    return [];
+  }
+}
+export async function saveRecTemplate(
+  t: Partial<RecTemplateRow> & { context: string; copy: string }
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  if (!t.context.trim() || !t.copy.trim())
+    return { ok: false, reason: "Context + copy required." };
+  try {
+    const row = {
+      context: t.context.trim(),
+      copy: t.copy,
+      variables: t.variables ?? [],
+      status: t.status ?? "draft",
+    };
+    const { error } = t.id
+      ? await sb
+          .from("cms_recommendation_templates")
+          .update(row)
+          .eq("id", t.id)
+      : await sb.from("cms_recommendation_templates").insert(row);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Save failed.",
+    };
+  }
+}
+export async function deleteRecTemplate(
+  id: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { error } = await sb
+      .from("cms_recommendation_templates")
+      .delete()
+      .eq("id", id);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Delete failed.",
+    };
+  }
+}
+
 /** Upsert-by-(target,kind): one explanation per (target, kind). */
 export async function upsertExplanation(input: {
   targetType: string;

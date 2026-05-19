@@ -77,6 +77,21 @@ drop policy if exists "admins self-read" on public.cms_admins;
 create policy "admins self-read" on public.cms_admins
   for select using (auth.uid() = user_id);
 
+-- Wave C: let an admin list + manage the allowlist from the UI
+-- (otherwise admin onboarding requires the SQL editor). The
+-- self-read policy above stays so non-admins can still detect their
+-- own admin status. cms_is_admin() is a security-definer function so
+-- referencing it here avoids the recursive policy-on-policy trap.
+drop policy if exists "admin list all" on public.cms_admins;
+create policy "admin list all" on public.cms_admins
+  for select using (public.cms_is_admin());
+drop policy if exists "admin insert" on public.cms_admins;
+create policy "admin insert" on public.cms_admins
+  for insert with check (public.cms_is_admin());
+drop policy if exists "admin delete" on public.cms_admins;
+create policy "admin delete" on public.cms_admins
+  for delete using (public.cms_is_admin());
+
 create or replace function public.cms_is_admin()
 returns boolean language sql stable security definer
 set search_path = public as $$
