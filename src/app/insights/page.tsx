@@ -16,6 +16,7 @@ import {
 import { getAccess } from "@/lib/entitlements";
 import { UpgradeCTA } from "@/components/PremiumGate";
 import { compileTimeline } from "@/lib/engine";
+import { personalModel, identityReflection } from "@/lib/reflect";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 
@@ -112,6 +113,11 @@ export default function InsightsPage() {
   );
   const ks = useMemo(() => keystone(intelState), [intelState]);
   const works = useMemo(() => whatWorks(intelState), [intelState]);
+  const model = useMemo(() => personalModel(intelState), [intelState]);
+  const identity = useMemo(
+    () => identityReflection(intelState),
+    [intelState]
+  );
   const topStreaks = useMemo(() => {
     return compileTimeline(intelState, 0)
       .map((it) => ({
@@ -129,6 +135,8 @@ export default function InsightsPage() {
     !ks &&
     !works &&
     !review &&
+    !identity &&
+    model.length === 0 &&
     topStreaks.length === 0;
 
   const delayed = !access.premium && !nothing;
@@ -166,6 +174,65 @@ export default function InsightsPage() {
 
         {(
           <>
+        {/* Identity reflection — who you've become (the emotional anchor) */}
+        {identity && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="panel relative overflow-hidden p-6"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(140% 100% at 50% 0%, color-mix(in srgb, var(--warm) 22%, transparent), transparent 62%)",
+              }}
+            />
+            <div className="relative">
+              <Eyebrow color="var(--warm)">Identity</Eyebrow>
+              <p className="mt-3 text-[20px] font-bold leading-snug text-[var(--text-1)]">
+                {identity.headline}
+              </p>
+              <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
+                {identity.body}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* What I've learned about you — the compounding personal model */}
+        {model.length > 0 && (
+          <div>
+            <Eyebrow>What I&apos;ve learned about you</Eyebrow>
+            <div className="well mt-3 space-y-1.5 p-1.5">
+              {model.map((t) => (
+                <div
+                  key={t.label}
+                  className="row flex items-start gap-3.5 px-3.5 py-3"
+                >
+                  <span
+                    className="chip h-9 w-9 shrink-0"
+                    style={{
+                      background: "var(--surface-3)",
+                      color: "var(--recovery)",
+                    }}
+                  >
+                    <Icon name={t.icon} size={17} stroke={1.7} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[14px] font-semibold text-[var(--text-1)]">
+                      {t.label}
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--text-3)]">
+                      {t.detail}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Weekly review — calm narrative */}
         {review && (
           <motion.div
@@ -190,6 +257,11 @@ export default function InsightsPage() {
               <p className="mt-3 text-[19px] font-bold leading-snug text-[var(--text-1)]">
                 {review.headline}
               </p>
+              {review.continuity && (
+                <p className="mt-3 text-[13px] italic leading-relaxed text-[var(--text-3)]">
+                  {review.continuity}
+                </p>
+              )}
               <div className="mt-4 space-y-2">
                 {review.wins.map((w) => (
                   <div key={w} className="flex items-center gap-2.5">

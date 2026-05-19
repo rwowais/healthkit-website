@@ -399,6 +399,8 @@ export interface WeeklyReview {
   wins: string[];
   focus: string;
   delta: number | null;
+  /** Memory: did last week's focus actually hold? (coach continuity) */
+  continuity?: string;
 }
 
 const DOW = [
@@ -482,6 +484,35 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
       ? `Next week, tighten one thing: “${focusTitle}”. It's your highest-leverage gap.`
       : `Next week, hold the line. Consistency at this level compounds quietly.`;
 
+  // Coach continuity: re-derive what we would have flagged LAST week and
+  // report whether it actually moved — the system "remembering".
+  let continuity: string | undefined;
+  const prevTracked = dayList(7).filter((l) => l.score > 0);
+  if (prevTracked.length >= 4) {
+    let pKey: string | null = null;
+    let pTitle: string | null = null;
+    let pMin = 99;
+    for (const it of essentials) {
+      const c = prevTracked.filter(
+        (l) => l.behaviorCompletions?.[it.canonicalKey]
+      ).length;
+      if (c < pMin) {
+        pMin = c;
+        pKey = it.canonicalKey;
+        pTitle = it.title;
+      }
+    }
+    if (pKey && pTitle && pMin < prevTracked.length) {
+      const nowC = tracked.filter(
+        (l) => l.behaviorCompletions?.[pKey]
+      ).length;
+      continuity =
+        nowC > pMin
+          ? `Last week we flagged “${pTitle}” — you lifted it to ${nowC} of ${tracked.length} days. It's holding.`
+          : `Last week's focus was “${pTitle}” — still light (${nowC} of ${tracked.length}). One small re-anchor, not a verdict.`;
+    }
+  }
+
   let headline: string;
   if (delta != null && delta >= 5)
     headline = `A stronger week — up ${delta} points. Momentum is real.`;
@@ -501,6 +532,7 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
     wins,
     focus,
     delta,
+    continuity,
   };
 }
 
