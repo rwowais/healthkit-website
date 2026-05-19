@@ -352,8 +352,8 @@ export function adapt(state: AppState): Adaptation {
   };
 }
 
-const RECOVERY_DEMOTE = new Set(["strength", "zone2", "deep-work", "vo2"]);
-const RECOVERY_PROMOTE = new Set([
+export const RECOVERY_DEMOTE = new Set(["strength", "zone2", "deep-work", "vo2"]);
+export const RECOVERY_PROMOTE = new Set([
   "nsdr",
   "extra-sleep",
   "wind-down",
@@ -364,8 +364,8 @@ const RECOVERY_PROMOTE = new Set([
 // Restraint behaviors that semantically forbid hard training. When one
 // is active we must not also instruct the user to train hard — that's a
 // contradiction, not a protocol.
-const RESTRAINT_KEYS = new Set(["no-intense"]);
-const TRAINING_KEYS = new Set(["strength", "zone2", "vo2", "sprint"]);
+export const RESTRAINT_KEYS = new Set(["no-intense"]);
+export const TRAINING_KEYS = new Set(["strength", "zone2", "vo2", "sprint"]);
 
 /** A deterministic, stable rank: leverage desc, then block, then key. */
 function stableRank(a: TimelineItem, b: TimelineItem): number {
@@ -605,7 +605,7 @@ export function timelineProgress(
 
 // ── Semantic leverage labels ──────────────────────────────────────
 
-const CIRCADIAN = new Set([
+export const CIRCADIAN = new Set([
   "morning-sunlight",
   "dim-lights",
   "screens-off",
