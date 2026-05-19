@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorker from "@/components/ServiceWorker";
+import SyncConflictPrompt from "@/components/SyncConflictPrompt";
 
 export const metadata: Metadata = {
   title: "Protocolize — Longevity Intelligence",
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="en" style={{ colorScheme: "dark" }}>
       <body className="antialiased">
         {children}
+        <SyncConflictPrompt />
         <ServiceWorker />
       </body>
     </html>

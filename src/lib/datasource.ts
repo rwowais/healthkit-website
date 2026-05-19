@@ -87,6 +87,31 @@ function markReconciled(uid: string): void {
   }
 }
 
+/**
+ * On any auth identity change (sign-out, or a *different* user signing
+ * in on this device) the per-session sync singletons must reset, or the
+ * conflict prompt can't re-evaluate for the new account and a stale
+ * `updated_at` could clobber the new user's data. Subscribed once.
+ */
+let lastSeenUid: string | null = null;
+let authResetBound = false;
+function bindAuthReset() {
+  if (authResetBound) return;
+  const sb = getSupabase();
+  if (!sb) return;
+  authResetBound = true;
+  sb.auth.onAuthStateChange((_e, session) => {
+    const uid = session?.user?.id ?? null;
+    if (uid !== lastSeenUid) {
+      lastSeenUid = uid;
+      conflictHandled = false;
+      conflictEvaluated = false;
+      pendingConflict = null;
+      lastCloudUpdatedAt = null;
+    }
+  });
+}
+
 export function getPendingConflict() {
   return pendingConflict;
 }
@@ -327,6 +352,7 @@ class SupabaseDataSource implements DataSource {
   }
 
   async load(): Promise<AppState> {
+    bindAuthReset();
     const sb = getSupabase();
     if (!sb) return loadState();
     try {

@@ -438,14 +438,25 @@ export function shapeTimeline(
   } else if (mode === "rebuild") {
     // Deterministic, block-diverse, keystone-first: at most 2 per block,
     // exactly the 3 highest-leverage that span the day — never a random
-    // 3 that all land in the morning.
-    const ranked = [...items].sort(stableRank);
+    // 3 that all land in the morning. If a restraint is active, training
+    // behaviors are excluded from the slots up front, so reconciliation
+    // can't later mute a kept item and break the "exactly 3" contract.
+    const restraint = items.some((it) =>
+      RESTRAINT_KEYS.has(it.canonicalKey)
+    );
+    const eligible = items.filter(
+      (it) => !(restraint && TRAINING_KEYS.has(it.canonicalKey))
+    );
+    const ranked = [...eligible].sort(stableRank);
     const perBlock = new Map<string, number>();
     const keep = new Set<string>();
     const ksKey = opts.keystoneKey;
-    if (ksKey && items.some((i) => i.canonicalKey === ksKey)) {
+    if (
+      ksKey &&
+      eligible.some((i) => i.canonicalKey === ksKey)
+    ) {
       keep.add(ksKey);
-      const ksItem = items.find((i) => i.canonicalKey === ksKey)!;
+      const ksItem = eligible.find((i) => i.canonicalKey === ksKey)!;
       perBlock.set(ksItem.block, 1);
     }
     for (const it of ranked) {

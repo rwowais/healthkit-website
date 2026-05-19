@@ -242,11 +242,12 @@ export default function InsightsPage() {
                 {ks.title}
               </p>
               <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-                On days you do this, your overall score runs{" "}
+                On the days you do this, you keep{" "}
                 <span className="font-bold text-[var(--warm)]">
-                  {ks.delta} points higher
-                </span>
-                . If you protect one behavior, make it this one.
+                  {ks.delta} {ks.delta === 1 ? "point" : "points"} more
+                </span>{" "}
+                of everything else. If you protect one behavior, make it
+                this one.
               </p>
             </div>
           </motion.div>

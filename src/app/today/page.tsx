@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getLogForDate } from "@/lib/storage";
+import { getPendingConflict } from "@/lib/datasource";
 import {
   compileTimeline,
   adapt,
@@ -159,7 +160,11 @@ export default function TodayPage() {
     if (
       !loading &&
       !state.settings.completedOnboarding &&
-      !redirectedRef.current
+      !redirectedRef.current &&
+      // Don't bounce to onboarding while a sync-conflict choice is
+      // pending — the held local state is intentionally not authoritative
+      // yet, and the prompt must resolve first.
+      !getPendingConflict()
     ) {
       redirectedRef.current = true;
       router.replace("/onboarding");

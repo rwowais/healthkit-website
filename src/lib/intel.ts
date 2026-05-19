@@ -75,7 +75,7 @@ export function behaviorStats(
 export interface Keystone {
   key: string;
   title: string;
-  delta: number; // % points higher on days done
+  delta: number; // pts more of *other* behaviors kept on days done
 }
 
 /**
@@ -111,29 +111,26 @@ export function keystone(state: AppState): Keystone | null {
       ? 0
       : xs.reduce((s, v) => s + (v - m) ** 2, 0) / (xs.length - 1);
 
-  // The more behaviors we scan, the stronger the effect must be.
-  const dThreshold = 0.5 + 0.07 * Math.log2(Math.max(items.length, 2));
+  // The more behaviors we scan, the stronger the effect must be — but
+  // tuned to actually fire for a real, consistent user (the prior bar
+  // of d>=0.77 + >=8/group made it a dead feature).
+  const dThreshold = 0.4 + 0.05 * Math.log2(Math.max(items.length, 2));
 
   let best: (Keystone & { d: number }) | null = null;
   for (const it of items) {
     const k = it.canonicalKey;
     const otherDone: number[] = [];
     const otherNot: number[] = [];
-    const scoreDone: number[] = [];
-    const scoreNot: number[] = [];
     for (const l of logs) {
       const bc = l.behaviorCompletions ?? {};
       let others = 0;
       for (const key in bc) if (key !== k && bc[key]) others++;
-      if (bc[k]) {
-        otherDone.push(others);
-        scoreDone.push(l.score);
-      } else {
-        otherNot.push(others);
-        scoreNot.push(l.score);
-      }
+      (bc[k] ? otherDone : otherNot).push(others);
     }
-    if (otherDone.length < 8 || otherNot.length < 8) continue;
+    // A keystone is, by definition, done most days — so the "not done"
+    // bucket is naturally small. Require a solid "done" sample but only
+    // a few contrast days.
+    if (otherDone.length < 8 || otherNot.length < 4) continue;
     const mD = mean(otherDone);
     const mN = mean(otherNot);
     if (mD <= mN) continue;
@@ -145,9 +142,13 @@ export function keystone(state: AppState): Keystone | null {
     const d = pooledSD > 0 ? (mD - mN) / pooledSD : 99;
     if (d < dThreshold) continue;
     if (!best || d > best.d) {
+      // De-circularised delta: the lift in *other* behaviors kept,
+      // expressed as percentage points (the score-based delta still
+      // included the behaviour's own completion — reverse causality).
+      const others = Math.max(items.length - 1, 1);
       const delta = Math.max(
         1,
-        Math.round(mean(scoreDone) - mean(scoreNot))
+        Math.round(((mD - mN) / others) * 100)
       );
       best = { key: k, title: it.title, delta, d };
     }
@@ -238,7 +239,9 @@ export function suggestions(state: AppState): Suggestion[] {
         id: `sug-keystone-${ks.key}`,
         kind: "progress",
         title: `Your keystone is slipping`,
-        body: `On days you do “${ks.title}” your score runs ${ks.delta} points higher — but it's been light lately. Re-anchor it tomorrow.`,
+        body: `On the days you do “${ks.title}” you keep ${ks.delta} ${
+          ks.delta === 1 ? "point" : "points"
+        } more of everything else — but it's been light lately. Re-anchor it tomorrow.`,
         cta: "Got it",
         action: { type: "none" },
       });

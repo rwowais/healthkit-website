@@ -40,6 +40,28 @@ import type {
   ProtocolPack,
 } from "@/lib/types";
 
+/**
+ * Canonical, key-order-independent serialization. The dedupe guard must
+ * survive a round-trip through `normalize()` (which rebuilds objects with
+ * a different key order); a raw JSON.stringify made every load look like
+ * a change → endless save→event→load→setState churn (write amplification
+ * on Supabase). Sorting keys makes a round-trip a true fixed point.
+ */
+function stableStringify(v: unknown): string {
+  return JSON.stringify(v, function repl(_k, val) {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      const o = val as Record<string, unknown>;
+      return Object.keys(o)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, k) => {
+          acc[k] = o[k];
+          return acc;
+        }, {});
+    }
+    return val;
+  });
+}
+
 export function useAppState() {
   const [state, setState] = useState<AppState>(getDefaultState);
   const [loading, setLoading] = useState(true);
@@ -50,8 +72,11 @@ export function useAppState() {
     activeDataSource.load().then((raw) => {
       if (!alive) return;
       const loaded = maybeExtendTrial(raw);
-      // Persist baseline so an extension is saved on next change.
-      lastJson.current = JSON.stringify(raw);
+      // Canonical baseline off the *pre-extension* state: if a trial
+      // extension was applied, state ≠ baseline → exactly one save fires
+      // and the extension persists; if not, a round-trip is a fixed
+      // point and there is no save/load churn.
+      lastJson.current = stableStringify(raw);
       setState(loaded);
       setLoading(false);
     });
@@ -80,7 +105,7 @@ export function useAppState() {
 
   useEffect(() => {
     if (loading) return;
-    const json = JSON.stringify(state);
+    const json = stableStringify(state);
     if (json === lastJson.current) return;
     lastJson.current = json;
     pendingSave.current = state;
@@ -106,11 +131,15 @@ export function useAppState() {
   useEffect(() => {
     if (loading) return;
     const sync = () => {
+      // Never clobber an unflushed local edit with a resync — the
+      // pending write wins and the next resync reconciles. This closes
+      // the "focus/visibility during the debounce window loses a toggle"
+      // race (and the concurrency-guard early-return variant).
+      if (pendingSave.current) return;
       activeDataSource.load().then((raw) => {
-        const j = JSON.stringify(raw);
+        if (pendingSave.current) return; // a mutation landed mid-load
+        const j = stableStringify(raw);
         if (j === lastJson.current) return;
-        // Keep the pre-extension baseline so an engagement-gated trial
-        // extension is persisted on the next mutation (matches initial load).
         lastJson.current = j;
         setState(maybeExtendTrial(raw));
       });

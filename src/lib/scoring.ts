@@ -139,8 +139,24 @@ function hasAnyActivity(log: DailyLog): boolean {
   );
   const hasSupplements = log.supplementEntries.some((s) => s.taken || s.skipped);
   const hasLegacy = log.completions.some((c) => c.completedAt !== null);
+  // The Protocol-OS timeline is the actual product surface — a day with
+  // any behavior completed (or a check-in) is unambiguously "active".
+  // Without this the streak never accrues for real users.
+  const hasBehavior = Object.values(log.behaviorCompletions ?? {}).some(
+    Boolean
+  );
+  const hasCheckin =
+    log.sleepLog?.sleepQuality != null || log.energyLevel != null;
 
-  return hasSleep || hasExercise || hasNutrition || hasSupplements || hasLegacy;
+  return (
+    hasSleep ||
+    hasExercise ||
+    hasNutrition ||
+    hasSupplements ||
+    hasLegacy ||
+    hasBehavior ||
+    hasCheckin
+  );
 }
 
 function formatDateKey(date: Date): string {
