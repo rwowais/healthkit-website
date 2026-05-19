@@ -416,12 +416,16 @@ class SupabaseDataSource implements DataSource {
   }
 
   async save(state: AppState): Promise<void> {
-    saveState(state); // offline-first cache + same-tab notify
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(STATE_EVENT));
-    }
+    saveState(state); // offline-first cache
+    const notify = () => {
+      if (typeof window !== "undefined")
+        window.dispatchEvent(new CustomEvent(STATE_EVENT));
+    };
     const sb = getSupabase();
-    if (!sb) return;
+    if (!sb) {
+      notify();
+      return;
+    }
     try {
       const userId = await getUserId();
       if (!userId) return;
@@ -439,9 +443,8 @@ class SupabaseDataSource implements DataSource {
         lastCloudUpdatedAt &&
         head.updated_at > lastCloudUpdatedAt
       ) {
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent(STATE_EVENT));
-        }
+        // Another device is ahead — let other tabs resync to it.
+        notify();
         return;
       }
 
@@ -458,6 +461,10 @@ class SupabaseDataSource implements DataSource {
       // the document write above already succeeded and stays the safety
       // net through Phase 2, so a logs hiccup never surfaces an error.
       await this.writeChangedDays(sb, userId, state);
+
+      // Notify other tabs ONLY after the cloud copy is durable, so a
+      // resync never reads a pre-write row.
+      notify();
     } catch {
       // Local cache still holds; tell the user the cloud copy is behind
       // rather than letting the failure pass invisibly.

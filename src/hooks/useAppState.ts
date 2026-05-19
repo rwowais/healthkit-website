@@ -91,6 +91,12 @@ export function useAppState() {
   // so nothing is lost.
   const pendingSave = useRef<AppState | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True for the entire duration of a save (incl. the cloud round-trip).
+  // SupabaseDataSource.save() dispatches the "state changed" event before
+  // the upsert resolves; without this, the same page's resync reads the
+  // *old* cloud row and reverts the optimistic edit — the click "shows
+  // unchecked" until a manual refresh. Suppress self-resync while saving.
+  const saving = useRef(false);
   const flush = useRef(() => {
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
@@ -99,7 +105,10 @@ export function useAppState() {
     if (pendingSave.current) {
       const s = pendingSave.current;
       pendingSave.current = null;
-      void activeDataSource.save(s);
+      saving.current = true;
+      Promise.resolve(activeDataSource.save(s)).finally(() => {
+        saving.current = false;
+      });
     }
   });
 
@@ -131,13 +140,13 @@ export function useAppState() {
   useEffect(() => {
     if (loading) return;
     const sync = () => {
-      // Never clobber an unflushed local edit with a resync — the
-      // pending write wins and the next resync reconciles. This closes
-      // the "focus/visibility during the debounce window loses a toggle"
-      // race (and the concurrency-guard early-return variant).
-      if (pendingSave.current) return;
+      // Never clobber an unflushed OR in-flight local write with a
+      // resync — the local write wins and a later resync reconciles.
+      // Closes both the debounce-window race and the self-clobber where
+      // our own save's "changed" event reloads a stale cloud row.
+      if (pendingSave.current || saving.current) return;
       activeDataSource.load().then((raw) => {
-        if (pendingSave.current) return; // a mutation landed mid-load
+        if (pendingSave.current || saving.current) return;
         const j = stableStringify(raw);
         if (j === lastJson.current) return;
         lastJson.current = j;
