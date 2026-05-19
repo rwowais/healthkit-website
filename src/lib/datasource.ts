@@ -351,6 +351,24 @@ class SupabaseDataSource implements DataSource {
     }
   }
 
+  /** The row's server-clock updated_at (post-trigger) — the only value
+   *  safe to compare in the concurrency guard. */
+  private async readStateUpdatedAt(
+    sb: NonNullable<ReturnType<typeof getSupabase>>,
+    userId: string
+  ): Promise<string | null> {
+    try {
+      const { data } = await sb
+        .from(STATE_TABLE)
+        .select("updated_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+      return (data?.updated_at as string | undefined) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async load(): Promise<AppState> {
     bindAuthReset();
     const sb = getSupabase();
@@ -408,7 +426,8 @@ class SupabaseDataSource implements DataSource {
         state: local,
         updated_at: nowIso,
       });
-      lastCloudUpdatedAt = nowIso;
+      lastCloudUpdatedAt =
+        (await this.readStateUpdatedAt(sb, userId)) ?? nowIso;
       return await this.reconcileLogs(sb, userId, local);
     } catch {
       return loadState(); // offline / transient → local cache
@@ -455,7 +474,13 @@ class SupabaseDataSource implements DataSource {
         updated_at: nowIso,
       });
       if (error) throw error;
-      lastCloudUpdatedAt = nowIso;
+      // CRITICAL: the DB trigger rewrites updated_at with the *server*
+      // clock. Baseline the concurrency guard off that server value, not
+      // our client clock — otherwise any client/server skew makes the
+      // next save mistake our own write for a remote one and silently
+      // drop it (every change after the first is lost).
+      lastCloudUpdatedAt =
+        (await this.readStateUpdatedAt(sb, userId)) ?? nowIso;
 
       // Dual-write the changed day(s) to the per-day table. Best effort:
       // the document write above already succeeded and stays the safety

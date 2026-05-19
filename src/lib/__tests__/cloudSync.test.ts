@@ -15,6 +15,7 @@ const fake = vi.hoisted(() => {
   type Row = Record<string, unknown>;
   const state = {
     latencyMs: 8,
+    serverSkewMs: 90_000, // server clock 90s ahead of client
     session: null as null | { user: { id: string } },
     authCbs: [] as ((e: string, s: unknown) => void)[],
     tables: new Map<string, Map<string, Row>>(),
@@ -63,7 +64,17 @@ const fake = vi.hoisted(() => {
         const key = keyCols.map((k) => row[k]).join("::");
         const exists = tbl(this.table).has(key);
         if (exists && opts?.ignoreDuplicates) continue;
-        tbl(this.table).set(key, { ...row });
+        const stored = { ...row };
+        // Mimic the DB `before update` trigger: the server rewrites
+        // updated_at with the SERVER clock, which is skewed ahead of the
+        // client. This is what made client-vs-server timestamp compares
+        // silently drop every save after the first.
+        if (this.table === "protocolize_state") {
+          stored.updated_at = new Date(
+            Date.now() + state.serverSkewMs
+          ).toISOString();
+        }
+        tbl(this.table).set(key, stored);
       }
       state.lastUpsertAt.set(this.table, Date.now());
       return { data: null, error: null };
@@ -140,6 +151,7 @@ const fake = vi.hoisted(() => {
       state.session = null;
       state.authCbs = [];
       state.latencyMs = 8;
+      state.serverSkewMs = 90_000;
     },
   };
 });
@@ -324,5 +336,29 @@ describe("cloud sync — regression class", () => {
       .map((r) => r.log_date)
       .sort();
     expect(dates).toEqual(["2026-05-17", "2026-05-19"]);
+  });
+
+  it("T7: server clock ahead of client — the SECOND save still persists (no silent drop)", async () => {
+    fake.setSession({ user: { id: "u6" } });
+    fake.state.serverSkewMs = 120_000; // server 2 min ahead
+    const { ds } = await fresh();
+    await ds.activeDataSource.load(); // baseline (uploads default)
+
+    await ds.activeDataSource.save(
+      makeState({ settings: { completedOnboarding: true, name: "first" } })
+    );
+    // The concurrency guard must NOT mistake our own (server-stamped)
+    // write for a remote one and skip this second save.
+    await ds.activeDataSource.save(
+      makeState({
+        settings: { completedOnboarding: true, name: "second" },
+        currentStreak: 7,
+      })
+    );
+
+    const row = fake.stateRow("u6")!;
+    expect(row.state.settings?.name).toBe("second");
+    const back = await ds.activeDataSource.load();
+    expect(back.currentStreak).toBe(7);
   });
 });
