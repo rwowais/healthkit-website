@@ -129,6 +129,19 @@ export interface Signals {
   trackedDays: number;
   bioConcern: string | null;
   bioRecoveryFlag: boolean;
+  /**
+   * Wearable readiness seam (0-100). Null until a device stream exists;
+   * when present it *replaces* the subjective recovery proxy. Nothing
+   * downstream changes — adapt() only reads recoveryProxy.
+   */
+  readiness: number | null;
+}
+
+/** Future wearable hook: return device readiness (0-100) or null. */
+function deviceReadiness(_state: AppState): number | null {
+  // No wearable integration yet — the seam is here so HRV/sleep can plug
+  // in without touching adapt() or any screen.
+  return null;
 }
 
 // Recovery-relevant markers whose "Watch" band should soften the day.
@@ -216,6 +229,9 @@ export function getSignals(state: AppState): Signals {
       parts.reduce((s, p) => s + p.v * p.w, 0) / ws
     );
   }
+  // Device readiness, when available, supersedes the subjective proxy.
+  const readiness = deviceReadiness(state);
+  if (readiness != null) recoveryProxy = readiness;
 
   // evening adherence yesterday
   let eveningMissedYesterday = false;
@@ -243,6 +259,7 @@ export function getSignals(state: AppState): Signals {
     trackedDays: recent.length,
     bioConcern: bio.text,
     bioRecoveryFlag: bio.recovery,
+    readiness,
   };
 }
 
@@ -344,35 +361,125 @@ const RECOVERY_PROMOTE = new Set([
   "morning-sunlight",
 ]);
 
+// Restraint behaviors that semantically forbid hard training. When one
+// is active we must not also instruct the user to train hard — that's a
+// contradiction, not a protocol.
+const RESTRAINT_KEYS = new Set(["no-intense"]);
+const TRAINING_KEYS = new Set(["strength", "zone2", "vo2", "sprint"]);
+
+/** A deterministic, stable rank: leverage desc, then block, then key. */
+function stableRank(a: TimelineItem, b: TimelineItem): number {
+  return (
+    b.leverage - a.leverage ||
+    BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block] ||
+    a.canonicalKey.localeCompare(b.canonicalKey)
+  );
+}
+
+/** At scale, never let a load-reduction mode mute a block to nothing. */
+function guaranteePerBlock(items: TimelineItem[]): TimelineItem[] {
+  const byBlock = new Map<string, TimelineItem[]>();
+  for (const it of items) {
+    (byBlock.get(it.block) ?? byBlock.set(it.block, []).get(it.block)!).push(
+      it
+    );
+  }
+  const keepKeys = new Set<string>();
+  for (const group of byBlock.values()) {
+    if (group.some((g) => !g.muted)) continue;
+    const top = [...group].sort(stableRank)[0];
+    if (top) keepKeys.add(top.canonicalKey);
+  }
+  return keepKeys.size
+    ? items.map((it) =>
+        keepKeys.has(it.canonicalKey) ? { ...it, muted: false } : it
+      )
+    : items;
+}
+
 /** Apply the adaptation: mute + reprioritize for reduced cognitive load. */
 export function shapeTimeline(
   items: TimelineItem[],
-  mode: AdaptMode
+  mode: AdaptMode,
+  opts: { keystoneKey?: string } = {}
 ): TimelineItem[] {
+  let shaped: TimelineItem[];
+
   if (mode === "essentials") {
-    return items.map((it) => ({ ...it, muted: it.leverage < 3 }));
-  }
-  if (mode === "recovery") {
-    const shaped = items.map((it) => ({
+    shaped = items.map((it) => ({ ...it, muted: it.leverage < 3 }));
+    shaped = guaranteePerBlock(shaped);
+    // Ceiling: if "essentials" still shows a wall (power users with many
+    // leverage-3 behaviors), keep the strongest 7 and rest the others —
+    // the whole point is reduced load.
+    const visible = shaped
+      .filter((i) => !i.muted)
+      .sort(stableRank);
+    if (visible.length > 7) {
+      const keep = new Set(visible.slice(0, 7).map((i) => i.canonicalKey));
+      shaped = shaped.map((it) =>
+        it.muted || keep.has(it.canonicalKey)
+          ? it
+          : { ...it, muted: true }
+      );
+    }
+  } else if (mode === "recovery") {
+    shaped = items
+      .map((it) => ({
+        ...it,
+        muted: RECOVERY_DEMOTE.has(it.canonicalKey),
+      }))
+      .sort(
+        (a, b) =>
+          (RECOVERY_PROMOTE.has(b.canonicalKey) ? 1 : 0) -
+            (RECOVERY_PROMOTE.has(a.canonicalKey) ? 1 : 0) ||
+          BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block]
+      );
+    shaped = guaranteePerBlock(shaped);
+  } else if (mode === "rebuild") {
+    // Deterministic, block-diverse, keystone-first: at most 2 per block,
+    // exactly the 3 highest-leverage that span the day — never a random
+    // 3 that all land in the morning.
+    const ranked = [...items].sort(stableRank);
+    const perBlock = new Map<string, number>();
+    const keep = new Set<string>();
+    const ksKey = opts.keystoneKey;
+    if (ksKey && items.some((i) => i.canonicalKey === ksKey)) {
+      keep.add(ksKey);
+      const ksItem = items.find((i) => i.canonicalKey === ksKey)!;
+      perBlock.set(ksItem.block, 1);
+    }
+    for (const it of ranked) {
+      if (keep.size >= 3) break;
+      if (keep.has(it.canonicalKey)) continue;
+      const n = perBlock.get(it.block) ?? 0;
+      if (n >= 2) continue;
+      keep.add(it.canonicalKey);
+      perBlock.set(it.block, n + 1);
+    }
+    shaped = items.map((it) => ({
       ...it,
-      muted: RECOVERY_DEMOTE.has(it.canonicalKey),
+      muted: !keep.has(it.canonicalKey),
     }));
-    return shaped.sort(
-      (a, b) =>
-        (RECOVERY_PROMOTE.has(b.canonicalKey) ? 1 : 0) -
-          (RECOVERY_PROMOTE.has(a.canonicalKey) ? 1 : 0) ||
-        BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block]
+  } else if (mode === "lighter") {
+    shaped = items.map((it) => ({ ...it, muted: it.leverage === 1 }));
+    shaped = guaranteePerBlock(shaped);
+  } else {
+    shaped = items;
+  }
+
+  // Always-on conflict reconciliation: if an active restraint behavior
+  // forbids hard training, mute the training behaviors rather than
+  // present the user with contradictory instructions.
+  const restraintActive = shaped.some(
+    (it) => RESTRAINT_KEYS.has(it.canonicalKey) && !it.muted
+  );
+  if (restraintActive) {
+    shaped = shaped.map((it) =>
+      TRAINING_KEYS.has(it.canonicalKey) ? { ...it, muted: true } : it
     );
   }
-  if (mode === "rebuild") {
-    const ranked = [...items].sort((a, b) => b.leverage - a.leverage);
-    const keep = new Set(ranked.slice(0, 3).map((i) => i.canonicalKey));
-    return items.map((it) => ({ ...it, muted: !keep.has(it.canonicalKey) }));
-  }
-  if (mode === "lighter") {
-    return items.map((it) => ({ ...it, muted: it.leverage === 1 }));
-  }
-  return items;
+
+  return shaped;
 }
 
 export function blockLabel(b: TimeBlock): string {

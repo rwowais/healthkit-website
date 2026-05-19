@@ -36,3 +36,27 @@ export function getSupabase(): SupabaseClient | null {
 
 /** Row shape in the `protocolize_state` table. */
 export const STATE_TABLE = "protocolize_state";
+
+/** Per-day log rows (config stays in STATE_TABLE). */
+export const LOGS_TABLE = "protocolize_logs";
+
+/**
+ * Cached user id. `getSession()` is local (no network) unlike
+ * `getUser()`, which we were calling on *every* save. Cache + refresh
+ * on auth changes so a mutation never costs a round-trip.
+ */
+let cachedUserId: string | null | undefined;
+
+export async function getUserId(): Promise<string | null> {
+  if (cachedUserId !== undefined) return cachedUserId;
+  const sb = getSupabase();
+  if (!sb) return (cachedUserId = null);
+  const {
+    data: { session },
+  } = await sb.auth.getSession();
+  cachedUserId = session?.user?.id ?? null;
+  sb.auth.onAuthStateChange((_e, s) => {
+    cachedUserId = s?.user?.id ?? null;
+  });
+  return cachedUserId;
+}

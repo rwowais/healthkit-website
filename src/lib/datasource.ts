@@ -9,7 +9,12 @@
 import type { AppState } from "./types";
 import { loadState, saveState, SAVE_ERROR_EVENT } from "./storage";
 import { STORAGE_KEY } from "./constants";
-import { getSupabase, supabaseEnabled, STATE_TABLE } from "./supabase";
+import {
+  getSupabase,
+  supabaseEnabled,
+  STATE_TABLE,
+  getUserId,
+} from "./supabase";
 
 export interface DataSource {
   readonly kind: "local" | "supabase";
@@ -48,6 +53,8 @@ export const CONFLICT_EVENT = "pz:sync-conflict";
 
 let pendingConflict: { local: AppState; cloud: AppState } | null = null;
 let conflictHandled = false;
+/** updated_at we last observed — used for optimistic concurrency. */
+let lastCloudUpdatedAt: string | null = null;
 
 export function getPendingConflict() {
   return pendingConflict;
@@ -166,16 +173,16 @@ class SupabaseDataSource implements DataSource {
     const sb = getSupabase();
     if (!sb) return loadState();
     try {
-      const {
-        data: { user },
-      } = await sb.auth.getUser();
-      if (!user) return loadState();
+      const userId = await getUserId();
+      if (!userId) return loadState();
 
       const { data } = await sb
         .from(STATE_TABLE)
-        .select("state")
-        .eq("user_id", user.id)
+        .select("state, updated_at")
+        .eq("user_id", userId)
         .maybeSingle();
+
+      lastCloudUpdatedAt = data?.updated_at ?? null;
 
       if (data?.state) {
         const cloud = data.state as AppState;
@@ -202,11 +209,13 @@ class SupabaseDataSource implements DataSource {
 
       // First sign-in on this account: lift local data up, don't wipe.
       const local = loadState();
+      const nowIso = new Date().toISOString();
       await sb.from(STATE_TABLE).upsert({
-        user_id: user.id,
+        user_id: userId,
         state: local,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       });
+      lastCloudUpdatedAt = nowIso;
       return local;
     } catch {
       return loadState(); // offline / transient → local cache
@@ -221,16 +230,36 @@ class SupabaseDataSource implements DataSource {
     const sb = getSupabase();
     if (!sb) return;
     try {
-      const {
-        data: { user },
-      } = await sb.auth.getUser();
-      if (!user) return;
+      const userId = await getUserId();
+      if (!userId) return;
+
+      // Optimistic-concurrency guard: if another device wrote since we
+      // last loaded, don't blindly clobber the whole document — pull the
+      // newer copy and let the app resync instead of silently losing it.
+      const { data: head } = await sb
+        .from(STATE_TABLE)
+        .select("updated_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (
+        head?.updated_at &&
+        lastCloudUpdatedAt &&
+        head.updated_at > lastCloudUpdatedAt
+      ) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent(STATE_EVENT));
+        }
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
       const { error } = await sb.from(STATE_TABLE).upsert({
-        user_id: user.id,
+        user_id: userId,
         state,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       });
       if (error) throw error;
+      lastCloudUpdatedAt = nowIso;
     } catch {
       // Local cache still holds; tell the user the cloud copy is behind
       // rather than letting the failure pass invisibly.
@@ -246,17 +275,16 @@ class SupabaseDataSource implements DataSource {
     const sb = getSupabase();
     if (!sb) return;
     try {
-      const {
-        data: { user },
-      } = await sb.auth.getUser();
-      if (!user) return;
+      const userId = await getUserId();
+      if (!userId) return;
       // Drop the cloud row so a local reset isn't immediately
       // re-hydrated from the server on the next load.
       const { error } = await sb
         .from(STATE_TABLE)
         .delete()
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
       if (error) throw error;
+      lastCloudUpdatedAt = null;
     } catch {
       if (typeof window !== "undefined") {
         window.dispatchEvent(

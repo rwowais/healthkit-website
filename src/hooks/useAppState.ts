@@ -60,14 +60,46 @@ export function useAppState() {
     };
   }, []);
 
-  // Persist — skip no-op writes (also breaks the reload→save loop).
+  // Persist — debounced so a burst of toggles becomes ONE write instead
+  // of re-uploading the whole document per tap. Still skips no-op writes
+  // (also breaks the reload→save loop) and flushes on tab hide/unmount
+  // so nothing is lost.
+  const pendingSave = useRef<AppState | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flush = useRef(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    if (pendingSave.current) {
+      const s = pendingSave.current;
+      pendingSave.current = null;
+      void activeDataSource.save(s);
+    }
+  });
+
   useEffect(() => {
     if (loading) return;
     const json = JSON.stringify(state);
     if (json === lastJson.current) return;
     lastJson.current = json;
-    void activeDataSource.save(state);
+    pendingSave.current = state;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => flush.current(), 600);
   }, [state, loading]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush.current();
+    };
+    window.addEventListener("pagehide", flush.current);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flush.current);
+      document.removeEventListener("visibilitychange", onHide);
+      flush.current();
+    };
+  }, []);
 
   // React to changes made by another live instance / tab / on refocus,
   // so removing or customizing a protocol updates Today immediately.

@@ -19,6 +19,7 @@ import type {
 
 import { DEFAULT_INSTALLED, PACKS } from "./packs";
 import { compileTimeline, shapeTimeline, adapt } from "./engine";
+import { keystone } from "./intel";
 import type {
   BehaviorOverride,
   Insight,
@@ -375,7 +376,8 @@ export function computeBehaviorScore(
   const compiled = compileTimeline(state, isoDayIndex(date));
   const shaped = shapeTimeline(
     compiled,
-    isToday ? adapt(state).mode : "normal"
+    isToday ? adapt(state).mode : "normal",
+    { keystoneKey: keystone(state)?.key }
   );
   const active = shaped.filter((i) => !i.muted);
   if (active.length === 0) return 0;

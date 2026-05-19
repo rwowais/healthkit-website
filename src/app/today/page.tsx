@@ -237,17 +237,18 @@ export default function TodayPage() {
 
   const adaptation = useMemo(() => adapt(state), [state]);
   const sig = useMemo(() => getSignals(state), [state]);
+  const ks = useMemo(() => keystone(state), [state]);
   const timeline = useMemo(() => {
     const items = compileTimeline(state, selDayIdx);
-    return shapeTimeline(items, isToday ? adaptation.mode : "normal");
-  }, [state, adaptation.mode, selDayIdx, isToday]);
+    return shapeTimeline(items, isToday ? adaptation.mode : "normal", {
+      keystoneKey: ks?.key,
+    });
+  }, [state, adaptation.mode, selDayIdx, isToday, ks]);
 
   const prog = useMemo(
     () => timelineProgress(timeline, log),
     [timeline, log]
   );
-
-  const ks = useMemo(() => keystone(state), [state]);
   const ksItem = useMemo(
     () =>
       ks ? timeline.find((i) => i.canonicalKey === ks.key) ?? null : null,
