@@ -26,6 +26,8 @@ import {
   getProtocolBehaviors,
   saveProtocol,
   saveBehavior,
+  createBehavior,
+  reorderBehavior,
   type CmsProtocol,
   type CmsBehavior,
 } from "@/lib/cms/authoring";
@@ -136,6 +138,12 @@ export default function AdminHome() {
     setEdP({ ...p });
     setEdB(await getProtocolBehaviors(p.id));
   };
+  const reopen = async () => {
+    if (edP) setEdB(await getProtocolBehaviors(edP.id));
+  };
+  const [nbTitle, setNbTitle] = useState("");
+  const [nbBlock, setNbBlock] = useState("morning");
+  const [nbLev, setNbLev] = useState(2);
 
   const sim = useMemo(() => {
     const base = getDefaultState();
@@ -599,6 +607,32 @@ export default function AdminHome() {
                 <Eyebrow>Behaviors</Eyebrow>
                 {edB.map((b, idx) => (
                   <div key={b.id} className={card} style={surf}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="t-caption">#{idx + 1}</span>
+                      <span className="flex gap-1">
+                        {(["-1", "1"] as const).map((d) => (
+                          <button
+                            key={d}
+                            disabled={busy}
+                            onClick={async () => {
+                              setBusy(true);
+                              await reorderBehavior(
+                                edP.id,
+                                b.id,
+                                d === "-1" ? -1 : 1
+                              );
+                              setBusy(false);
+                              reopen();
+                            }}
+                            className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)]"
+                            style={{ background: "var(--surface-3)" }}
+                            aria-label={d === "-1" ? "Move up" : "Move down"}
+                          >
+                            {d === "-1" ? "↑" : "↓"}
+                          </button>
+                        ))}
+                      </span>
+                    </div>
                     <input
                       className={inp}
                       value={b.title}
@@ -721,6 +755,65 @@ export default function AdminHome() {
                     </button>
                   </div>
                 ))}
+
+                <div className={card} style={surf}>
+                  <Eyebrow color="var(--readiness)">Add behavior</Eyebrow>
+                  <input
+                    className={`${inp} mt-2`}
+                    value={nbTitle}
+                    onChange={(e) => setNbTitle(e.target.value)}
+                    placeholder="Title"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <select
+                      className={inp}
+                      value={nbBlock}
+                      onChange={(e) => setNbBlock(e.target.value)}
+                    >
+                      {[
+                        "morning",
+                        "afternoon",
+                        "evening",
+                        "anytime",
+                      ].map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                    <select
+                      className={inp}
+                      value={nbLev}
+                      onChange={(e) => setNbLev(Number(e.target.value))}
+                    >
+                      {[1, 2, 3].map((s) => (
+                        <option key={s} value={s}>
+                          L{s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    disabled={busy || !nbTitle.trim()}
+                    onClick={async () => {
+                      setBusy(true);
+                      const r = await createBehavior(edP.id, {
+                        title: nbTitle.trim(),
+                        block: nbBlock,
+                        leverage: nbLev,
+                      });
+                      setBusy(false);
+                      setMsg(
+                        r.ok ? "Behavior added" : r.reason ?? "Failed"
+                      );
+                      if (r.ok) {
+                        setNbTitle("");
+                        reopen();
+                      }
+                    }}
+                    className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                  >
+                    Add behavior
+                  </button>
+                </div>
                 {msg && (
                   <p className="text-[12px] text-[var(--text-3)]">
                     {msg}

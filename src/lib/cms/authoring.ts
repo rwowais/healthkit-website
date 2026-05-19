@@ -256,6 +256,122 @@ export async function saveBehavior(
   }
 }
 
+/** Create a brand-new behavior and link it to a protocol at the end. */
+export async function createBehavior(
+  protocolId: string,
+  fields: {
+    title: string;
+    block: string;
+    leverage: number;
+    dose?: string;
+    rationale?: string;
+  }
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  const uid = await getUserId();
+  if (!uid) return { ok: false, reason: "Sign in required." };
+  if (!fields.title.trim())
+    return { ok: false, reason: "Title required." };
+  try {
+    const key =
+      fields.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 32) +
+      "-" +
+      Date.now().toString(36).slice(-4);
+    const { data: b, error: bErr } = await sb
+      .from("cms_behaviors")
+      .insert({
+        canonical_key: key,
+        title: fields.title.trim(),
+        block: fields.block,
+        anchor: fields.block === "evening" ? "bed" : "wake",
+        offset_min: 0,
+        dose: fields.dose ?? null,
+        leverage: fields.leverage,
+        kind: "action",
+        icon: "sparkle",
+        rationale: fields.rationale ?? "Custom behavior.",
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (bErr || !b) return { ok: false, reason: bErr?.message };
+    const { count } = await sb
+      .from("cms_protocol_behaviors")
+      .select("*", { count: "exact", head: true })
+      .eq("protocol_id", protocolId);
+    const { error: lErr } = await sb
+      .from("cms_protocol_behaviors")
+      .insert({
+        protocol_id: protocolId,
+        behavior_id: b.id,
+        position: count ?? 0,
+      });
+    if (lErr) return { ok: false, reason: lErr.message };
+    await rev(
+      sb,
+      "behavior",
+      b.id as string,
+      1,
+      { key, ...fields },
+      "create behavior"
+    );
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Create failed.",
+    };
+  }
+}
+
+/** Move a behavior one slot up/down within a protocol (swap positions). */
+export async function reorderBehavior(
+  protocolId: string,
+  behaviorId: string,
+  dir: -1 | 1
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { data } = await sb
+      .from("cms_protocol_behaviors")
+      .select("behavior_id, position")
+      .eq("protocol_id", protocolId)
+      .order("position");
+    const rows = (data ?? []) as {
+      behavior_id: string;
+      position: number;
+    }[];
+    const i = rows.findIndex((r) => r.behavior_id === behaviorId);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= rows.length)
+      return { ok: false, reason: "Out of range." };
+    const a = rows[i];
+    const b = rows[j];
+    await sb
+      .from("cms_protocol_behaviors")
+      .update({ position: b.position })
+      .eq("protocol_id", protocolId)
+      .eq("behavior_id", a.behavior_id);
+    await sb
+      .from("cms_protocol_behaviors")
+      .update({ position: a.position })
+      .eq("protocol_id", protocolId)
+      .eq("behavior_id", b.behavior_id);
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Reorder failed.",
+    };
+  }
+}
+
 /**
  * Reconstruct the runtime catalog from the CMS tables. Returns null when
  * the CMS is unseeded so Publish safely falls back to the built-in.
