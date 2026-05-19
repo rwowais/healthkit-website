@@ -388,7 +388,8 @@ export default function ProfilePage() {
         </Card>
 
         <p className="pb-2 text-center text-[11px] text-[var(--text-4)]">
-          Protocolize · Adaptive Protocol OS
+          Protocolize · Adaptive Protocol OS · build{" "}
+          {process.env.NEXT_PUBLIC_BUILD ?? "dev"}
         </p>
       </div>
 
