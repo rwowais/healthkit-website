@@ -337,6 +337,19 @@ export default function TodayPage() {
                 Back to today
               </button>
             )}
+            {isToday && state.currentStreak >= 2 && (
+              <span
+                className="ml-auto flex items-center gap-1 rounded-[var(--r-pill)] px-2.5 py-1 text-[12px] font-bold"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--warm) 16%, var(--surface-2))",
+                  color: "var(--warm)",
+                }}
+              >
+                <Icon name="flame" size={12} />
+                {state.currentStreak}
+              </span>
+            )}
           </div>
         </div>
 
@@ -718,7 +731,9 @@ export default function TodayPage() {
               </p>
               <div className="relative mt-4 flex items-center justify-between">
                 <span className="text-[11px] font-medium text-[var(--text-4)]">
-                  {prog.done > 0
+                  {state.currentStreak >= 2 && prog.done === 0
+                    ? `Keep your ${state.currentStreak}-day streak alive`
+                    : prog.done > 0
                     ? `${prog.done} done — keep the thread going`
                     : "First one sets the tone"}
                 </span>

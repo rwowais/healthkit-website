@@ -9,7 +9,7 @@ import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
 import { biomarkerDef, biomarkerBand } from "@/lib/biomarkers";
 import { keystone, behaviorStats, weeklyReview } from "@/lib/intel";
 import { getAccess } from "@/lib/entitlements";
-import { PremiumPeek } from "@/components/PremiumGate";
+import { UpgradeCTA } from "@/components/PremiumGate";
 import { compileTimeline } from "@/lib/engine";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -20,16 +20,41 @@ interface Insight {
   text: string;
 }
 
+function dateKeyOf(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const LAG_DAYS = 3;
+
 export default function InsightsPage() {
   const { state, loading } = useAppState();
+  const access = getAccess(state);
+
+  // Time-decayed peek: free / post-trial users still get the intelligence
+  // — just on a 3-day delay (a real reason to keep showing up, and a
+  // genuine upgrade reason) instead of a blurred wall that removes the
+  // daily payoff exactly when the habit is most fragile.
+  const intelState = useMemo(() => {
+    if (access.premium) return state;
+    const d = new Date();
+    d.setDate(d.getDate() - LAG_DAYS);
+    const cutoff = dateKeyOf(d);
+    return {
+      ...state,
+      dailyLogs: (state.dailyLogs ?? []).filter((l) => l.date <= cutoff),
+    };
+  }, [access.premium, state]);
 
   const streak = useMemo(
-    () => calculateStreak(state.dailyLogs),
-    [state.dailyLogs]
+    () => calculateStreak(intelState.dailyLogs),
+    [intelState.dailyLogs]
   );
   const week = useMemo(
-    () => weeklyActiveDays(state.dailyLogs),
-    [state.dailyLogs]
+    () => weeklyActiveDays(intelState.dailyLogs),
+    [intelState.dailyLogs]
   );
 
   const insights = useMemo<Insight[]>(() => {
@@ -49,7 +74,7 @@ export default function InsightsPage() {
         text: `${week} of the last 7 days active. This is the consistency band where real physiological adaptation happens.`,
       });
 
-    for (const d of derivedInsights(state.dailyLogs)) {
+    for (const d of derivedInsights(intelState.dailyLogs)) {
       out.push({ icon: "bulb", accent: "var(--readiness)", text: d });
     }
 
@@ -74,21 +99,24 @@ export default function InsightsPage() {
     }
 
     return out;
-  }, [state.dailyLogs, state.biomarkers, streak, week]);
+  }, [intelState.dailyLogs, state.biomarkers, streak, week]);
 
-  const review = useMemo(() => weeklyReview(state), [state]);
-  const ks = useMemo(() => keystone(state), [state]);
+  const review = useMemo(
+    () => weeklyReview(intelState),
+    [intelState]
+  );
+  const ks = useMemo(() => keystone(intelState), [intelState]);
   const topStreaks = useMemo(() => {
-    return compileTimeline(state, 0)
+    return compileTimeline(intelState, 0)
       .map((it) => ({
         title: it.title,
         icon: it.icon as IconName,
-        ...behaviorStats(state, it.canonicalKey),
+        ...behaviorStats(intelState, it.canonicalKey),
       }))
       .filter((b) => b.streak >= 3)
       .sort((a, b) => b.streak - a.streak)
       .slice(0, 3);
-  }, [state]);
+  }, [intelState]);
 
   const nothing =
     insights.length === 0 &&
@@ -96,13 +124,7 @@ export default function InsightsPage() {
     !review &&
     topStreaks.length === 0;
 
-  const access = getAccess(state);
-  const gated = !nothing && !access.premium;
-  const teaser = ks
-    ? `Your data has a clear pattern: "${ks.title}" is driving your best days. See the full picture with Premium.`
-    : review
-    ? `${review.headline} Your full weekly intelligence is ready.`
-    : "Your personalized intelligence is ready — unlock it with Premium.";
+  const delayed = !access.premium && !nothing;
 
   if (loading) {
     return (
@@ -128,16 +150,14 @@ export default function InsightsPage() {
           </p>
         </div>
 
-        {gated && (
-          <PremiumPeek teaser={teaser}>
-            <div className="space-y-3">
-              <div className="panel h-32" />
-              <div className="panel h-28" />
-            </div>
-          </PremiumPeek>
+        {delayed && (
+          <UpgradeCTA
+            title="You're seeing a delayed view"
+            line="On the free plan, Insights update on a 3-day delay. Premium makes them live — your patterns the moment they form."
+          />
         )}
 
-        {!gated && (
+        {(
           <>
         {/* Weekly review — calm narrative */}
         {review && (

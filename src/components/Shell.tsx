@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ToastProvider } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import Reminders from "@/components/Reminders";
+import SyncConflictPrompt from "@/components/SyncConflictPrompt";
 
 const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: "/today", label: "Today", icon: "home" },
@@ -24,6 +25,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <Reminders />
+      <SyncConflictPrompt />
       <div className="min-h-screen">
         <header className="glass sticky top-0 z-50 border-b border-[var(--hairline)]">
           <div className="mx-auto flex h-16 max-w-[600px] items-center justify-between px-6">

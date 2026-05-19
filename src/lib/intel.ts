@@ -78,26 +78,81 @@ export interface Keystone {
   delta: number; // % points higher on days done
 }
 
+/**
+ * Keystone detection — de-circularised and statistically gated.
+ *
+ * The naive version compared `score` on days a behavior was done vs not.
+ * But `score` *includes* that behavior's own completion, so any behavior
+ * trivially correlates with a higher score (reverse causality), on tiny
+ * samples, max-picked across ~15 behaviors — a guaranteed false positive
+ * presented as a causal claim.
+ *
+ * Instead: the outcome is how many *other* behaviors were kept that day
+ * (the behavior's own completion is excluded, killing the circularity).
+ * We require a real sample (>=8 per group), a Cohen's-d effect size, and
+ * a threshold that rises with the number of behaviors tested (a
+ * multiple-comparison guard). Below the bar we return null and the UI
+ * honestly says "patterns are forming" rather than asserting causality.
+ */
 export function keystone(state: AppState): Keystone | null {
-  const logs = state.dailyLogs.filter((l) => l.score > 0);
-  if (logs.length < 6) return null;
+  const logs = (state.dailyLogs ?? []).filter(
+    (l) =>
+      l.score > 0 ||
+      Object.values(l.behaviorCompletions ?? {}).some(Boolean)
+  );
+  if (logs.length < 10) return null;
   const items = analyticsItems(state);
-  let best: Keystone | null = null;
+  if (items.length < 2) return null;
+
+  const mean = (xs: number[]) =>
+    xs.reduce((a, b) => a + b, 0) / xs.length;
+  const variance = (xs: number[], m: number) =>
+    xs.length < 2
+      ? 0
+      : xs.reduce((s, v) => s + (v - m) ** 2, 0) / (xs.length - 1);
+
+  // The more behaviors we scan, the stronger the effect must be.
+  const dThreshold = 0.5 + 0.07 * Math.log2(Math.max(items.length, 2));
+
+  let best: (Keystone & { d: number }) | null = null;
   for (const it of items) {
-    const done: number[] = [];
-    const not: number[] = [];
+    const k = it.canonicalKey;
+    const otherDone: number[] = [];
+    const otherNot: number[] = [];
+    const scoreDone: number[] = [];
+    const scoreNot: number[] = [];
     for (const l of logs) {
-      (l.behaviorCompletions?.[it.canonicalKey] ? done : not).push(l.score);
+      const bc = l.behaviorCompletions ?? {};
+      let others = 0;
+      for (const key in bc) if (key !== k && bc[key]) others++;
+      if (bc[k]) {
+        otherDone.push(others);
+        scoreDone.push(l.score);
+      } else {
+        otherNot.push(others);
+        scoreNot.push(l.score);
+      }
     }
-    if (done.length < 4 || not.length < 3) continue;
-    const avg = (xs: number[]) =>
-      xs.reduce((a, b) => a + b, 0) / xs.length;
-    const delta = Math.round(avg(done) - avg(not));
-    if (delta >= 8 && (!best || delta > best.delta)) {
-      best = { key: it.canonicalKey, title: it.title, delta };
+    if (otherDone.length < 8 || otherNot.length < 8) continue;
+    const mD = mean(otherDone);
+    const mN = mean(otherNot);
+    if (mD <= mN) continue;
+    const pooledSD = Math.sqrt(
+      ((otherDone.length - 1) * variance(otherDone, mD) +
+        (otherNot.length - 1) * variance(otherNot, mN)) /
+        (otherDone.length + otherNot.length - 2)
+    );
+    const d = pooledSD > 0 ? (mD - mN) / pooledSD : 99;
+    if (d < dThreshold) continue;
+    if (!best || d > best.d) {
+      const delta = Math.max(
+        1,
+        Math.round(mean(scoreDone) - mean(scoreNot))
+      );
+      best = { key: k, title: it.title, delta, d };
     }
   }
-  return best;
+  return best ? { key: best.key, title: best.title, delta: best.delta } : null;
 }
 
 // ── Adaptive suggestions ──────────────────────────────────────────
@@ -143,6 +198,7 @@ export function suggestions(state: AppState): Suggestion[] {
 
   // 2. Chronically skipped behavior → offer to pause (kills guilt)
   const items = analyticsItems(state);
+  const ks = keystone(state);
   const activeDays = [...state.dailyLogs]
     .filter((l) => l.score > 0)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -150,6 +206,9 @@ export function suggestions(state: AppState): Suggestion[] {
   if (activeDays.length >= 5) {
     for (const it of items) {
       if (state.behaviorOverrides?.[it.canonicalKey]?.disabled) continue;
+      // Never tell the user to pause their own keystone — that's a
+      // self-contradicting, trust-destroying suggestion.
+      if (ks && it.canonicalKey === ks.key) continue;
       const everDone = activeDays.some(
         (l) => l.behaviorCompletions?.[it.canonicalKey]
       );
@@ -168,7 +227,6 @@ export function suggestions(state: AppState): Suggestion[] {
   }
 
   // 3. Keystone slipping → gentle awareness (no guilt, no pause)
-  const ks = keystone(state);
   if (
     ks &&
     !state.behaviorOverrides?.[ks.key]?.disabled &&
