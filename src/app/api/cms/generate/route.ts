@@ -143,14 +143,25 @@ export async function POST(req: Request) {
     const draft = clampDraft(parsed);
     return json({ ok: true, draft });
   } catch (e) {
-    // Map to a friendly reason; never leak the key, stack, or raw error.
+    // Always log the full upstream error server-side so it shows in
+    // Vercel runtime logs. The route is admin-only, so we also surface
+    // status + Anthropic's own message back to the caller — that one
+    // line tells the operator exactly what the API rejected (bad model
+    // id, out of credits, invalid_request_error, etc.). The key itself
+    // is never in any of these fields, so this is safe.
+    console.error("[api/cms/generate] upstream error", e);
     let reason = "AI drafting failed. Try again.";
-    if (e instanceof Anthropic.RateLimitError)
+    if (e instanceof Anthropic.RateLimitError) {
       reason = "AI is busy (rate limited). Try again shortly.";
-    else if (e instanceof Anthropic.AuthenticationError)
+    } else if (e instanceof Anthropic.AuthenticationError) {
       reason = "AI key is invalid. Check ANTHROPIC_API_KEY in Vercel.";
-    else if (e instanceof Anthropic.APIError)
-      reason = "AI service error. Try again.";
+    } else if (e instanceof Anthropic.APIError) {
+      const status = (e as { status?: number }).status ?? "?";
+      const type =
+        (e as { type?: string | null }).type ?? "api_error";
+      const msg = (e as Error).message ?? "";
+      reason = `AI service error (HTTP ${status}, ${type}): ${msg}`;
+    }
     return json({ ok: false, reason }, 502);
   }
 }
