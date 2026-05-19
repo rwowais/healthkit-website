@@ -54,8 +54,38 @@ export const CONFLICT_EVENT = "pz:sync-conflict";
 
 let pendingConflict: { local: AppState; cloud: AppState } | null = null;
 let conflictHandled = false;
+/**
+ * The conflict prompt is a *first-sign-in* event, not a per-load check.
+ * `load()` runs on every focus/visibility/save resync, and local is
+ * normally ahead of cloud in an offline-first app — that is NOT a
+ * conflict. We evaluate it at most once per session and, durably, at
+ * most once per (device, account) via a localStorage marker.
+ */
+let conflictEvaluated = false;
 /** updated_at we last observed — used for optimistic concurrency. */
 let lastCloudUpdatedAt: string | null = null;
+
+function reconKey(uid: string) {
+  return `pz:recon:${uid}`;
+}
+function isReconciled(uid: string): boolean {
+  try {
+    return (
+      typeof window !== "undefined" &&
+      localStorage.getItem(reconKey(uid)) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+function markReconciled(uid: string): void {
+  try {
+    if (typeof window !== "undefined")
+      localStorage.setItem(reconKey(uid), "1");
+  } catch {
+    /* non-fatal */
+  }
+}
 
 export function getPendingConflict() {
   return pendingConflict;
@@ -149,6 +179,10 @@ export async function resolveConflict(
   if (!pc) return;
   conflictHandled = true;
   pendingConflict = null;
+  // Durably mark this device reconciled with the account BEFORE the
+  // post-resolve reload, so the fresh module load doesn't re-prompt.
+  const uid = await getUserId();
+  if (uid) markReconciled(uid);
   const chosen =
     choice === "cloud"
       ? pc.cloud
@@ -310,20 +344,27 @@ class SupabaseDataSource implements DataSource {
       if (data?.state) {
         const cloud = data.state as AppState;
         const local = loadState();
-        // Don't silently let "cloud win" and erase guest progress — if
-        // this device has real data that differs from the account's,
-        // ask the user (keep / use account / merge) instead.
-        if (
+        // Genuine first-sign-in conflict ONLY: this device has guest
+        // data, the account already has independent data, and we've
+        // never reconciled this device with this account. Evaluated at
+        // most once per session and once per (device, account) — local
+        // simply being ahead of cloud is normal, not a conflict.
+        const genuineFirstSignIn =
           !conflictHandled &&
+          !conflictEvaluated &&
+          !isReconciled(userId) &&
           hasMeaningfulData(local) &&
-          slicesDiffer(local, cloud)
-        ) {
+          slicesDiffer(local, cloud);
+        conflictEvaluated = true;
+        if (genuineFirstSignIn) {
           pendingConflict = { local, cloud };
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent(CONFLICT_EVENT));
           }
           return local; // hold local until the user decides
         }
+        // Established on this account/device — never prompt again here.
+        markReconciled(userId);
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
         }
@@ -332,6 +373,8 @@ class SupabaseDataSource implements DataSource {
       }
 
       // First sign-in on this account: lift local data up, don't wipe.
+      conflictEvaluated = true;
+      markReconciled(userId); // this device is the source of truth here
       const local = loadState();
       const nowIso = new Date().toISOString();
       await sb.from(STATE_TABLE).upsert({
