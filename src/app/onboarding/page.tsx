@@ -1,266 +1,494 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { loadState, saveState } from "@/lib/storage";
 import { packById } from "@/lib/packs";
 import { Button, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 
-const GOALS: { key: string; label: string; desc: string; icon: IconName }[] = [
-  { key: "longevity", label: "Longevity", desc: "Maximize healthspan", icon: "pulse" },
-  { key: "sleep", label: "Better sleep", desc: "Deeper, consistent rest", icon: "moon" },
-  { key: "body", label: "Body composition", desc: "Strength & metabolic health", icon: "dumbbell" },
-  { key: "energy", label: "Daily energy", desc: "Steady focus & vitality", icon: "sparkle" },
+type Chip = { key: string; label: string; sub?: string; icon?: IconName };
+
+const GOALS: Chip[] = [
+  { key: "longevity", label: "Longevity", sub: "Healthspan & resilience", icon: "pulse" },
+  { key: "sleep", label: "Better sleep", sub: "Deeper, consistent nights", icon: "moon" },
+  { key: "energy", label: "Daily energy", sub: "Focus & vitality", icon: "sparkle" },
+  { key: "body", label: "Body composition", sub: "Strength & metabolic", icon: "dumbbell" },
+];
+const MOOD: Chip[] = [
+  { key: "calm", label: "Pretty calm", sub: "Room for more" },
+  { key: "some", label: "Some pressure", sub: "Manageable" },
+  { key: "stretched", label: "Stretched thin", sub: "Keep it light" },
+];
+const SLEEP: Chip[] = [
+  { key: "rough", label: "Rough", sub: "Hard to fall/stay asleep" },
+  { key: "ok", label: "Okay", sub: "Inconsistent" },
+  { key: "solid", label: "Solid", sub: "Mostly rested" },
+];
+const FOCUS: Chip[] = [
+  { key: "sleep", label: "Sleep", icon: "moon" },
+  { key: "training", label: "Training", icon: "dumbbell" },
+  { key: "nutrition", label: "Nutrition", icon: "leaf" },
+  { key: "stress", label: "Stress & recovery", icon: "lungs" },
+  { key: "focus", label: "Focus", icon: "sparkle" },
+  { key: "supplements", label: "Supplements", icon: "pill" },
+];
+const EXP: Chip[] = [
+  { key: "new", label: "New to this", sub: "Start gently" },
+  { key: "some", label: "Some experience", sub: "" },
+  { key: "deep", label: "Deep into it", sub: "Give me the system" },
 ];
 
-// Each goal seeds a tailored starter system.
-const GOAL_PACKS: Record<string, string[]> = {
-  longevity: ["longevity-foundation", "better-sleep"],
-  sleep: ["better-sleep", "longevity-foundation"],
-  body: ["longevity-foundation", "blood-sugar"],
-  energy: ["longevity-foundation", "deep-focus"],
-};
-
-const STEPS = 4;
+const STEPS = 8;
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("longevity");
+  const [overwhelm, setOverwhelm] = useState<"calm" | "some" | "stretched">(
+    "some"
+  );
+  const [sleepBaseline, setSleepBaseline] = useState<
+    "rough" | "ok" | "solid"
+  >("ok");
+  const [focus, setFocus] = useState<string[]>([]);
+  const [experience, setExperience] = useState<"new" | "some" | "deep">(
+    "some"
+  );
+  const [hasWearable, setHasWearable] = useState(false);
   const [bedtime, setBedtime] = useState("22:30");
   const [wakeTime, setWakeTime] = useState("06:30");
 
-  function complete() {
-    const state = loadState();
-    state.settings.name = name.trim();
-    state.settings.primaryGoal = goal;
-    state.settings.bedtime = bedtime;
-    state.settings.wakeTime = wakeTime;
-    state.settings.completedOnboarding = true;
-    state.settings.disclaimerAcknowledged = true;
-    state.settings.trialStartDate = new Date().toISOString();
-    state.installedPacks = [...(GOAL_PACKS[goal] ?? GOAL_PACKS.longevity)];
-    saveState(state);
-    router.push("/today");
-  }
+  // Compute the personalized starting system.
+  const packs = useMemo(() => {
+    const ids = new Set<string>(["longevity-foundation"]);
+    if (
+      goal === "sleep" ||
+      sleepBaseline === "rough" ||
+      focus.includes("sleep")
+    )
+      ids.add("better-sleep");
+    if (goal === "energy" || focus.includes("focus"))
+      ids.add("deep-focus");
+    if (goal === "body" || focus.includes("nutrition"))
+      ids.add("blood-sugar");
+    if (overwhelm === "stretched" && focus.includes("stress"))
+      ids.add("burnout-recovery");
+    if (focus.includes("supplements")) ids.add("daily-essentials");
 
-  const recommended = (GOAL_PACKS[goal] ?? GOAL_PACKS.longevity)
-    .map((id) => packById(id))
-    .filter((p): p is NonNullable<typeof p> => !!p);
+    let list = [...ids];
+    // Reduce overwhelm: cap the starting system for stretched / new users.
+    const cap =
+      overwhelm === "stretched" || experience === "new"
+        ? 2
+        : experience === "deep"
+        ? 5
+        : 3;
+    list = list.slice(0, cap);
+    return list
+      .map((id) => packById(id))
+      .filter((p): p is NonNullable<typeof p> => !!p);
+  }, [goal, sleepBaseline, focus, overwhelm, experience]);
+
+  function finish(withAccount: boolean) {
+    const s = loadState();
+    Object.assign(s.settings, {
+      name: name.trim(),
+      primaryGoal: goal,
+      overwhelm,
+      sleepBaseline,
+      focusAreas: focus,
+      experience,
+      hasWearable,
+      bedtime,
+      wakeTime,
+      completedOnboarding: true,
+      disclaimerAcknowledged: true,
+      trialStartDate: new Date().toISOString(),
+      tier: "free" as const,
+      premiumTrialEndsAt: new Date(
+        Date.now() + 14 * 86400000
+      ).toISOString(),
+    });
+    s.installedPacks = packs.map((p) => p.id);
+    saveState(s);
+    router.push(withAccount ? "/auth" : "/today");
+  }
 
   const inputCls =
     "w-full rounded-[var(--r-md)] bg-[var(--surface-2)] px-4 py-4 text-[17px] text-[var(--text-1)] outline-none focus:ring-1 focus:ring-[var(--readiness)] tr-fast";
 
+  const Choice = ({
+    chips,
+    value,
+    onPick,
+    multi = false,
+  }: {
+    chips: Chip[];
+    value: string | string[];
+    onPick: (k: string) => void;
+    multi?: boolean;
+  }) => (
+    <div className="mt-8 space-y-2.5">
+      {chips.map((c) => {
+        const on = multi
+          ? (value as string[]).includes(c.key)
+          : value === c.key;
+        return (
+          <button
+            key={c.key}
+            onClick={() => onPick(c.key)}
+            className="press tr-fast flex w-full items-center gap-4 rounded-[var(--r-md)] p-4 text-left"
+            style={{
+              background: on
+                ? "color-mix(in srgb, var(--readiness) 14%, var(--surface-2))"
+                : "var(--surface-2)",
+              boxShadow: on
+                ? "inset 0 0 0 1.5px var(--readiness)"
+                : "none",
+            }}
+          >
+            {c.icon && (
+              <span
+                className="chip h-10 w-10 shrink-0"
+                style={{
+                  background: on
+                    ? "var(--readiness)"
+                    : "var(--surface-3)",
+                  color: on ? "#08090B" : "var(--text-2)",
+                }}
+              >
+                <Icon name={c.icon} size={19} />
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-[var(--text-1)]">
+                {c.label}
+              </span>
+              {c.sub && (
+                <span className="mt-0.5 block text-[12.5px] text-[var(--text-3)]">
+                  {c.sub}
+                </span>
+              )}
+            </span>
+            {multi && on && (
+              <Icon
+                name="check"
+                size={16}
+                className="shrink-0 text-[var(--readiness)]"
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const Nav = ({
+    next,
+    disabled,
+  }: {
+    next: () => void;
+    disabled?: boolean;
+  }) => (
+    <div className="mt-10 flex items-center gap-3">
+      {step > 0 && (
+        <Button variant="ghost" onClick={() => setStep((s) => s - 1)}>
+          Back
+        </Button>
+      )}
+      <Button full disabled={disabled} onClick={next}>
+        Continue
+      </Button>
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen flex-col">
       <div className="h-1 w-full bg-[var(--surface-2)]">
-        <div
-          className="h-full tr"
+        <motion.div
+          className="h-full"
           style={{
-            width: `${((step + 1) / STEPS) * 100}%`,
             background:
               "linear-gradient(90deg, var(--sleep), var(--readiness))",
           }}
+          animate={{ width: `${((step + 1) / STEPS) * 100}%` }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         />
       </div>
 
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-12">
-        {step === 0 && (
-          <div className="anim-rise w-full">
-            <span
-              className="mb-8 grid h-12 w-12 place-items-center rounded-[14px]"
-              style={{
-                background:
-                  "linear-gradient(145deg, var(--sleep), var(--readiness))",
-              }}
-            >
-              <span className="h-3 w-3 rounded-full bg-[#08090B]" />
-            </span>
-            <h1 className="t-display text-[var(--text-1)]">
-              Longevity, measured.
-            </h1>
-            <p className="t-body mt-4 leading-relaxed">
-              Protocolize turns science-backed routines into a calm daily
-              practice. Let&apos;s set up your protocol in under a minute.
-            </p>
-            <div className="mt-10">
-              <Eyebrow>What should we call you?</Eyebrow>
-              <input
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="First name"
-                className={`mt-3 ${inputCls}`}
-              />
-            </div>
-            <Button
-              full
-              className="mt-8"
-              disabled={!name.trim()}
-              onClick={() => name.trim() && setStep(1)}
-            >
-              Continue
-            </Button>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full"
+          >
+            {step === 0 && (
+              <>
+                <span
+                  className="mb-7 grid h-12 w-12 place-items-center rounded-[14px]"
+                  style={{
+                    background:
+                      "linear-gradient(145deg, var(--sleep), var(--readiness))",
+                  }}
+                >
+                  <span className="h-3 w-3 rounded-full bg-[#08090B]" />
+                </span>
+                <h1 className="t-display text-[var(--text-1)]">
+                  Let&apos;s build your system.
+                </h1>
+                <p className="t-body mt-4 leading-relaxed">
+                  Six quick taps. We&apos;ll assemble an adaptive protocol
+                  tuned to you — and refine it as you go.
+                </p>
+                <div className="mt-9">
+                  <Eyebrow>First, your name</Eyebrow>
+                  <input
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="First name"
+                    className={`mt-3 ${inputCls}`}
+                  />
+                </div>
+                <Nav next={() => setStep(1)} disabled={!name.trim()} />
+              </>
+            )}
 
-        {step === 1 && (
-          <div className="anim-rise w-full">
-            <Eyebrow color="var(--readiness)">Step 2</Eyebrow>
-            <h1 className="t-title mt-3 text-[var(--text-1)]">
-              What matters most to you?
-            </h1>
-            <p className="t-body mt-3 leading-relaxed">
-              We&apos;ll tune your focus around this. You can change it anytime.
-            </p>
-            <div className="mt-8 space-y-3">
-              {GOALS.map((g) => {
-                const on = goal === g.key;
-                return (
-                  <button
-                    key={g.key}
-                    onClick={() => setGoal(g.key)}
-                    className="press tr-fast flex w-full items-center gap-4 rounded-[var(--r-md)] p-4 text-left"
+            {step === 1 && (
+              <>
+                <Eyebrow color="var(--readiness)">Step 1</Eyebrow>
+                <h1 className="t-title mt-3 text-[var(--text-1)]">
+                  What matters most right now?
+                </h1>
+                <Choice chips={GOALS} value={goal} onPick={setGoal} />
+                <Nav next={() => setStep(2)} />
+              </>
+            )}
+
+            {step === 2 && (
+              <>
+                <Eyebrow color="var(--recovery)">Step 2</Eyebrow>
+                <h1 className="t-title mt-3 text-[var(--text-1)]">
+                  How&apos;s life feeling lately?
+                </h1>
+                <p className="t-caption mt-2">
+                  This sets how much we put on your plate.
+                </p>
+                <Choice
+                  chips={MOOD}
+                  value={overwhelm}
+                  onPick={(k) =>
+                    setOverwhelm(k as "calm" | "some" | "stretched")
+                  }
+                />
+                <Nav next={() => setStep(3)} />
+              </>
+            )}
+
+            {step === 3 && (
+              <>
+                <Eyebrow color="var(--sleep)">Step 3</Eyebrow>
+                <h1 className="t-title mt-3 text-[var(--text-1)]">
+                  How&apos;s your sleep?
+                </h1>
+                <Choice
+                  chips={SLEEP}
+                  value={sleepBaseline}
+                  onPick={(k) =>
+                    setSleepBaseline(k as "rough" | "ok" | "solid")
+                  }
+                />
+                <Nav next={() => setStep(4)} />
+              </>
+            )}
+
+            {step === 4 && (
+              <>
+                <Eyebrow color="var(--vitality)">Step 4</Eyebrow>
+                <h1 className="t-title mt-3 text-[var(--text-1)]">
+                  Where do you want to focus?
+                </h1>
+                <p className="t-caption mt-2">Pick any that resonate.</p>
+                <Choice
+                  chips={FOCUS}
+                  value={focus}
+                  multi
+                  onPick={(k) =>
+                    setFocus((f) =>
+                      f.includes(k)
+                        ? f.filter((x) => x !== k)
+                        : [...f, k]
+                    )
+                  }
+                />
+                <Nav next={() => setStep(5)} />
+              </>
+            )}
+
+            {step === 5 && (
+              <>
+                <Eyebrow>Step 5</Eyebrow>
+                <h1 className="t-title mt-3 text-[var(--text-1)]">
+                  How deep are you already?
+                </h1>
+                <Choice
+                  chips={EXP}
+                  value={experience}
+                  onPick={(k) =>
+                    setExperience(k as "new" | "some" | "deep")
+                  }
+                />
+                <button
+                  onClick={() => setHasWearable((v) => !v)}
+                  className="press tr-fast mt-3 flex w-full items-center justify-between rounded-[var(--r-md)] p-4"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  <span className="text-[14px] font-medium text-[var(--text-1)]">
+                    I wear an Oura / Whoop / Apple Watch
+                  </span>
+                  <span
+                    className="h-6 w-11 rounded-full p-0.5 tr-fast"
                     style={{
-                      background: on
-                        ? "color-mix(in srgb, var(--readiness) 14%, var(--surface-2))"
-                        : "var(--surface-2)",
-                      boxShadow: on
-                        ? "inset 0 0 0 1.5px var(--readiness)"
-                        : "none",
+                      background: hasWearable
+                        ? "var(--vitality)"
+                        : "var(--surface-3)",
                     }}
                   >
                     <span
-                      className="chip h-11 w-11 shrink-0"
+                      className="block h-5 w-5 rounded-full bg-white tr"
                       style={{
-                        background: on
-                          ? "var(--readiness)"
-                          : "var(--surface-3)",
-                        color: on ? "#08090B" : "var(--text-2)",
+                        transform: hasWearable
+                          ? "translateX(20px)"
+                          : "translateX(0)",
+                      }}
+                    />
+                  </span>
+                </button>
+                <Nav next={() => setStep(6)} />
+              </>
+            )}
+
+            {step === 6 && (
+              <>
+                <Eyebrow color="var(--sleep)">Step 6</Eyebrow>
+                <h1 className="t-title mt-3 text-[var(--text-1)]">
+                  Your sleep window
+                </h1>
+                <p className="t-caption mt-2">
+                  Anchors the timing of every behavior. Change anytime.
+                </p>
+                <div className="mt-8 grid grid-cols-2 gap-3">
+                  <div>
+                    <Eyebrow>Bedtime</Eyebrow>
+                    <input
+                      type="time"
+                      value={bedtime}
+                      onChange={(e) => setBedtime(e.target.value)}
+                      className={`mt-2 ${inputCls}`}
+                    />
+                  </div>
+                  <div>
+                    <Eyebrow>Wake</Eyebrow>
+                    <input
+                      type="time"
+                      value={wakeTime}
+                      onChange={(e) => setWakeTime(e.target.value)}
+                      className={`mt-2 ${inputCls}`}
+                    />
+                  </div>
+                </div>
+                <Nav next={() => setStep(7)} />
+              </>
+            )}
+
+            {step === 7 && (
+              <>
+                <Eyebrow color="var(--vitality)">Ready</Eyebrow>
+                <h1 className="t-title mt-3 text-[var(--text-1)]">
+                  Your starting system
+                  {name.trim() ? `, ${name.trim()}` : ""}
+                </h1>
+                <p className="t-body mt-3 leading-relaxed">
+                  Tuned to you and assembled into one adaptive day. It
+                  adapts as you go.
+                </p>
+                <div className="card mt-7 p-5">
+                  {packs.map((p, i) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3.5 py-3.5"
+                      style={{
+                        borderTop:
+                          i > 0 ? "1px solid var(--hairline)" : "none",
                       }}
                     >
-                      <Icon name={g.icon} size={20} />
-                    </span>
-                    <div>
-                      <p className="text-[15px] font-semibold text-[var(--text-1)]">
-                        {g.label}
-                      </p>
-                      <p className="t-caption mt-0.5">{g.desc}</p>
+                      <span
+                        className="chip h-10 w-10 shrink-0"
+                        style={{
+                          background: `color-mix(in srgb, ${p.accent} 16%, var(--surface-3))`,
+                          color: p.accent,
+                        }}
+                      >
+                        <Icon name={p.icon as IconName} size={18} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[15px] font-semibold text-[var(--text-1)]">
+                          {p.name}
+                        </p>
+                        <p className="t-caption mt-0.5 truncate">
+                          {p.tagline}
+                        </p>
+                      </div>
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-8 flex gap-3">
-              <Button variant="ghost" onClick={() => setStep(0)}>
-                Back
-              </Button>
-              <Button full onClick={() => setStep(2)}>
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="anim-rise w-full">
-            <Eyebrow color="var(--sleep)">Step 3</Eyebrow>
-            <h1 className="t-title mt-3 text-[var(--text-1)]">
-              Your sleep window
-            </h1>
-            <p className="t-body mt-3 leading-relaxed">
-              This anchors the timing of your wind-down and morning protocols.
-            </p>
-            <div className="mt-10 space-y-6">
-              <div>
-                <Eyebrow>Target bedtime</Eyebrow>
-                <input
-                  type="time"
-                  value={bedtime}
-                  onChange={(e) => setBedtime(e.target.value)}
-                  className={`mt-3 ${inputCls}`}
-                />
-              </div>
-              <div>
-                <Eyebrow>Target wake</Eyebrow>
-                <input
-                  type="time"
-                  value={wakeTime}
-                  onChange={(e) => setWakeTime(e.target.value)}
-                  className={`mt-3 ${inputCls}`}
-                />
-              </div>
-            </div>
-            <div className="mt-10 flex gap-3">
-              <Button variant="ghost" onClick={() => setStep(1)}>
-                Back
-              </Button>
-              <Button full onClick={() => setStep(3)}>
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="anim-rise w-full">
-            <Eyebrow color="var(--vitality)">Ready</Eyebrow>
-            <h1 className="t-title mt-3 text-[var(--text-1)]">
-              You&apos;re all set{name.trim() ? `, ${name.trim()}` : ""}
-            </h1>
-            <p className="t-body mt-3 leading-relaxed">
-              Based on your focus, these protocols are installed. They compile
-              into one adaptive daily timeline — overlapping behaviors merge
-              automatically.
-            </p>
-            <div className="card mt-8 p-5">
-              {recommended.map((p, i) => (
+                  ))}
+                </div>
                 <div
-                  key={p.id}
-                  className="flex items-center gap-3.5 py-3.5"
+                  className="mt-4 flex items-start gap-2.5 rounded-[var(--r-md)] p-3.5"
                   style={{
-                    borderTop: i > 0 ? "1px solid var(--hairline)" : "none",
+                    background:
+                      "color-mix(in srgb, var(--vitality) 9%, var(--surface-2))",
                   }}
                 >
-                  <span
-                    className="chip h-10 w-10 shrink-0"
-                    style={{
-                      background: `color-mix(in srgb, ${p.accent} 16%, var(--surface-3))`,
-                      color: p.accent,
-                    }}
-                  >
-                    <Icon name={p.icon as IconName} size={18} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-semibold text-[var(--text-1)]">
-                      {p.name}
-                    </p>
-                    <p className="t-caption mt-0.5 truncate">{p.tagline}</p>
-                  </div>
-                  <span className="t-caption shrink-0">
-                    {p.behaviors.length}
-                  </span>
+                  <Icon
+                    name="sparkle"
+                    size={14}
+                    className="mt-0.5 shrink-0 text-[var(--vitality)]"
+                  />
+                  <p className="text-[12.5px] leading-relaxed text-[var(--text-2)]">
+                    The adaptive intelligence — keystone insights, weekly
+                    review, biomarker-aware adaptation — is{" "}
+                    <span className="font-semibold text-[var(--text-1)]">
+                      free for your first 14 days
+                    </span>
+                    . No card, nothing to do now.
+                  </p>
                 </div>
-              ))}
-            </div>
-            <p className="mt-6 text-[12px] leading-relaxed text-[var(--text-3)]">
-              Protocolize is an educational tool, not medical advice or a
-              diagnostic device. Consult a qualified clinician before changing
-              your health, supplement, or exercise routine. By continuing you
-              acknowledge this.
-            </p>
-            <div className="mt-8 flex gap-3">
-              <Button variant="ghost" onClick={() => setStep(2)}>
-                Back
-              </Button>
-              <Button full onClick={complete}>
-                Agree & begin
-              </Button>
-            </div>
-          </div>
-        )}
+                <p className="mt-5 text-[12px] leading-relaxed text-[var(--text-3)]">
+                  Educational tool, not medical advice. Consult a
+                  clinician before changing your health routine.
+                </p>
+                <div className="mt-7 space-y-2.5">
+                  <Button full onClick={() => finish(true)}>
+                    Save & sync across devices
+                  </Button>
+                  <button
+                    onClick={() => finish(false)}
+                    className="press tr-fast w-full py-2 text-center text-[13px] font-medium text-[var(--text-3)]"
+                  >
+                    I&apos;ll do this later
+                  </button>
+                </div>
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -44,10 +44,10 @@ export default function LandingPage() {
           </span>
         </div>
         <button
-          onClick={() => router.push("/onboarding")}
+          onClick={() => router.push("/auth")}
           className="t-label tr-fast text-[var(--text-1)] hover:opacity-70"
         >
-          Open app →
+          Sign in →
         </button>
       </header>
 

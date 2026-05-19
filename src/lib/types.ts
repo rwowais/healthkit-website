@@ -102,6 +102,19 @@ export interface UserSettings {
   completedOnboarding: boolean;
   primaryGoal?: string;
   disclaimerAcknowledged?: boolean;
+
+  // Onboarding 2.0 — drives personalization & adaptation
+  recoveryPriority?: "low" | "medium" | "high";
+  sleepBaseline?: "rough" | "ok" | "solid";
+  overwhelm?: "calm" | "some" | "stretched";
+  focusAreas?: string[];
+  experience?: "new" | "some" | "deep";
+  hasWearable?: boolean;
+
+  // Monetization (gating + Stripe wired in a later phase)
+  tier?: "free" | "premium";
+  /** ISO; reverse-trial: full Premium intelligence until this date. */
+  premiumTrialEndsAt?: string;
 }
 
 // ── Legacy completion (kept for migration) ────────────────────────

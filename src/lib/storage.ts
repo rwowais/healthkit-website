@@ -115,6 +115,7 @@ function getDefaultSettings(): UserSettings {
     notificationsEnabled: false,
     weekStartsOn: 1,
     completedOnboarding: false,
+    tier: "free",
   };
 }
 
