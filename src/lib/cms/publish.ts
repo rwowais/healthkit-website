@@ -17,6 +17,7 @@ import {
   BUNDLE_SCHEMA,
   type KnowledgeBundle,
 } from "../knowledge";
+import { assembleBundleFromCMS } from "./authoring";
 
 const PUB_TABLE = "cms_publications";
 
@@ -114,7 +115,18 @@ export async function publishBundle(
   if (!uid) return { ok: false, reason: "Sign in required." };
   const cur = await latest();
   const version = (cur?.version ?? 0) + 1;
-  const bundle = buildCatalogBundle(version);
+  // Assemble from the CMS authoring tables when seeded; otherwise the
+  // built-in catalog (so publish still works pre-seed, byte-identical).
+  const cmsPacks = await assembleBundleFromCMS();
+  const bundle: KnowledgeBundle = cmsPacks
+    ? {
+        schema: BUNDLE_SCHEMA,
+        version,
+        generatedAt: new Date().toISOString(),
+        protocols: cmsPacks,
+        config: activeConfig(),
+      }
+    : buildCatalogBundle(version);
   const checksum = bundleChecksum(bundle);
   if (cur && bundleChecksum(cur.bundle) === checksum)
     return {

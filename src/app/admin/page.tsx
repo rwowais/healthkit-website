@@ -20,6 +20,15 @@ import {
   rollbackTo,
   type Publication,
 } from "@/lib/cms/publish";
+import {
+  importBuiltin,
+  listCmsProtocols,
+  getProtocolBehaviors,
+  saveProtocol,
+  saveBehavior,
+  type CmsProtocol,
+  type CmsBehavior,
+} from "@/lib/cms/authoring";
 import type { AppState, DailyLog } from "@/lib/types";
 import { Eyebrow, Skeleton } from "@/components/ui";
 
@@ -31,6 +40,7 @@ type Tab =
   | "config"
   | "intelligence"
   | "simulate"
+  | "edit"
   | "publish";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -40,6 +50,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "config", label: "Config" },
   { id: "intelligence", label: "Intelligence" },
   { id: "simulate", label: "Simulate" },
+  { id: "edit", label: "Edit" },
   { id: "publish", label: "Publish" },
 ];
 
@@ -92,6 +103,19 @@ export default function AdminHome() {
   useEffect(() => {
     if (gate === "ok") refreshPubs();
   }, [gate]);
+
+  // ── Edit (relational authoring) ───────────────────────────────────
+  const [cmsP, setCmsP] = useState<CmsProtocol[]>([]);
+  const [edP, setEdP] = useState<CmsProtocol | null>(null);
+  const [edB, setEdB] = useState<CmsBehavior[]>([]);
+  const loadCms = () => listCmsProtocols().then(setCmsP);
+  useEffect(() => {
+    if (gate === "ok" && tab === "edit") loadCms();
+  }, [gate, tab]);
+  const openProto = async (p: CmsProtocol) => {
+    setEdP({ ...p });
+    setEdB(await getProtocolBehaviors(p.id));
+  };
 
   const sim = useMemo(() => {
     const base = getDefaultState();
@@ -432,6 +456,264 @@ export default function AdminHome() {
             </div>
           </div>
         )}
+        {tab === "edit" &&
+          (() => {
+            const inp =
+              "w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none";
+            if (cmsP.length === 0)
+              return (
+                <div className={card} style={surf}>
+                  <p className="text-[13.5px] text-[var(--text-2)]">
+                    The CMS is empty. Seed it from the built-in catalog
+                    (idempotent, byte-identical) to start editing.
+                  </p>
+                  <button
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      setMsg(null);
+                      const r = await importBuiltin();
+                      setBusy(false);
+                      setMsg(r.ok ? "Seeded." : r.reason ?? "Failed");
+                      if (r.ok) loadCms();
+                    }}
+                    className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[13px] font-semibold text-[#08090B] disabled:opacity-40"
+                  >
+                    {busy ? "…" : "Seed from built-in catalog"}
+                  </button>
+                  {msg && (
+                    <p className="mt-2 text-[12px] text-[var(--text-3)]">
+                      {msg}
+                    </p>
+                  )}
+                </div>
+              );
+            if (!edP)
+              return (
+                <div className="space-y-1.5">
+                  {cmsP.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => openProto(p)}
+                      className="press row flex w-full items-center justify-between px-4 py-3 text-left"
+                    >
+                      <span className="text-[14px] font-medium text-[var(--text-1)]">
+                        {p.name}
+                      </span>
+                      <span className="t-caption">
+                        {p.status} · v{p.version}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              );
+            return (
+              <div className="space-y-4">
+                <button
+                  onClick={() => {
+                    setEdP(null);
+                    setEdB([]);
+                  }}
+                  className="press text-[13px] font-semibold text-[var(--readiness)]"
+                >
+                  ← All protocols
+                </button>
+                <div className={card} style={surf}>
+                  <Eyebrow>Protocol</Eyebrow>
+                  <div className="mt-2 space-y-2">
+                    <input
+                      className={inp}
+                      value={edP.name}
+                      onChange={(e) =>
+                        setEdP({ ...edP, name: e.target.value })
+                      }
+                      placeholder="Name"
+                    />
+                    <input
+                      className={inp}
+                      value={edP.tagline ?? ""}
+                      onChange={(e) =>
+                        setEdP({ ...edP, tagline: e.target.value })
+                      }
+                      placeholder="Tagline"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        className={inp}
+                        value={edP.accent ?? ""}
+                        onChange={(e) =>
+                          setEdP({ ...edP, accent: e.target.value })
+                        }
+                        placeholder="Accent (CSS var)"
+                      />
+                      <select
+                        className={inp}
+                        value={edP.status}
+                        onChange={(e) =>
+                          setEdP({ ...edP, status: e.target.value })
+                        }
+                      >
+                        {["draft", "published", "archived"].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      const r = await saveProtocol(edP);
+                      setBusy(false);
+                      setMsg(
+                        r.ok ? "Protocol saved" : r.reason ?? "Failed"
+                      );
+                      if (r.ok) loadCms();
+                    }}
+                    className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                  >
+                    Save protocol
+                  </button>
+                </div>
+
+                <Eyebrow>Behaviors</Eyebrow>
+                {edB.map((b, idx) => (
+                  <div key={b.id} className={card} style={surf}>
+                    <input
+                      className={inp}
+                      value={b.title}
+                      onChange={(e) =>
+                        setEdB((xs) =>
+                          xs.map((x, i) =>
+                            i === idx
+                              ? { ...x, title: e.target.value }
+                              : x
+                          )
+                        )
+                      }
+                      placeholder="Title"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <select
+                        className={inp}
+                        value={b.block}
+                        onChange={(e) =>
+                          setEdB((xs) =>
+                            xs.map((x, i) =>
+                              i === idx
+                                ? { ...x, block: e.target.value }
+                                : x
+                            )
+                          )
+                        }
+                      >
+                        {[
+                          "morning",
+                          "afternoon",
+                          "evening",
+                          "anytime",
+                        ].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                      <select
+                        className={inp}
+                        value={b.leverage}
+                        onChange={(e) =>
+                          setEdB((xs) =>
+                            xs.map((x, i) =>
+                              i === idx
+                                ? {
+                                    ...x,
+                                    leverage: Number(e.target.value),
+                                  }
+                                : x
+                            )
+                          )
+                        }
+                      >
+                        {[1, 2, 3].map((s) => (
+                          <option key={s} value={s}>
+                            L{s}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className={inp}
+                        value={b.status}
+                        onChange={(e) =>
+                          setEdB((xs) =>
+                            xs.map((x, i) =>
+                              i === idx
+                                ? { ...x, status: e.target.value }
+                                : x
+                            )
+                          )
+                        }
+                      >
+                        {["draft", "published", "archived"].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <input
+                      className={`${inp} mt-2`}
+                      value={b.dose ?? ""}
+                      onChange={(e) =>
+                        setEdB((xs) =>
+                          xs.map((x, i) =>
+                            i === idx
+                              ? { ...x, dose: e.target.value }
+                              : x
+                          )
+                        )
+                      }
+                      placeholder="Dose"
+                    />
+                    <textarea
+                      className={`${inp} mt-2`}
+                      rows={2}
+                      value={b.rationale ?? ""}
+                      onChange={(e) =>
+                        setEdB((xs) =>
+                          xs.map((x, i) =>
+                            i === idx
+                              ? { ...x, rationale: e.target.value }
+                              : x
+                          )
+                        )
+                      }
+                      placeholder="Rationale"
+                    />
+                    <button
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        const r = await saveBehavior(b);
+                        setBusy(false);
+                        setMsg(
+                          r.ok ? "Behavior saved" : r.reason ?? "Failed"
+                        );
+                      }}
+                      className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                    >
+                      Save behavior
+                    </button>
+                  </div>
+                ))}
+                {msg && (
+                  <p className="text-[12px] text-[var(--text-3)]">
+                    {msg}
+                  </p>
+                )}
+                <p className="t-caption">
+                  Edits are drafts until you Publish a bundle — users see
+                  nothing change until then.
+                </p>
+              </div>
+            );
+          })()}
+
         {tab === "publish" && (
           <div className="space-y-4">
             <div className={card} style={surf}>
