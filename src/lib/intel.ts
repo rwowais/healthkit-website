@@ -114,7 +114,7 @@ export function keystone(state: AppState): Keystone | null {
   // The more behaviors we scan, the stronger the effect must be — but
   // tuned to actually fire for a real, consistent user (the prior bar
   // of d>=0.77 + >=8/group made it a dead feature).
-  const dThreshold = 0.4 + 0.05 * Math.log2(Math.max(items.length, 2));
+  const dThreshold = 0.35 + 0.05 * Math.log2(Math.max(items.length, 2));
 
   let best: (Keystone & { d: number }) | null = null;
   for (const it of items) {
@@ -130,7 +130,7 @@ export function keystone(state: AppState): Keystone | null {
     // A keystone is, by definition, done most days — so the "not done"
     // bucket is naturally small. Require a solid "done" sample but only
     // a few contrast days.
-    if (otherDone.length < 8 || otherNot.length < 4) continue;
+    if (otherDone.length < 8 || otherNot.length < 3) continue;
     const mD = mean(otherDone);
     const mN = mean(otherNot);
     if (mD <= mN) continue;

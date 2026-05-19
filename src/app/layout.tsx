@@ -33,7 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" style={{ colorScheme: "dark" }}>
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      style={{ colorScheme: "dark" }}
+    >
       <body className="antialiased">
         {children}
         <SyncConflictPrompt />

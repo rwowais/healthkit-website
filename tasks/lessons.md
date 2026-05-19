@@ -36,3 +36,9 @@ rule that prevents it.
   expensive/irreversible decisions (schema, data loss, infra, credentials).
 - Never create accounts/projects on the owner's behalf (e.g. Supabase) —
   build the abstraction, leave it inert until they provide keys.
+- Never run multiple preview/browser-driven agents against the SAME dev
+  server at once — they share one localStorage/origin and stomp each
+  other's seeds every ~1s, producing false "state desync" findings.
+  Run such agents sequentially, or give each its own server/port.
+- Bash cwd resets between calls — always `cd /Users/rami/Claude/healthkit-website &&`
+  before npx tsc/next/vitest, or they run from the wrong dir.

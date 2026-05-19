@@ -7,7 +7,7 @@ import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess, FREE_PACKS } from "@/lib/entitlements";
 import { PACKS } from "@/lib/packs";
-import { Eyebrow, Skeleton, Button, useToast } from "@/components/ui";
+import { Eyebrow, Skeleton, Button, Sheet, useToast } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { ProtocolPack } from "@/lib/types";
 
@@ -123,20 +123,13 @@ export default function LibraryPage() {
         </div>
       </div>
 
-      {open && (
-        <div
-          className="anim-fade fixed inset-0 z-[100] flex items-end justify-center sm:items-center"
-          style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={() => setOpen(null)}
-        >
-          <motion.div
-            initial={{ y: 40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="glass max-h-[85vh] w-full max-w-[480px] overflow-y-auto rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] no-scrollbar sm:rounded-[var(--r-xl)] sm:border"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden" />
+      <Sheet
+        open={!!open}
+        onClose={() => setOpen(null)}
+        title={open?.name}
+      >
+        {open && (
+          <div className="max-h-[70vh] overflow-y-auto no-scrollbar">
             <span
               className="chip h-14 w-14"
               style={{
@@ -146,8 +139,7 @@ export default function LibraryPage() {
             >
               <Icon name={open.icon as IconName} size={26} />
             </span>
-            <h3 className="t-title mt-4 text-[var(--text-1)]">{open.name}</h3>
-            <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
+            <p className="mt-3 text-[14px] leading-relaxed text-[var(--text-2)]">
               {open.tagline}
             </p>
 
@@ -213,9 +205,9 @@ export default function LibraryPage() {
                 </Button>
               )}
             </div>
-          </motion.div>
-        </div>
-      )}
+          </div>
+        )}
+      </Sheet>
     </Shell>
   );
 }
