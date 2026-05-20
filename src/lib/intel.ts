@@ -407,13 +407,16 @@ export function suggestions(state: AppState): Suggestion[] {
       out.push({
         id: `sug-keystone-${ks.key}`,
         kind: "progress",
-        title: `Your keystone is slipping`,
+        title: getInsightTemplate(
+          "keystone-slipping-title",
+          "Your keystone is slipping"
+        ),
         body: renderTemplate(tpl, {
           title: ks.title,
           delta: ks.delta,
           pointWord,
         }),
-        cta: "Got it",
+        cta: getInsightTemplate("keystone-slipping-cta", "Got it"),
         action: { type: "none" },
       });
     }
@@ -533,11 +536,32 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
   }
 
   const wins: string[] = [];
-  wins.push(`${tracked.length} of 7 days active`);
+  wins.push(
+    renderTemplate(
+      getInsightTemplate("weekly-wins-active", "{count} of 7 days active"),
+      { count: tracked.length }
+    )
+  );
   if (bestName && best)
-    wins.push(`Best day was ${bestName} at ${best.score}`);
+    wins.push(
+      renderTemplate(
+        getInsightTemplate(
+          "weekly-wins-best",
+          "Best day was {dayName} at {score}"
+        ),
+        { dayName: bestName, score: best.score }
+      )
+    );
   if (topTitle && topCount >= 3)
-    wins.push(`Kept “${topTitle}” ${topCount} days`);
+    wins.push(
+      renderTemplate(
+        getInsightTemplate(
+          "weekly-wins-kept",
+          "Kept “{title}” {count} days"
+        ),
+        { title: topTitle, count: topCount }
+      )
+    );
 
   // focus: weakest behavior among essentials
   const essentials = items.filter((i) => i.leverage === 3);
@@ -554,8 +578,17 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
   }
   const focus =
     focusTitle && focusCount < tracked.length
-      ? `Next week, tighten one thing: “${focusTitle}”. It's your highest-leverage gap.`
-      : `Next week, hold the line. Consistency at this level compounds quietly.`;
+      ? renderTemplate(
+          getInsightTemplate(
+            "weekly-focus-tighten",
+            "Next week, tighten one thing: “{title}”. It's your highest-leverage gap."
+          ),
+          { title: focusTitle }
+        )
+      : getInsightTemplate(
+          "weekly-focus-hold",
+          "Next week, hold the line. Consistency at this level compounds quietly."
+        );
 
   // Coach continuity: re-derive what we would have flagged LAST week and
   // report whether it actually moved — the system "remembering".
@@ -581,21 +614,58 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
       ).length;
       continuity =
         nowC > pMin
-          ? `Last week we flagged “${pTitle}” — you lifted it to ${nowC} of ${tracked.length} days. It's holding.`
-          : `Last week's focus was “${pTitle}” — still light (${nowC} of ${tracked.length}). One small re-anchor, not a verdict.`;
+          ? renderTemplate(
+              getInsightTemplate(
+                "continuity-holding",
+                "Last week we flagged “{title}” — you lifted it to {count} of {total} days. It's holding."
+              ),
+              {
+                title: pTitle,
+                count: nowC,
+                total: tracked.length,
+              }
+            )
+          : renderTemplate(
+              getInsightTemplate(
+                "continuity-light",
+                "Last week's focus was “{title}” — still light ({count} of {total}). One small re-anchor, not a verdict."
+              ),
+              {
+                title: pTitle,
+                count: nowC,
+                total: tracked.length,
+              }
+            );
     }
   }
 
   let headline: string;
   if (delta != null && delta >= 5)
-    headline = `A stronger week — up ${delta} points. Momentum is real.`;
+    headline = renderTemplate(
+      getInsightTemplate(
+        "weekly-headline-up",
+        "A stronger week — up {delta} points. Momentum is real."
+      ),
+      { delta }
+    );
   else if (delta != null && delta <= -5)
-    headline = `A lighter week, down ${Math.abs(
-      delta
-    )}. Not a setback — a signal to simplify.`;
+    headline = renderTemplate(
+      getInsightTemplate(
+        "weekly-headline-down",
+        "A lighter week, down {abs}. Not a setback — a signal to simplify."
+      ),
+      { abs: Math.abs(delta) }
+    );
   else if (avgThis >= 75)
-    headline = `A strong, steady week. This is what good looks like.`;
-  else headline = `A solid week of showing up. That's the whole game.`;
+    headline = getInsightTemplate(
+      "weekly-headline-strong",
+      "A strong, steady week. This is what good looks like."
+    );
+  else
+    headline = getInsightTemplate(
+      "weekly-headline-steady",
+      "A solid week of showing up. That's the whole game."
+    );
 
   return {
     headline,
