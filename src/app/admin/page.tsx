@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { isAdmin } from "@/lib/admin";
 import { activePacks, activeBundleVersion } from "@/lib/knowledge";
@@ -9,7 +15,10 @@ import {
   RULE_SETS,
   CONFIG_ROWS,
   INTEL_KINDS,
+  KNOWN_CONFIG_KEYS,
+  KNOWN_INSIGHT_KINDS,
 } from "@/lib/cms/introspect";
+import { getCfgNumber, activeInsightTemplates } from "@/lib/knowledge";
 import { getDefaultState } from "@/lib/storage";
 import { adapt, compileTimeline, shapeTimeline } from "@/lib/engine";
 import { bundleChecksum } from "@/lib/knowledge";
@@ -21,6 +30,8 @@ import {
   previewNextBundle,
   getLatestPublishedBundle,
   diffBundles,
+  fetchAndApplyPublished,
+  resetRefresh,
   type Publication,
   type BundleDiff,
 } from "@/lib/cms/publish";
@@ -253,6 +264,13 @@ export default function AdminHome() {
   // opened so the admin can see exactly what would ship.
   const [diff, setDiff] = useState<BundleDiff | null>(null);
   const [diffBusy, setDiffBusy] = useState(false);
+  const diffAlive = useRef(true);
+  useEffect(
+    () => () => {
+      diffAlive.current = false;
+    },
+    []
+  );
   const refreshDiff = async () => {
     setDiffBusy(true);
     try {
@@ -260,11 +278,11 @@ export default function AdminHome() {
         getLatestPublishedBundle(),
         previewNextBundle(),
       ]);
-      setDiff(diffBundles(prev, next));
+      if (diffAlive.current) setDiff(diffBundles(prev, next));
     } catch {
-      setDiff(null);
+      if (diffAlive.current) setDiff(null);
     } finally {
-      setDiffBusy(false);
+      if (diffAlive.current) setDiffBusy(false);
     }
   };
   useEffect(() => {
@@ -279,10 +297,19 @@ export default function AdminHome() {
   const loadCms = () => listCmsProtocols().then(setCmsP);
   useEffect(() => {
     if (
-      gate === "ok" &&
-      (tab === "content" || tab === "home" || tab === "simulate")
+      !(
+        gate === "ok" &&
+        (tab === "content" || tab === "home" || tab === "simulate")
+      )
     )
-      loadCms();
+      return;
+    let alive = true;
+    listCmsProtocols().then((ps) => {
+      if (alive) setCmsP(ps);
+    });
+    return () => {
+      alive = false;
+    };
   }, [gate, tab]);
 
   // CMS counts for the Home "Drafts in CMS" tile.
@@ -359,9 +386,21 @@ export default function AdminHome() {
   const loadSugs = (status = sugStatus) =>
     listSuggestions(status).then(setSugs);
   useEffect(() => {
-    if (gate === "ok" && tab === "content" && contentMode === "review")
-      loadSugs(sugStatus);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (
+      !(
+        gate === "ok" &&
+        tab === "content" &&
+        contentMode === "review"
+      )
+    )
+      return;
+    let alive = true;
+    listSuggestions(sugStatus).then((s) => {
+      if (alive) setSugs(s);
+    });
+    return () => {
+      alive = false;
+    };
   }, [gate, tab, contentMode, sugStatus]);
   // When the create-suggestion form switches to behavior mode, pull
   // the protocol's behavior list so the picker is populated.
@@ -610,16 +649,31 @@ export default function AdminHome() {
   // actions — much clearer than the global status line buried far
   // below the row the user clicked on.
   const [savedIds, setSavedIds] = useState<Record<string, true>>({});
+  // Track flash timers per-id so we (a) clear them on unmount to avoid
+  // setState-after-unmount warnings, and (b) reset cleanly if the same
+  // row flashes again before the first timer fires.
+  const flashTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>(
+    {}
+  );
+  useEffect(
+    () => () => {
+      for (const t of Object.values(flashTimers.current))
+        clearTimeout(t);
+      flashTimers.current = {};
+    },
+    []
+  );
   const flashSaved = (id: string) => {
     setSavedIds((s) => ({ ...s, [id]: true }));
-    setTimeout(
-      () => setSavedIds((s) => {
+    if (flashTimers.current[id]) clearTimeout(flashTimers.current[id]);
+    flashTimers.current[id] = setTimeout(() => {
+      delete flashTimers.current[id];
+      setSavedIds((s) => {
         const n = { ...s };
         delete n[id];
         return n;
-      }),
-      1500
-    );
+      });
+    }, 1500);
   };
   // Per-row in-flight state — saving behavior #3 should NOT disable
   // every other row's buttons. The page-wide `busy` is reserved for
@@ -1280,21 +1334,84 @@ export default function AdminHome() {
                 <Eyebrow color="var(--readiness)">CMS overrides</Eyebrow>
                 <span
                   className="t-caption"
-                  title="Stored in cms_intelligence_config. The Publish pipeline will include these in the bundle in a follow-up — for now the editor is here so you can author them."
+                  title="Stored in cms_intelligence_config. Live at runtime after Publish — the entitlement gates and engine constants read these via getCfg*."
                 >
-                  editor live · runtime adopts next ?
+                  runtime live ?
                 </span>
               </div>
               <p className="t-caption leading-relaxed">
-                Author key/value overrides keyed by string. JSON value
-                (e.g. <code>14</code>, <code>&quot;evening&quot;</code>,{" "}
-                <code>true</code>, or a JSON object).
+                Override the keys the runtime actually reads. Pick a
+                known key below to author one — those take effect on
+                Publish. Unknown keys can be authored too (forward
+                compat) but won&apos;t change behavior.
               </p>
+
+              {/* Effective-value panel: known keys, their default,
+                  current override (if any), and the effective value
+                  the runtime is using right now. */}
+              <div className={card} style={surf}>
+                <Eyebrow>Known keys (effective values)</Eyebrow>
+                <div className="mt-2 space-y-1.5 text-[12.5px]">
+                  {KNOWN_CONFIG_KEYS.map((k) => {
+                    const override = cfgRows.find(
+                      (r) => r.key === k.key
+                    );
+                    const effective = getCfgNumber(
+                      k.key,
+                      k.defaultValue
+                    );
+                    const overridden =
+                      override !== undefined &&
+                      effective !== k.defaultValue;
+                    return (
+                      <div
+                        key={k.key}
+                        className="flex items-baseline justify-between gap-3"
+                        title={k.description}
+                      >
+                        <span className="font-mono text-[var(--text-2)]">
+                          {k.key}
+                        </span>
+                        <span className="grow text-right text-[var(--text-3)]">
+                          default {k.defaultValue}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setCfgKey(k.key);
+                            setCfgValue(
+                              JSON.stringify(
+                                override?.value ?? k.defaultValue
+                              )
+                            );
+                            setCfgDesc(k.description);
+                          }}
+                          className="press shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{
+                            background: overridden
+                              ? "rgba(111,168,245,.18)"
+                              : "var(--surface-3)",
+                            color: overridden
+                              ? "var(--readiness)"
+                              : "var(--text-2)",
+                          }}
+                          title={
+                            overridden
+                              ? "Override is live"
+                              : "No override — click to author one"
+                          }
+                        >
+                          effective {effective}
+                          {overridden ? " · live" : ""}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 {cfgRows.length === 0 && (
-                  <p className="t-caption px-1">
-                    No overrides yet.
-                  </p>
+                  <p className="t-caption px-1">No overrides yet.</p>
                 )}
                 {cfgRows.map((c) => (
                   <div
@@ -1341,9 +1458,17 @@ export default function AdminHome() {
                   <input
                     value={cfgKey}
                     onChange={(e) => setCfgKey(e.target.value)}
-                    placeholder="key (e.g. AHA_DAYS_OVERRIDE)"
+                    list="known-config-keys"
+                    placeholder="key — e.g. AHA_DAYS (pick from the known list above)"
                     className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
                   />
+                  <datalist id="known-config-keys">
+                    {KNOWN_CONFIG_KEYS.map((k) => (
+                      <option key={k.key} value={k.key}>
+                        {k.description}
+                      </option>
+                    ))}
+                  </datalist>
                   <input
                     value={cfgValue}
                     onChange={(e) => setCfgValue(e.target.value)}
@@ -1529,45 +1654,119 @@ export default function AdminHome() {
               </div>
               <div className={card} style={surf}>
                 <Eyebrow>Add insight template</Eyebrow>
-                <div className="mt-2 space-y-2">
-                  <input
-                    value={newInsKind}
-                    onChange={(e) => setNewInsKind(e.target.value)}
-                    placeholder="kind (e.g. keystone, weekly, proven)"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
-                  <textarea
-                    value={newInsTpl}
-                    onChange={(e) => setNewInsTpl(e.target.value)}
-                    rows={2}
-                    placeholder="template copy (placeholders like {behavior} are OK)"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
-                  <button
-                    disabled={
-                      busy || !newInsKind.trim() || !newInsTpl.trim()
-                    }
-                    onClick={async () => {
-                      setBusy(true);
-                      const r = await saveInsightTemplate({
-                        kind: newInsKind,
-                        template: newInsTpl,
-                      });
-                      setBusy(false);
-                      setMsg(
-                        r.ok ? "Added." : r.reason ?? "Failed"
-                      );
-                      if (r.ok) {
-                        setNewInsKind("");
-                        setNewInsTpl("");
-                        refreshTemplates();
-                      }
-                    }}
-                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
-                  >
-                    Add template
-                  </button>
-                </div>
+                <p className="t-caption mt-1 leading-relaxed">
+                  Pick a known kind below — the runtime reads templates
+                  by exact kind name, so an unknown kind is harmless but
+                  has no effect.
+                </p>
+                {(() => {
+                  const known = KNOWN_INSIGHT_KINDS.find(
+                    (k) => k.kind === newInsKind.trim()
+                  );
+                  return (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        value={newInsKind}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setNewInsKind(v);
+                          const m = KNOWN_INSIGHT_KINDS.find(
+                            (k) => k.kind === v.trim()
+                          );
+                          if (m && !newInsTpl)
+                            setNewInsTpl(m.defaultCopy);
+                        }}
+                        list="known-insight-kinds"
+                        placeholder="kind — pick or type"
+                        className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12.5px] text-[var(--text-1)] outline-none"
+                      />
+                      <datalist id="known-insight-kinds">
+                        {KNOWN_INSIGHT_KINDS.map((k) => (
+                          <option key={k.kind} value={k.kind}>
+                            {k.group} · default: {k.defaultCopy.slice(0, 60)}
+                          </option>
+                        ))}
+                      </datalist>
+                      {known ? (
+                        <p
+                          className="rounded-[var(--r-sm)] px-3 py-2 text-[11.5px] leading-relaxed"
+                          style={{
+                            background: "rgba(111,168,245,.10)",
+                            color: "var(--text-2)",
+                          }}
+                        >
+                          <b>{known.group}</b>{" "}
+                          {known.vars.length > 0 ? (
+                            <>
+                              · variables:{" "}
+                              {known.vars.map((v) => (
+                                <code key={v}>{`{${v}}`} </code>
+                              ))}
+                            </>
+                          ) : (
+                            "· no variables"
+                          )}
+                          <br />
+                          <span className="text-[var(--text-3)]">
+                            default: “{known.defaultCopy}”
+                          </span>
+                        </p>
+                      ) : newInsKind.trim() ? (
+                        <p
+                          className="rounded-[var(--r-sm)] px-3 py-2 text-[11.5px] font-medium"
+                          style={{
+                            background: "rgba(232,201,155,.10)",
+                            color: "var(--warm)",
+                          }}
+                        >
+                          ⚠ This kind isn&apos;t one the runtime reads
+                          today — authoring it is allowed but it
+                          won&apos;t fire. Pick from the list to author
+                          one that actually takes effect.
+                        </p>
+                      ) : null}
+                      <textarea
+                        value={newInsTpl}
+                        onChange={(e) => setNewInsTpl(e.target.value)}
+                        rows={2}
+                        placeholder="template copy (use {variable} placeholders shown above)"
+                        className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                      />
+                      <button
+                        disabled={
+                          busy ||
+                          !newInsKind.trim() ||
+                          !newInsTpl.trim()
+                        }
+                        onClick={async () => {
+                          setBusy(true);
+                          const r = await saveInsightTemplate({
+                            kind: newInsKind,
+                            template: newInsTpl,
+                            status: "draft",
+                          });
+                          setBusy(false);
+                          setMsg(
+                            r.ok ? "Added (as draft)." : r.reason ?? "Failed"
+                          );
+                          if (r.ok) {
+                            setNewInsKind("");
+                            setNewInsTpl("");
+                            refreshTemplates();
+                          }
+                        }}
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        Add template (draft)
+                      </button>
+                      <p className="t-caption">
+                        New rows save as draft. Flip the status dropdown
+                        to <b>published</b> + Save to make it live on the
+                        next Publish.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -2112,22 +2311,32 @@ export default function AdminHome() {
                                   return (
                                     <button
                                       key={s.slug}
+                                      disabled={aiIdeaBusy}
                                       onClick={async () => {
-                                        // Strip suggestions to leave a
-                                        // plain AiBehaviorDraft for the
-                                        // in-protocol editor.
-                                        const {
-                                          suggestedProtocols: _drop,
-                                          ...rest
-                                        } = aiIdeaResult;
-                                        void _drop;
-                                        await openProto(target);
-                                        setAiDraft(
-                                          rest as AiBehaviorDraft
-                                        );
-                                        setAiDesc(aiIdea);
-                                        setAiIdeaResult(null);
-                                        setAiIdea("");
+                                        // Guard against double-click /
+                                        // racing a second suggestion
+                                        // before openProto resolves —
+                                        // the second click would leave
+                                        // edP from suggestion A and
+                                        // aiDraft from suggestion B.
+                                        if (aiIdeaBusy) return;
+                                        setAiIdeaBusy(true);
+                                        try {
+                                          const {
+                                            suggestedProtocols: _drop,
+                                            ...rest
+                                          } = aiIdeaResult;
+                                          void _drop;
+                                          await openProto(target);
+                                          setAiDraft(
+                                            rest as AiBehaviorDraft
+                                          );
+                                          setAiDesc(aiIdea);
+                                          setAiIdeaResult(null);
+                                          setAiIdea("");
+                                        } finally {
+                                          setAiIdeaBusy(false);
+                                        }
                                       }}
                                       className="press tr-fast row flex w-full items-start gap-3 rounded-[var(--r-sm)] p-2.5 text-left"
                                       style={{
@@ -3237,6 +3446,9 @@ export default function AdminHome() {
                           (b) => savingIds[b.id]
                         )}
                         onClick={async () => {
+                          // Continue past failures so a single bad row
+                          // doesn't leave the rest stuck dirty + silent.
+                          const failed: string[] = [];
                           for (const b of dirtyList) {
                             markSavingStart(b.id);
                             const r = await saveBehavior(b);
@@ -3248,12 +3460,16 @@ export default function AdminHome() {
                                 [b.id]: snapBehavior(b),
                               }));
                             } else {
-                              setMsg(
+                              failed.push(
                                 `${b.title}: ${r.reason ?? "failed"}`
                               );
-                              return;
                             }
                           }
+                          if (failed.length === 0) setMsg(null);
+                          else
+                            setMsg(
+                              `Saved ${dirtyList.length - failed.length}/${dirtyList.length}. Failed: ${failed.join(" · ")}`
+                            );
                         }}
                         className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
                       >
@@ -3749,14 +3965,22 @@ export default function AdminHome() {
                   setMsg(null);
                   const r = await publishBundle(note.trim());
                   setBusy(false);
-                  setMsg(
-                    r.ok
-                      ? `Published v${r.version} (${r.checksum})`
-                      : r.reason
-                  );
                   if (r.ok) {
+                    // fetchAndApplyPublished is one-shot per session;
+                    // reset it so this admin session adopts the bundle
+                    // they just published without forcing a full page
+                    // reload. Future-runtime sessions pick it up on
+                    // first load as before.
+                    resetRefresh();
+                    await fetchAndApplyPublished();
+                    setMsg(
+                      `Published v${r.version} (${r.checksum}) — runtime adopted.`
+                    );
                     setNote("");
                     refreshPubs();
+                    refreshDiff();
+                  } else {
+                    setMsg(r.reason);
                   }
                 }}
                 className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[13px] font-semibold text-[#08090B] disabled:opacity-40"
@@ -3802,19 +4026,24 @@ export default function AdminHome() {
                         disabled={busy}
                         onClick={async () => {
                           const yes = window.confirm(
-                            `Roll back to v${p.version}? This creates a NEW published version on top of history (nothing is deleted), and the app will adopt it on next refresh.`
+                            `Roll back to v${p.version}? This creates a NEW published version on top of history (nothing is deleted) and the runtime adopts it immediately for you.`
                           );
                           if (!yes) return;
                           setBusy(true);
                           setMsg(null);
                           const r = await rollbackTo(p.version);
                           setBusy(false);
-                          setMsg(
-                            r.ok
-                              ? `Rolled back → v${r.version}`
-                              : r.reason
-                          );
-                          if (r.ok) refreshPubs();
+                          if (r.ok) {
+                            resetRefresh();
+                            await fetchAndApplyPublished();
+                            setMsg(
+                              `Rolled back → v${r.version} — runtime adopted.`
+                            );
+                            refreshPubs();
+                            refreshDiff();
+                          } else {
+                            setMsg(r.reason);
+                          }
                         }}
                         className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--surface-3)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)]"
                       >

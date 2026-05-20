@@ -203,6 +203,18 @@ create table if not exists public.cms_explanations (
   updated_at timestamptz not null default now(),
   updated_by uuid
 );
+-- One explanation per (target, kind) — concurrent upserts used to race.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'cms_explanations_target_kind_unique'
+  ) then
+    alter table public.cms_explanations
+      add constraint cms_explanations_target_kind_unique
+      unique (target_type, target_ref, kind);
+  end if;
+end $$;
 
 create table if not exists public.cms_evidence (
   id uuid primary key default gen_random_uuid(),
@@ -216,6 +228,20 @@ create table if not exists public.cms_evidence (
   updated_at timestamptz not null default now(),
   updated_by uuid
 );
+-- One evidence row per (target_type, target_ref) — concurrent upserts
+-- from the editor used to race; this makes them deterministic.
+-- Wrapped in DO so the migration is idempotent across re-runs.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'cms_evidence_target_unique'
+  ) then
+    alter table public.cms_evidence
+      add constraint cms_evidence_target_unique
+      unique (target_type, target_ref);
+  end if;
+end $$;
 
 create table if not exists public.cms_recommendation_templates (
   id uuid primary key default gen_random_uuid(),

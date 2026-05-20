@@ -324,9 +324,9 @@ export async function listEvidence(
   }
 }
 /**
- * Upsert-by-target: at most one evidence row per (target_type,
- * target_ref). Find-then-(update|insert) so no schema constraint is
- * required and existing data stays clean.
+ * Atomic upsert by (target_type, target_ref) — one evidence row per
+ * behavior. Schema enforces uniqueness via cms_evidence_target_unique
+ * so concurrent saves can no longer create duplicate rows.
  */
 export async function upsertEvidence(input: {
   targetType: string;
@@ -339,12 +339,6 @@ export async function upsertEvidence(input: {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "Cloud not configured." };
   try {
-    const { data: existing } = await sb
-      .from("cms_evidence")
-      .select("id")
-      .eq("target_type", input.targetType)
-      .eq("target_ref", input.targetRef)
-      .maybeSingle();
     const row = {
       target_type: input.targetType,
       target_ref: input.targetRef,
@@ -353,9 +347,9 @@ export async function upsertEvidence(input: {
       url: input.url ?? null,
       summary: input.summary ?? null,
     };
-    const { error } = existing?.id
-      ? await sb.from("cms_evidence").update(row).eq("id", existing.id)
-      : await sb.from("cms_evidence").insert(row);
+    const { error } = await sb
+      .from("cms_evidence")
+      .upsert(row, { onConflict: "target_type,target_ref" });
     if (error) return { ok: false, reason: error.message };
     return { ok: true };
   } catch (e) {
@@ -786,7 +780,7 @@ export async function deleteRecTemplate(
   }
 }
 
-/** Upsert-by-(target,kind): one explanation per (target, kind). */
+/** Atomic upsert by (target_type, target_ref, kind). */
 export async function upsertExplanation(input: {
   targetType: string;
   targetRef: string;
@@ -796,13 +790,6 @@ export async function upsertExplanation(input: {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "Cloud not configured." };
   try {
-    const { data: existing } = await sb
-      .from("cms_explanations")
-      .select("id")
-      .eq("target_type", input.targetType)
-      .eq("target_ref", input.targetRef)
-      .eq("kind", input.kind)
-      .maybeSingle();
     const row = {
       target_type: input.targetType,
       target_ref: input.targetRef,
@@ -810,9 +797,9 @@ export async function upsertExplanation(input: {
       text: input.text,
       status: "draft",
     };
-    const { error } = existing?.id
-      ? await sb.from("cms_explanations").update(row).eq("id", existing.id)
-      : await sb.from("cms_explanations").insert(row);
+    const { error } = await sb
+      .from("cms_explanations")
+      .upsert(row, { onConflict: "target_type,target_ref,kind" });
     if (error) return { ok: false, reason: error.message };
     return { ok: true };
   } catch (e) {

@@ -152,6 +152,85 @@ export interface IntelKind {
   gate: string;
 }
 
+/**
+ * Config keys the runtime actually reads via getCfg*. Authoring a row
+ * with a key NOT in this list is allowed (forward-compat) but has no
+ * effect — the editor warns about it.
+ */
+export interface KnownConfigKey {
+  key: string;
+  type: "number";
+  defaultValue: number;
+  description: string;
+}
+export const KNOWN_CONFIG_KEYS: KnownConfigKey[] = [
+  {
+    key: "AHA_DAYS",
+    type: "number",
+    defaultValue: AHA_DAYS,
+    description:
+      "Engaged days before the reverse trial stops auto-extending.",
+  },
+  {
+    key: "FREE_PACKS",
+    type: "number",
+    defaultValue: FREE_PACKS,
+    description: "Official packs a free user may install.",
+  },
+  {
+    key: "FREE_BIOMARKERS",
+    type: "number",
+    defaultValue: FREE_BIOMARKERS,
+    description: "Distinct biomarkers a free user may track.",
+  },
+  {
+    key: "FREE_INSIGHT_DAYS",
+    type: "number",
+    defaultValue: FREE_INSIGHT_DAYS,
+    description: "Free insight window before the time-decayed peek.",
+  },
+];
+
+/**
+ * Insight template kinds the runtime actually reads via
+ * getInsightTemplate. Authoring a row with a kind NOT in this list is
+ * allowed but never fires — the editor warns about it.
+ */
+export interface KnownInsightKind {
+  kind: string;
+  defaultCopy: string;
+  vars: string[];
+  group: "suggestion" | "weekly";
+}
+export const KNOWN_INSIGHT_KINDS: KnownInsightKind[] = [
+  { kind: "install-better-sleep-title", defaultCopy: "Your sleep keeps coming up short", vars: [], group: "suggestion" },
+  { kind: "install-better-sleep-body", defaultCopy: "The Better Sleep protocol targets exactly this — light, temperature, and timing.", vars: [], group: "suggestion" },
+  { kind: "install-better-sleep-cta", defaultCopy: "Install Better Sleep", vars: [], group: "suggestion" },
+  { kind: "retime-title", defaultCopy: "“{title}” keeps slipping at its time", vars: ["title"], group: "suggestion" },
+  { kind: "retime-body", defaultCopy: "Its scheduled slot isn't landing. Free it from the clock — do it whenever it fits, not on a schedule.", vars: [], group: "suggestion" },
+  { kind: "retime-cta", defaultCopy: "Make it anytime", vars: [], group: "suggestion" },
+  { kind: "pause-title", defaultCopy: "“{title}” isn't landing", vars: ["title"], group: "suggestion" },
+  { kind: "pause-body", defaultCopy: "It's been skipped every recent day even unscheduled. Pausing it is not failure — it clears space for what works.", vars: [], group: "suggestion" },
+  { kind: "pause-cta", defaultCopy: "Pause this behavior", vars: [], group: "suggestion" },
+  { kind: "keystone-slipping-title", defaultCopy: "Your keystone is slipping", vars: [], group: "suggestion" },
+  { kind: "keystone-slipping", defaultCopy: "On the days you do “{title}” you keep {delta} {pointWord} more of everything else — but it's been light lately. Re-anchor it tomorrow.", vars: ["title", "delta", "pointWord"], group: "suggestion" },
+  { kind: "keystone-slipping-cta", defaultCopy: "Got it", vars: [], group: "suggestion" },
+  { kind: "progression-title", defaultCopy: "You've earned a new layer", vars: [], group: "suggestion" },
+  { kind: "progression-body", defaultCopy: "Your consistency is excellent. {name} stacks cleanly on your current system — overlaps merge automatically.", vars: ["name"], group: "suggestion" },
+  { kind: "progression-cta", defaultCopy: "Explore {name}", vars: ["name"], group: "suggestion" },
+  { kind: "weekly-headline-up", defaultCopy: "A stronger week — up {delta} points. Momentum is real.", vars: ["delta"], group: "weekly" },
+  { kind: "weekly-headline-down", defaultCopy: "A lighter week, down {abs}. Not a setback — a signal to simplify.", vars: ["abs"], group: "weekly" },
+  { kind: "weekly-headline-strong", defaultCopy: "A strong, steady week. This is what good looks like.", vars: [], group: "weekly" },
+  { kind: "weekly-headline-steady", defaultCopy: "A solid week of showing up. That's the whole game.", vars: [], group: "weekly" },
+  { kind: "weekly-wins-active", defaultCopy: "{count} of 7 days active", vars: ["count"], group: "weekly" },
+  { kind: "weekly-wins-best", defaultCopy: "Best day was {dayName} at {score}", vars: ["dayName", "score"], group: "weekly" },
+  { kind: "weekly-wins-kept", defaultCopy: "Kept “{title}” {count} days", vars: ["title", "count"], group: "weekly" },
+  { kind: "weekly-focus-tighten", defaultCopy: "Next week, tighten one thing: “{title}”. It's your highest-leverage gap.", vars: ["title"], group: "weekly" },
+  { kind: "weekly-focus-hold", defaultCopy: "Next week, hold the line. Consistency at this level compounds quietly.", vars: [], group: "weekly" },
+  { kind: "continuity-holding", defaultCopy: "Last week we flagged “{title}” — you lifted it to {count} of {total} days. It's holding.", vars: ["title", "count", "total"], group: "weekly" },
+  { kind: "continuity-light", defaultCopy: "Last week's focus was “{title}” — still light ({count} of {total}). One small re-anchor, not a verdict.", vars: ["title", "count", "total"], group: "weekly" },
+];
+
 export const INTEL_KINDS: IntelKind[] = [
   {
     name: "Keystone",
