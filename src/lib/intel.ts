@@ -302,9 +302,18 @@ export function suggestions(state: AppState): Suggestion[] {
     out.push({
       id: "sug-sleep",
       kind: "install",
-      title: "Your sleep keeps coming up short",
-      body: "The Better Sleep protocol targets exactly this — light, temperature, and timing.",
-      cta: "Install Better Sleep",
+      title: getInsightTemplate(
+        "install-better-sleep-title",
+        "Your sleep keeps coming up short"
+      ),
+      body: getInsightTemplate(
+        "install-better-sleep-body",
+        "The Better Sleep protocol targets exactly this — light, temperature, and timing."
+      ),
+      cta: getInsightTemplate(
+        "install-better-sleep-cta",
+        "Install Better Sleep"
+      ),
       action: { type: "install", packId: "better-sleep" },
     });
   }
@@ -337,9 +346,18 @@ export function suggestions(state: AppState): Suggestion[] {
           out.push({
             id: `sug-retime-${it.canonicalKey}`,
             kind: "pause",
-            title: `“${it.title}” keeps slipping at its time`,
-            body: "Its scheduled slot isn't landing. Free it from the clock — do it whenever it fits, not on a schedule.",
-            cta: "Make it anytime",
+            title: renderTemplate(
+              getInsightTemplate(
+                "retime-title",
+                `“{title}” keeps slipping at its time`
+              ),
+              { title: it.title }
+            ),
+            body: getInsightTemplate(
+              "retime-body",
+              "Its scheduled slot isn't landing. Free it from the clock — do it whenever it fits, not on a schedule."
+            ),
+            cta: getInsightTemplate("retime-cta", "Make it anytime"),
             action: {
               type: "retime",
               key: it.canonicalKey,
@@ -350,9 +368,18 @@ export function suggestions(state: AppState): Suggestion[] {
           out.push({
             id: `sug-pause-${it.canonicalKey}`,
             kind: "pause",
-            title: `“${it.title}” isn't landing`,
-            body: "It's been skipped every recent day even unscheduled. Pausing it is not failure — it clears space for what works.",
-            cta: "Pause this behavior",
+            title: renderTemplate(
+              getInsightTemplate(
+                "pause-title",
+                `“{title}” isn't landing`
+              ),
+              { title: it.title }
+            ),
+            body: getInsightTemplate(
+              "pause-body",
+              "It's been skipped every recent day even unscheduled. Pausing it is not failure — it clears space for what works."
+            ),
+            cta: getInsightTemplate("pause-cta", "Pause this behavior"),
             action: { type: "pause", key: it.canonicalKey },
           });
         }
@@ -410,9 +437,21 @@ export function suggestions(state: AppState): Suggestion[] {
       out.push({
         id: "sug-progress",
         kind: "progress",
-        title: "You've earned a new layer",
-        body: `Your consistency is excellent. ${next.name} stacks cleanly on your current system — overlaps merge automatically.`,
-        cta: `Explore ${next.name}`,
+        title: getInsightTemplate(
+          "progression-title",
+          "You've earned a new layer"
+        ),
+        body: renderTemplate(
+          getInsightTemplate(
+            "progression-body",
+            "Your consistency is excellent. {name} stacks cleanly on your current system — overlaps merge automatically."
+          ),
+          { name: next.name }
+        ),
+        cta: renderTemplate(
+          getInsightTemplate("progression-cta", "Explore {name}"),
+          { name: next.name }
+        ),
         action: { type: "install", packId: next.id },
       });
     }

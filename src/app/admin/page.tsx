@@ -54,6 +54,10 @@ import {
   listRecTemplates,
   saveRecTemplate,
   deleteRecTemplate,
+  listAdaptationRules,
+  saveAdaptationRule,
+  deleteAdaptationRule,
+  type AdaptationRuleRow,
   type CmsProtocol,
   type CmsBehavior,
   type RevisionRow,
@@ -70,6 +74,7 @@ import {
   generateBehaviorDraftAndSuggestProtocol,
 } from "@/lib/cms/ai";
 import { PACKS } from "@/lib/packs";
+import { RULE_METRICS } from "@/lib/cms/rules";
 import type { ProtocolPack } from "@/lib/types";
 import {
   BLOCKS,
@@ -477,6 +482,22 @@ export default function AdminHome() {
   useEffect(() => {
     if (gate === "ok" && tab === "engine" && engineSub === "intelligence")
       refreshTemplates();
+  }, [gate, tab, engineSub]);
+
+  // Adaptation rules editor.
+  const [rules, setRules] = useState<AdaptationRuleRow[]>([]);
+  const refreshRules = () => listAdaptationRules().then(setRules);
+  const [newRuleName, setNewRuleName] = useState("");
+  const [newRulePriority, setNewRulePriority] = useState(50);
+  const [newRuleTrigger, setNewRuleTrigger] = useState(
+    '{"all":[{"metric":"recoveryProxy","op":"<","value":45}]}'
+  );
+  const [newRuleEffect, setNewRuleEffect] = useState(
+    '{"setMode":"recovery"}'
+  );
+  useEffect(() => {
+    if (gate === "ok" && tab === "engine" && engineSub === "rules")
+      refreshRules();
   }, [gate, tab, engineSub]);
 
   // ── ⌘K command palette ────────────────────────────────────────────
@@ -911,20 +932,267 @@ export default function AdminHome() {
               Each <b>Rule set</b> lists the behavior keys grouped under a
               tag (promote / demote / restraint / training / circadian).
             </p>
-            <div
-              className="rounded-[var(--r-sm)] p-3"
-              style={{
-                background: "rgba(232,201,155,.10)",
-                color: "var(--warm)",
-              }}
-              title="Deferred deliberately — shipping an editor that the engine doesn't read would create a misleading 'I edited it, why didn't it change?' experience."
-            >
-              <p className="text-[12.5px] font-medium leading-relaxed">
-                Live editing of cms_adaptation_rules is paused until the
-                runtime is wired to read them. Editing the database now
-                wouldn&apos;t change anything users see — the engine
-                still uses the code constants above.
-              </p>
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Eyebrow color="var(--readiness)">
+                  CMS adaptation rules
+                </Eyebrow>
+                <span
+                  className="t-caption"
+                  title="adapt() runs the hardcoded baseline above, then any matching published rule overrides mode / headline / tone / reason by ascending priority."
+                >
+                  runtime live ?
+                </span>
+              </div>
+              <div
+                className={card}
+                style={surf}
+                title="The metrics you can reference in a trigger condition. Numbers compare with <, <=, >, >=, ==, !=; booleans only ==, !=."
+              >
+                <Eyebrow>Available metrics</Eyebrow>
+                <div className="mt-2 space-y-1 text-[12px]">
+                  {RULE_METRICS.map((m) => (
+                    <div
+                      key={m.name}
+                      className="flex items-start justify-between gap-3"
+                    >
+                      <span className="shrink-0 font-mono text-[var(--text-2)]">
+                        {m.name}
+                      </span>
+                      <span className="grow text-right text-[var(--text-3)]">
+                        {m.description}
+                      </span>
+                      <span className="shrink-0 text-[10.5px] text-[var(--text-4)]">
+                        {m.type}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="t-caption mt-2 leading-relaxed">
+                  Trigger shape:{" "}
+                  <code>{`{ "all": [{metric, op, value}, ...], "any": [...] }`}</code>
+                  . Effect shape:{" "}
+                  <code>{`{ "setMode": "recovery" | "lighter" | "primed" | ..., "headline": "...", "tone": "...", "reason": "..." }`}</code>
+                  . Only published rules apply at runtime; drafts stay
+                  in the CMS until promoted.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {rules.length === 0 && (
+                  <p className="t-caption px-1">No rules yet.</p>
+                )}
+                {rules.map((r) => (
+                  <div key={r.id} className={card} style={surf}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-[12.5px] font-semibold text-[var(--text-1)]">
+                        {r.name}
+                      </p>
+                      <span className="t-caption">
+                        priority {r.priority} · v{r.version}
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <input
+                        className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] text-[var(--text-1)] outline-none"
+                        value={r.name}
+                        onChange={(e) =>
+                          setRules((rs) =>
+                            rs.map((x) =>
+                              x.id === r.id
+                                ? { ...x, name: e.target.value }
+                                : x
+                            )
+                          )
+                        }
+                      />
+                      <input
+                        type="number"
+                        className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] text-[var(--text-1)] outline-none"
+                        value={r.priority}
+                        onChange={(e) =>
+                          setRules((rs) =>
+                            rs.map((x) =>
+                              x.id === r.id
+                                ? {
+                                    ...x,
+                                    priority: Number(e.target.value),
+                                  }
+                                : x
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                    <textarea
+                      className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[11.5px] text-[var(--text-1)] outline-none"
+                      rows={3}
+                      value={JSON.stringify(r.trigger, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          const parsed = JSON.parse(e.target.value);
+                          setRules((rs) =>
+                            rs.map((x) =>
+                              x.id === r.id
+                                ? { ...x, trigger: parsed }
+                                : x
+                            )
+                          );
+                        } catch {
+                          /* keep stale until valid JSON */
+                        }
+                      }}
+                    />
+                    <textarea
+                      className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[11.5px] text-[var(--text-1)] outline-none"
+                      rows={2}
+                      value={JSON.stringify(r.effect, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          const parsed = JSON.parse(e.target.value);
+                          setRules((rs) =>
+                            rs.map((x) =>
+                              x.id === r.id
+                                ? { ...x, effect: parsed }
+                                : x
+                            )
+                          );
+                        } catch {
+                          /* keep stale until valid JSON */
+                        }
+                      }}
+                    />
+                    <div className="mt-2 flex items-center gap-2">
+                      <select
+                        value={r.status}
+                        onChange={(e) =>
+                          setRules((rs) =>
+                            rs.map((x) =>
+                              x.id === r.id
+                                ? { ...x, status: e.target.value }
+                                : x
+                            )
+                          )
+                        }
+                        className="rounded-[var(--r-sm)] bg-[var(--surface-3)] px-2 py-1 text-[11.5px] text-[var(--text-1)] outline-none"
+                      >
+                        {["draft", "published", "archived"].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          const result = await saveAdaptationRule(r);
+                          setBusy(false);
+                          setMsg(
+                            result.ok
+                              ? "Saved."
+                              : result.reason ?? "Failed"
+                          );
+                          if (result.ok) refreshRules();
+                        }}
+                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1 text-[11.5px] font-semibold text-[#08090B] disabled:opacity-40"
+                      >
+                        Save
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              `Delete the "${r.name}" rule?`
+                            )
+                          )
+                            return;
+                          setBusy(true);
+                          const result = await deleteAdaptationRule(r.id);
+                          setBusy(false);
+                          setMsg(
+                            result.ok
+                              ? "Deleted."
+                              : result.reason ?? "Failed"
+                          );
+                          if (result.ok) refreshRules();
+                        }}
+                        className="press rounded-[var(--r-pill)] bg-[var(--surface-3)] px-4 py-1 text-[11.5px] font-semibold text-[var(--alert)] disabled:opacity-40"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className={card} style={surf}>
+                <Eyebrow>Add rule</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={newRuleName}
+                    onChange={(e) => setNewRuleName(e.target.value)}
+                    placeholder="name (e.g. soft-recovery)"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <input
+                    type="number"
+                    value={newRulePriority}
+                    onChange={(e) =>
+                      setNewRulePriority(Number(e.target.value))
+                    }
+                    placeholder="priority (lower = wins)"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                  <textarea
+                    rows={3}
+                    value={newRuleTrigger}
+                    onChange={(e) => setNewRuleTrigger(e.target.value)}
+                    placeholder="trigger JSON"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
+                  />
+                  <textarea
+                    rows={2}
+                    value={newRuleEffect}
+                    onChange={(e) => setNewRuleEffect(e.target.value)}
+                    placeholder="effect JSON"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
+                  />
+                  <button
+                    disabled={busy || !newRuleName.trim()}
+                    onClick={async () => {
+                      let trigger: unknown;
+                      let effect: unknown;
+                      try {
+                        trigger = JSON.parse(newRuleTrigger);
+                      } catch {
+                        setMsg("Trigger isn't valid JSON.");
+                        return;
+                      }
+                      try {
+                        effect = JSON.parse(newRuleEffect);
+                      } catch {
+                        setMsg("Effect isn't valid JSON.");
+                        return;
+                      }
+                      setBusy(true);
+                      const r = await saveAdaptationRule({
+                        name: newRuleName,
+                        priority: newRulePriority,
+                        trigger,
+                        effect,
+                      });
+                      setBusy(false);
+                      setMsg(r.ok ? "Added." : r.reason ?? "Failed");
+                      if (r.ok) {
+                        setNewRuleName("");
+                        setNewRulePriority(50);
+                        refreshRules();
+                      }
+                    }}
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                  >
+                    Add rule (draft)
+                  </button>
+                </div>
+              </div>
             </div>
             <div>
               <Eyebrow>Adaptive modes</Eyebrow>
@@ -1184,9 +1452,7 @@ export default function AdminHome() {
                       <p className="text-[12.5px] font-semibold text-[var(--text-1)]">
                         {t.kind}
                       </p>
-                      <span className="t-caption">
-                        {t.status} · v{t.version}
-                      </span>
+                      <span className="t-caption">v{t.version}</span>
                     </div>
                     <textarea
                       className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] text-[var(--text-1)] outline-none"
@@ -1202,7 +1468,25 @@ export default function AdminHome() {
                         )
                       }
                     />
-                    <div className="mt-2 flex gap-2">
+                    <div className="mt-2 flex items-center gap-2">
+                      <select
+                        value={t.status}
+                        onChange={(e) =>
+                          setInsTemplates((rs) =>
+                            rs.map((r) =>
+                              r.id === t.id
+                                ? { ...r, status: e.target.value }
+                                : r
+                            )
+                          )
+                        }
+                        title="Only published templates flow into the bundle at publish time."
+                        className="rounded-[var(--r-sm)] bg-[var(--surface-3)] px-2 py-1 text-[11.5px] text-[var(--text-1)] outline-none"
+                      >
+                        {["draft", "published", "archived"].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
                       <button
                         disabled={busy}
                         onClick={async () => {
@@ -1307,12 +1591,9 @@ export default function AdminHome() {
                 )}
                 {recTemplates.map((t) => (
                   <div key={t.id} className={card} style={surf}>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-[12.5px] font-semibold text-[var(--text-1)]">
-                        {t.context}
-                      </p>
-                      <span className="t-caption">{t.status}</span>
-                    </div>
+                    <p className="text-[12.5px] font-semibold text-[var(--text-1)]">
+                      {t.context}
+                    </p>
                     <textarea
                       className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] text-[var(--text-1)] outline-none"
                       rows={2}
@@ -1327,7 +1608,25 @@ export default function AdminHome() {
                         )
                       }
                     />
-                    <div className="mt-2 flex gap-2">
+                    <div className="mt-2 flex items-center gap-2">
+                      <select
+                        value={t.status}
+                        onChange={(e) =>
+                          setRecTemplates((rs) =>
+                            rs.map((r) =>
+                              r.id === t.id
+                                ? { ...r, status: e.target.value }
+                                : r
+                            )
+                          )
+                        }
+                        title="Promote to 'published' so this template flows into the bundle at publish time."
+                        className="rounded-[var(--r-sm)] bg-[var(--surface-3)] px-2 py-1 text-[11.5px] text-[var(--text-1)] outline-none"
+                      >
+                        {["draft", "published", "archived"].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
                       <button
                         disabled={busy}
                         onClick={async () => {

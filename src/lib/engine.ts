@@ -15,7 +15,8 @@ import type {
   ProtocolPack,
   TimeBlock,
 } from "./types";
-import { activePacks } from "./knowledge";
+import { activePacks, activeAdaptationRules } from "./knowledge";
+import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
 import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 
@@ -289,9 +290,7 @@ export interface Adaptation {
   reasons: string[];
 }
 
-export function adapt(state: AppState): Adaptation {
-  const s = getSignals(state);
-
+function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
   if (s.gapDays >= 2) {
     return {
       mode: "rebuild",
@@ -358,6 +357,40 @@ export function adapt(state: AppState): Adaptation {
     headline: "Today",
     tone: "A calm, complete day. Move through it block by block — momentum over perfection.",
     reasons: s.bioConcern ? [s.bioConcern] : [],
+  };
+}
+
+/**
+ * Public adapt: hardcoded baseline first, then any matching CMS rule
+ * may override mode / headline / tone / reasons by priority. With no
+ * published rules the function is byte-identical to the previous
+ * pure-hardcoded version.
+ */
+export function adapt(state: AppState): Adaptation {
+  const s = getSignals(state);
+  const baseline = baselineAdapt(s);
+  const rules = activeAdaptationRules();
+  if (rules.length === 0) return baseline;
+  const ctx: Record<string, unknown> = {
+    gapDays: s.gapDays,
+    recoveryProxy: s.recoveryProxy,
+    adherence7: s.adherence7,
+    sleepQuality: s.sleepQuality,
+    energy: s.energy,
+    trackedDays: s.trackedDays,
+    eveningMissedYesterday: s.eveningMissedYesterday,
+    bioRecoveryFlag: s.bioRecoveryFlag,
+  };
+  const hit = pickMatchingRule(rules, ctx);
+  if (!hit) return baseline;
+  const e = sanitizeEffect(hit.effect);
+  return {
+    mode: e.setMode ?? baseline.mode,
+    headline: e.headline ?? baseline.headline,
+    tone: e.tone ?? baseline.tone,
+    reasons: e.reason
+      ? [...baseline.reasons, e.reason]
+      : baseline.reasons,
   };
 }
 

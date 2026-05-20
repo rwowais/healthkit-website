@@ -40,6 +40,9 @@ export interface KnowledgeBundle {
   /** Optional — CMS-authored insight copy. Older bundles omit this; the
    *  intelligence layer falls back to its built-in default copy. */
   insightTemplates?: InsightTemplate[];
+  /** Optional — CMS-authored adaptation rules. Older bundles omit this;
+   *  adapt() then runs purely on the hardcoded baseline. */
+  adaptationRules?: import("./cms/rules").AdaptationRule[];
 }
 
 /** Stable, order-independent checksum for bundle integrity. */
@@ -47,6 +50,7 @@ export function bundleChecksum(b: {
   protocols: ProtocolPack[];
   config: Record<string, unknown>;
   insightTemplates?: unknown;
+  adaptationRules?: unknown;
 }): string {
   const canon = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(canon);
@@ -61,12 +65,16 @@ export function bundleChecksum(b: {
     }
     return v;
   };
-  // Only include `t` (insightTemplates) in the canonical form when it
-  // exists AND is non-empty — keeps backward compatibility with every
-  // bundle published before Wave D so integrity checks still pass.
+  // Only include `t` (insightTemplates) and `r` (adaptationRules) in
+  // the canonical form when they exist AND are non-empty — keeps
+  // backward compatibility with every bundle published before Wave D
+  // so stored integrity checksums still validate on read-back.
   const canonObj: Record<string, unknown> = { p: b.protocols, c: b.config };
   if (Array.isArray(b.insightTemplates) && b.insightTemplates.length > 0) {
     canonObj.t = b.insightTemplates;
+  }
+  if (Array.isArray(b.adaptationRules) && b.adaptationRules.length > 0) {
+    canonObj.r = b.adaptationRules;
   }
   const s = JSON.stringify(canon(canonObj));
   let h = 0;
@@ -152,6 +160,11 @@ export function getCfgBool(key: string, def: boolean): boolean {
 /** Current insight templates from the active bundle (empty if none). */
 export function activeInsightTemplates(): InsightTemplate[] {
   return published?.insightTemplates ?? [];
+}
+
+/** Current CMS adaptation rules from the active bundle (empty if none). */
+export function activeAdaptationRules(): import("./cms/rules").AdaptationRule[] {
+  return published?.adaptationRules ?? [];
 }
 
 /**

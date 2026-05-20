@@ -637,6 +637,85 @@ export async function deleteInsightTemplate(
   }
 }
 
+// ── Adaptation rules (Wave D-3: runtime adopts via adapt()) ────────
+export interface AdaptationRuleRow {
+  id: string;
+  name: string;
+  priority: number;
+  trigger: unknown;
+  effect: unknown;
+  status: string;
+  version: number;
+}
+export async function listAdaptationRules(): Promise<AdaptationRuleRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_adaptation_rules")
+      .select("id, name, priority, trigger, effect, status, version")
+      .order("priority");
+    return (data ?? []) as AdaptationRuleRow[];
+  } catch {
+    return [];
+  }
+}
+export async function saveAdaptationRule(
+  r: Partial<AdaptationRuleRow> & {
+    name: string;
+    priority: number;
+    trigger: unknown;
+    effect: unknown;
+  }
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  if (!r.name.trim())
+    return { ok: false, reason: "Name required." };
+  try {
+    const row = {
+      name: r.name.trim(),
+      priority: r.priority,
+      trigger: r.trigger ?? {},
+      effect: r.effect ?? {},
+      status: r.status ?? "draft",
+      version: ((r.version as number | undefined) ?? 0) + 1,
+    };
+    const { error } = r.id
+      ? await sb
+          .from("cms_adaptation_rules")
+          .update(row)
+          .eq("id", r.id)
+      : await sb.from("cms_adaptation_rules").insert(row);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Save failed.",
+    };
+  }
+}
+export async function deleteAdaptationRule(
+  id: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { error } = await sb
+      .from("cms_adaptation_rules")
+      .delete()
+      .eq("id", id);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Delete failed.",
+    };
+  }
+}
+
 // ── Recommendation templates (runtime adoption pending) ────────────
 export interface RecTemplateRow {
   id: string;
@@ -1057,6 +1136,12 @@ export interface AssembledBundle {
     template: string;
     conditions?: unknown;
   }[];
+  adaptationRules: {
+    name: string;
+    priority: number;
+    trigger: unknown;
+    effect: unknown;
+  }[];
 }
 
 export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
@@ -1149,7 +1234,33 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
       /* templates are enrichment; assembly continues without them */
     }
 
-    return { protocols, config, insightTemplates };
+    // Adaptation rules — only "published" rows; drafts/archived held back.
+    const adaptationRules: AssembledBundle["adaptationRules"] = [];
+    try {
+      const { data: ruleRows } = await sb
+        .from("cms_adaptation_rules")
+        .select("name, priority, trigger, effect, status")
+        .order("priority");
+      for (const row of (ruleRows ?? []) as {
+        name: string;
+        priority: number;
+        trigger: unknown;
+        effect: unknown;
+        status: string;
+      }[]) {
+        if (row.status === "published")
+          adaptationRules.push({
+            name: row.name,
+            priority: row.priority,
+            trigger: row.trigger,
+            effect: row.effect,
+          });
+      }
+    } catch {
+      /* rules are enrichment; assembly continues without them */
+    }
+
+    return { protocols, config, insightTemplates, adaptationRules };
   } catch {
     return null;
   }
