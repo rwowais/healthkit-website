@@ -211,6 +211,17 @@ export function Sheet({
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Stable onClose ref. Callers pass inline arrows
+  // (`onClose={() => setX(null)}`), which become a new function identity
+  // on every parent render. Putting `onClose` in the effect deps would
+  // re-run the effect on every keystroke in any child input, which
+  // calls panelRef.current?.focus() and yanks focus off the input the
+  // user is actively typing in. Holding onClose in a ref lets the
+  // Escape handler stay current without retriggering the effect.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -218,7 +229,7 @@ export function Sheet({
     document.body.style.overflow = "hidden";
     panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     return () => {
@@ -226,7 +237,7 @@ export function Sheet({
       document.removeEventListener("keydown", onKey);
       prevFocus?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return (

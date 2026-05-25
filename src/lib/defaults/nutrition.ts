@@ -24,7 +24,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 1,
     isEnabled: true,
     icon: "💧",
-    recommendedBy: ["Huberman"],
+    recommendedBy: ["Neuroscience research"],
     evidenceNote:
       "You lose approximately 1 liter of water overnight through respiration and perspiration. Early hydration with electrolytes (sodium, potassium) restores plasma volume and supports cortisol clearance.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -44,7 +44,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 2,
     isEnabled: true,
     icon: "🥩",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Distributing protein evenly across meals (30-50g per meal) maximizes muscle protein synthesis compared to loading it all at dinner. The leucine threshold (~2.5-3g) must be met at each meal to trigger mTOR-mediated synthesis.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -66,9 +66,9 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 3,
     isEnabled: true,
     icon: "🍗",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
-      "Attia recommends 1g protein per pound of target lean body mass daily. For most adults this is 120-180g/day, split across 3-4 meals to maximize the muscle protein synthesis response at each feeding.",
+      "Longevity research suggests 1g protein per pound of target lean body mass daily. For most adults this is 120-180g/day, split across 3-4 meals to maximize the muscle protein synthesis response at each feeding.",
     createdAt: "2026-01-01T00:00:00Z",
   },
   {
@@ -86,7 +86,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 4,
     isEnabled: true,
     icon: "🥦",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
       "Higher dietary fiber intake is associated with reduced cardiovascular mortality and improved glycemic control. Aiming for 30-50g of fiber daily from whole food sources supports a diverse gut microbiome.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -106,7 +106,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 5,
     isEnabled: true,
     icon: "🐟",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "EPA and DHA omega-3 fatty acids have anti-inflammatory effects and support neuronal membrane integrity. Aim for 2-4g combined EPA/DHA daily from food or supplementation.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -128,7 +128,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 6,
     isEnabled: true,
     icon: "🍽️",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Late-night eating elevates core body temperature through diet-induced thermogenesis, which directly opposes the thermoregulatory drop required for sleep onset. It also impairs overnight growth hormone secretion.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -148,7 +148,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 7,
     isEnabled: true,
     icon: "🚫",
-    recommendedBy: ["Walker", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Alcohol is a sedative, not a sleep aid. It blocks REM sleep, causes more awakenings in the second half of the night, and disrupts the body's overnight repair processes. Even moderate drinking impairs sleep quality measurably.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -168,7 +168,7 @@ export const defaultNutritionProtocol: ProtocolItem[] = [
     sortOrder: 8,
     isEnabled: true,
     icon: "🍬",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
       "Chronic hyperinsulinemia from refined sugar consumption is a primary driver of metabolic syndrome, type 2 diabetes, cardiovascular disease, and potentially neurodegenerative disease. Focus on whole food carbohydrate sources.",
     createdAt: "2026-01-01T00:00:00Z",

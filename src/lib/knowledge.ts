@@ -116,12 +116,23 @@ export function isValidBundle(b: unknown): b is KnowledgeBundle {
 }
 
 /**
- * The catalog the runtime should use: a validated published bundle when
- * one has been loaded, otherwise the built-in. Single chokepoint —
- * P3 routes packById / engine pack access through this.
+ * The catalog the runtime should use. CMS-published bundles take
+ * precedence pack-by-pack, but any built-in PACK not present in the
+ * bundle is included as a fallback. Without this merge, shipping a
+ * new built-in protocol (e.g., Jetlag Recovery) requires republishing
+ * the CMS bundle before users can see it — the CMS would otherwise
+ * silently shadow newer code.
+ *
+ * Identity is by `id`. A bundle with id "longevity-foundation"
+ * overrides the built-in with the same id; a built-in id absent from
+ * the bundle is appended at the end.
  */
 export function activePacks(): ProtocolPack[] {
-  return published?.protocols ?? PACKS;
+  const bundled = published?.protocols ?? [];
+  if (bundled.length === 0) return PACKS;
+  const bundleIds = new Set(bundled.map((p) => p.id));
+  const builtInExtras = PACKS.filter((p) => !bundleIds.has(p.id));
+  return [...bundled, ...builtInExtras];
 }
 
 export function activeConfig(): Record<string, number | string | boolean> {

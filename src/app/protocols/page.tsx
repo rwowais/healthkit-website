@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAccess } from "@/lib/entitlements";
 import Link from "next/link";
@@ -13,6 +13,8 @@ import {
   customCanonicalKey,
   type BehaviorAtom,
 } from "@/lib/packs";
+import { activePacks } from "@/lib/knowledge";
+import { getFreePacks } from "@/lib/entitlements";
 import {
   compileTimeline,
   blockLabel,
@@ -37,6 +39,7 @@ export default function ProtocolsPage() {
   const {
     state,
     loading,
+    installPack,
     uninstallPack,
     setBehaviorOverride,
     upsertCustomPack,
@@ -51,6 +54,41 @@ export default function ProtocolsPage() {
   const [packSheet, setPackSheet] = useState<ProtocolPack | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Library + Protocols merged. "yours" shows the installed system (the
+  // original Protocols page); "discover" shows the catalog of every
+  // available protocol pack (what used to be /library). One mental
+  // model: this tab is your relationship with the catalog — what you
+  // run, and what's available to add.
+  const [viewMode, setViewMode] = useState<"yours" | "discover">("yours");
+  const [discoverOpen, setDiscoverOpen] = useState<ProtocolPack | null>(null);
+  // Hash routing: /protocols#discover opens the catalog directly. Lets
+  // the old /library route redirect here while landing on the right
+  // segment, and lets onboarding deep-link "browse more protocols"
+  // into the right view.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sync = () => {
+      const h = window.location.hash.replace(/^#/, "");
+      if (h === "discover") setViewMode("discover");
+      else if (h === "yours") setViewMode("yours");
+    };
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const nextHash = viewMode === "discover" ? "#discover" : "";
+    if (window.location.hash !== nextHash) {
+      // replaceState avoids polluting history with a back-button entry
+      // for every segment toggle.
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + nextHash
+      );
+    }
+  }, [viewMode]);
   const [draft, setDraft] = useState<{
     name: string;
     tagline: string;
@@ -98,6 +136,32 @@ export default function ProtocolsPage() {
       .map((id) => packById(id) ?? state.customPacks.find((p) => p.id === id))
       .filter((p): p is ProtocolPack => !!p);
   }, [state]);
+
+  // Live catalog from the same chokepoint Library used to read. The
+  // merge in activePacks() guarantees newly-shipped built-in packs
+  // (e.g., Jetlag Recovery) appear here even when an older CMS bundle
+  // is live — they're appended after the bundle's own protocols.
+  const catalog = useMemo(() => activePacks(), []);
+  const installedSet = useMemo(
+    () => new Set(state?.installedPacks ?? []),
+    [state]
+  );
+  const officialPackIds = useMemo(
+    () =>
+      new Set(
+        catalog.filter((p) => p.source === "official").map((p) => p.id)
+      ),
+    [catalog]
+  );
+  const officialInstalledCount = useMemo(
+    () =>
+      (state?.installedPacks ?? []).filter((id) =>
+        officialPackIds.has(id)
+      ).length,
+    [state, officialPackIds]
+  );
+  const atFreeCap =
+    !access.premium && officialInstalledCount >= getFreePacks();
 
   const timeline = useMemo(
     () => (state ? compileTimeline(state, 0) : []),
@@ -262,7 +326,9 @@ export default function ProtocolsPage() {
       <div className="flex flex-col gap-7">
         <div className="flex items-end justify-between">
           <div>
-            <Eyebrow>Your System</Eyebrow>
+            <Eyebrow color={viewMode === "discover" ? "var(--vitality)" : undefined}>
+              {viewMode === "discover" ? "Discover" : "Your system"}
+            </Eyebrow>
             <h1 className="t-title mt-2 text-[var(--text-1)]">Protocols</h1>
           </div>
           <button
@@ -277,7 +343,117 @@ export default function ProtocolsPage() {
           </button>
         </div>
 
+        {/* Segmented control: yours / discover. Lives at the top of
+            the page so the user always knows which half of the
+            relationship-with-the-catalog they're looking at. */}
+        <div className="flex gap-1 rounded-[var(--r-pill)] bg-[var(--surface-2)] p-1">
+          {(
+            [
+              { id: "yours", label: "Your system" },
+              {
+                id: "discover",
+                label: `Discover · ${
+                  catalog.filter((p) => !installedSet.has(p.id)).length
+                }`,
+              },
+            ] as const
+          ).map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setViewMode(m.id)}
+              className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2 text-[12.5px] font-semibold"
+              style={{
+                background: viewMode === m.id ? "var(--text-1)" : "transparent",
+                color: viewMode === m.id ? "#08090B" : "var(--text-3)",
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        {viewMode === "discover" && (
+          <section>
+            <p className="t-caption px-1 leading-relaxed">
+              Research-backed protocol systems. Install any combination —
+              overlapping behaviors merge automatically.
+            </p>
+            <div className="mt-4 flex flex-col gap-4">
+              {catalog.map((pack, i) => {
+                const isInstalled = installedSet.has(pack.id);
+                return (
+                  <motion.button
+                    key={pack.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.4 }}
+                    onClick={() => setDiscoverOpen(pack)}
+                    className="panel relative overflow-hidden p-6 text-left"
+                  >
+                    <span
+                      className="ambient"
+                      style={{
+                        background: `radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, ${pack.accent} 26%, transparent), transparent 60%)`,
+                      }}
+                    />
+                    <div className="relative">
+                      <div className="flex items-start justify-between">
+                        <span
+                          className="chip h-12 w-12"
+                          style={{
+                            background: `color-mix(in srgb, ${pack.accent} 20%, var(--surface-3))`,
+                            color: pack.accent,
+                          }}
+                        >
+                          <Icon name={pack.icon as IconName} size={22} />
+                        </span>
+                        {isInstalled && (
+                          <span
+                            className="flex items-center gap-1.5 rounded-[var(--r-pill)] px-3 py-1.5 text-[11px] font-bold"
+                            style={{
+                              background: "var(--surface-3)",
+                              color: pack.accent,
+                            }}
+                          >
+                            <Icon name="check" size={12} /> Installed
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-4 text-[19px] font-bold text-[var(--text-1)]">
+                        {pack.name}
+                      </p>
+                      <p className="mt-1 text-[14px] leading-relaxed text-[var(--text-2)]">
+                        {pack.tagline}
+                      </p>
+                      <div className="mt-4 flex items-center gap-2">
+                        {pack.behaviors.slice(0, 5).map((b) => (
+                          <span
+                            key={b.canonicalKey}
+                            className="grid h-8 w-8 place-items-center rounded-[10px]"
+                            style={{
+                              background: "var(--surface-2)",
+                              color: "var(--text-3)",
+                            }}
+                          >
+                            <Icon name={b.icon as IconName} size={15} />
+                          </span>
+                        ))}
+                        <span className="ml-1 t-caption">
+                          {pack.behaviors.length} behaviors ·{" "}
+                          {pack.durationLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Installed packs */}
+        {viewMode === "yours" && (
+        <>
         <section>
           <p className="t-eyebrow mb-3 px-1">Installed</p>
           <div className="flex flex-col gap-3">
@@ -354,12 +530,12 @@ export default function ProtocolsPage() {
                 </motion.button>
               );
             })}
-            <Link
-              href="/library"
+            <button
+              onClick={() => setViewMode("discover")}
               className="press tr-fast flex items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--hairline-strong)] py-4 text-[14px] font-semibold text-[var(--text-2)]"
             >
-              <Icon name="plus" size={16} /> Add from Library
-            </Link>
+              <Icon name="plus" size={16} /> Discover more protocols
+            </button>
           </div>
         </section>
 
@@ -511,7 +687,127 @@ export default function ProtocolsPage() {
             })}
           </div>
         </section>
+        </>
+        )}
       </div>
+
+      {/* Discover-pack sheet — install/uninstall, free-cap context.
+          The same merge-overlap toast the old Library used to show is
+          retained so the install-feel-magic moment isn't lost. */}
+      <Sheet
+        open={!!discoverOpen}
+        onClose={() => setDiscoverOpen(null)}
+        title={discoverOpen?.name}
+      >
+        {discoverOpen && (
+          <div>
+            <span
+              className="chip h-14 w-14"
+              style={{
+                background: `color-mix(in srgb, ${discoverOpen.accent} 20%, var(--surface-3))`,
+                color: discoverOpen.accent,
+              }}
+            >
+              <Icon name={discoverOpen.icon as IconName} size={26} />
+            </span>
+            <p className="mt-3 text-[14px] leading-relaxed text-[var(--text-2)]">
+              {discoverOpen.tagline}
+            </p>
+            <div className="mt-6 space-y-1.5">
+              {discoverOpen.behaviors.map((b) => (
+                <div
+                  key={b.canonicalKey}
+                  className="flex items-center gap-3 rounded-[var(--r-md)] px-3.5 py-3"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  <span
+                    className="chip h-9 w-9 shrink-0"
+                    style={{
+                      background: "var(--surface-3)",
+                      color: discoverOpen.accent,
+                    }}
+                  >
+                    <Icon name={b.icon as IconName} size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-semibold text-[var(--text-1)]">
+                      {b.title}
+                    </p>
+                    <p className="truncate text-[11.5px] text-[var(--text-3)]">
+                      {b.dose ?? b.rationale}
+                    </p>
+                  </div>
+                  <span className="t-caption capitalize">{b.block}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6">
+              {installedSet.has(discoverOpen.id) ? (
+                <Button
+                  full
+                  variant="ghost"
+                  onClick={() => {
+                    uninstallPack(discoverOpen.id);
+                    toast.show(`${discoverOpen.name} removed`);
+                    setDiscoverOpen(null);
+                  }}
+                >
+                  Remove protocol
+                </Button>
+              ) : (
+                <>
+                  {atFreeCap && (
+                    <p
+                      className="rounded-[var(--r-sm)] px-3 py-2.5 text-[12.5px] leading-relaxed"
+                      style={{
+                        background:
+                          "color-mix(in srgb, var(--readiness) 9%, var(--surface-2))",
+                        color: "var(--text-2)",
+                      }}
+                    >
+                      You have {getFreePacks()} of {getFreePacks()} free
+                      protocols installed. Premium unlocks unlimited — or
+                      remove one in your installed list to swap.
+                    </p>
+                  )}
+                  <Button
+                    full
+                    onClick={() => {
+                      if (atFreeCap) {
+                        setDiscoverOpen(null);
+                        router.push("/upgrade");
+                        return;
+                      }
+                      const activeKeys = new Set(
+                        timeline.map((i) => i.canonicalKey)
+                      );
+                      const overlap = discoverOpen.behaviors.filter((b) =>
+                        activeKeys.has(b.canonicalKey)
+                      );
+                      installPack(discoverOpen.id);
+                      const name = discoverOpen.name;
+                      setDiscoverOpen(null);
+                      if (overlap.length === 1) {
+                        toast.show(
+                          `${name} added — "${overlap[0].title}" merged with your system, you'll do it once`
+                        );
+                      } else if (overlap.length > 1) {
+                        toast.show(
+                          `${name} added — ${overlap.length} overlapping behaviors merged, no doubling up`
+                        );
+                      } else {
+                        toast.show(`${name} installed`);
+                      }
+                    }}
+                  >
+                    {atFreeCap ? "Unlock more with Premium" : "Install protocol"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </Sheet>
 
       <Sheet
         open={creating}

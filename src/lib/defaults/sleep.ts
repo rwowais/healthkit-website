@@ -24,7 +24,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 1,
     isEnabled: true,
     icon: "☀️",
-    recommendedBy: ["Huberman", "Attia"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Bright-light exposure in the first hour of waking advances the cortisol pulse and suppresses melatonin, anchoring the circadian phase. Even overcast outdoor light (~10,000 lux) is 10-50x brighter than indoor lighting.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -44,7 +44,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 2,
     isEnabled: true,
     icon: "🧊",
-    recommendedBy: ["Huberman"],
+    recommendedBy: ["Neuroscience research"],
     evidenceNote:
       "Brief cold-water immersion triggers a sustained 200-300% increase in dopamine lasting several hours, along with norepinephrine release that supports wakefulness and mood.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -64,7 +64,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 3,
     isEnabled: true,
     icon: "☕",
-    recommendedBy: ["Huberman"],
+    recommendedBy: ["Neuroscience research"],
     evidenceNote:
       "Adenosine accumulates during waking and is partly cleared during sleep. Consuming caffeine immediately blocks adenosine receptors before they naturally clear, leading to a stronger afternoon crash when the caffeine wears off.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -86,7 +86,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 4,
     isEnabled: true,
     icon: "⛔",
-    recommendedBy: ["Walker", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Caffeine consumed 6 hours before bed reduced total sleep by over 1 hour in controlled studies. It selectively suppresses slow-wave (deep) sleep, even when subjective sleep quality feels unchanged.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -106,7 +106,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 5,
     isEnabled: true,
     icon: "🍽️",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Late eating raises core body temperature via diet-induced thermogenesis. Since the body must drop ~1-1.5°C to initiate sleep, eating close to bedtime delays sleep onset and reduces sleep efficiency.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -126,7 +126,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 6,
     isEnabled: true,
     icon: "🔅",
-    recommendedBy: ["Huberman", "Walker"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Light viewed from below eye level (table lamps, candles) activates fewer melanopsin-containing retinal ganglion cells than overhead light, preserving melatonin onset. Warm-spectrum light (<3000K) has the least suppressive effect.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -146,7 +146,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 7,
     isEnabled: true,
     icon: "📱",
-    recommendedBy: ["Walker", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Screen use before bed delays melatonin onset by an average of 1.5 hours. The cognitive stimulation from device content compounds the photobiological effect of the light itself.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -166,7 +166,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 8,
     isEnabled: true,
     icon: "❄️",
-    recommendedBy: ["Walker", "Huberman", "Attia"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Ambient temperature is the most under-appreciated factor in sleep quality. A room temperature of 65-68°F allows heat to dissipate from the body's core through the hands and feet, triggering the hypothalamic sleep switch.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -186,7 +186,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 9,
     isEnabled: true,
     icon: "💊",
-    recommendedBy: ["Huberman", "Attia"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Magnesium L-threonate (Magtein) has been shown to increase brain magnesium levels and improve sleep quality markers. Bisglycinate is well-absorbed and less likely to cause GI distress than other forms.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -206,7 +206,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 10,
     isEnabled: true,
     icon: "🧘",
-    recommendedBy: ["Walker"],
+    recommendedBy: ["Sleep research"],
     evidenceNote:
       "A consistent pre-sleep routine serves as a conditioned cue for the brain to begin the physiological wind-down process. Journaling specifically reduces pre-sleep cognitive arousal by externalizing rumination.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -226,7 +226,7 @@ export const defaultSleepProtocol: ProtocolItem[] = [
     sortOrder: 11,
     isEnabled: true,
     icon: "😴",
-    recommendedBy: ["Walker", "Huberman", "Attia"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Irregular sleep timing (social jet lag) disrupts the master clock and is associated with metabolic dysfunction independent of total sleep duration. Consistency is as important as duration.",
     createdAt: "2026-01-01T00:00:00Z",

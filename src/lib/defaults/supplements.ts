@@ -24,7 +24,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 1,
     isEnabled: true,
     icon: "☀️",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Vitamin D deficiency is linked to increased all-cause mortality, immune dysfunction, and depression. Most adults in northern latitudes are insufficient. Take with dietary fat for optimal absorption. Pair with K2 to direct calcium to bones rather than arteries.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -44,9 +44,9 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 2,
     isEnabled: true,
     icon: "🐟",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
-      "High-dose EPA/DHA supplementation (2-4g/day) significantly reduces triglycerides and inflammatory markers (hs-CRP). Attia recommends aiming for an omega-3 index above 8% via blood testing.",
+      "High-dose EPA/DHA supplementation (2-4g/day) significantly reduces triglycerides and inflammatory markers (hs-CRP). Longevity research suggests aiming for an omega-3 index above 8% via blood testing.",
     createdAt: "2026-01-01T00:00:00Z",
   },
   {
@@ -64,7 +64,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 3,
     isEnabled: true,
     icon: "💪",
-    recommendedBy: ["Huberman", "Attia"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Creatine monohydrate increases phosphocreatine stores in muscle and brain. Beyond strength gains, emerging evidence shows cognitive benefits, neuroprotection, and potential anti-aging effects. Timing doesn't matter — consistency does.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -84,7 +84,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 4,
     isEnabled: true,
     icon: "🦴",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
       "Vitamin K2 activates matrix GLA protein (MGP) which inhibits arterial calcification, and osteocalcin which promotes bone mineralization. The MK-7 form has the longest half-life and most research support.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -106,7 +106,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 5,
     isEnabled: false,
     icon: "🥬",
-    recommendedBy: ["Huberman"],
+    recommendedBy: ["Neuroscience research"],
     evidenceNote:
       "Greens powders provide a broad spectrum of vitamins, minerals, probiotics, and adaptogens. While not a substitute for a nutrient-dense diet, they can fill gaps especially during travel or periods of dietary inconsistency.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -128,7 +128,7 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 6,
     isEnabled: true,
     icon: "💊",
-    recommendedBy: ["Huberman", "Attia"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Magnesium L-threonate (Magtein) is one of the few forms that effectively crosses the blood-brain barrier. It enhances GABAergic signaling, reduces cortisol, and has been shown to improve sleep quality and next-day cognitive performance.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -148,9 +148,9 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 7,
     isEnabled: false,
     icon: "🍵",
-    recommendedBy: ["Huberman"],
+    recommendedBy: ["Neuroscience research"],
     evidenceNote:
-      "L-theanine increases alpha brain wave activity (associated with calm alertness) and supports GABA, serotonin, and dopamine levels. Huberman notes that some people experience excessively vivid dreams — discontinue if sleep feels disrupted.",
+      "L-theanine increases alpha brain wave activity (associated with calm alertness) and supports GABA, serotonin, and dopamine levels. Some research notes that some people experience excessively vivid dreams — discontinue if sleep feels disrupted.",
     createdAt: "2026-01-01T00:00:00Z",
   },
   {
@@ -168,9 +168,9 @@ export const defaultSupplementsProtocol: ProtocolItem[] = [
     sortOrder: 8,
     isEnabled: false,
     icon: "🌼",
-    recommendedBy: ["Huberman"],
+    recommendedBy: ["Neuroscience research"],
     evidenceNote:
-      "Apigenin is found naturally in chamomile and acts as a chloride channel activator at GABA-A receptors. Huberman includes it in his nightly sleep stack. Note: not recommended for women trying to conceive due to potential anti-estrogenic effects.",
+      "Apigenin is found naturally in chamomile and acts as a chloride channel activator at GABA-A receptors. A common evening sleep stack includes it. Note: not recommended for women trying to conceive due to potential anti-estrogenic effects.",
     createdAt: "2026-01-01T00:00:00Z",
   },
 ];

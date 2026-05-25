@@ -25,7 +25,7 @@ const MORNING_SUNLIGHT = B({
     "Anchors your circadian clock — the strongest lever for sleep, mood, and energy.",
   evidence:
     "Early outdoor light advances the cortisol peak and times melatonin onset ~16h later. Overcast daylight is still 10–50× brighter than indoor light.",
-  recommendedBy: ["Huberman", "Walker"],
+  recommendedBy: ["Clinical research"],
   icon: "sun",
   leverage: 3,
   kind: "action",
@@ -57,7 +57,7 @@ const PROTEIN_BREAKFAST = B({
   dose: "30–50 g protein",
   rationale:
     "Blunts the glucose curve, drives muscle protein synthesis, and stabilizes appetite all day.",
-  recommendedBy: ["Attia"],
+  recommendedBy: ["Longevity research"],
   icon: "protein",
   leverage: 3,
   kind: "action",
@@ -75,7 +75,7 @@ const MAGNESIUM_PM = B({
   rationale: "Supports parasympathetic tone and sleep depth.",
   evidence:
     "Glycinate and L-threonate forms cross the blood–brain barrier; associated with improved subjective sleep quality.",
-  recommendedBy: ["Huberman", "Attia"],
+  recommendedBy: ["Clinical research"],
   icon: "pill",
   leverage: 2,
   kind: "action",
@@ -99,7 +99,7 @@ const WIND_DOWN = B({
   dose: "Dim lights, no screens, slow breathing",
   rationale:
     "Lowers core temperature and arousal so sleep onset is fast and deep.",
-  recommendedBy: ["Walker"],
+  recommendedBy: ["Sleep research"],
   icon: "wind",
   leverage: 3,
   kind: "action",
@@ -131,7 +131,7 @@ const CAFFEINE_CUTOFF = B({
   dose: "None within ~10h of bed",
   rationale:
     "Caffeine's long half-life erodes deep sleep even when you fall asleep fine.",
-  recommendedBy: ["Walker", "Huberman"],
+  recommendedBy: ["Clinical research"],
   icon: "coffee",
   leverage: 2,
   kind: "avoid",
@@ -152,7 +152,7 @@ const OMEGA3_AM = B({
   dose: "2 g combined EPA/DHA",
   rationale:
     "Lowers systemic inflammation; supports cardiovascular and brain health.",
-  recommendedBy: ["Attia", "Huberman"],
+  recommendedBy: ["Clinical research"],
   icon: "fish",
   leverage: 2,
   kind: "action",
@@ -174,7 +174,7 @@ const NEW_TZ_SUNLIGHT = B({
     "Resets the master clock to local time — accelerates adaptation by 1–2 days.",
   evidence:
     "Light is the primary zeitgeber; properly timed exposure can shift the circadian phase by ~1h/day.",
-  recommendedBy: ["Huberman", "Walker"],
+  recommendedBy: ["Clinical research"],
   icon: "sun",
   leverage: 3,
   kind: "action",
@@ -193,7 +193,7 @@ const STRATEGIC_MELATONIN = B({
     "A small dose helps shift sleep timing; large doses don't help more and disrupt next-morning alertness.",
   evidence:
     "Low-dose melatonin (0.3 mg) effectively phase-shifts circadian rhythms during jetlag without sedation hangover.",
-  recommendedBy: ["Walker"],
+  recommendedBy: ["Sleep research"],
   icon: "moon",
   leverage: 3,
   kind: "action",
@@ -210,7 +210,7 @@ const ANCHOR_MEAL = B({
   dose: "Protein-forward, daylight",
   rationale:
     "Food is a powerful zeitgeber for peripheral clocks; sync them to destination time, not departure time.",
-  recommendedBy: ["Attia"],
+  recommendedBy: ["Longevity research"],
   icon: "utensils",
   leverage: 2,
   kind: "action",
@@ -242,7 +242,7 @@ const NO_ARRIVAL_ALCOHOL = B({
   offsetMin: 0,
   rationale:
     "Alcohol blocks REM, dehydrates further, and delays circadian realignment.",
-  recommendedBy: ["Walker"],
+  recommendedBy: ["Sleep research"],
   icon: "wine",
   leverage: 2,
   kind: "avoid",
@@ -292,7 +292,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "20–45 min easy aerobic",
         rationale:
           "Builds mitochondrial density and aerobic base — a top predictor of lifespan.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "footprints",
         leverage: 3,
         kind: "action",
@@ -308,7 +308,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "3×/week, compound lifts",
         rationale:
           "Muscle and strength are protective against nearly every cause of late-life decline.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "dumbbell",
         leverage: 3,
         kind: "action",
@@ -358,7 +358,7 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: -120,
         dose: "Warm, low light only",
         rationale: "Evening bright light suppresses melatonin and delays sleep.",
-        recommendedBy: ["Huberman"],
+        recommendedBy: ["Neuroscience research"],
         icon: "moon",
         leverage: 2,
         kind: "action",
@@ -394,7 +394,7 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: -90,
         dose: "~18°C / 65°F",
         rationale: "A cool room enables the core-temp drop that triggers sleep.",
-        recommendedBy: ["Walker"],
+        recommendedBy: ["Sleep research"],
         icon: "thermometer",
         leverage: 2,
         kind: "action",
@@ -424,7 +424,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "2,000–5,000 IU D3 + K2",
         rationale:
           "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries.",
-        recommendedBy: ["Attia", "Huberman"],
+        recommendedBy: ["Clinical research"],
         icon: "sun",
         leverage: 2,
         kind: "action",
@@ -441,7 +441,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "5 g daily",
         rationale:
           "The most evidence-backed supplement — strength, power, and cognition.",
-        recommendedBy: ["Huberman", "Attia"],
+        recommendedBy: ["Clinical research"],
         icon: "flask",
         leverage: 2,
         kind: "action",
@@ -470,7 +470,7 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: 90,
         rationale:
           "Delaying caffeine after waking avoids the afternoon adenosine crash.",
-        recommendedBy: ["Huberman"],
+        recommendedBy: ["Neuroscience research"],
         icon: "coffee",
         leverage: 2,
         kind: "action",
@@ -529,7 +529,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "10–20 min",
         rationale:
           "Non-sleep deep rest restores dopamine and lowers sympathetic load.",
-        recommendedBy: ["Huberman"],
+        recommendedBy: ["Neuroscience research"],
         icon: "lungs",
         leverage: 3,
         kind: "action",
@@ -605,7 +605,7 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: 360,
         dose: "10 min after eating",
         rationale: "Muscle contraction clears glucose without insulin.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "footprints",
         leverage: 3,
         kind: "action",
@@ -653,7 +653,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "Normal dose, new timezone",
         rationale:
           "Caffeine timing reinforces the new wake-time; off-timezone caffeine prolongs misalignment.",
-        recommendedBy: ["Huberman"],
+        recommendedBy: ["Neuroscience research"],
         icon: "coffee",
         leverage: 2,
         kind: "action",
@@ -687,7 +687,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "Black coffee / tea / water only",
         rationale:
           "A long overnight fast supports insulin sensitivity, autophagy, and metabolic flexibility.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "clock",
         leverage: 3,
         kind: "action",
@@ -703,7 +703,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "30–50 g protein, fiber, fat",
         rationale:
           "Protein-led refeeding preserves muscle and stabilizes the post-fast glucose response.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "protein",
         leverage: 3,
         kind: "action",
@@ -741,7 +741,7 @@ export const PACKS: ProtocolPack[] = [
           "Dopamine and norepinephrine rise sharply and stay elevated; builds stress resilience.",
         evidence:
           "Cold exposure (~14°C, 1 min) elevates norepinephrine ~5×; effect lasts hours.",
-        recommendedBy: ["Huberman"],
+        recommendedBy: ["Neuroscience research"],
         icon: "snowflake",
         leverage: 2,
         kind: "action",
@@ -756,7 +756,7 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: 0,
         rationale:
           "Cold post-resistance training reduces hypertrophy signaling; separate them.",
-        recommendedBy: ["Huberman"],
+        recommendedBy: ["Neuroscience research"],
         icon: "ban",
         leverage: 2,
         kind: "avoid",
@@ -778,7 +778,7 @@ export const PACKS: ProtocolPack[] = [
           "Regular sauna is associated with lower all-cause and cardiovascular mortality.",
         evidence:
           "Finnish cohort studies show 4–7 sauna sessions/week associated with ~40% lower all-cause mortality.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "thermometer",
         leverage: 3,
         kind: "action",
@@ -826,7 +826,7 @@ export const PACKS: ProtocolPack[] = [
           "The fastest-acting voluntary tool to drop heart rate and stress in the moment.",
         evidence:
           "Stanford-led RCT (2023): 5 min/day cyclic sighing reduced anxiety and improved mood more than equivalent mindfulness.",
-        recommendedBy: ["Huberman"],
+        recommendedBy: ["Neuroscience research"],
         icon: "wind",
         leverage: 3,
         kind: "action",
@@ -887,7 +887,7 @@ export const PACKS: ProtocolPack[] = [
     id: "heart-health",
     name: "Heart Health",
     tagline:
-      "An Attia-style cardiovascular protocol — zone 2, strength, lipids, sleep.",
+      "A research-backed cardiovascular protocol — zone 2, strength, lipids, sleep.",
     goal: "longevity",
     accent: "var(--alert)",
     icon: "pulse",
@@ -910,10 +910,10 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: 300,
         dose: "45 min nasal-breathing pace",
         rationale:
-          "Builds mitochondrial density and lactate clearance — Attia's top cardiovascular lever.",
+          "Builds mitochondrial density and lactate clearance — a top cardiovascular lever in longevity research.",
         evidence:
           "Aerobic fitness (VO2 max) is one of the strongest predictors of all-cause mortality across cohorts.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "footprints",
         leverage: 3,
         kind: "action",
@@ -930,7 +930,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "4×4 min at 90% HRmax",
         rationale:
           "Brief high-intensity work raises VO2 max — strongest known fitness predictor of late-life function.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "pulse",
         leverage: 3,
         kind: "action",
@@ -950,7 +950,7 @@ export const PACKS: ProtocolPack[] = [
         dose: "3×/week, compound lifts",
         rationale:
           "Strength training improves arterial compliance and metabolic risk markers.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "dumbbell",
         leverage: 3,
         kind: "action",
@@ -968,13 +968,520 @@ export const PACKS: ProtocolPack[] = [
         dose: "Weekly, same time",
         rationale:
           "Tracking BP at home reveals trends invisible at sporadic clinic visits.",
-        recommendedBy: ["Attia"],
+        recommendedBy: ["Longevity research"],
         icon: "pulse",
         leverage: 2,
         kind: "action",
         daysActive: [true, false, false, false, false, false, false],
       }),
       WIND_DOWN,
+    ],
+  },
+  {
+    id: "gut-health",
+    name: "Gut Health",
+    tagline:
+      "Feed the microbiome, calm the gut–brain axis, eat in rhythm with circadian metabolism.",
+    goal: "metabolic",
+    accent: "var(--vitality)",
+    icon: "leaf",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      HYDRATE_AM,
+      B({
+        canonicalKey: "fermented-daily",
+        timingReason:
+          "With any meal — what matters is daily frequency, not the clock.",
+        title: "Fermented food daily",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        dose: "~1 serving · yogurt, kefir, kimchi, sauerkraut",
+        rationale:
+          "Increases microbial diversity, a strong predictor of metabolic and immune health.",
+        icon: "leaf",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "prebiotic-fiber",
+        timingReason:
+          "Across the day — the microbiome thrives on consistent, varied fiber, not one big dose.",
+        title: "Diverse prebiotic fiber",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        dose: "30+ g across 25+ plant types/week",
+        rationale:
+          "Prebiotic fiber feeds beneficial bacteria and short-chain fatty acid production.",
+        icon: "leaf",
+        leverage: 3,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "no-late-eating",
+        timingReason:
+          "Within ~3h of bed — late eating fragments gut motility and the microbial daily rhythm.",
+        title: "No late-night snacking",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -180,
+        rationale:
+          "Microbes have their own circadian rhythm; late eating disrupts it.",
+        icon: "ban",
+        leverage: 2,
+        kind: "avoid",
+      }),
+      LAST_MEAL_3H,
+    ],
+  },
+  {
+    id: "longevity-supplements",
+    name: "Longevity Stack",
+    tagline:
+      "A minimal, evidence-backed supplement stack — close common gaps, no megadoses.",
+    goal: "supplements",
+    accent: "var(--warm)",
+    icon: "pill",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      OMEGA3_AM,
+      B({
+        canonicalKey: "vitamin-d3",
+        timingReason:
+          "With a morning fat-containing meal — fat aids absorption and it suits a daytime rhythm.",
+        title: "Vitamin D3 + K2",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 90,
+        dose: "2,000–5,000 IU D3 + K2",
+        rationale:
+          "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries.",
+        recommendedBy: ["Clinical research"],
+        icon: "sun",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "creatine",
+        timingReason:
+          "Anytime — for creatine, daily consistency matters far more than the clock.",
+        title: "Creatine monohydrate",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 120,
+        dose: "5 g daily",
+        rationale:
+          "The most evidence-backed supplement — strength, power, and cognition.",
+        recommendedBy: ["Clinical research"],
+        icon: "flask",
+        leverage: 2,
+        kind: "action",
+      }),
+      MAGNESIUM_PM,
+    ],
+  },
+  {
+    id: "cognitive-performance",
+    name: "Cognitive Performance",
+    tagline:
+      "Sharpen focus, protect attention, build the conditions for deep work.",
+    goal: "focus",
+    accent: "var(--readiness)",
+    icon: "bulb",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      MORNING_SUNLIGHT,
+      HYDRATE_AM,
+      B({
+        canonicalKey: "deep-work",
+        timingReason:
+          "Late morning — peak alertness for your hardest cognitive block.",
+        title: "One deep-work block",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 150,
+        dose: "60–90 min, no inputs",
+        rationale:
+          "A single protected block beats a fragmented day for meaningful output.",
+        icon: "sparkle",
+        leverage: 3,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "delay-caffeine",
+        timingReason:
+          "~90 min after waking — lets adenosine clear first and blunts the afternoon crash.",
+        title: "Delay caffeine 90 min",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 90,
+        rationale:
+          "Delaying caffeine after waking avoids the afternoon adenosine crash.",
+        icon: "coffee",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "walking-meditation",
+        timingReason:
+          "Between deep-work blocks — restores attention faster than passive rest.",
+        title: "Walking break, no phone",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 300,
+        dose: "10–15 min outdoors",
+        rationale:
+          "Movement + outdoor exposure restores directed attention — peer-reviewed.",
+        icon: "footprints",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "notification-window",
+        timingReason:
+          "All day — interruption is the enemy of deep work; batch reactive input.",
+        title: "Notifications batched twice/day",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        dose: "Check at 11am & 4pm",
+        rationale:
+          "Each notification fragment costs ~23 min of recovery time; batching protects flow.",
+        icon: "screen",
+        leverage: 2,
+        kind: "avoid",
+      }),
+      CAFFEINE_CUTOFF,
+    ],
+  },
+  {
+    id: "metabolic-health",
+    name: "Metabolic Health",
+    tagline:
+      "Improve insulin sensitivity, glucose stability, and metabolic flexibility.",
+    goal: "metabolic",
+    accent: "var(--vitality)",
+    icon: "pulse",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      PROTEIN_BREAKFAST,
+      B({
+        canonicalKey: "veg-first",
+        timingReason:
+          "At each meal — eating fiber before carbs blunts that meal's glucose spike.",
+        title: "Vegetables first",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        rationale:
+          "Fiber before carbs measurably blunts the post-meal glucose spike.",
+        icon: "leaf",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "post-meal-walk",
+        timingReason:
+          "Within ~30 min of any meal — muscle contraction clears glucose without insulin.",
+        title: "Walk after meals",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        dose: "10 min after eating",
+        rationale: "Muscle contraction clears glucose without insulin.",
+        recommendedBy: ["Longevity research"],
+        icon: "footprints",
+        leverage: 3,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "no-liquid-sugar",
+        timingReason:
+          "Any time — liquid sugar spikes fastest with the least satiety.",
+        title: "No liquid sugar",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        rationale:
+          "Sugary drinks are the fastest route to a glucose spike with no satiety.",
+        icon: "ban",
+        leverage: 2,
+        kind: "avoid",
+      }),
+      LAST_MEAL_3H,
+    ],
+  },
+  {
+    id: "longevity-mobility",
+    name: "Mobility & Joint Health",
+    tagline:
+      "Stay strong in the joints that matter most — hips, shoulders, spine.",
+    goal: "longevity",
+    accent: "var(--recovery)",
+    icon: "stretch",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      B({
+        canonicalKey: "daily-mobility",
+        timingReason:
+          "Morning — joints are stiffest after sleep; mobility opens them for the day.",
+        title: "10-min mobility flow",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 30,
+        dose: "10 min · hips, shoulders, spine",
+        rationale:
+          "Daily mobility work preserves joint range — a leading factor in healthy aging.",
+        icon: "stretch",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "balance-practice",
+        timingReason:
+          "Anytime — balance is built through daily reps, not single sessions.",
+        title: "Balance practice",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        dose: "2 min single-leg + eyes closed",
+        rationale:
+          "Falls account for major late-life disability; balance training is preventive.",
+        icon: "balance",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "loaded-carry",
+        timingReason:
+          "On training days — grip strength and core stability tie to longevity directly.",
+        title: "Loaded carry",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 360,
+        dose: "2 × 30s farmer's carry",
+        rationale:
+          "Grip strength is one of the best predictors of all-cause mortality.",
+        recommendedBy: ["Longevity research"],
+        icon: "hand",
+        leverage: 2,
+        kind: "action",
+        daysActive: [true, false, true, false, true, false, false],
+      }),
+    ],
+  },
+  {
+    id: "morning-momentum",
+    name: "Morning Momentum",
+    tagline:
+      "A research-backed wake-up sequence that compounds energy across the day.",
+    goal: "energy",
+    accent: "var(--warm)",
+    icon: "sun",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      HYDRATE_AM,
+      MORNING_SUNLIGHT,
+      B({
+        canonicalKey: "no-snooze",
+        timingReason:
+          "At wake time — snoozing fragments REM and starts the day in sleep inertia.",
+        title: "No snooze button",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 0,
+        rationale:
+          "Snoozing pulls you back into a new sleep cycle you'll have to break out of mid-stage.",
+        icon: "ban",
+        leverage: 2,
+        kind: "avoid",
+      }),
+      B({
+        canonicalKey: "cold-shower-am",
+        timingReason:
+          "End of morning shower — cold delivers a clean alertness lift without a sleep cost.",
+        title: "End shower cold (60s)",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 25,
+        dose: "60s cold at the end",
+        rationale:
+          "Brief cold exposure raises norepinephrine and alertness for hours.",
+        icon: "snowflake",
+        leverage: 2,
+        kind: "action",
+      }),
+      PROTEIN_BREAKFAST,
+      B({
+        canonicalKey: "delay-caffeine",
+        timingReason:
+          "~90 min after waking — lets adenosine clear first and blunts the afternoon crash.",
+        title: "Delay caffeine 90 min",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 90,
+        rationale:
+          "Delaying caffeine after waking avoids the afternoon adenosine crash.",
+        icon: "coffee",
+        leverage: 2,
+        kind: "action",
+      }),
+    ],
+  },
+  {
+    id: "evening-shutdown",
+    name: "Evening Shutdown",
+    tagline:
+      "A calm, deliberate evening sequence that protects sleep quality.",
+    goal: "sleep",
+    accent: "var(--sleep)",
+    icon: "moon",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      CAFFEINE_CUTOFF,
+      LAST_MEAL_3H,
+      B({
+        canonicalKey: "evening-walk",
+        timingReason:
+          "After the last meal — a short walk doubles as digestion + a wind-down cue.",
+        title: "Evening walk",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -120,
+        dose: "15 min easy pace",
+        rationale:
+          "Helps digestion, lowers post-meal glucose, and signals end-of-day to the nervous system.",
+        icon: "footprints",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "alcohol-cutoff",
+        timingReason:
+          "Within ~3h of bed — alcohol blocks REM even at small doses.",
+        title: "No alcohol within 3h of bed",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -180,
+        rationale:
+          "Alcohol fragments sleep architecture and suppresses REM, even at modest doses.",
+        recommendedBy: ["Sleep research"],
+        icon: "wine",
+        leverage: 2,
+        kind: "avoid",
+      }),
+      B({
+        canonicalKey: "dim-lights",
+        timingReason:
+          "~2h before bed — bright evening light is what most delays melatonin.",
+        title: "Dim the lights",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -120,
+        dose: "Warm, low light only",
+        rationale: "Evening bright light suppresses melatonin and delays sleep.",
+        recommendedBy: ["Neuroscience research"],
+        icon: "moon",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "screens-off",
+        timingReason:
+          "~1h before bed — removes the most alerting light source so the wind-down can actually land.",
+        title: "Screens off",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -60,
+        rationale: "Reduces alerting blue light and cognitive arousal pre-sleep.",
+        icon: "screen",
+        leverage: 2,
+        kind: "avoid",
+      }),
+      MAGNESIUM_PM,
+      WIND_DOWN,
+    ],
+  },
+  {
+    id: "weekly-recovery",
+    name: "Weekly Recovery Day",
+    tagline:
+      "One day per week to deload, recover, and let adaptation catch up.",
+    goal: "recovery",
+    accent: "var(--recovery)",
+    icon: "lungs",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      B({
+        canonicalKey: "deload-day",
+        timingReason:
+          "One day per week — adaptation happens during recovery, not training.",
+        title: "Full deload — no intense training",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        rationale:
+          "Recovery is when adaptation happens; ignoring it stalls progress and raises injury risk.",
+        icon: "ban",
+        leverage: 3,
+        kind: "avoid",
+        daysActive: [false, false, false, false, false, false, true],
+      }),
+      B({
+        canonicalKey: "easy-walk",
+        timingReason:
+          "Mid-day on the deload — gentle movement promotes recovery without adding load.",
+        title: "Easy 30-min walk",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 300,
+        dose: "30 min nasal breathing",
+        rationale: "Gentle aerobic movement enhances recovery via blood flow.",
+        icon: "footprints",
+        leverage: 2,
+        kind: "action",
+        daysActive: [false, false, false, false, false, false, true],
+      }),
+      B({
+        canonicalKey: "nsdr",
+        timingReason:
+          "Early afternoon — catches the post-lunch dip and resets you without harming night sleep.",
+        title: "NSDR / yoga nidra",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 420,
+        dose: "10–20 min",
+        rationale:
+          "Non-sleep deep rest restores dopamine and lowers sympathetic load.",
+        recommendedBy: ["Neuroscience research"],
+        icon: "lungs",
+        leverage: 3,
+        kind: "action",
+        daysActive: [false, false, false, false, false, false, true],
+      }),
+      B({
+        canonicalKey: "extra-sleep",
+        timingReason:
+          "Set at night — protecting the sleep opportunity is the recovery itself.",
+        title: "Protect 8.5h sleep opportunity",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -30,
+        rationale: "Recovery is built in bed before it's built in the gym.",
+        icon: "bed",
+        leverage: 3,
+        kind: "action",
+        daysActive: [false, false, false, false, false, false, true],
+      }),
     ],
   },
 ];
@@ -1010,6 +1517,317 @@ export interface BehaviorAtom extends BehaviorDef {
   /** Origin packs (for "this is from …" hints in the picker). */
   fromOfficialPacks: string[];
 }
+
+/**
+ * Standalone atoms — curated behaviors discoverable in the atom-library
+ * picker but NOT part of any installable pack. Lets the library cover
+ * common behaviors people add custom-style (stretching, gratitude
+ * journaling, weighing in, etc.) without bloating any official pack
+ * with stuff most users wouldn't want by default.
+ *
+ * Same intelligence-layer participation as pack-bound atoms: when a
+ * user picks one of these, their custom behavior gets a derivedFrom
+ * pointer so merging, conflict resolution, mastery, and adaptive
+ * shaping all work normally.
+ */
+const STANDALONE_ATOMS: BehaviorDef[] = [
+  B({
+    canonicalKey: "gratitude-journal",
+    timingReason:
+      "Evening — naming what went well primes the brain for rest and shifts the next-day baseline.",
+    title: "Gratitude journal",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -60,
+    dose: "3 things, 2 min",
+    rationale:
+      "Brief gratitude practice is one of the most-replicated positive-psychology interventions.",
+    icon: "sparkle",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "weigh-in",
+    timingReason:
+      "Morning, post-bathroom, pre-coffee — the most consistent reading window.",
+    title: "Weigh in",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 15,
+    dose: "Same time daily",
+    rationale:
+      "Consistent measurement reveals trends invisible at sporadic readings.",
+    icon: "pulse",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "hrv-check",
+    timingReason:
+      "Morning before stimulation — captures the resting baseline before sympathetic activation.",
+    title: "Morning HRV check",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 10,
+    dose: "2-min reading at rest",
+    rationale:
+      "HRV trend (not single readings) tracks autonomic recovery.",
+    icon: "pulse",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "meditation",
+    timingReason:
+      "Morning OR pre-bed — both windows reliably drop arousal and improve focus.",
+    title: "Meditation",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 30,
+    dose: "10–20 min",
+    rationale:
+      "Regular meditation thickens prefrontal cortex and reduces stress reactivity.",
+    icon: "lungs",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "breath-work",
+    timingReason:
+      "Anytime stressed — the fastest voluntary tool to drop heart rate.",
+    title: "Box breathing",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "5 min · 4-4-4-4 cycle",
+    rationale:
+      "Slow, paced breathing activates the parasympathetic system within minutes.",
+    icon: "wind",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "journaling",
+    timingReason:
+      "Morning brain-dump OR evening reflection — both improve clarity.",
+    title: "Journaling (5 min)",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "5 min unstructured",
+    rationale:
+      "Expressive writing reduces rumination and improves working memory.",
+    icon: "sparkle",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "stretching",
+    timingReason:
+      "After waking OR pre-bed — gentle stretching at either end of the day works.",
+    title: "Full-body stretch",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "10 min · major joints",
+    rationale: "Daily stretching maintains range of motion across the joints.",
+    icon: "stretch",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "10k-steps",
+    timingReason:
+      "Across the day — total step count matters more than one big walk.",
+    title: "10,000 steps",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "~10k cumulative",
+    rationale:
+      "Total daily movement is one of the strongest health markers; aim for spread, not bursts.",
+    icon: "footprints",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "social-connection",
+    timingReason:
+      "Evening tends to be the natural slot — even brief connection downregulates stress.",
+    title: "One real human connection",
+    block: "evening",
+    anchor: "wake",
+    offsetMin: 600,
+    dose: "10+ min, ideally in person",
+    rationale:
+      "Social connection is one of the strongest predictors of long-term resilience and health.",
+    icon: "user",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "no-phone-bedroom",
+    timingReason:
+      "From wind-down until wake — phone in another room protects both sleep and morning attention.",
+    title: "No phone in the bedroom",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -60,
+    rationale:
+      "Removes the snooze trap, late-night scrolling, and morning attention raid in one move.",
+    icon: "ban",
+    leverage: 2,
+    kind: "avoid",
+  }),
+  B({
+    canonicalKey: "vitamin-c",
+    timingReason:
+      "With breakfast — supports collagen synthesis and immune function.",
+    title: "Vitamin C",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "500–1000 mg with food",
+    rationale: "Antioxidant + collagen cofactor; safe and inexpensive.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "berberine",
+    timingReason:
+      "Before carb-heavy meals — peak effect is on the next-meal glucose response.",
+    title: "Berberine",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "500 mg pre-meal",
+    rationale:
+      "Improves insulin sensitivity; talk to a clinician before stacking with other glucose meds.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "l-theanine",
+    timingReason:
+      "With caffeine — smooths the caffeine alertness curve and lowers jitter.",
+    title: "L-theanine with coffee",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "100–200 mg",
+    rationale:
+      "Synergistic with caffeine for focused calm; especially helpful for caffeine-sensitive users.",
+    icon: "flask",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "ashwagandha",
+    timingReason:
+      "Evening — helps lower cortisol toward sleep; AM dosing has mixed evidence.",
+    title: "Ashwagandha",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -120,
+    dose: "300–600 mg",
+    rationale:
+      "Adaptogen with replicated cortisol-lowering effects in stressed populations.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "kegels",
+    timingReason:
+      "Anytime — sets of 10 spread across the day build the habit.",
+    title: "Pelvic floor exercises",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "3 × 10 reps",
+    rationale:
+      "Often-overlooked group that contributes to core stability, continence, and sexual health.",
+    icon: "balance",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "humming-vagal",
+    timingReason:
+      "Anytime stressed — humming stimulates the vagus nerve via vocal-cord vibration.",
+    title: "Humming or chanting (vagal tone)",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "5 min, low pitch",
+    rationale:
+      "Stimulates vagal afferents; a low-effort way to nudge the autonomic system parasympathetic.",
+    icon: "lungs",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "screen-distance",
+    timingReason:
+      "While working — eye strain compounds across the day; 20-20-20 prevents it.",
+    title: "20-20-20 eye rule",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "Every 20 min, look 20 ft away for 20 sec",
+    rationale:
+      "Reduces eye strain, dryness, and computer-vision-syndrome symptoms.",
+    icon: "screen",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "no-news-am",
+    timingReason:
+      "First hour after waking — sets the day's emotional baseline; news raids it.",
+    title: "No news in the first hour",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 0,
+    rationale:
+      "Negative news priming raises cortisol and impairs working memory for hours after.",
+    icon: "ban",
+    leverage: 2,
+    kind: "avoid",
+  }),
+  B({
+    canonicalKey: "phone-airplane-night",
+    timingReason:
+      "From sleep to wake — eliminates 100% of overnight notifications.",
+    title: "Phone on airplane mode overnight",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -15,
+    rationale:
+      "Protects sleep continuity from any push notification that slips through other guards.",
+    icon: "ban",
+    leverage: 2,
+    kind: "avoid",
+  }),
+  B({
+    canonicalKey: "creative-output",
+    timingReason:
+      "Daily — small consistent creative output beats sporadic big sessions.",
+    title: "30 min creative work",
+    block: "afternoon",
+    anchor: "wake",
+    offsetMin: 480,
+    dose: "30+ min · writing, music, art",
+    rationale:
+      "Regular creative practice correlates with lower depression risk and higher life satisfaction.",
+    icon: "sparkle",
+    leverage: 1,
+    kind: "action",
+  }),
+];
+
 export function listBehaviorAtoms(): BehaviorAtom[] {
   const byKey = new Map<string, BehaviorAtom>();
   for (const pack of activePacks()) {
@@ -1026,6 +1844,17 @@ export function listBehaviorAtoms(): BehaviorAtom[] {
         fromOfficialPacks: [pack.name],
       });
     }
+  }
+  // Merge standalone atoms — discoverable in the library picker but
+  // not part of any pack. If a standalone shares a canonicalKey with a
+  // pack-bound atom (it shouldn't, but be defensive), the pack-bound
+  // version wins so the picker shows the richer "from X pack" hint.
+  for (const a of STANDALONE_ATOMS) {
+    if (byKey.has(a.canonicalKey)) continue;
+    byKey.set(a.canonicalKey, {
+      ...a,
+      fromOfficialPacks: ["Library"],
+    });
   }
   return [...byKey.values()].sort((a, b) =>
     a.title.localeCompare(b.title)

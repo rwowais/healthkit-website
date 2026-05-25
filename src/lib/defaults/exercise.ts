@@ -24,7 +24,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 1,
     isEnabled: true,
     icon: "🚶",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Low-intensity morning movement has been shown to improve insulin sensitivity for the remainder of the day. Walking outdoors also provides the bright-light exposure needed to anchor circadian rhythm.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -44,9 +44,9 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 2,
     isEnabled: true,
     icon: "🫀",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
-      "Peter Attia recommends 3-4 hours per week of Zone 2 training to improve mitochondrial efficiency. Zone 2 is defined as the highest intensity at which lactate remains stable, typically 60-70% of max heart rate.",
+      "Longevity research recommends 3-4 hours per week of Zone 2 training to improve mitochondrial efficiency. Zone 2 is defined as the highest intensity at which lactate remains stable, typically 60-70% of max heart rate.",
     createdAt: "2026-01-01T00:00:00Z",
   },
   {
@@ -64,9 +64,9 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 3,
     isEnabled: true,
     icon: "🏋️",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
-      "Muscle mass and strength (especially grip strength and leg strength) are among the strongest predictors of all-cause mortality. Attia recommends 3-4 sessions per week emphasizing squat, hinge, push, pull, and carry patterns.",
+      "Muscle mass and strength (especially grip strength and leg strength) are among the strongest predictors of all-cause mortality. Longevity research suggests 3-4 sessions per week emphasizing squat, hinge, push, pull, and carry patterns.",
     createdAt: "2026-01-01T00:00:00Z",
   },
   {
@@ -84,9 +84,9 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 4,
     isEnabled: true,
     icon: "🧘",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
-      "Attia's stability framework emphasizes that flexibility and joint mobility decline with age and are a leading cause of falls and fractures. Daily mobility work is a longevity insurance policy.",
+      "Stability research emphasizes that flexibility and joint mobility decline with age and are a leading cause of falls and fractures. Daily mobility work is a longevity insurance policy.",
     createdAt: "2026-01-01T00:00:00Z",
   },
   {
@@ -104,7 +104,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 5,
     isEnabled: true,
     icon: "🔥",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
       "VO2 max is the strongest predictor of all-cause mortality, stronger even than smoking, diabetes, or cardiovascular disease. Moving from the bottom 25th percentile to above average confers a 5x reduction in mortality risk.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -124,7 +124,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 6,
     isEnabled: true,
     icon: "✊",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
       "Grip strength is one of the most robust biomarkers of biological age. Low grip strength is associated with higher risk of cardiovascular events, disability, and mortality independent of other factors.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -144,9 +144,9 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 7,
     isEnabled: true,
     icon: "⚖️",
-    recommendedBy: ["Attia"],
+    recommendedBy: ["Longevity research"],
     evidenceNote:
-      "Attia emphasizes that the ability to balance on one foot with eyes closed for 10+ seconds is a practical longevity test. Falls account for more injury-related deaths than any other cause after age 65.",
+      "Longevity research emphasizes that the ability to balance on one foot with eyes closed for 10+ seconds is a practical longevity test. Falls account for more injury-related deaths than any other cause after age 65.",
     createdAt: "2026-01-01T00:00:00Z",
   },
 
@@ -166,7 +166,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 8,
     isEnabled: true,
     icon: "🌆",
-    recommendedBy: ["Attia", "Huberman"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "A 15-minute post-meal walk has been shown to reduce post-prandial glucose spikes by up to 30%. This is one of the simplest and most effective metabolic health interventions.",
     createdAt: "2026-01-01T00:00:00Z",
@@ -186,7 +186,7 @@ export const defaultExerciseProtocol: ProtocolItem[] = [
     sortOrder: 9,
     isEnabled: true,
     icon: "⛔",
-    recommendedBy: ["Huberman", "Walker"],
+    recommendedBy: ["Clinical research"],
     evidenceNote:
       "Vigorous exercise elevates core body temperature for several hours. Since the body needs to drop 1-1.5°C for sleep initiation, late-night intense exercise delays the thermoregulatory sleep trigger.",
     createdAt: "2026-01-01T00:00:00Z",

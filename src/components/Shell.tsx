@@ -7,11 +7,14 @@ import { ToastProvider } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import Reminders from "@/components/Reminders";
 
+// Library + Protocols merged into a single hub. Discovery (browse + install
+// curated packs) and management (installed system) are one workflow, not
+// two — splitting them across tabs created a confusing "I added it, now
+// where do I find it?" loop.
 const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: "/today", label: "Today", icon: "home" },
   { href: "/protocols", label: "Protocols", icon: "layers" },
   { href: "/insights", label: "Insights", icon: "bulb" },
-  { href: "/library", label: "Library", icon: "compass" },
   { href: "/profile", label: "Profile", icon: "user" },
 ];
 
