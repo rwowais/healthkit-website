@@ -1821,6 +1821,48 @@ export default function TodayPage() {
                                     {it.rationale}
                                   </p>
                                 )}
+                                {/* Visual link from avoid-card to the
+                                    target behavior(s) it references —
+                                    "→ Strength training" under the
+                                    "no cold within 6h post-lift" card.
+                                    Replaces the implicit assumption
+                                    that the user knows what's being
+                                    referenced. Only renders when both
+                                    the avoid card AND the target are
+                                    in today's timeline. */}
+                                {it.kind === "avoid" &&
+                                  it.targets &&
+                                  it.targets.length > 0 &&
+                                  !it.muted && (
+                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                      {it.targets.map((tk) => {
+                                        const target = timeline.find(
+                                          (x) =>
+                                            x.canonicalKey === tk ||
+                                            x.derivedFrom === tk
+                                        );
+                                        if (!target) return null;
+                                        return (
+                                          <span
+                                            key={tk}
+                                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+                                            style={{
+                                              background:
+                                                "var(--surface-3)",
+                                              color: "var(--text-3)",
+                                            }}
+                                            title={`This rule references "${target.title}" — they're paired by design.`}
+                                          >
+                                            <Icon
+                                              name="arrowRight"
+                                              size={10}
+                                            />
+                                            {target.title}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 {lev1 && t != null && !it.muted && (
                                   <span className="ml-2 text-[11px] tabular-nums text-[var(--text-4)]">
                                     {fmtClock(t)}

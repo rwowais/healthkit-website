@@ -207,6 +207,28 @@ export interface BehaviorDef {
   daysActive?: boolean[]; // optional per-behavior schedule
   /** Why this slot was recommended — calm, specific, one line. */
   timingReason?: string;
+  /**
+   * Identity link to a curated atom. When the user creates a custom
+   * behavior by picking from the atom library, the new behavior gets
+   * a fresh user-namespaced `canonicalKey` (so dose / time / days can
+   * differ without contaminating the canonical row) AND a `derivedFrom`
+   * pointer back to the original. The engine uses `derivedFrom` for
+   * intelligence purposes — conflict pairs, recovery demotion, mastery
+   * graduation transfer, "is this strength training?" classification —
+   * so user-derived behaviors participate in the intelligence layer
+   * exactly like the curated atom they're based on. Pure-free-text
+   * customs (escape hatch) have no derivedFrom and skip those layers.
+   */
+  derivedFrom?: string;
+  /**
+   * For `kind: "avoid"` behaviors that reference a specific target
+   * (e.g., "no cold within 6h post-lift" references the strength
+   * behavior), this lists the canonicalKeys of the related behaviors.
+   * Used by the Today timeline to surface a visible link between the
+   * avoid-card and its target — the user sees "this rule is about
+   * THAT row" without an engine deciding for them.
+   */
+  targets?: string[];
 }
 
 export interface ProtocolPack {

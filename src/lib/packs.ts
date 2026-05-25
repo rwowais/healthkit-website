@@ -83,12 +83,19 @@ const MAGNESIUM_PM = B({
 
 const WIND_DOWN = B({
   canonicalKey: "wind-down",
+  // Sequenced relative to the other pre-bed essentials:
+  //   bed -90: cool-room (the room takes time to cool)
+  //   bed -60: screens-off (start of low-light period)
+  //   bed -45: magnesium-pm (passive — take the pill)
+  //   bed -30: wind-down (the active calming ritual)
+  // Avoids the old bed-45 pile-up where 3 essentials rendered at the
+  // same exact clock-time.
   timingReason:
-    "The last ~45 min before bed — that's the window where lowering arousal most improves sleep onset.",
+    "The last ~30 min before bed — that's the window where lowering arousal most improves sleep onset.",
   title: "Wind-down ritual",
   block: "evening",
   anchor: "bed",
-  offsetMin: -45,
+  offsetMin: -30,
   dose: "Dim lights, no screens, slow breathing",
   rationale:
     "Lowers core temperature and arousal so sleep onset is fast and deep.",
@@ -358,12 +365,16 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "screens-off",
+        // Bed -60 (was -45) so it sits BEFORE magnesium-pm and the
+        // wind-down ritual — the screens-off cue is a precondition for
+        // those, not parallel to them. See WIND_DOWN comment for the
+        // pre-bed sequence.
         timingReason:
-          "The final stretch before bed — removes the most alerting light source.",
+          "~1h before bed — removes the most alerting light source so the wind-down can actually land.",
         title: "Screens off",
         block: "evening",
         anchor: "bed",
-        offsetMin: -45,
+        offsetMin: -60,
         rationale: "Reduces alerting blue light and cognitive arousal pre-sleep.",
         icon: "screen",
         leverage: 2,
@@ -371,12 +382,16 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "cool-room",
+        // Bed -90: a real room takes time to cool. Earliest of the
+        // pre-bed sequence so by the time the user is lying down the
+        // air temp has actually dropped. (Was bed-30, which collided
+        // with wind-down.)
         timingReason:
-          "Set before bed so the room is already cool when core temperature needs to fall.",
+          "~90 min before bed — the room needs time to cool, and the temperature drop is what triggers sleep onset.",
         title: "Cool the bedroom",
         block: "evening",
         anchor: "bed",
-        offsetMin: -30,
+        offsetMin: -90,
         dose: "~18°C / 65°F",
         rationale: "A cool room enables the core-temp drop that triggers sleep.",
         recommendedBy: ["Walker"],
@@ -693,21 +708,12 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
       }),
-      B({
-        canonicalKey: "close-eating-7pm",
-        timingReason:
-          "~3h before bed AND aligned to your eating window — both ends matter for metabolic and sleep benefits.",
-        title: "Close the eating window by ~7pm",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -180,
-        rationale:
-          "An early eating window aligns with the body's daytime metabolic peak and protects sleep.",
-        recommendedBy: ["Attia"],
-        icon: "clock",
-        leverage: 2,
-        kind: "action",
-      }),
+      // Merge with `last-meal-3h` (Longevity Foundation) since they're
+      // structurally identical — both = "stop eating ~3h before bed".
+      // Same canonical key MERGES the two rows when both packs are
+      // installed (was rendering as two evening cards saying the same
+      // thing under different titles).
+      LAST_MEAL_3H,
       WIND_DOWN,
     ],
   },
@@ -754,6 +760,10 @@ export const PACKS: ProtocolPack[] = [
         icon: "ban",
         leverage: 2,
         kind: "avoid",
+        // Visual link target — the Today timeline renders a small "→
+        // Strength training" affordance under this card so the user
+        // sees the relationship without an engine deciding.
+        targets: ["strength"],
       }),
       B({
         canonicalKey: "sauna-pm",
@@ -837,13 +847,17 @@ export const PACKS: ProtocolPack[] = [
         kind: "action",
       }),
       B({
-        canonicalKey: "caffeine-low",
+        canonicalKey: "caffeine-cap-dose",
+        // Different concept from `delay-caffeine` (Deep Focus, +90) —
+        // that's about WHEN to take caffeine, this is HOW MUCH. Live
+        // alongside but at a different offset so the two don't render
+        // at the same exact clock-time when both packs are installed.
         timingReason:
           "Cap dose, not just timing — high caffeine on a stressed system pushes cortisol higher and worsens sleep.",
         title: "Cap caffeine at 1–2 cups",
         block: "morning",
         anchor: "wake",
-        offsetMin: 90,
+        offsetMin: 120,
         rationale:
           "On an already-stressed system, caffeine amplifies cortisol and erodes recovery.",
         icon: "coffee",
@@ -880,8 +894,14 @@ export const PACKS: ProtocolPack[] = [
     source: "official",
     durationLabel: "Ongoing",
     behaviors: [
+      // Use the canonical `zone2` key so installing Heart Health
+      // alongside Longevity Foundation MERGES the two zone2 rows
+      // instead of rendering duplicates. Heart Health prescribes the
+      // 3×/wk cadence; the merge keeps whichever schedule is added
+      // first (acceptable for v1; a future merge that unions days
+      // across packs would be more correct).
       B({
-        canonicalKey: "zone2-3x",
+        canonicalKey: "zone2",
         timingReason:
           "Mid-day — fits sustained aerobic work without competing with strength or sleep, and avoids late-evening sympathetic load.",
         title: "Zone 2, 3×/week",
@@ -916,8 +936,11 @@ export const PACKS: ProtocolPack[] = [
         kind: "action",
         daysActive: [false, false, false, false, false, true, false],
       }),
+      // Same canonical key as the Longevity Foundation strength row
+      // so the two MERGE instead of rendering twice at the same offset
+      // (the old `strength-heart` key defeated the merge contract).
       B({
-        canonicalKey: "strength-heart",
+        canonicalKey: "strength",
         timingReason:
           "Afternoon — body temperature and force output peak, lowering injury risk.",
         title: "Strength training",
@@ -971,3 +994,60 @@ export function packById(id: string): ProtocolPack | undefined {
 }
 
 export const DEFAULT_INSTALLED = ["longevity-foundation", "better-sleep"];
+
+/**
+ * Flat, de-duplicated atom library — every unique behavior across all
+ * official packs. Powers the 2B custom-behavior builder: users search
+ * this list first ("Magnesium", "Morning sunlight", "Cold plunge")
+ * and pick an atom instead of free-typing a row that misses every
+ * intelligence-layer hook.
+ *
+ * Returns DEEP COPIES so callers can mutate dose/time/days without
+ * mutating the module-level atom (which would silently affect every
+ * official pack that references it).
+ */
+export interface BehaviorAtom extends BehaviorDef {
+  /** Origin packs (for "this is from …" hints in the picker). */
+  fromOfficialPacks: string[];
+}
+export function listBehaviorAtoms(): BehaviorAtom[] {
+  const byKey = new Map<string, BehaviorAtom>();
+  for (const pack of activePacks()) {
+    if (pack.source !== "official") continue;
+    for (const b of pack.behaviors) {
+      const existing = byKey.get(b.canonicalKey);
+      if (existing) {
+        if (!existing.fromOfficialPacks.includes(pack.name))
+          existing.fromOfficialPacks.push(pack.name);
+        continue;
+      }
+      byKey.set(b.canonicalKey, {
+        ...b,
+        fromOfficialPacks: [pack.name],
+      });
+    }
+  }
+  return [...byKey.values()].sort((a, b) =>
+    a.title.localeCompare(b.title)
+  );
+}
+
+/**
+ * Generate a user-namespaced canonical key for a custom behavior. The
+ * `custom:` prefix is what the engine looks for to skip the hardcoded
+ * intelligence-layer key matches (RESTRAINT_KEYS, CIRCADIAN, etc.) —
+ * a user typing "Strength" no longer contaminates the burnout-recovery
+ * mute, and two users typing "Sleep" don't silently merge.
+ */
+export function customCanonicalKey(packId: string, title: string): string {
+  const base = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  // Random suffix so two custom behaviors with the same title in the
+  // same pack don't collide. Short enough to stay readable in debug
+  // logs and the URL bar if it ever surfaces.
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `custom:${packId}:${base || "item"}-${suffix}`;
+}

@@ -7,7 +7,12 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
-import { packById } from "@/lib/packs";
+import {
+  packById,
+  listBehaviorAtoms,
+  customCanonicalKey,
+  type BehaviorAtom,
+} from "@/lib/packs";
 import {
   compileTimeline,
   blockLabel,
@@ -56,7 +61,36 @@ export default function ProtocolsPage() {
     block: "morning" as TimeBlock,
     dose: "",
     rationale: "",
+    timingReason: "",
   });
+  // 2B atom-library picker — two modes for the "Add behavior" panel:
+  //   "library" (default): search a flat list of curated atoms, pick one,
+  //                        the new behavior inherits the curated identity
+  //                        via derivedFrom for intelligence purposes.
+  //   "custom":  free-text fallback (the original path) for behaviors
+  //              we don't have curated.
+  const [addMode, setAddMode] = useState<"library" | "custom">("library");
+  const [atomQuery, setAtomQuery] = useState("");
+  const atoms = useMemo(() => listBehaviorAtoms(), []);
+  const filteredAtoms = useMemo(() => {
+    const q = atomQuery.trim().toLowerCase();
+    // Filter out atoms already in the draft so the picker never shows
+    // a duplicate of something the user just added.
+    const alreadyAdded = new Set(
+      draft.behaviors
+        .map((b) => b.derivedFrom)
+        .filter((k): k is string => !!k)
+    );
+    const usable = atoms.filter((a) => !alreadyAdded.has(a.canonicalKey));
+    if (!q) return usable;
+    return usable.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) ||
+        a.fromOfficialPacks.some((p) => p.toLowerCase().includes(q)) ||
+        a.rationale.toLowerCase().includes(q) ||
+        a.timingReason?.toLowerCase().includes(q)
+    );
+  }, [atoms, atomQuery, draft.behaviors]);
 
   const installed = useMemo(() => {
     const ids = state?.installedPacks ?? [];
@@ -155,31 +189,69 @@ export default function ProtocolsPage() {
     );
   };
 
+  /**
+   * Free-text custom path. Generates a user-namespaced canonicalKey
+   * (`custom:<packId>:<base>-<rand>`) so it can NEVER collide with a
+   * curated atom or another user's behavior. No `derivedFrom` is set —
+   * this behavior is opaque to the intelligence layer by design (the
+   * 2B "escape hatch" path). The atom-library picker is the
+   * recommended path; this is for genuinely novel behaviors only.
+   */
   const addBehaviorToDraft = () => {
     if (!bDraft.title.trim()) return;
-    const key = bDraft.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .slice(0, 40);
+    const packId = editingId ?? "draft";
     setDraft((d) => ({
       ...d,
       behaviors: [
         ...d.behaviors,
         {
-          canonicalKey: `${key}-${d.behaviors.length}`,
+          canonicalKey: customCanonicalKey(packId, bDraft.title),
           title: bDraft.title.trim(),
           block: bDraft.block,
           anchor: bDraft.block === "evening" ? "bed" : "wake",
           offsetMin: 0,
           dose: bDraft.dose.trim() || undefined,
           rationale: bDraft.rationale.trim() || "Custom behavior.",
+          timingReason: bDraft.timingReason.trim() || undefined,
           icon: "sparkle",
           leverage: 2,
           kind: "action",
         },
       ],
     }));
-    setBDraft({ title: "", block: "morning", dose: "", rationale: "" });
+    setBDraft({
+      title: "",
+      block: "morning",
+      dose: "",
+      rationale: "",
+      timingReason: "",
+    });
+  };
+
+  /**
+   * 2B atom-library pick path. Deep-copies the curated atom so the
+   * user can tweak dose / time / days without mutating the canonical
+   * module-level definition, but stamps `derivedFrom` so the engine's
+   * intelligence-layer hooks (CONFLICT_PAIRS, RECOVERY_DEMOTE,
+   * CIRCADIAN, KEY_MESSAGE) still match via effectiveKey().
+   */
+  const pickAtomToDraft = (atom: BehaviorAtom) => {
+    const packId = editingId ?? "draft";
+    setDraft((d) => ({
+      ...d,
+      behaviors: [
+        ...d.behaviors,
+        {
+          ...atom,
+          canonicalKey: customCanonicalKey(packId, atom.title),
+          derivedFrom: atom.canonicalKey,
+          // Strip the atom's `fromOfficialPacks` metadata — that's
+          // picker UI scaffolding, not part of the BehaviorDef shape.
+          fromOfficialPacks: undefined as never,
+        } as BehaviorDef,
+      ],
+    }));
+    setAtomQuery("");
   };
 
   const inputCls =
@@ -498,48 +570,196 @@ export default function ProtocolsPage() {
             className="space-y-3 rounded-[var(--r-md)] p-3.5"
             style={{ background: "var(--surface-2)" }}
           >
-            <Eyebrow>Add behavior</Eyebrow>
-            <input
-              value={bDraft.title}
-              onChange={(e) =>
-                setBDraft((b) => ({ ...b, title: e.target.value }))
-              }
-              placeholder="Behavior title"
-              className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
-            />
-            <div className="flex gap-1 rounded-[10px] bg-[var(--surface-3)] p-1">
-              {BLOCKS.map((bl) => (
-                <button
-                  key={bl}
-                  onClick={() => setBDraft((b) => ({ ...b, block: bl }))}
-                  className="flex-1 rounded-[7px] py-1.5 text-[11px] font-semibold capitalize tr-fast"
-                  style={{
-                    background:
-                      bDraft.block === bl
-                        ? "var(--readiness)"
-                        : "transparent",
-                    color:
-                      bDraft.block === bl ? "#08090B" : "var(--text-3)",
-                  }}
-                >
-                  {bl}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2">
+              <Eyebrow>Add behavior</Eyebrow>
+              {/* Mode toggle. Default is Library (the recommended path
+                  — atoms participate in the intelligence layer). Custom
+                  is the escape hatch for genuinely novel behaviors not
+                  in the catalog. */}
+              <div className="flex gap-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] p-0.5">
+                {(["library", "custom"] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setAddMode(m)}
+                    className="press tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11px] font-semibold capitalize"
+                    style={{
+                      background:
+                        addMode === m
+                          ? "var(--text-1)"
+                          : "transparent",
+                      color: addMode === m ? "#08090B" : "var(--text-3)",
+                    }}
+                  >
+                    {m === "library" ? "From library" : "Custom"}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input
-              value={bDraft.rationale}
-              onChange={(e) =>
-                setBDraft((b) => ({ ...b, rationale: e.target.value }))
-              }
-              placeholder="Why it matters (optional)"
-              className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
-            />
-            <button
-              onClick={addBehaviorToDraft}
-              className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--surface-3)] py-2.5 text-[13px] font-semibold text-[var(--text-1)]"
-            >
-              + Add behavior
-            </button>
+
+            {addMode === "library" ? (
+              <>
+                <input
+                  value={atomQuery}
+                  onChange={(e) => setAtomQuery(e.target.value)}
+                  placeholder="Search the library — magnesium, sunlight, cold…"
+                  className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
+                />
+                <p className="t-caption leading-relaxed">
+                  Picking from the library makes this behavior
+                  intelligent — it merges with the same behavior from
+                  any other protocol you install, inherits the science
+                  behind its timing, and participates in the adaptive
+                  engine. You can still customize dose, days, and time
+                  after picking.
+                </p>
+                <div className="max-h-[320px] space-y-1.5 overflow-y-auto">
+                  {filteredAtoms.length === 0 && (
+                    <p className="px-3 py-3 text-[12.5px] text-[var(--text-3)]">
+                      {atomQuery.trim()
+                        ? "Nothing matches in our library yet."
+                        : "Every curated behavior is already in this draft."}{" "}
+                      Try{" "}
+                      <button
+                        onClick={() => {
+                          setAddMode("custom");
+                          if (atomQuery.trim())
+                            setBDraft((b) => ({ ...b, title: atomQuery }));
+                        }}
+                        className="press underline-offset-2 hover:underline"
+                        style={{ color: "var(--readiness)" }}
+                      >
+                        adding it as custom
+                      </button>{" "}
+                      — it won't participate in the cross-protocol
+                      intelligence, but the basics still work.
+                    </p>
+                  )}
+                  {filteredAtoms.map((a) => (
+                    <button
+                      key={a.canonicalKey}
+                      onClick={() => pickAtomToDraft(a)}
+                      className="press tr-fast flex w-full items-start gap-3 rounded-[var(--r-sm)] p-3 text-left"
+                      style={{ background: "var(--surface-3)" }}
+                    >
+                      <span
+                        className="chip h-9 w-9 shrink-0"
+                        style={{
+                          background: "var(--surface-2)",
+                          color: "var(--text-2)",
+                        }}
+                      >
+                        <Icon
+                          name={a.icon as IconName}
+                          size={16}
+                          stroke={1.7}
+                        />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-semibold text-[var(--text-1)]">
+                          {a.title}
+                        </span>
+                        <span className="t-caption mt-0.5 block leading-snug">
+                          {a.dose ?? a.rationale}
+                        </span>
+                        <span
+                          className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize"
+                          style={{
+                            background: "var(--surface-2)",
+                            color: "var(--text-3)",
+                          }}
+                        >
+                          {a.block}
+                          {a.fromOfficialPacks.length > 0 && (
+                            <>
+                              <span>·</span>
+                              <span className="normal-case">
+                                from {a.fromOfficialPacks[0]}
+                                {a.fromOfficialPacks.length > 1
+                                  ? ` +${a.fromOfficialPacks.length - 1}`
+                                  : ""}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </span>
+                      <Icon
+                        name="plus"
+                        size={16}
+                        className="mt-1 shrink-0 text-[var(--text-3)]"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <input
+                  value={bDraft.title}
+                  onChange={(e) =>
+                    setBDraft((b) => ({ ...b, title: e.target.value }))
+                  }
+                  placeholder="Behavior title"
+                  className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
+                />
+                <div className="flex gap-1 rounded-[10px] bg-[var(--surface-3)] p-1">
+                  {BLOCKS.map((bl) => (
+                    <button
+                      key={bl}
+                      onClick={() =>
+                        setBDraft((b) => ({ ...b, block: bl }))
+                      }
+                      className="flex-1 rounded-[7px] py-1.5 text-[11px] font-semibold capitalize tr-fast"
+                      style={{
+                        background:
+                          bDraft.block === bl
+                            ? "var(--readiness)"
+                            : "transparent",
+                        color:
+                          bDraft.block === bl ? "#08090B" : "var(--text-3)",
+                      }}
+                    >
+                      {bl}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={bDraft.rationale}
+                  onChange={(e) =>
+                    setBDraft((b) => ({ ...b, rationale: e.target.value }))
+                  }
+                  placeholder="Why it matters (optional)"
+                  className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
+                />
+                {/* timingReason field — fills the cross-block warning
+                    sheet with this behavior's own scientific voice when
+                    the user later drags it to a different time of day.
+                    Without it, the warning falls back to generic
+                    block-level copy. Optional but high-payoff. */}
+                <input
+                  value={bDraft.timingReason}
+                  onChange={(e) =>
+                    setBDraft((b) => ({
+                      ...b,
+                      timingReason: e.target.value,
+                    }))
+                  }
+                  placeholder="Why this time of day matters (optional)"
+                  className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
+                />
+                <p className="t-caption leading-relaxed">
+                  Custom behaviors work, but they sit outside the
+                  cross-protocol intelligence (no merging, no adaptive
+                  mute, no scientific timing copy). Use this for things
+                  the library doesn&apos;t cover.
+                </p>
+                <button
+                  onClick={addBehaviorToDraft}
+                  className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--surface-3)] py-2.5 text-[13px] font-semibold text-[var(--text-1)]"
+                >
+                  + Add custom behavior
+                </button>
+              </>
+            )}
           </div>
 
           <Button full onClick={saveCustom}>

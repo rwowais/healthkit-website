@@ -500,16 +500,29 @@ export function duplicatePack(
   source: ProtocolPack
 ): AppState {
   const newId = `custom-${Date.now()}`;
+  // Forked behaviors now use a fork-namespaced canonicalKey AND a
+  // `derivedFrom` pointer back to the curated original. Why both:
+  //   - Namespaced key isolates the fork's behaviorOverrides, mastery
+  //     streak, and keystone continuity from the curated row. Editing
+  //     "Magnesium (yours)" no longer mutates the canonical magnesium-pm
+  //     state shared by every other pack.
+  //   - `derivedFrom` keeps the intelligence layer working: the engine's
+  //     CONFLICT_PAIRS / RECOVERY_DEMOTE / CIRCADIAN / KEY_MESSAGE
+  //     lookups go through effectiveKey() so a fork of "no-intense"
+  //     still mutes strength training, a fork of "morning-sunlight"
+  //     still gets the circadian-anchor tag, etc.
+  // Net: the fork is a true independent copy that still participates
+  // in the cross-pack adaptive intelligence.
   const copy: ProtocolPack = {
     ...source,
     id: newId,
     name: `${source.name} (yours)`,
     source: "custom",
-    // Keep the original canonicalKeys: a fork is the SAME behaviors, so
-    // it must merge by canonicalKey like every other pack. Namespacing
-    // them made the timeline show every behavior twice whenever the
-    // original (or any pack sharing those behaviors) was also installed.
-    behaviors: source.behaviors.map((b) => ({ ...b })),
+    behaviors: source.behaviors.map((b) => ({
+      ...b,
+      canonicalKey: `fork:${newId}:${b.canonicalKey}`,
+      derivedFrom: b.derivedFrom ?? b.canonicalKey,
+    })),
   };
   const customPacks = [...state.customPacks, copy];
   const installedPacks = [

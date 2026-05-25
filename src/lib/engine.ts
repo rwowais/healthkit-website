@@ -70,6 +70,13 @@ export function compileTimeline(
   const installed = new Set(state.installedPacks ?? []);
   const paused = new Set(state.pausedPacks ?? []);
   const overrides = state.behaviorOverrides ?? {};
+  // Merge by effectiveKey (derivedFrom ?? canonicalKey) so a forked
+  // pack's "wind-down" (canonicalKey: "fork:abc:wind-down", derivedFrom:
+  // "wind-down") merges with the curated Better Sleep "wind-down" into
+  // ONE timeline row instead of two visually-similar cards. The fork
+  // still owns its independent behaviorOverrides (those are keyed by
+  // the namespaced canonicalKey), but at render time the user sees one
+  // unified behavior — which is what they actually expect.
   const merged = new Map<string, TimelineItem>();
 
   for (const pack of packsOverride ?? allPacks(state)) {
@@ -77,11 +84,12 @@ export function compileTimeline(
     for (const b of pack.behaviors) {
       const ov: BehaviorOverride | undefined = overrides[b.canonicalKey];
       if (ov?.disabled) continue;
-      const existing = merged.get(b.canonicalKey);
+      const mergeKey = b.derivedFrom ?? b.canonicalKey;
+      const existing = merged.get(mergeKey);
       if (!existing) {
         const retimed =
           (!!ov?.block && ov.block !== b.block) || !!ov?.customTime;
-        merged.set(b.canonicalKey, {
+        merged.set(mergeKey, {
           ...b,
           daysActive: ov?.daysActive ?? b.daysActive,
           dose: ov?.dose ?? b.dose,
@@ -398,7 +406,28 @@ export function adapt(state: AppState): Adaptation {
   };
 }
 
-export const RECOVERY_DEMOTE = new Set(["strength", "zone2", "deep-work", "vo2"]);
+/**
+ * Effective canonical key for intelligence-layer matches. A behavior
+ * picked from the atom library (e.g., custom "Magnesium glycinate"
+ * with `derivedFrom: "magnesium-pm"`) gets the curated key for
+ * conflict resolution, recovery demotion, CIRCADIAN tagging, etc. —
+ * even though its own canonicalKey is namespaced (`custom:...`).
+ * Free-text customs (no derivedFrom) keep their namespaced key and
+ * skip the official key matches entirely.
+ */
+export function effectiveKey(it: { canonicalKey: string; derivedFrom?: string }): string {
+  return it.derivedFrom ?? it.canonicalKey;
+}
+
+export const RECOVERY_DEMOTE = new Set([
+  "strength",
+  "zone2",
+  "deep-work",
+  // Was "vo2" — actual canonicalKey is "vo2max-intervals". The old
+  // entry never matched anything; high-intensity intervals slipped
+  // through the recovery-mode mute.
+  "vo2max-intervals",
+]);
 export const RECOVERY_PROMOTE = new Set([
   "nsdr",
   "extra-sleep",
@@ -407,11 +436,42 @@ export const RECOVERY_PROMOTE = new Set([
   "morning-sunlight",
 ]);
 
-// Restraint behaviors that semantically forbid hard training. When one
-// is active we must not also instruct the user to train hard — that's a
-// contradiction, not a protocol.
-export const RESTRAINT_KEYS = new Set(["no-intense"]);
-export const TRAINING_KEYS = new Set(["strength", "zone2", "vo2", "sprint"]);
+/**
+ * Explicit cross-behavior conflict map. When a restraint is present
+ * and not muted, every paired target is muted — preventing the surface
+ * from showing two contradictory instructions side by side.
+ *
+ * Why a flat list (not a graph or solver): each entry is auditable,
+ * and the set of real cross-pack contradictions is small (<10). A
+ * typed constraint engine would be the right answer when this grows
+ * past ~15 pairs or when constraints need offsets/severity.
+ *
+ * Whitelist semantics: only `source: "official"` behaviors participate
+ * (enforced at the call site in shapeTimeline). That prevents a user-
+ * typed custom behavior named "no-intense" from silently muting their
+ * strength training, or a custom "strength" being muted by Burnout
+ * Recovery's "no-intense" rule.
+ */
+export const CONFLICT_PAIRS: ReadonlyArray<{
+  restraint: string;
+  target: string;
+}> = [
+  // Burnout Recovery's "no intense training" mutes the hard-training
+  // behaviors so the recovery contract isn't contradicted.
+  { restraint: "no-intense", target: "strength" },
+  { restraint: "no-intense", target: "zone2" },
+  { restraint: "no-intense", target: "vo2max-intervals" },
+  // Fasted Mornings' delay-first-meal contradicts a protein-led
+  // breakfast — both have leverage 3, and the timeline would otherwise
+  // tell the user "eat now" and "don't eat until 11am" in the same
+  // morning block. The restraint wins (it's the active discipline).
+  { restraint: "delay-first-meal", target: "protein-breakfast" },
+];
+
+// Derived sets — used in mode-specific shaping (rebuild excludes
+// training-keys from its 3-pick lineup; recovery demotes them).
+export const RESTRAINT_KEYS = new Set(CONFLICT_PAIRS.map((p) => p.restraint));
+export const TRAINING_KEYS = new Set(CONFLICT_PAIRS.map((p) => p.target));
 
 /** A deterministic, stable rank: leverage desc, then block, then key. */
 function stableRank(a: TimelineItem, b: TimelineItem): number {
@@ -568,29 +628,44 @@ export function shapeTimeline(
       );
     }
   } else if (mode === "recovery") {
+    // effectiveKey lets atom-library-derived custom behaviors (e.g.,
+    // a custom "Heavy back squats" derivedFrom: "strength") still
+    // demote correctly in recovery — without it, custom-derived
+    // training behaviors silently slip through the mute.
     shaped = items
       .map((it) => ({
         ...it,
-        muted: RECOVERY_DEMOTE.has(it.canonicalKey),
+        muted: RECOVERY_DEMOTE.has(effectiveKey(it)),
       }))
       .sort(
         (a, b) =>
-          (RECOVERY_PROMOTE.has(b.canonicalKey) ? 1 : 0) -
-            (RECOVERY_PROMOTE.has(a.canonicalKey) ? 1 : 0) ||
+          (RECOVERY_PROMOTE.has(effectiveKey(b)) ? 1 : 0) -
+            (RECOVERY_PROMOTE.has(effectiveKey(a)) ? 1 : 0) ||
           BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block]
       );
     shaped = guaranteePerBlock(shaped);
   } else if (mode === "rebuild") {
     // Deterministic, block-diverse, keystone-first: at most 2 per block,
     // exactly the 3 highest-leverage that span the day — never a random
-    // 3 that all land in the morning. If a restraint is active, training
-    // behaviors are excluded from the slots up front, so reconciliation
-    // can't later mute a kept item and break the "exactly 3" contract.
-    const restraint = items.some((it) =>
-      RESTRAINT_KEYS.has(it.canonicalKey)
+    // 3 that all land in the morning. Restraint targets (the SPECIFIC
+    // ones from CONFLICT_PAIRS, not every training key) are excluded
+    // from the slots up front so reconciliation can't later mute a kept
+    // item and break the "exactly 3" contract.
+    // Use effectiveKey so a custom-derived restraint (someone built
+    // their own "no intense training" derivedFrom: "no-intense") also
+    // triggers the rebuild-mode training exclusion.
+    const activeRestraintsRebuild = new Set(
+      items
+        .filter((it) => RESTRAINT_KEYS.has(effectiveKey(it)))
+        .map((it) => effectiveKey(it))
     );
+    const targetsExcluded = new Set<string>();
+    for (const pair of CONFLICT_PAIRS) {
+      if (activeRestraintsRebuild.has(pair.restraint))
+        targetsExcluded.add(pair.target);
+    }
     const eligible = items.filter(
-      (it) => !(restraint && TRAINING_KEYS.has(it.canonicalKey))
+      (it) => !targetsExcluded.has(effectiveKey(it))
     );
     const ranked = [...eligible].sort(stableRank);
     const perBlock = new Map<string, number>();
@@ -623,15 +698,31 @@ export function shapeTimeline(
     shaped = items;
   }
 
-  // Always-on conflict reconciliation: if an active restraint behavior
-  // forbids hard training, mute the training behaviors rather than
-  // present the user with contradictory instructions.
-  const restraintActive = shaped.some(
-    (it) => RESTRAINT_KEYS.has(it.canonicalKey) && !it.muted
+  // Always-on conflict reconciliation. Each restraint mutes only its
+  // SPECIFIC targets from CONFLICT_PAIRS — the old "every restraint
+  // mutes every target" lumped fasting and intense-training restraints
+  // together, which would mute strength training when the only active
+  // restraint was "delay-first-meal" (no relation). The pair list keeps
+  // mutes precise.
+  // effectiveKey: atom-library-derived custom restraints still trigger
+  // their target mutes; atom-library-derived custom targets still get
+  // muted by curated restraints. Pure-free-text customs (no derivedFrom)
+  // are correctly invisible to this pass.
+  const activeRestraints = new Set(
+    shaped
+      .filter(
+        (it) => RESTRAINT_KEYS.has(effectiveKey(it)) && !it.muted
+      )
+      .map((it) => effectiveKey(it))
   );
-  if (restraintActive) {
+  if (activeRestraints.size > 0) {
+    const targetsToMute = new Set<string>();
+    for (const pair of CONFLICT_PAIRS) {
+      if (activeRestraints.has(pair.restraint))
+        targetsToMute.add(pair.target);
+    }
     shaped = shaped.map((it) =>
-      TRAINING_KEYS.has(it.canonicalKey) ? { ...it, muted: true } : it
+      targetsToMute.has(effectiveKey(it)) ? { ...it, muted: true } : it
     );
   }
 
@@ -701,9 +792,9 @@ export function leverageTag(
 ): LeverageTag {
   if (it.muted) return { text: "Optional today", tone: "muted" };
   if (opts.isKeystone) return { text: "Your keystone", tone: "warm" };
-  if (mode === "recovery" && RECOVERY_PROMOTE.has(it.canonicalKey))
+  if (mode === "recovery" && RECOVERY_PROMOTE.has(effectiveKey(it)))
     return { text: "Recovery-critical", tone: "recovery" };
-  if (CIRCADIAN.has(it.canonicalKey))
+  if (CIRCADIAN.has(effectiveKey(it)))
     return { text: "Circadian anchor", tone: "sleep" };
   if (it.leverage === 3) return { text: "Essential", tone: "accent" };
   if ((opts.streak ?? 0) >= 3)
@@ -738,7 +829,7 @@ export function upNextMessage(
 ): string {
   if (ctx.isKeystone)
     return "On the days you do this, everything else lands better.";
-  if (KEY_MESSAGE[it.canonicalKey]) return KEY_MESSAGE[it.canonicalKey];
+  if (KEY_MESSAGE[effectiveKey(it)]) return KEY_MESSAGE[effectiveKey(it)];
   if (ctx.mode === "recovery")
     return "Recovery suggests a lower-stimulation path — this one still counts.";
   if (ctx.mode === "rebuild")
