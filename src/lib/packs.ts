@@ -132,10 +132,14 @@ const CAFFEINE_CUTOFF = B({
 
 const OMEGA3_AM = B({
   canonicalKey: "omega-3",
+  // Flexible by design — "with any fat-containing meal" isn't time-
+  // locked. Set to anytime so a user on IF (first meal at noon) or an
+  // evening-eater isn't warned when they drop it where their actual
+  // meals are.
   timingReason:
-    "With the first fat-containing meal — dietary fat markedly improves absorption.",
+    "With any fat-containing meal — dietary fat markedly improves absorption. Time of day doesn't matter.",
   title: "Omega-3 (EPA/DHA)",
-  block: "morning",
+  block: "anytime",
   anchor: "wake",
   offsetMin: 90,
   dose: "2 g combined EPA/DHA",
@@ -143,6 +147,112 @@ const OMEGA3_AM = B({
     "Lowers systemic inflammation; supports cardiovascular and brain health.",
   recommendedBy: ["Attia", "Huberman"],
   icon: "fish",
+  leverage: 2,
+  kind: "action",
+});
+
+// ── Jetlag-recovery atoms (used by the Jetlag pack and reusable
+// elsewhere when travel/circadian-shift protocols evolve) ──────────
+
+const NEW_TZ_SUNLIGHT = B({
+  canonicalKey: "new-tz-sunlight",
+  timingReason:
+    "Bright light at the new timezone's morning is the single most powerful signal for shifting your circadian clock to the destination.",
+  title: "Morning light at destination",
+  block: "morning",
+  anchor: "wake",
+  offsetMin: 30,
+  dose: "20–40 min outdoor, no sunglasses",
+  rationale:
+    "Resets the master clock to local time — accelerates adaptation by 1–2 days.",
+  evidence:
+    "Light is the primary zeitgeber; properly timed exposure can shift the circadian phase by ~1h/day.",
+  recommendedBy: ["Huberman", "Walker"],
+  icon: "sun",
+  leverage: 3,
+  kind: "action",
+});
+
+const STRATEGIC_MELATONIN = B({
+  canonicalKey: "strategic-melatonin",
+  timingReason:
+    "30–60 min before the NEW timezone's bedtime — its sleep-timing effect depends on being taken near intended sleep.",
+  title: "Strategic melatonin",
+  block: "evening",
+  anchor: "bed",
+  offsetMin: -45,
+  dose: "0.3–0.5 mg (low dose)",
+  rationale:
+    "A small dose helps shift sleep timing; large doses don't help more and disrupt next-morning alertness.",
+  evidence:
+    "Low-dose melatonin (0.3 mg) effectively phase-shifts circadian rhythms during jetlag without sedation hangover.",
+  recommendedBy: ["Walker"],
+  icon: "moon",
+  leverage: 3,
+  kind: "action",
+});
+
+const ANCHOR_MEAL = B({
+  canonicalKey: "anchor-meal",
+  timingReason:
+    "Eating at the NEW timezone's breakfast hour anchors your peripheral clocks (liver, gut) — the second-strongest zeitgeber after light.",
+  title: "Eat at destination breakfast",
+  block: "morning",
+  anchor: "wake",
+  offsetMin: 90,
+  dose: "Protein-forward, daylight",
+  rationale:
+    "Food is a powerful zeitgeber for peripheral clocks; sync them to destination time, not departure time.",
+  recommendedBy: ["Attia"],
+  icon: "utensils",
+  leverage: 2,
+  kind: "action",
+});
+
+const TRAVEL_HYDRATE = B({
+  canonicalKey: "travel-hydrate",
+  timingReason:
+    "Spread across the first 24h post-arrival — cabin air severely dehydrates, and dehydration mimics and worsens jetlag.",
+  title: "Aggressive hydration",
+  block: "anytime",
+  anchor: "wake",
+  offsetMin: 0,
+  dose: "~3 L water + electrolytes",
+  rationale:
+    "Cabin air is ~10% humidity; dehydration amplifies fatigue, headaches, and brain fog.",
+  icon: "droplet",
+  leverage: 2,
+  kind: "action",
+});
+
+const NO_ARRIVAL_ALCOHOL = B({
+  canonicalKey: "no-arrival-alcohol",
+  timingReason:
+    "First 48h on the new timezone — alcohol fragments sleep and prolongs circadian misalignment.",
+  title: "No alcohol on flight + first night",
+  block: "anytime",
+  anchor: "wake",
+  offsetMin: 0,
+  rationale:
+    "Alcohol blocks REM, dehydrates further, and delays circadian realignment.",
+  recommendedBy: ["Walker"],
+  icon: "wine",
+  leverage: 2,
+  kind: "avoid",
+});
+
+const ARRIVAL_WALK = B({
+  canonicalKey: "arrival-walk",
+  timingReason:
+    "Within hours of arrival in the daylight — combines light, movement, and grounding to push the body into the local time zone fast.",
+  title: "Outdoor walk on arrival",
+  block: "afternoon",
+  anchor: "wake",
+  offsetMin: 240,
+  dose: "20–40 min in daylight",
+  rationale:
+    "Light + movement together drive faster phase shift than either alone.",
+  icon: "footprints",
   leverage: 2,
   kind: "action",
 });
@@ -199,10 +309,14 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "fiber-veg",
+        // "Across the day" is genuinely time-flexible — surfacing a
+        // cross-block warning when the user moves this to morning or
+        // anytime would be misleading. Block: anytime keeps it warning-
+        // free; timingReason still recommends spreading.
         timingReason:
-          "Spread across daytime meals to steady glucose through the day.",
+          "Spread across daytime meals — pace beats one big serving for both microbiome and glucose stability.",
         title: "Fiber & plants",
-        block: "afternoon",
+        block: "anytime",
         anchor: "wake",
         offsetMin: 330,
         dose: "30+ g fiber across the day",
@@ -449,10 +563,12 @@ export const PACKS: ProtocolPack[] = [
       PROTEIN_BREAKFAST,
       B({
         canonicalKey: "veg-first",
+        // "At every meal" is not a specific time block — anytime
+        // keeps the warning honest.
         timingReason:
-          "At meals — eating fiber before carbs blunts that meal's glucose spike.",
+          "At each meal — eating fiber before carbs blunts that meal's glucose spike. Applies every time you eat.",
         title: "Vegetables first",
-        block: "afternoon",
+        block: "anytime",
         anchor: "wake",
         offsetMin: 330,
         rationale:
@@ -463,10 +579,13 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "post-meal-walk",
+        // After meals — happens whenever the user eats, not locked
+        // to one block. Anytime here preserves the science (walk
+        // within ~30 min of eating) without falsely warning.
         timingReason:
-          "Right after eating — muscle contraction clears glucose without insulin.",
+          "Within ~30 min of any meal — muscle contraction clears glucose without insulin.",
         title: "Walk after meals",
-        block: "afternoon",
+        block: "anytime",
         anchor: "wake",
         offsetMin: 360,
         dose: "10 min after eating",
@@ -491,6 +610,348 @@ export const PACKS: ProtocolPack[] = [
         kind: "avoid",
       }),
       LAST_MEAL_3H,
+    ],
+  },
+  {
+    id: "jetlag-recovery",
+    name: "Jetlag Recovery",
+    tagline:
+      "Reset to a new timezone in days, not a week — with light, food, and timing.",
+    goal: "recovery",
+    accent: "var(--sleep)",
+    icon: "compass",
+    source: "official",
+    durationLabel: "4–7 days",
+    behaviors: [
+      NEW_TZ_SUNLIGHT,
+      ANCHOR_MEAL,
+      TRAVEL_HYDRATE,
+      ARRIVAL_WALK,
+      B({
+        canonicalKey: "delay-caffeine-tz",
+        timingReason:
+          "~90 min after waking at destination — anchors alertness to the new morning instead of pulling you back to departure-time.",
+        title: "Caffeine at new-morning + 90",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 90,
+        dose: "Normal dose, new timezone",
+        rationale:
+          "Caffeine timing reinforces the new wake-time; off-timezone caffeine prolongs misalignment.",
+        recommendedBy: ["Huberman"],
+        icon: "coffee",
+        leverage: 2,
+        kind: "action",
+      }),
+      NO_ARRIVAL_ALCOHOL,
+      STRATEGIC_MELATONIN,
+      WIND_DOWN,
+    ],
+  },
+  {
+    id: "fasted-mornings",
+    name: "Fasted Mornings",
+    tagline:
+      "A clean morning fast, well-timed eating window, and steady energy.",
+    goal: "metabolic",
+    accent: "var(--vitality)",
+    icon: "flame",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      HYDRATE_AM,
+      MORNING_SUNLIGHT,
+      B({
+        canonicalKey: "delay-first-meal",
+        timingReason:
+          "Push the first calorie ~14–16h after dinner — that's where most autophagy and metabolic flexibility benefits accrue.",
+        title: "Delay first meal to ~11am–1pm",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 240,
+        dose: "Black coffee / tea / water only",
+        rationale:
+          "A long overnight fast supports insulin sensitivity, autophagy, and metabolic flexibility.",
+        recommendedBy: ["Attia"],
+        icon: "clock",
+        leverage: 3,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "break-fast-protein",
+        timingReason:
+          "When breaking the fast — a protein-led first meal protects muscle and blunts the rebound glucose spike.",
+        title: "Break the fast with protein",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 270,
+        dose: "30–50 g protein, fiber, fat",
+        rationale:
+          "Protein-led refeeding preserves muscle and stabilizes the post-fast glucose response.",
+        recommendedBy: ["Attia"],
+        icon: "protein",
+        leverage: 3,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "close-eating-7pm",
+        timingReason:
+          "~3h before bed AND aligned to your eating window — both ends matter for metabolic and sleep benefits.",
+        title: "Close the eating window by ~7pm",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -180,
+        rationale:
+          "An early eating window aligns with the body's daytime metabolic peak and protects sleep.",
+        recommendedBy: ["Attia"],
+        icon: "clock",
+        leverage: 2,
+        kind: "action",
+      }),
+      WIND_DOWN,
+    ],
+  },
+  {
+    id: "cold-heat-therapy",
+    name: "Cold & Heat Therapy",
+    tagline:
+      "Stack cold and sauna for cardiovascular and mental resilience.",
+    goal: "recovery",
+    accent: "var(--recovery)",
+    icon: "snowflake",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      B({
+        canonicalKey: "cold-plunge-am",
+        timingReason:
+          "Morning — cold delivers a clean, sustained dopamine and noradrenaline lift that's perfect to start the day, and avoids sleep disruption.",
+        title: "Cold plunge or cold shower",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 30,
+        dose: "1–3 min, ~10–15°C",
+        rationale:
+          "Dopamine and norepinephrine rise sharply and stay elevated; builds stress resilience.",
+        evidence:
+          "Cold exposure (~14°C, 1 min) elevates norepinephrine ~5×; effect lasts hours.",
+        recommendedBy: ["Huberman"],
+        icon: "snowflake",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "no-cold-post-lift",
+        timingReason:
+          "Within ~6h after strength training — cold immediately after lifting blunts the muscle-growth adaptation you just trained for.",
+        title: "No cold within 6h post-lift",
+        block: "anytime",
+        anchor: "wake",
+        offsetMin: 0,
+        rationale:
+          "Cold post-resistance training reduces hypertrophy signaling; separate them.",
+        recommendedBy: ["Huberman"],
+        icon: "ban",
+        leverage: 2,
+        kind: "avoid",
+      }),
+      B({
+        canonicalKey: "sauna-pm",
+        timingReason:
+          "Evening — heat shock lowers cortisol, raises HRV, and supports sleep when finished ~1–2h before bed.",
+        title: "Sauna session",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -180,
+        dose: "15–25 min, 80–90°C, 2–4×/wk",
+        rationale:
+          "Regular sauna is associated with lower all-cause and cardiovascular mortality.",
+        evidence:
+          "Finnish cohort studies show 4–7 sauna sessions/week associated with ~40% lower all-cause mortality.",
+        recommendedBy: ["Attia"],
+        icon: "thermometer",
+        leverage: 3,
+        kind: "action",
+        daysActive: [true, false, true, false, true, true, false],
+      }),
+      B({
+        canonicalKey: "post-sauna-hydrate",
+        timingReason:
+          "Right after sauna — heavy fluid and electrolyte replacement protects against orthostatic dips and cramping.",
+        title: "Replenish electrolytes after sauna",
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -150,
+        dose: "500 ml + sodium/potassium",
+        rationale:
+          "Sauna sweat loss is mostly water + sodium; replace both.",
+        icon: "droplet",
+        leverage: 1,
+        kind: "action",
+      }),
+    ],
+  },
+  {
+    id: "stress-resilience",
+    name: "Stress Resilience",
+    tagline:
+      "Lower baseline arousal so daily stress doesn't cumulate into depletion.",
+    goal: "recovery",
+    accent: "var(--recovery)",
+    icon: "lungs",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      MORNING_SUNLIGHT,
+      B({
+        canonicalKey: "cyclic-sighing",
+        timingReason:
+          "Mid-morning OR pre-bed — both windows reliably drop sympathetic load within minutes.",
+        title: "Cyclic sighing",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 150,
+        dose: "5 min · double inhale, long exhale",
+        rationale:
+          "The fastest-acting voluntary tool to drop heart rate and stress in the moment.",
+        evidence:
+          "Stanford-led RCT (2023): 5 min/day cyclic sighing reduced anxiety and improved mood more than equivalent mindfulness.",
+        recommendedBy: ["Huberman"],
+        icon: "wind",
+        leverage: 3,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "nature-time",
+        timingReason:
+          "Afternoon — restores attention and lowers cortisol fastest in daylight.",
+        title: "Outdoor time without phone",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 360,
+        dose: "20+ min, no screens",
+        rationale:
+          "Even brief outdoor time reduces rumination and cortisol; phone-free amplifies the effect.",
+        icon: "leaf",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "caffeine-low",
+        timingReason:
+          "Cap dose, not just timing — high caffeine on a stressed system pushes cortisol higher and worsens sleep.",
+        title: "Cap caffeine at 1–2 cups",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 90,
+        rationale:
+          "On an already-stressed system, caffeine amplifies cortisol and erodes recovery.",
+        icon: "coffee",
+        leverage: 2,
+        kind: "action",
+      }),
+      B({
+        canonicalKey: "social-connection",
+        timingReason:
+          "Evening tends to be the natural slot — even brief connection (call, in-person) downregulates stress.",
+        title: "One real human connection",
+        block: "evening",
+        anchor: "wake",
+        offsetMin: 600,
+        dose: "10+ min, ideally in person",
+        rationale:
+          "Social connection is one of the strongest predictors of long-term resilience and health.",
+        icon: "user",
+        leverage: 2,
+        kind: "action",
+      }),
+      WIND_DOWN,
+      MAGNESIUM_PM,
+    ],
+  },
+  {
+    id: "heart-health",
+    name: "Heart Health",
+    tagline:
+      "An Attia-style cardiovascular protocol — zone 2, strength, lipids, sleep.",
+    goal: "longevity",
+    accent: "var(--alert)",
+    icon: "pulse",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: [
+      B({
+        canonicalKey: "zone2-3x",
+        timingReason:
+          "Mid-day — fits sustained aerobic work without competing with strength or sleep, and avoids late-evening sympathetic load.",
+        title: "Zone 2, 3×/week",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 300,
+        dose: "45 min nasal-breathing pace",
+        rationale:
+          "Builds mitochondrial density and lactate clearance — Attia's top cardiovascular lever.",
+        evidence:
+          "Aerobic fitness (VO2 max) is one of the strongest predictors of all-cause mortality across cohorts.",
+        recommendedBy: ["Attia"],
+        icon: "footprints",
+        leverage: 3,
+        kind: "action",
+        daysActive: [true, false, true, false, true, false, false],
+      }),
+      B({
+        canonicalKey: "vo2max-intervals",
+        timingReason:
+          "Once weekly — high-intensity intervals demand full recovery between, so cap frequency to protect the rest.",
+        title: "VO2 max intervals",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 360,
+        dose: "4×4 min at 90% HRmax",
+        rationale:
+          "Brief high-intensity work raises VO2 max — strongest known fitness predictor of late-life function.",
+        recommendedBy: ["Attia"],
+        icon: "pulse",
+        leverage: 3,
+        kind: "action",
+        daysActive: [false, false, false, false, false, true, false],
+      }),
+      B({
+        canonicalKey: "strength-heart",
+        timingReason:
+          "Afternoon — body temperature and force output peak, lowering injury risk.",
+        title: "Strength training",
+        block: "afternoon",
+        anchor: "wake",
+        offsetMin: 360,
+        dose: "3×/week, compound lifts",
+        rationale:
+          "Strength training improves arterial compliance and metabolic risk markers.",
+        recommendedBy: ["Attia"],
+        icon: "dumbbell",
+        leverage: 3,
+        kind: "action",
+        daysActive: [false, true, false, true, false, false, true],
+      }),
+      OMEGA3_AM,
+      B({
+        canonicalKey: "bp-check",
+        timingReason:
+          "Same time daily — consistent measurement window is what makes the trend interpretable.",
+        title: "Check blood pressure",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 60,
+        dose: "Weekly, same time",
+        rationale:
+          "Tracking BP at home reveals trends invisible at sporadic clinic visits.",
+        recommendedBy: ["Attia"],
+        icon: "pulse",
+        leverage: 2,
+        kind: "action",
+        daysActive: [true, false, false, false, false, false, false],
+      }),
+      WIND_DOWN,
     ],
   },
 ];

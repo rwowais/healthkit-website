@@ -224,18 +224,23 @@ export default function TodayPage() {
   /**
    * A move that requires confirmation. Set when the user drags a
    * behavior to a block that doesn't match its recommendedBlock. Holds
-   * everything we need to commit (or several keys, for bulk moves).
+   * everything we need to commit and a per-key rationale so each
+   * behavior speaks with its own science instead of a generic
+   * block-level message.
    */
   const [pendingMove, setPendingMove] = useState<{
-    keys: { key: string; title: string }[];
+    items: {
+      key: string;
+      title: string;
+      reason: string; // the specific timingReason for THIS behavior
+    }[];
     toBlock: TimeBlock;
-    rationale: string;
   } | null>(null);
 
-  // Block-specific rationale for the "are you sure" prompt. Stays
-  // calm and educational — no shaming or hard-blocking, just naming
-  // why the system originally placed the behavior where it did.
-  const blockRationale = (block: TimeBlock): string => {
+  // Fallback rationale when a behavior in the catalog hasn't been
+  // hand-curated with a timingReason yet. Block-level copy ensures
+  // the message is still meaningful instead of empty.
+  const fallbackBlockReason = (block: TimeBlock): string => {
     switch (block) {
       case "morning":
         return "Morning timing anchors the circadian rhythm — the strongest lever for sleep, mood, and energy.";
@@ -254,7 +259,7 @@ export default function TodayPage() {
    * wiped — and writes them all in one pass.
    */
   const commitBlockMove = (
-    moves: { key: string; title: string }[],
+    moves: { key: string }[],
     toBlock: TimeBlock
   ) => {
     for (const m of moves) {
@@ -275,13 +280,20 @@ export default function TodayPage() {
    * Centralized request-to-move. Surfaces the confirm sheet for any
    * move that contradicts a recommended block; commits immediately
    * for moves into the recommended block or to anytime (the gentle
-   * fallback).
+   * fallback). The sheet renders the per-behavior timingReason so
+   * each behavior speaks with its own science — melatonin says
+   * "before bed", morning sunlight says "circadian anchor", etc.
+   *
+   * Behaviors whose recommendedBlock is "anytime" are intentionally
+   * flexible (e.g., Omega-3 with food); we never warn on those even
+   * when they happen to be slotted in the morning by default.
    */
   const requestBlockMove = (
     moves: {
       key: string;
       title: string;
       recommendedBlock: TimeBlock;
+      timingReason?: string;
     }[],
     toBlock: TimeBlock
   ) => {
@@ -295,12 +307,15 @@ export default function TodayPage() {
       return;
     }
     setPendingMove({
-      keys: contradicts.map((m) => ({ key: m.key, title: m.title })),
+      items: contradicts.map((m) => ({
+        key: m.key,
+        title: m.title,
+        // Prefer the curated per-behavior reason; fall back to a
+        // generic block-level explanation if the catalog didn't
+        // provide one (custom packs, AI drafts pre-curation).
+        reason: m.timingReason ?? fallbackBlockReason(m.recommendedBlock),
+      })),
       toBlock,
-      // Use the first contradicted behavior's recommended block for
-      // the rationale; a mixed-bag bulk move falls back to "different
-      // blocks are recommended" copy below.
-      rationale: blockRationale(contradicts[0].recommendedBlock),
     });
   };
   // Acknowledged-mastery set: a behavior that's been graduated to
@@ -1414,6 +1429,7 @@ export default function TodayPage() {
                         key,
                         title: it.title,
                         recommendedBlock: it.recommendedBlock,
+                        timingReason: it.timingReason,
                       },
                     ],
                     block
@@ -1904,6 +1920,7 @@ export default function TodayPage() {
                     key: string;
                     title: string;
                     recommendedBlock: TimeBlock;
+                    timingReason?: string;
                   }[] = [];
                   for (const k of selectedKeys) {
                     const it = timeline.find((x) => x.canonicalKey === k);
@@ -1912,6 +1929,7 @@ export default function TodayPage() {
                       key: k,
                       title: it.title,
                       recommendedBlock: it.recommendedBlock,
+                      timingReason: it.timingReason,
                     });
                   }
                   requestBlockMove(moves, b);
@@ -1937,55 +1955,56 @@ export default function TodayPage() {
         </div>
       )}
 
-      {/* Cross-block move confirmation. The rationale comes from the
-          recommendedBlock of the *first* contradicted behavior — for
-          mixed bulk moves we say "this affects multiple recommendations"
-          to stay honest. The user can still proceed; we're educating,
-          not blocking. */}
+      {/* Cross-block move confirmation. Each contradicted behavior
+          surfaces ITS OWN scientific rationale — melatonin says
+          "before bed", morning sunlight says "anchors the circadian
+          clock", caffeine cutoff says "10h half-life", etc. The user
+          can still proceed; we educate, not block. */}
       <Sheet
         open={!!pendingMove}
         onClose={() => setPendingMove(null)}
-        title="Move outside the recommended time?"
+        title={
+          pendingMove && pendingMove.items.length === 1
+            ? "Move outside the recommended time?"
+            : "Move outside the recommended times?"
+        }
       >
         {pendingMove && (
           <div>
             <p className="text-[14px] leading-relaxed text-[var(--text-2)]">
-              {pendingMove.keys.length === 1
-                ? `“${pendingMove.keys[0].title}” is recommended at a different time of day.`
-                : `${pendingMove.keys.length} of your selected behaviors are recommended at different times of day.`}
+              {pendingMove.items.length === 1
+                ? `Here's why "${pendingMove.items[0].title}" was placed where it was:`
+                : `Here's why each of these was placed where it was:`}
             </p>
-            <p
-              className="mt-3 rounded-[var(--r-sm)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--text-2)]"
-              style={{
-                background:
-                  "color-mix(in srgb, var(--warm) 9%, var(--surface-2))",
-              }}
-            >
-              {pendingMove.keys.length === 1
-                ? pendingMove.rationale
-                : "Different behaviors have different ideal times. You can move them all to this block anyway — the override sticks until you reset it."}
-            </p>
-            {pendingMove.keys.length > 1 && (
-              <ul className="mt-3 space-y-1">
-                {pendingMove.keys.slice(0, 6).map((k) => (
-                  <li
-                    key={k.key}
-                    className="flex items-center gap-2 text-[12.5px] text-[var(--text-3)]"
+            <div className="mt-3 space-y-2">
+              {pendingMove.items.map((m) => (
+                <div
+                  key={m.key}
+                  className="rounded-[var(--r-sm)] px-3 py-2.5"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--warm) 9%, var(--surface-2))",
+                  }}
+                >
+                  {pendingMove.items.length > 1 && (
+                    <p className="text-[12.5px] font-semibold text-[var(--text-1)]">
+                      {m.title}
+                    </p>
+                  )}
+                  <p
+                    className={`text-[13px] leading-relaxed text-[var(--text-2)] ${
+                      pendingMove.items.length > 1 ? "mt-1" : ""
+                    }`}
                   >
-                    <span
-                      className="h-1 w-1 rounded-full"
-                      style={{ background: "var(--warm)" }}
-                    />
-                    {k.title}
-                  </li>
-                ))}
-                {pendingMove.keys.length > 6 && (
-                  <li className="t-caption">
-                    +{pendingMove.keys.length - 6} more
-                  </li>
-                )}
-              </ul>
-            )}
+                    {m.reason}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="t-caption mt-3 leading-relaxed">
+              You can still move it — overrides stick until you reset
+              them.
+            </p>
             <div className="mt-5 grid grid-cols-2 gap-2.5">
               <Button
                 variant="ghost"
@@ -1997,7 +2016,7 @@ export default function TodayPage() {
               <Button
                 full
                 onClick={() => {
-                  commitBlockMove(pendingMove.keys, pendingMove.toBlock);
+                  commitBlockMove(pendingMove.items, pendingMove.toBlock);
                   setPendingMove(null);
                 }}
               >
