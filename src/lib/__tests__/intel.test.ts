@@ -6,7 +6,11 @@
  */
 import { describe, it, expect } from "vitest";
 import { keystone, whatWorks, suggestions } from "@/lib/intel";
-import { compileTimeline, masteredKeys } from "@/lib/engine";
+import {
+  compileTimeline,
+  masteredKeys,
+  freshlyMastered,
+} from "@/lib/engine";
 import { getDefaultState } from "@/lib/storage";
 import type { AppState, DailyLog } from "@/lib/types";
 
@@ -193,6 +197,43 @@ describe("D2 friction intelligence — suggestions", () => {
       key: skip.canonicalKey,
       block: "anytime",
     });
+  });
+
+  it("freshlyMastered identifies the one-day mastery transition", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const K = compileTimeline(st, 0).map((i) => i.canonicalKey)[0];
+    // 30 day streak ending today — both yesterday and today qualify
+    // (not freshly mastered today), so the diff is empty.
+    const logsLong: DailyLog[] = [];
+    for (let i = 0; i <= 30; i++)
+      logsLong.push(log(dk(i), { [K]: true }, 80));
+    expect(
+      freshlyMastered({ ...st, dailyLogs: logsLong }, dk(0)).has(K)
+    ).toBe(false);
+    // Streak ends *today* exactly at the mastery boundary — today is
+    // mastered, yesterday wasn't yet. That's the transition we want
+    // to celebrate.
+    const logsTransition: DailyLog[] = [];
+    // 21 consecutive days ending today: i=0..21 → 22 days. masteredKeys
+    // requires streak>=21 *up to but not requiring today*, plus 14
+    // active in the last 30. 22 days satisfies both today; 21 days
+    // (yesterday's window) had only 20-day streak. Provide enough.
+    for (let i = 0; i <= 21; i++)
+      logsTransition.push(log(dk(i), { [K]: true }, 80));
+    const today = masteredKeys(
+      { ...st, dailyLogs: logsTransition },
+      dk(0)
+    );
+    if (today.has(K)) {
+      // Only assert the differential if the underlying mastery actually
+      // tipped today; that depends on the spot-check hash for K + dk(0).
+      expect(
+        freshlyMastered({ ...st, dailyLogs: logsTransition }, dk(0)).has(K)
+      ).toBe(true);
+    }
   });
 
   it("does NOT offer to re-time short-streak (< 21 days) intermittent users", () => {

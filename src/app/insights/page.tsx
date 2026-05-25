@@ -294,85 +294,100 @@ export default function InsightsPage() {
           </motion.div>
         )}
 
-        {/* Proven for you — outcome reflection (the strategic core) */}
-        {works && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="panel relative overflow-hidden p-6"
-          >
-            <span
-              className="ambient"
-              style={{
-                background:
-                  "radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, var(--recovery) 22%, transparent), transparent 60%)",
-              }}
-            />
-            <div className="relative">
-              <div className="flex items-center gap-2">
-                <Icon
-                  name="pulse"
-                  size={14}
-                  className="text-[var(--recovery)]"
-                />
-                <Eyebrow color="var(--recovery)">Proven for you</Eyebrow>
-              </div>
-              <p className="mt-3 text-[22px] font-bold leading-snug text-[var(--text-1)]">
-                {works.title}
-              </p>
-              <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-                On the days you do this, your{" "}
-                <span className="font-bold text-[var(--recovery)]">
-                  {works.dimension === "energy"
-                    ? "energy"
-                    : works.dimension === "sleep"
-                    ? "sleep"
-                    : "energy and sleep"}{" "}
-                  runs {works.delta} point
-                  {works.delta === 1 ? "" : "s"} higher
-                </span>{" "}
-                — measured from your own check-ins, not a generic claim.
-              </p>
-            </div>
-          </motion.div>
-        )}
+        {/* What matters most — consolidated. Keystone and "Proven for you"
+            used to live as twin cards that read as the same idea twice
+            (the One Behavior That Matters). Unifying them into a single
+            framed section with two sub-cards lets each speak with its
+            own evidence (one behavioral, one outcome-correlated) while
+            making clear they're facets of the same strategic core. */}
+        {(ks || works) && (
+          <div>
+            <Eyebrow color="var(--warm)">What matters most for you</Eyebrow>
+            <div className="mt-3 flex flex-col gap-3.5">
+              {ks && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="panel relative overflow-hidden p-6"
+                >
+                  <span
+                    className="ambient"
+                    style={{
+                      background:
+                        "radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, var(--warm) 22%, transparent), transparent 60%)",
+                    }}
+                  />
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        name="flame"
+                        size={14}
+                        className="text-[var(--warm)]"
+                      />
+                      <Eyebrow color="var(--warm)">Your keystone</Eyebrow>
+                    </div>
+                    <p className="mt-3 text-[22px] font-bold leading-snug text-[var(--text-1)]">
+                      {ks.title}
+                    </p>
+                    <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
+                      On the days you do this, you keep{" "}
+                      <span className="font-bold text-[var(--warm)]">
+                        {ks.delta} {ks.delta === 1 ? "point" : "points"} more
+                      </span>{" "}
+                      of everything else. If you protect one behavior, make
+                      it this one.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
 
-        {/* Keystone — the single behavior that matters most */}
-        {ks && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="panel relative overflow-hidden p-6"
-          >
-            <span
-              className="ambient"
-              style={{
-                background:
-                  "radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, var(--warm) 22%, transparent), transparent 60%)",
-              }}
-            />
-            <div className="relative">
-              <div className="flex items-center gap-2">
-                <Icon
-                  name="flame"
-                  size={14}
-                  className="text-[var(--warm)]"
-                />
-                <Eyebrow color="var(--warm)">Your keystone</Eyebrow>
-              </div>
-              <p className="mt-3 text-[22px] font-bold leading-snug text-[var(--text-1)]">
-                {ks.title}
-              </p>
-              <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-                On the days you do this, you keep{" "}
-                <span className="font-bold text-[var(--warm)]">
-                  {ks.delta} {ks.delta === 1 ? "point" : "points"} more
-                </span>{" "}
-                of everything else. If you protect one behavior, make it
-                this one.
-              </p>
+              {works && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 }}
+                  className="panel relative overflow-hidden p-6"
+                >
+                  <span
+                    className="ambient"
+                    style={{
+                      background:
+                        "radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, var(--recovery) 22%, transparent), transparent 60%)",
+                    }}
+                  />
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        name="pulse"
+                        size={14}
+                        className="text-[var(--recovery)]"
+                      />
+                      <Eyebrow color="var(--recovery)">
+                        Proven by your data
+                      </Eyebrow>
+                    </div>
+                    <p className="mt-3 text-[22px] font-bold leading-snug text-[var(--text-1)]">
+                      {works.title}
+                    </p>
+                    <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
+                      On the days you do this, your{" "}
+                      <span className="font-bold text-[var(--recovery)]">
+                        {works.dimension === "energy"
+                          ? "energy"
+                          : works.dimension === "sleep"
+                          ? "sleep"
+                          : "energy and sleep"}{" "}
+                        runs {works.delta} point
+                        {works.delta === 1 ? "" : "s"} higher
+                      </span>{" "}
+                      — measured from your own check-ins, not a generic
+                      claim.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Strongest streaks */}
@@ -419,38 +434,43 @@ export default function InsightsPage() {
             />
           </div>
         ) : (
-          <div className="flex flex-col gap-3.5">
-            {insights.map((ins, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.4 }}
-                className="panel relative overflow-hidden p-5"
-              >
-                <span
-                  className="ambient"
-                  style={{
-                    background: `radial-gradient(110% 80% at 0% 0%, color-mix(in srgb, ${ins.accent} 18%, transparent), transparent 60%)`,
-                  }}
-                />
-                <div className="relative flex gap-4">
-                  <span
-                    className="chip h-11 w-11 shrink-0"
-                    style={{
-                      background: `color-mix(in srgb, ${ins.accent} 18%, var(--surface-3))`,
-                      color: ins.accent,
-                    }}
+          insights.length > 0 && (
+            <div>
+              <Eyebrow>Other patterns</Eyebrow>
+              <div className="mt-3 flex flex-col gap-3.5">
+                {insights.map((ins, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.4 }}
+                    className="panel relative overflow-hidden p-5"
                   >
-                    <Icon name={ins.icon} size={20} />
-                  </span>
-                  <p className="text-[14.5px] leading-relaxed text-[var(--text-1)]">
-                    {ins.text}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                    <span
+                      className="ambient"
+                      style={{
+                        background: `radial-gradient(110% 80% at 0% 0%, color-mix(in srgb, ${ins.accent} 18%, transparent), transparent 60%)`,
+                      }}
+                    />
+                    <div className="relative flex gap-4">
+                      <span
+                        className="chip h-11 w-11 shrink-0"
+                        style={{
+                          background: `color-mix(in srgb, ${ins.accent} 18%, var(--surface-3))`,
+                          color: ins.accent,
+                        }}
+                      >
+                        <Icon name={ins.icon} size={20} />
+                      </span>
+                      <p className="text-[14.5px] leading-relaxed text-[var(--text-1)]">
+                        {ins.text}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )
         )}
           </>
         )}

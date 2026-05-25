@@ -644,8 +644,26 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
     }
   }
 
+  // Rebalanced detection: continuity "holding" means last week's
+  // flagged behavior actually moved up *this* week. When that's true
+  // AND the average is mid (50–75) with flat delta, the user isn't
+  // "up", "down", "strong", or "steady" — they're trading one thing
+  // for another. Calling that out with its own variant prevents the
+  // misread of a real, conscious rebalance as "a meh week."
+  const rebalanced =
+    !!continuity &&
+    continuity.includes("holding") &&
+    (delta == null || (delta > -5 && delta < 5)) &&
+    avgThis >= 50 &&
+    avgThis < 75;
+
   let headline: string;
-  if (delta != null && delta >= 5)
+  if (rebalanced)
+    headline = getInsightTemplate(
+      "weekly-headline-rebalanced",
+      "A rebalancing week. You lifted what was struggling — the center is shifting, not slipping."
+    );
+  else if (delta != null && delta >= 5)
     headline = renderTemplate(
       getInsightTemplate(
         "weekly-headline-up",

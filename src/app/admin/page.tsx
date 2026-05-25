@@ -46,6 +46,8 @@ import {
   createBehavior,
   createProtocol,
   reorderBehavior,
+  setBehaviorOrder,
+  bulkSetBehaviorStatus,
   clearUnverified,
   getBehaviorById,
   listRevisions,
@@ -367,6 +369,17 @@ export default function AdminHome() {
   const [cmsP, setCmsP] = useState<CmsProtocol[]>([]);
   const [edP, setEdP] = useState<CmsProtocol | null>(null);
   const [edB, setEdB] = useState<CmsBehavior[]>([]);
+  // Drag-handle reorder state. dragIdx is the row currently being
+  // dragged; overIdx is the row it's hovering over (so we can render an
+  // insertion line). Persisted via setBehaviorOrder on drop.
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  // Multi-select for bulk operations on behaviors within a protocol.
+  // Bulk supports publish/draft/archive — the most common chores when
+  // grooming a pack. Selection clears whenever the open protocol
+  // changes so a stray selection can't leak across packs.
+  const [bulkSel, setBulkSel] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   // Flat all-behavior index for the command palette — lazy-loaded the
   // first time ⌘K opens so the admin can fuzzy-jump by behavior title,
   // not just by pack. Avoids paying the join cost when nobody's looking.
@@ -526,6 +539,11 @@ export default function AdminHome() {
     const bs = await getProtocolBehaviors(p.id);
     setEdB(bs);
     captureBaseline(bs);
+    // A fresh protocol gets a clean selection — bulk picks shouldn't
+    // carry over from a previous pack the admin had open.
+    setBulkSel(new Set());
+    setDragIdx(null);
+    setDragOverIdx(null);
   };
   const reopen = async () => {
     if (!edP) return;
@@ -3247,9 +3265,122 @@ export default function AdminHome() {
                   )}
                 </div>
 
-                <Eyebrow>Behaviors</Eyebrow>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Eyebrow>Behaviors</Eyebrow>
+                  {edB.length > 1 && (
+                    <span className="t-caption">
+                      Drag <span className="font-mono">⋮⋮</span> to reorder ·
+                      Check to multi-select
+                    </span>
+                  )}
+                </div>
+                {bulkSel.size > 0 && (
+                  <div
+                    className="flex flex-wrap items-center gap-2 rounded-[var(--r-md)] p-3"
+                    style={{
+                      background:
+                        "color-mix(in srgb, var(--readiness) 9%, var(--surface-2))",
+                    }}
+                  >
+                    <span className="text-[12.5px] font-semibold text-[var(--text-1)]">
+                      {bulkSel.size} selected
+                    </span>
+                    <span className="t-caption">·</span>
+                    {(["draft", "published", "archived"] as const).map((s) => (
+                      <button
+                        key={s}
+                        disabled={bulkBusy}
+                        onClick={async () => {
+                          setBulkBusy(true);
+                          const r = await bulkSetBehaviorStatus(
+                            [...bulkSel],
+                            s
+                          );
+                          setBulkBusy(false);
+                          if (r.ok) {
+                            setMsg(
+                              `${r.affected} behavior${
+                                r.affected === 1 ? "" : "s"
+                              } → ${s}`
+                            );
+                            setBulkSel(new Set());
+                            reopen();
+                          } else {
+                            setMsg(r.reason ?? "Bulk update failed");
+                          }
+                        }}
+                        className="press tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11.5px] font-semibold disabled:opacity-40"
+                        style={{
+                          background: "var(--surface-3)",
+                          color: "var(--text-1)",
+                        }}
+                        title={`Set status of every selected behavior to "${s}".`}
+                      >
+                        Set status: {s}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setBulkSel(new Set())}
+                      className="press ml-auto text-[11px] text-[var(--text-3)]"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
                 {edB.map((b, idx) => (
-                  <div key={b.id} className={card} style={surf}>
+                  <div
+                    key={b.id}
+                    className={card}
+                    style={{
+                      ...surf,
+                      opacity: dragIdx === idx ? 0.45 : 1,
+                      // Insertion line: a soft warm border on the edge
+                      // the dragged row would land against. Far less
+                      // disruptive than reflowing the layout mid-drag.
+                      borderTop:
+                        dragIdx != null &&
+                        dragOverIdx === idx &&
+                        dragOverIdx < dragIdx
+                          ? "2px solid var(--warm)"
+                          : "1px solid transparent",
+                      borderBottom:
+                        dragIdx != null &&
+                        dragOverIdx === idx &&
+                        dragOverIdx > dragIdx
+                          ? "2px solid var(--warm)"
+                          : "1px solid transparent",
+                      transition:
+                        "opacity 120ms ease, border-color 120ms ease",
+                    }}
+                    onDragOver={(e) => {
+                      if (dragIdx === null) return;
+                      e.preventDefault();
+                      if (dragOverIdx !== idx) setDragOverIdx(idx);
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      const from = dragIdx;
+                      const to = idx;
+                      setDragIdx(null);
+                      setDragOverIdx(null);
+                      if (from === null || from === to) return;
+                      // Optimistic reorder so the admin sees it move
+                      // instantly; persist in the background. If the
+                      // RPC fails we reopen() to snap back to truth.
+                      const next = [...edB];
+                      const [moved] = next.splice(from, 1);
+                      next.splice(to, 0, moved);
+                      setEdB(next);
+                      if (!edP) return;
+                      const r = await setBehaviorOrder(
+                        edP.id,
+                        next.map((x) => x.id)
+                      );
+                      if (!r.ok) {
+                        setMsg(r.reason ?? "Reorder failed");
+                        reopen();
+                      }
+                    }}>
                     {b.ai_unverified && (
                       <div
                         className="mb-2 flex items-center justify-between gap-2 rounded-[var(--r-sm)] px-3 py-2"
@@ -3284,16 +3415,72 @@ export default function AdminHome() {
                         </button>
                       </div>
                     )}
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="t-caption flex items-center gap-1.5">
-                        #{idx + 1}
-                        {isDirty(b) && (
-                          <span
-                            title="Unsaved changes on this behavior."
-                            className="inline-block h-1.5 w-1.5 rounded-full"
-                            style={{ background: "var(--warm)" }}
-                          />
-                        )}
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        {/* Drag handle — the row itself isn't draggable
+                            so admins can still select text in the
+                            fields. Only this little grip starts a drag. */}
+                        <span
+                          role="button"
+                          tabIndex={-1}
+                          aria-label="Drag to reorder"
+                          title="Drag to reorder · arrows for one-at-a-time fallback"
+                          draggable
+                          onDragStart={(e) => {
+                            setDragIdx(idx);
+                            setDragOverIdx(idx);
+                            // dragImage on the handle is too small to
+                            // identify; set it on the parent card.
+                            const card = (
+                              e.currentTarget as HTMLElement
+                            ).closest("div[draggable], div");
+                            if (card)
+                              e.dataTransfer.setDragImage(
+                                card as Element,
+                                10,
+                                10
+                              );
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDragIdx(null);
+                            setDragOverIdx(null);
+                          }}
+                          className="grid h-7 w-7 cursor-grab place-items-center rounded-[var(--r-sm)] text-[var(--text-3)] active:cursor-grabbing"
+                          style={{ background: "var(--surface-3)" }}
+                        >
+                          <span className="font-mono text-[12px] leading-none">
+                            ⋮⋮
+                          </span>
+                        </span>
+                        {/* Multi-select for bulk operations. Kept
+                            next to the handle so the leading area of
+                            every row is "manipulate this row" affordances
+                            and the trailing area stays focused on the
+                            content. */}
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${b.title}`}
+                          title="Select for bulk status change"
+                          checked={bulkSel.has(b.id)}
+                          onChange={(e) => {
+                            const next = new Set(bulkSel);
+                            if (e.target.checked) next.add(b.id);
+                            else next.delete(b.id);
+                            setBulkSel(next);
+                          }}
+                          className="h-4 w-4 cursor-pointer accent-[var(--readiness)]"
+                        />
+                        <span className="t-caption flex items-center gap-1.5">
+                          #{idx + 1}
+                          {isDirty(b) && (
+                            <span
+                              title="Unsaved changes on this behavior."
+                              className="inline-block h-1.5 w-1.5 rounded-full"
+                              style={{ background: "var(--warm)" }}
+                            />
+                          )}
+                        </span>
                       </span>
                       <span className="flex gap-1">
                         {(["-1", "1"] as const).map((d) => (
@@ -3313,6 +3500,7 @@ export default function AdminHome() {
                             className="press grid h-7 w-7 place-items-center rounded-full text-[var(--text-3)] disabled:opacity-40"
                             style={{ background: "var(--surface-3)" }}
                             aria-label={d === "-1" ? "Move up" : "Move down"}
+                            title="Move one slot — drag the handle for cross-list moves."
                           >
                             {d === "-1" ? "↑" : "↓"}
                           </button>

@@ -13,6 +13,7 @@ import {
   adapt,
   shapeTimeline,
   masteredKeys,
+  freshlyMastered,
   isDone,
   timelineProgress,
   blockLabel,
@@ -210,6 +211,21 @@ export default function TodayPage() {
     }
   }, [dismissed]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
+  // Acknowledged-mastery set: a behavior that's been graduated to
+  // maintenance gets ONE calm celebratory moment, then disappears into
+  // the lighter cadence. Local storage so the cloud mutation stays
+  // minimal; we never want a "you graduated!" surprise on a new device
+  // either, so the ack is also unique per-key.
+  const [masteryAcked, setMasteryAcked] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      return new Set(
+        JSON.parse(localStorage.getItem("pz:mastered-ack") || "[]")
+      );
+    } catch {
+      return new Set();
+    }
+  });
   // One-time calm note when the trial auto-extended — surface the
   // kindness instead of doing it silently. Local-only ack so the cloud
   // mutation stays minimal; tied to the exact extension timestamp so a
@@ -275,6 +291,39 @@ export default function TodayPage() {
       mastered: masteredKeys(state, selectedDate),
     });
   }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate]);
+
+  // Just-graduated behaviors today. We render their titles (from the
+  // full pre-shape timeline) so the toast can name what tipped over —
+  // anonymous "you mastered something" is colder than "Morning sunlight
+  // is in maintenance now." Only celebrate ones the user hasn't already
+  // acknowledged.
+  const freshlyMasteredToShow = useMemo(() => {
+    if (!isToday) return [];
+    const fresh = freshlyMastered(state, selectedDate);
+    if (fresh.size === 0) return [];
+    const fullTimeline = compileTimeline(state, selDayIdx);
+    const out: { key: string; title: string }[] = [];
+    for (const k of fresh) {
+      if (masteryAcked.has(k)) continue;
+      const it = fullTimeline.find((i) => i.canonicalKey === k);
+      out.push({ key: k, title: it?.title ?? k });
+    }
+    return out;
+  }, [isToday, state, selectedDate, selDayIdx, masteryAcked]);
+
+  const ackMastery = (keys: string[]) => {
+    const next = new Set(masteryAcked);
+    for (const k of keys) next.add(k);
+    setMasteryAcked(next);
+    try {
+      localStorage.setItem(
+        "pz:mastered-ack",
+        JSON.stringify([...next])
+      );
+    } catch {
+      /* non-fatal */
+    }
+  };
 
   const prog = useMemo(
     () => timelineProgress(timeline, log),
@@ -787,6 +836,82 @@ export default function TodayPage() {
                   Got it
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Mastery graduation — the one-time celebration when a behavior
+            crosses 21+ days of streak with high adherence. Without this
+            the system silently shifts it to a lighter cadence, which
+            reads as "did I forget to do my routine?" The whole point of
+            mastery is that it's a milestone; the surface should *say so*
+            once, then quietly recede. */}
+        {isToday && freshlyMasteredToShow.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="relative overflow-hidden rounded-[var(--r-xl)] p-5"
+            style={{
+              background:
+                "linear-gradient(155deg, color-mix(in srgb, var(--warm) 14%, var(--surface-1)), var(--surface-1) 70%)",
+              boxShadow: "var(--shadow-soft)",
+            }}
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--warm) 18%, transparent), transparent 60%)",
+              }}
+            />
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <Icon
+                  name="flame"
+                  size={14}
+                  className="text-[var(--warm)]"
+                />
+                <Eyebrow color="var(--warm)">Maintenance mode</Eyebrow>
+              </div>
+              <p className="mt-2 text-[15px] font-semibold leading-snug text-[var(--text-1)]">
+                {freshlyMasteredToShow.length === 1
+                  ? `“${freshlyMasteredToShow[0].title}” is yours now.`
+                  : `${freshlyMasteredToShow.length} behaviors are yours now.`}
+              </p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-2)]">
+                {freshlyMasteredToShow.length === 1
+                  ? "You've held it long and consistently enough that we'll stop nudging — it'll surface lightly, on a weekly spot-check, so you keep the gain without the friction."
+                  : "You've held these long and consistently enough that we'll stop nudging — they'll surface lightly on a weekly spot-check, so you keep the gains without the friction."}
+              </p>
+              {freshlyMasteredToShow.length > 1 && (
+                <ul className="mt-2 space-y-1">
+                  {freshlyMasteredToShow.map((m) => (
+                    <li
+                      key={m.key}
+                      className="flex items-center gap-2 text-[12.5px] text-[var(--text-2)]"
+                    >
+                      <span
+                        className="h-1 w-1 rounded-full"
+                        style={{ background: "var(--warm)" }}
+                      />
+                      {m.title}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                onClick={() =>
+                  ackMastery(freshlyMasteredToShow.map((m) => m.key))
+                }
+                className="press tr-fast mt-3 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
+                style={{
+                  background: "var(--surface-2)",
+                  color: "var(--text-2)",
+                }}
+              >
+                Earned
+              </button>
             </div>
           </motion.div>
         )}

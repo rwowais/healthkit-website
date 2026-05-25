@@ -462,6 +462,30 @@ function hashKey(s: string): number {
   return Math.abs(h);
 }
 
+/**
+ * Returns the set of canonical keys that *just* tipped into mastery —
+ * mastered today but not yesterday. Lets the surface celebrate the
+ * transition (a calm one-time graduation moment) instead of silently
+ * muting a behavior the user just spent three weeks earning. Tied to a
+ * specific dayKey so the caller decides what "today" means.
+ */
+export function freshlyMastered(
+  state: AppState,
+  dayKey: string
+): Set<string> {
+  const today = masteredKeys(state, dayKey);
+  if (today.size === 0) return new Set();
+  const d = new Date(dayKey + "T00:00:00");
+  d.setDate(d.getDate() - 1);
+  const yesterdayKey = `${d.getFullYear()}-${String(
+    d.getMonth() + 1
+  ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const yesterday = masteredKeys(state, yesterdayKey);
+  const out = new Set<string>();
+  for (const k of today) if (!yesterday.has(k)) out.add(k);
+  return out;
+}
+
 export function masteredKeys(
   state: AppState,
   dayKey: string

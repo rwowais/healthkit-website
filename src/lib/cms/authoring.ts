@@ -1151,6 +1151,87 @@ export async function clearUnverified(
   }
 }
 
+/**
+ * Rewrites the ordering of every behavior in a protocol in one go.
+ * Used by the drag-handle UI — adjacent-swap (reorderBehavior) is
+ * fine for the up/down arrow case but gets quadratic when an admin
+ * drags a row across 20 positions. With this function the UI computes
+ * the new order locally and persists it as one transactional batch.
+ *
+ * Reassigns positions densely (0..n-1) so future drags stay stable
+ * even if the previous order had gaps.
+ */
+export async function setBehaviorOrder(
+  protocolId: string,
+  behaviorIds: string[]
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    // Issue each update in parallel — they're independent rows and
+    // Supabase has no transactional batch for arbitrary updates. We
+    // need a unique-temp pass to avoid a (protocol_id, position)
+    // unique-constraint collision mid-update; bump to negative
+    // positions first, then to the final dense range.
+    const tempOps = behaviorIds.map((id, i) =>
+      sb
+        .from("cms_protocol_behaviors")
+        .update({ position: -1 - i })
+        .eq("protocol_id", protocolId)
+        .eq("behavior_id", id)
+    );
+    const tempResults = await Promise.all(tempOps);
+    for (const r of tempResults)
+      if (r.error) return { ok: false, reason: r.error.message };
+    const finalOps = behaviorIds.map((id, i) =>
+      sb
+        .from("cms_protocol_behaviors")
+        .update({ position: i })
+        .eq("protocol_id", protocolId)
+        .eq("behavior_id", id)
+    );
+    const finalResults = await Promise.all(finalOps);
+    for (const r of finalResults)
+      if (r.error) return { ok: false, reason: r.error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Reorder failed.",
+    };
+  }
+}
+
+/**
+ * Bulk-set the status of multiple behaviors in one batch. The admin
+ * "Behaviors" section lets admins multi-select and then publish/draft/
+ * archive all at once — without this every selection ends up as N
+ * sequential round-trips and a sticky busy state.
+ */
+export async function bulkSetBehaviorStatus(
+  behaviorIds: string[],
+  status: "draft" | "published" | "archived"
+): Promise<{ ok: boolean; reason?: string; affected: number }> {
+  const sb = getSupabase();
+  if (!sb)
+    return { ok: false, reason: "Cloud not configured.", affected: 0 };
+  if (behaviorIds.length === 0) return { ok: true, affected: 0 };
+  try {
+    const { error, count } = await sb
+      .from("cms_behaviors")
+      .update({ status }, { count: "exact" })
+      .in("id", behaviorIds);
+    if (error) return { ok: false, reason: error.message, affected: 0 };
+    return { ok: true, affected: count ?? behaviorIds.length };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Bulk update failed.",
+      affected: 0,
+    };
+  }
+}
+
 /** Move a behavior one slot up/down within a protocol (swap positions). */
 export async function reorderBehavior(
   protocolId: string,
