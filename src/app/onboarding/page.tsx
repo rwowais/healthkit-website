@@ -273,18 +273,16 @@ export default function OnboardingPage() {
                   Let&apos;s build your system.
                 </h1>
                 <p className="t-body mt-4 leading-relaxed">
-                  A handful of quick questions — about a minute. We&apos;ll
-                  assemble an adaptive protocol tuned to you, then refine it
-                  as you go.
+                  A handful of quick questions — about a minute. Your answers
+                  shape a starting system that respects your bandwidth.
                 </p>
                 <div className="mt-9">
-                  <Eyebrow>First, your name</Eyebrow>
                   <input
                     autoFocus
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="First name"
-                    className={`mt-3 ${inputCls}`}
+                    placeholder="Your first name"
+                    className={inputCls}
                   />
                 </div>
                 <Nav
@@ -302,6 +300,9 @@ export default function OnboardingPage() {
                 <h1 className="t-title mt-3 text-[var(--text-1)]">
                   What matters most right now?
                 </h1>
+                <p className="t-caption mt-2">
+                  This anchors the protocols we&apos;ll prioritize.
+                </p>
                 <Choice chips={GOALS} value={goal} onPick={setGoal} />
                 <Nav step={step} onBack={goBack} next={() => setStep(2)} />
               </>
@@ -314,7 +315,7 @@ export default function OnboardingPage() {
                   How&apos;s life feeling lately?
                 </h1>
                 <p className="t-caption mt-2">
-                  This sets how much we put on your plate.
+                  Calibrating today&apos;s load to your current bandwidth.
                 </p>
                 <Choice
                   chips={MOOD}
@@ -333,6 +334,9 @@ export default function OnboardingPage() {
                 <h1 className="t-title mt-3 text-[var(--text-1)]">
                   How&apos;s your sleep?
                 </h1>
+                <p className="t-caption mt-2">
+                  Sleep-aware adjustments switch on from here.
+                </p>
                 <Choice
                   chips={SLEEP}
                   value={sleepBaseline}
@@ -350,7 +354,9 @@ export default function OnboardingPage() {
                 <h1 className="t-title mt-3 text-[var(--text-1)]">
                   Where do you want to focus?
                 </h1>
-                <p className="t-caption mt-2">Pick any that resonate.</p>
+                <p className="t-caption mt-2">
+                  Pick any that resonate — these shape what surfaces first.
+                </p>
                 <Choice
                   chips={FOCUS}
                   value={focus}
@@ -371,8 +377,12 @@ export default function OnboardingPage() {
               <>
                 <Eyebrow>Step 5</Eyebrow>
                 <h1 className="t-title mt-3 text-[var(--text-1)]">
-                  How deep are you already?
+                  How experienced are you?
                 </h1>
+                <p className="t-caption mt-2">
+                  Sets the size of your starting system, not the depth of
+                  what&apos;s available.
+                </p>
                 <Choice
                   chips={EXP}
                   value={experience}
@@ -417,7 +427,7 @@ export default function OnboardingPage() {
               <>
                 <Eyebrow color="var(--sleep)">Step 6</Eyebrow>
                 <h1 className="t-title mt-3 text-[var(--text-1)]">
-                  Your sleep window
+                  Sleep & wake times
                 </h1>
                 <p className="t-caption mt-2">
                   Anchors the timing of every behavior. Change anytime.
@@ -450,12 +460,13 @@ export default function OnboardingPage() {
               <>
                 <Eyebrow color="var(--vitality)">Ready</Eyebrow>
                 <h1 className="t-title mt-3 text-[var(--text-1)]">
-                  Your starting system
-                  {name.trim() ? `, ${name.trim()}` : ""}
+                  Your system is ready
+                  {name.trim() ? `, ${name.trim()}` : ""}.
                 </h1>
                 <p className="t-body mt-3 leading-relaxed">
-                  Tuned to you and assembled into one adaptive day. It
-                  adapts as you go.
+                  {packs.length}{" "}
+                  {packs.length === 1 ? "protocol" : "protocols"}, merging
+                  into one calm day. It adapts as you go.
                 </p>
                 <div className="card mt-7 p-5">
                   {packs.map((p, i) => (
@@ -487,40 +498,19 @@ export default function OnboardingPage() {
                     </div>
                   ))}
                 </div>
-                <div
-                  className="mt-4 flex items-start gap-2.5 rounded-[var(--r-md)] p-3.5"
-                  style={{
-                    background:
-                      "color-mix(in srgb, var(--vitality) 9%, var(--surface-2))",
-                  }}
-                >
-                  <Icon
-                    name="sparkle"
-                    size={14}
-                    className="mt-0.5 shrink-0 text-[var(--vitality)]"
-                  />
-                  <p className="text-[12.5px] leading-relaxed text-[var(--text-2)]">
-                    The adaptive intelligence — keystone insights, weekly
-                    review, biomarker-aware adaptation — is{" "}
-                    <span className="font-semibold text-[var(--text-1)]">
-                      free for your first 14 days
-                    </span>
-                    . No card, nothing to do now.
-                  </p>
-                </div>
                 <p className="mt-5 text-[12px] leading-relaxed text-[var(--text-3)]">
                   Educational tool, not medical advice. Consult a
                   clinician before changing your health routine.
                 </p>
                 <div className="mt-7 space-y-2.5">
                   <Button full onClick={() => finish(true)}>
-                    Save & sync across devices
+                    Keep my system across devices
                   </Button>
                   <button
                     onClick={() => finish(false)}
                     className="press tr-fast w-full py-2 text-center text-[13px] font-medium text-[var(--text-3)]"
                   >
-                    I&apos;ll do this later
+                    Continue without an account
                   </button>
                 </div>
               </>

@@ -74,25 +74,25 @@ export default function AuthPage() {
 
   const headline =
     mode === "signup"
-      ? "Create your system"
+      ? "Keep your system safe"
       : mode === "forgot"
       ? "Reset your password"
       : mode === "magic"
       ? "Sign in with a link"
       : mode === "sent"
       ? "Check your email"
-      : "Welcome back";
+      : "Pick up where you left off";
 
   const sub =
     mode === "signup"
-      ? "One account keeps your protocols synced across every device."
+      ? "An account quietly preserves your protocols across every device — and lets your system follow you forward."
       : mode === "forgot"
       ? "We'll email you a secure link to set a new password."
       : mode === "magic"
       ? "No password — we'll email you a one-tap link."
       : mode === "sent"
       ? ""
-      : "Pick up exactly where you left off.";
+      : "Sign in to continue your system on this device.";
 
   const input =
     "w-full rounded-[var(--r-md)] bg-[var(--surface-2)] px-4 py-4 text-[16px] text-[var(--text-1)] outline-none focus:ring-1 focus:ring-[var(--readiness)] tr-fast";
@@ -166,22 +166,26 @@ export default function AuthPage() {
             ) : (
               <div className="space-y-3">
                 {(mode === "signin" || mode === "signup") && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {(["apple", "google"] as const).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => oauth(p)}
-                        disabled={!supabaseEnabled}
-                        className="press tr-fast flex items-center justify-center gap-2 rounded-[var(--r-md)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--text-1)] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Icon
-                          name={p === "apple" ? "sparkle" : "compass"}
-                          size={16}
-                        />
-                        {p === "apple" ? "Apple" : "Google"}
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    {/* Apple is visually primary — calmest, most familiar,
+                        and the gesture that best fits a personal system. */}
+                    <button
+                      onClick={() => oauth("apple")}
+                      disabled={!supabaseEnabled}
+                      className="press tr-fast flex w-full items-center justify-center gap-2 rounded-[var(--r-md)] bg-[var(--text-1)] py-3.5 text-[15px] font-semibold text-[#08090B] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Icon name="sparkle" size={16} />
+                      Continue with Apple
+                    </button>
+                    <button
+                      onClick={() => oauth("google")}
+                      disabled={!supabaseEnabled}
+                      className="press tr-fast flex w-full items-center justify-center gap-2 rounded-[var(--r-md)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--text-1)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Icon name="compass" size={16} />
+                      Continue with Google
+                    </button>
+                  </>
                 )}
                 {(mode === "signin" || mode === "signup") && (
                   <div className="flex items-center gap-3 py-1">
@@ -294,7 +298,7 @@ export default function AuthPage() {
                     onClick={() => setMode("signup")}
                     className="press font-semibold text-[var(--text-1)]"
                   >
-                    Create your system
+                    Keep my system safe
                   </button>
                 </>
               )}

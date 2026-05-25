@@ -80,18 +80,17 @@ export default function LandingPage() {
         >
           <Eyebrow>Adaptive Protocol OS</Eyebrow>
           <h1 className="mx-auto mt-5 max-w-2xl text-[40px] font-bold leading-[1.08] tracking-tight text-[var(--text-1)] sm:text-[54px]">
-            A calm, intelligent operating system for human optimization.
+            Your daily routine — adapted to how you actually feel today.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-[17px] leading-relaxed text-[var(--text-2)]">
-            Install longevity protocols, follow an adaptive daily timeline, and
-            let the system quietly reshape your day around recovery, sleep, and
-            consistency.
+            Sleep, training, focus, and supplements — quietly organized into one
+            calm day that reshapes itself around your recovery and bandwidth.
           </p>
           <button
             onClick={() => router.push("/onboarding")}
             className="press tr-fast mt-10 rounded-[var(--r-pill)] bg-[var(--text-1)] px-7 py-3.5 text-[15px] font-semibold text-[#08090B]"
           >
-            Begin your protocol
+            Build my system
           </button>
         </motion.div>
       </section>
