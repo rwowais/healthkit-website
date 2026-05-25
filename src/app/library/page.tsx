@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess, getFreePacks } from "@/lib/entitlements";
-import { PACKS } from "@/lib/packs";
+import { activePacks } from "@/lib/knowledge";
 import { compileTimeline } from "@/lib/engine";
 import { Eyebrow, Skeleton, Button, Sheet, useToast } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -32,9 +32,16 @@ export default function LibraryPage() {
   }
 
   const installedSet = new Set(state.installedPacks ?? []);
-  // Free cap applies to official library packs only — custom/forked
-  // packs and paused ones shouldn't burn a slot.
-  const officialPackIds = new Set(PACKS.map((p) => p.id));
+  // Live catalog — built-in unless a newer CMS-published bundle has
+  // been adopted this session. Listing this (not the frozen PACKS) is
+  // what makes admin-authored protocols visible to users.
+  const liveCatalog = activePacks();
+  // Free cap applies to "official" packs in the live catalog only —
+  // CMS-authored 'custom' packs and user-forked copies shouldn't burn
+  // a slot for a free user.
+  const officialPackIds = new Set(
+    liveCatalog.filter((p) => p.source === "official").map((p) => p.id)
+  );
   const officialInstalledCount = (state.installedPacks ?? []).filter((id) =>
     officialPackIds.has(id)
   ).length;
@@ -54,7 +61,7 @@ export default function LibraryPage() {
         </div>
 
         <div className="flex flex-col gap-4">
-          {PACKS.map((pack, i) => {
+          {liveCatalog.map((pack, i) => {
             const installed = installedSet.has(pack.id);
             return (
               <motion.button

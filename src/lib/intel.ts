@@ -6,7 +6,8 @@
  */
 import type { AppState, DailyLog, TimeBlock } from "./types";
 import { compileTimeline, type TimelineItem } from "./engine";
-import { packById, PACKS } from "./packs";
+import { packById } from "./packs";
+import { activePacks } from "./knowledge";
 import { effectiveMinutes, nowMinutes } from "./time";
 import { getInsightTemplate, renderTemplate } from "./knowledge";
 
@@ -431,7 +432,7 @@ export function suggestions(state: AppState): Suggestion[] {
     recent.length >= 6 &&
     recent.reduce((a, b) => a + b.score, 0) / recent.length >= 75
   ) {
-    const next = PACKS.find(
+    const next = activePacks().find(
       (p) =>
         !installed.has(p.id) &&
         ["deep-focus", "blood-sugar", "burnout-recovery"].includes(p.id)

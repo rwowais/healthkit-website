@@ -49,16 +49,18 @@ export async function previewNextBundle(): Promise<KnowledgeBundle> {
   const cms = await assembleBundleFromCMS();
   const version = 0; // placeholder — checksum doesn't include version
   if (!cms) return buildCatalogBundle(version);
-  // Merge CMS config OVER active config so admin-published values win,
-  // but built-in defaults still flow through when the admin hasn't
-  // overridden them. Same merge applies at publish.
-  const config = { ...activeConfig(), ...cms.config };
+  // Bundle is a pure function of the CMS tables — no spread of the
+  // currently-applied bundle. The CMS rows are the source of truth.
+  // (An earlier merge with activeConfig() resurrected deleted overrides
+  // whenever a browser session already had a prior bundle loaded —
+  // exactly the bug we hit when "delete an override" didn't actually
+  // remove it after publish.)
   return {
     schema: BUNDLE_SCHEMA,
     version,
     generatedAt: new Date().toISOString(),
     protocols: cms.protocols,
-    config,
+    config: cms.config,
     insightTemplates: cms.insightTemplates,
     adaptationRules: cms.adaptationRules,
   };
@@ -422,8 +424,10 @@ export async function publishBundle(
   const version = (cur?.version ?? 0) + 1;
   // Assemble from the CMS authoring tables when seeded; otherwise the
   // built-in catalog (so publish still works pre-seed, byte-identical).
-  // CMS config merges OVER active config so admin overrides win while
-  // built-in defaults still flow through unchanged keys.
+  // The bundle is a PURE function of the CMS rows — no spread of
+  // activeConfig() — so deleting an override actually removes it from
+  // the next bundle regardless of what the admin's browser session
+  // happens to have applied.
   const cms = await assembleBundleFromCMS();
   const bundle: KnowledgeBundle = cms
     ? {
@@ -431,7 +435,7 @@ export async function publishBundle(
         version,
         generatedAt: new Date().toISOString(),
         protocols: cms.protocols,
-        config: { ...activeConfig(), ...cms.config },
+        config: cms.config,
         insightTemplates: cms.insightTemplates,
         adaptationRules: cms.adaptationRules,
       }

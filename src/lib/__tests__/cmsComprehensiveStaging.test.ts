@@ -439,6 +439,76 @@ describe.skipIf(!enabled)("CMS comprehensive (real staging)", () => {
     await auth.deleteConfigOverride("AHA_DAYS");
   }, 60000);
 
+  it("13. Deleting an override actually removes it from the next bundle", async () => {
+    if (!admin) return;
+    // Bug we hit: { ...activeConfig(), ...cms.config } merge made the
+    // next bundle resurrect deleted overrides that lived in the last
+    // published bundle. The fix is to make the next bundle a PURE
+    // function of the CMS tables. Lock that in.
+    const t = tag();
+    const initial = 50 + Math.floor(Math.random() * 50);
+    // Publish a baseline that includes an override.
+    await auth.upsertConfigOverride({
+      key: "AHA_DAYS",
+      value: initial,
+      description: `e2e del ${t}`,
+    });
+    know.resetKnowledge();
+    const a = await pub.publishBundle(`e2e del baseline ${t}`);
+    expect(a.ok || /no changes/i.test(a.reason ?? "")).toBe(true);
+    pub.resetRefresh();
+    await pub.fetchAndApplyPublished();
+    expect(know.getCfgNumber("AHA_DAYS", 6)).toBe(initial);
+
+    // Now DELETE the override row from the CMS. The next bundle must
+    // not contain AHA_DAYS, even though activeConfig() in this session
+    // still has it from the prior publish.
+    await auth.deleteConfigOverride("AHA_DAYS");
+    const preview = await pub.previewNextBundle();
+    expect(preview.config.AHA_DAYS).toBeUndefined();
+    const next = await pub.publishBundle(`e2e del removal ${t}`);
+    expect(next.ok || /no changes/i.test(next.reason ?? "")).toBe(true);
+    pub.resetRefresh();
+    await pub.fetchAndApplyPublished();
+    expect(know.getCfgNumber("AHA_DAYS", 6)).toBe(6); // back to default
+  }, 90000);
+
+  it("14. packById finds CMS-authored protocols (Library visibility)", async () => {
+    if (!admin) return;
+    const t = tag();
+    const name = `e2e-vis-${t}`;
+    const c = await auth.createProtocol({
+      name,
+      tagline: "x",
+      goal: "test",
+    });
+    expect(c.ok).toBe(true);
+
+    know.resetKnowledge();
+    await pub.publishBundle(`e2e visibility ${t}`);
+    pub.resetRefresh();
+    await pub.fetchAndApplyPublished();
+
+    // The library page iterates activePacks() — verify the new pack
+    // is there AND packById finds it (previously broken; packById
+    // only searched the built-in PACKS).
+    const pkg = await import("@/lib/packs");
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 32);
+    // Find by slug fragment since createProtocol appends a hash.
+    const live = know.activePacks();
+    const found = live.find((p) => p.id.startsWith(slug));
+    expect(found).toBeTruthy();
+    if (found) {
+      const byId = pkg.packById(found.id);
+      expect(byId?.id).toBe(found.id);
+    }
+
+    // Cleanup — archive the protocol so it stays out of future bundles.
+    const protos = await auth.listCmsProtocols();
+    const row = protos.find((p) => p.name === name);
+    if (row) await auth.saveProtocol({ ...row, status: "archived" });
+  }, 90000);
+
   it("12. intel.ts insight template kinds resolve from the published bundle", async () => {
     if (!admin) return;
     const t = tag();

@@ -6,6 +6,7 @@
  * installed packs instead of duplicating them.
  */
 import type { BehaviorDef, ProtocolPack } from "./types";
+import { activePacks } from "./knowledge";
 
 const B = (b: BehaviorDef): BehaviorDef => b;
 
@@ -494,8 +495,18 @@ export const PACKS: ProtocolPack[] = [
   },
 ];
 
+/**
+ * Look up a pack by id in the LIVE catalog (built-in OR latest
+ * published CMS bundle), not just the frozen built-in. Without this,
+ * any CMS-authored protocol is invisible to Library / Protocols /
+ * Onboarding / Insights — the entire point of CMS-authoring breaks.
+ *
+ * ./knowledge also imports PACKS from this module; ESM resolves the
+ * cycle correctly so long as packById is only called after module
+ * evaluation completes (which is always — it's runtime-only).
+ */
 export function packById(id: string): ProtocolPack | undefined {
-  return PACKS.find((p) => p.id === id);
+  return activePacks().find((p) => p.id === id);
 }
 
 export const DEFAULT_INSTALLED = ["longevity-foundation", "better-sleep"];
