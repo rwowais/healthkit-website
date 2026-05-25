@@ -1298,36 +1298,61 @@ export default function AdminHome() {
         {tab === "engine" && engineSub === "config" && (
           <div className="space-y-2">
             <p className="t-caption leading-relaxed">
-              Runtime constants that gate trial behavior, free-tier
-              caps, and intelligence thresholds. <b>Live constant</b>{" "}
-              values come from <code>src/lib/entitlements.ts</code> and
-              are read every render; <b>documented</b> rows describe
-              behavior implemented elsewhere in the engine. CMS-backed
-              editing of these lands in Wave C.
+              Runtime tunables that gate trial behavior, free-tier
+              caps, and intelligence thresholds. Each row shows the
+              <b> code default</b> shipped in the binary and the{" "}
+              <b>effective</b> value after any published CMS override.
+              Author overrides below — they take effect the moment you
+              Publish.
             </p>
-            {CONFIG_ROWS.map((c) => (
-              <div
-                key={c.key}
-                className="flex items-start justify-between gap-3 rounded-[var(--r-md)] p-3.5"
-                style={surf}
-                title={`${c.key} — ${c.note}`}
-              >
-                <div className="min-w-0">
-                  <p className="text-[13.5px] font-semibold text-[var(--text-1)]">
-                    {c.key}
-                  </p>
-                  <p className="t-caption mt-0.5">{c.note}</p>
+            {CONFIG_ROWS.map((c) => {
+              const known = KNOWN_CONFIG_KEYS.find(
+                (k) => k.key === c.key
+              );
+              const effective = known
+                ? getCfgNumber(known.key, known.defaultValue)
+                : null;
+              const overridden =
+                known &&
+                effective != null &&
+                effective !== known.defaultValue;
+              return (
+                <div
+                  key={c.key}
+                  className="flex items-start justify-between gap-3 rounded-[var(--r-md)] p-3.5"
+                  style={surf}
+                  title={`${c.key} — ${c.note}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-[13.5px] font-semibold text-[var(--text-1)]">
+                      {c.key}
+                    </p>
+                    <p className="t-caption mt-0.5">{c.note}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[14px] font-bold text-[var(--text-1)]">
+                      {c.value}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-4)]">
+                      code default
+                    </p>
+                    {known && (
+                      <p
+                        className="mt-1 text-[12px] font-semibold"
+                        style={{
+                          color: overridden
+                            ? "var(--readiness)"
+                            : "var(--text-3)",
+                        }}
+                      >
+                        effective {effective}
+                        {overridden ? " · live" : ""}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-[14px] font-bold text-[var(--text-1)]">
-                    {c.value}
-                  </p>
-                  <p className="text-[10px] text-[var(--text-4)]">
-                    {c.kind}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             <div className="mt-6 space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -3880,11 +3905,11 @@ export default function AdminHome() {
                 <div className="mt-2 space-y-2 text-[12.5px]">
                   <p
                     className="leading-relaxed text-[var(--text-2)]"
-                    title="Counts of behavior-level changes between the latest published bundle and what would ship if you Publish now."
+                    title="Counts of every change between the latest published bundle and what would ship if you Publish now."
                   >
                     {[
                       diff.behaviorsAdded.length &&
-                        `${diff.behaviorsAdded.length} added`,
+                        `${diff.behaviorsAdded.length} behaviors added`,
                       diff.behaviorsChanged.length &&
                         `${diff.behaviorsChanged.length} edited`,
                       diff.behaviorsRemoved.length &&
@@ -3893,6 +3918,18 @@ export default function AdminHome() {
                         `${diff.protocolsAdded.length} new protocol${diff.protocolsAdded.length === 1 ? "" : "s"}`,
                       diff.protocolsRemoved.length &&
                         `${diff.protocolsRemoved.length} protocol${diff.protocolsRemoved.length === 1 ? "" : "s"} removed`,
+                      diff.configAdded.length +
+                        diff.configChanged.length +
+                        diff.configRemoved.length &&
+                        `${diff.configAdded.length + diff.configChanged.length + diff.configRemoved.length} config`,
+                      diff.templatesAdded.length +
+                        diff.templatesChanged.length +
+                        diff.templatesRemoved.length &&
+                        `${diff.templatesAdded.length + diff.templatesChanged.length + diff.templatesRemoved.length} templates`,
+                      diff.rulesAdded.length +
+                        diff.rulesChanged.length +
+                        diff.rulesRemoved.length &&
+                        `${diff.rulesAdded.length + diff.rulesChanged.length + diff.rulesRemoved.length} rules`,
                     ]
                       .filter(Boolean)
                       .join(" · ")}{" "}
@@ -3929,6 +3966,90 @@ export default function AdminHome() {
                       <span className="text-[var(--text-3)]">
                         in {b.protocolName}
                       </span>
+                    </p>
+                  ))}
+                  {/* Config overrides */}
+                  {diff.configAdded.map((c) => (
+                    <p
+                      key={`cfg+${c.key}`}
+                      className="text-[var(--vitality)]"
+                    >
+                      + config <b>{c.key}</b>{" "}
+                      <span className="text-[var(--text-3)]">
+                        → {JSON.stringify(c.next)}
+                      </span>
+                    </p>
+                  ))}
+                  {diff.configChanged.map((c) => (
+                    <p
+                      key={`cfg~${c.key}`}
+                      className="text-[var(--warm)]"
+                    >
+                      ~ config <b>{c.key}</b>{" "}
+                      <span className="text-[var(--text-3)]">
+                        {JSON.stringify(c.prev)} → {JSON.stringify(c.next)}
+                      </span>
+                    </p>
+                  ))}
+                  {diff.configRemoved.map((c) => (
+                    <p
+                      key={`cfg-${c.key}`}
+                      className="text-[var(--alert)]"
+                    >
+                      − config <b>{c.key}</b>{" "}
+                      <span className="text-[var(--text-3)]">
+                        (was {JSON.stringify(c.prev)})
+                      </span>
+                    </p>
+                  ))}
+                  {/* Insight templates */}
+                  {diff.templatesAdded.map((t) => (
+                    <p
+                      key={`tpl+${t.kind}`}
+                      className="text-[var(--vitality)]"
+                    >
+                      + template <b>{t.kind}</b>
+                    </p>
+                  ))}
+                  {diff.templatesChanged.map((t) => (
+                    <p
+                      key={`tpl~${t.kind}`}
+                      className="text-[var(--warm)]"
+                    >
+                      ~ template <b>{t.kind}</b>
+                    </p>
+                  ))}
+                  {diff.templatesRemoved.map((t) => (
+                    <p
+                      key={`tpl-${t.kind}`}
+                      className="text-[var(--alert)]"
+                    >
+                      − template <b>{t.kind}</b>
+                    </p>
+                  ))}
+                  {/* Adaptation rules */}
+                  {diff.rulesAdded.map((r) => (
+                    <p
+                      key={`rule+${r.name}`}
+                      className="text-[var(--vitality)]"
+                    >
+                      + rule <b>{r.name}</b>
+                    </p>
+                  ))}
+                  {diff.rulesChanged.map((r) => (
+                    <p
+                      key={`rule~${r.name}`}
+                      className="text-[var(--warm)]"
+                    >
+                      ~ rule <b>{r.name}</b>
+                    </p>
+                  ))}
+                  {diff.rulesRemoved.map((r) => (
+                    <p
+                      key={`rule-${r.name}`}
+                      className="text-[var(--alert)]"
+                    >
+                      − rule <b>{r.name}</b>
                     </p>
                   ))}
                   {diff.behaviorsAdded.length +

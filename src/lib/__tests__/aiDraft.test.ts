@@ -322,6 +322,66 @@ describe("diffBundles — what's about to ship", () => {
     expect(d.unchanged).toBe(1);
   });
 
+  it("detects config / template / rule changes — the silent-failure bug", () => {
+    // The first version of diffBundles only watched protocols + behaviors,
+    // so a config-only Publish (e.g. AHA_DAYS override) looked like
+    // "no changes" and a user couldn't tell their override would ship.
+    const base = mkBundle([
+      {
+        id: "p1",
+        name: "P1",
+        tagline: "t",
+        goal: "g",
+        accent: "x",
+        icon: "sparkle",
+        source: "custom",
+        behaviors: [beh("k1")],
+      },
+    ]);
+    const cfgOnly: KnowledgeBundle = {
+      ...base,
+      config: { AHA_DAYS: 21 },
+    };
+    const d = diffBundles(base, cfgOnly);
+    expect(d.hasChanges).toBe(true);
+    expect(d.configAdded.map((c) => c.key)).toEqual(["AHA_DAYS"]);
+    expect(d.configAdded[0].next).toBe(21);
+
+    const cfgChanged: KnowledgeBundle = {
+      ...base,
+      config: { AHA_DAYS: 6 },
+    };
+    const d2 = diffBundles(cfgOnly, cfgChanged);
+    expect(d2.configChanged.map((c) => c.key)).toEqual(["AHA_DAYS"]);
+    expect(d2.configChanged[0].prev).toBe(21);
+    expect(d2.configChanged[0].next).toBe(6);
+
+    const tplAdded: KnowledgeBundle = {
+      ...base,
+      insightTemplates: [{ kind: "keystone-slipping", template: "x" }],
+    };
+    const d3 = diffBundles(base, tplAdded);
+    expect(d3.templatesAdded.map((t) => t.kind)).toEqual([
+      "keystone-slipping",
+    ]);
+    expect(d3.hasChanges).toBe(true);
+
+    const ruleAdded: KnowledgeBundle = {
+      ...base,
+      adaptationRules: [
+        {
+          name: "primed",
+          priority: 30,
+          trigger: {},
+          effect: { setMode: "primed" },
+        },
+      ],
+    };
+    const d4 = diffBundles(base, ruleAdded);
+    expect(d4.rulesAdded.map((r) => r.name)).toEqual(["primed"]);
+    expect(d4.hasChanges).toBe(true);
+  });
+
   it("detects whole protocols added or removed", () => {
     const empty = mkBundle([]);
     const one = mkBundle([

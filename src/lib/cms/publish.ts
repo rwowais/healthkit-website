@@ -80,6 +80,17 @@ export interface BehaviorDiffRef {
 export interface BehaviorChange extends BehaviorDiffRef {
   fields: string[]; // names of fields whose values differ
 }
+export interface ConfigChange {
+  key: string;
+  prev: unknown;
+  next: unknown;
+}
+export interface TemplateChange {
+  kind: string;
+}
+export interface RuleChange {
+  name: string;
+}
 export interface BundleDiff {
   protocolsAdded: { id: string; name: string }[];
   protocolsRemoved: { id: string; name: string }[];
@@ -87,6 +98,15 @@ export interface BundleDiff {
   behaviorsAdded: BehaviorDiffRef[];
   behaviorsRemoved: BehaviorDiffRef[];
   behaviorsChanged: BehaviorChange[];
+  configAdded: ConfigChange[];
+  configRemoved: ConfigChange[];
+  configChanged: ConfigChange[];
+  templatesAdded: TemplateChange[];
+  templatesRemoved: TemplateChange[];
+  templatesChanged: TemplateChange[];
+  rulesAdded: RuleChange[];
+  rulesRemoved: RuleChange[];
+  rulesChanged: RuleChange[];
   unchanged: number;
   hasChanges: boolean;
 }
@@ -207,13 +227,100 @@ export function diffBundles(
     }
   }
 
+  // Config overrides — flat dict; track added / removed / changed.
+  const prevCfg = (prev?.config ?? {}) as Record<string, unknown>;
+  const nextCfg = (next.config ?? {}) as Record<string, unknown>;
+  const configAdded: ConfigChange[] = [];
+  const configRemoved: ConfigChange[] = [];
+  const configChanged: ConfigChange[] = [];
+  const allKeys = new Set([
+    ...Object.keys(prevCfg),
+    ...Object.keys(nextCfg),
+  ]);
+  for (const k of allKeys) {
+    const inPrev = k in prevCfg;
+    const inNext = k in nextCfg;
+    if (!inPrev && inNext)
+      configAdded.push({ key: k, prev: null, next: nextCfg[k] });
+    else if (inPrev && !inNext)
+      configRemoved.push({ key: k, prev: prevCfg[k], next: null });
+    else if (
+      JSON.stringify(prevCfg[k]) !== JSON.stringify(nextCfg[k])
+    )
+      configChanged.push({
+        key: k,
+        prev: prevCfg[k],
+        next: nextCfg[k],
+      });
+  }
+
+  // Insight templates — diff by `kind`.
+  const prevT = (prev?.insightTemplates ?? []).reduce<
+    Record<string, { kind: string; template: string }>
+  >((m, t) => {
+    m[t.kind] = { kind: t.kind, template: t.template };
+    return m;
+  }, {});
+  const nextT = (next.insightTemplates ?? []).reduce<
+    Record<string, { kind: string; template: string }>
+  >((m, t) => {
+    m[t.kind] = { kind: t.kind, template: t.template };
+    return m;
+  }, {});
+  const templatesAdded: TemplateChange[] = [];
+  const templatesRemoved: TemplateChange[] = [];
+  const templatesChanged: TemplateChange[] = [];
+  const allTKinds = new Set([...Object.keys(prevT), ...Object.keys(nextT)]);
+  for (const k of allTKinds) {
+    if (!prevT[k]) templatesAdded.push({ kind: k });
+    else if (!nextT[k]) templatesRemoved.push({ kind: k });
+    else if (prevT[k].template !== nextT[k].template)
+      templatesChanged.push({ kind: k });
+  }
+
+  // Adaptation rules — diff by `name` (the human handle).
+  const prevR = (prev?.adaptationRules ?? []).reduce<
+    Record<string, { name: string; sig: string }>
+  >((m, r) => {
+    m[r.name] = { name: r.name, sig: JSON.stringify(r) };
+    return m;
+  }, {});
+  const nextR = (next.adaptationRules ?? []).reduce<
+    Record<string, { name: string; sig: string }>
+  >((m, r) => {
+    m[r.name] = { name: r.name, sig: JSON.stringify(r) };
+    return m;
+  }, {});
+  const rulesAdded: RuleChange[] = [];
+  const rulesRemoved: RuleChange[] = [];
+  const rulesChanged: RuleChange[] = [];
+  const allRNames = new Set([
+    ...Object.keys(prevR),
+    ...Object.keys(nextR),
+  ]);
+  for (const n of allRNames) {
+    if (!prevR[n]) rulesAdded.push({ name: n });
+    else if (!nextR[n]) rulesRemoved.push({ name: n });
+    else if (prevR[n].sig !== nextR[n].sig)
+      rulesChanged.push({ name: n });
+  }
+
   const hasChanges =
     protocolsAdded.length +
       protocolsRemoved.length +
       protocolsChanged.length +
       behaviorsAdded.length +
       behaviorsRemoved.length +
-      behaviorsChanged.length >
+      behaviorsChanged.length +
+      configAdded.length +
+      configRemoved.length +
+      configChanged.length +
+      templatesAdded.length +
+      templatesRemoved.length +
+      templatesChanged.length +
+      rulesAdded.length +
+      rulesRemoved.length +
+      rulesChanged.length >
     0;
 
   return {
@@ -223,6 +330,15 @@ export function diffBundles(
     behaviorsAdded,
     behaviorsRemoved,
     behaviorsChanged,
+    configAdded,
+    configRemoved,
+    configChanged,
+    templatesAdded,
+    templatesRemoved,
+    templatesChanged,
+    rulesAdded,
+    rulesRemoved,
+    rulesChanged,
     unchanged,
     hasChanges,
   };
