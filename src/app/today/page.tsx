@@ -264,6 +264,44 @@ export default function TodayPage() {
   const dayComplete =
     isToday && prog.total > 0 && prog.done === prog.total;
 
+  /**
+   * First-day soft entry: if the user finished onboarding mid-day, the
+   * default "Up next: strength training in 2h" + 0% progress framing
+   * reads as "you're already behind on a routine you never started" —
+   * the opposite of the calm/safe contract from onboarding. So on the
+   * very first calendar day, IF there's already a behavior whose
+   * scheduled time has passed AND they haven't completed anything yet,
+   * we replace the high-pressure surface with an acknowledgement.
+   * Drops naturally as soon as they tick one item OR the calendar
+   * rolls over. Morning signups (no past items yet) are unaffected.
+   */
+  const firstDaySoft = useMemo(() => {
+    if (!isToday) return false;
+    const trial = state.settings.trialStartDate;
+    if (!trial) return false;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    if (trial.slice(0, 10) !== todayKey) return false;
+    if (prog.done > 0) return false; // engaged → resume normal
+    const now = nowMinutes();
+    return timeline.some((it) => {
+      const m = effectiveMinutes(it, settings);
+      return m != null && m < now;
+    });
+  }, [isToday, state.settings.trialStartDate, prog.done, timeline, settings]);
+
+  /** The most-leveraged morning behavior — what tomorrow "kicks off with". */
+  const tomorrowFirstFocus = useMemo(() => {
+    if (!firstDaySoft) return null;
+    const morningCandidates = timeline.filter(
+      (it) => !it.muted && it.block === "morning"
+    );
+    if (morningCandidates.length === 0)
+      return timeline.find((it) => !it.muted) ?? null;
+    return [...morningCandidates].sort(
+      (a, b) => b.leverage - a.leverage
+    )[0];
+  }, [firstDaySoft, timeline]);
+
   // Partial close: in the evening, a user who moved *some* things should
   // be met with acknowledgement, not the same anxious "Up next" pressure.
   // The product preaches consistency over perfection — so it must reward
@@ -514,10 +552,18 @@ export default function TodayPage() {
               <Eyebrow color={accent}>Operating summary</Eyebrow>
             </div>
             <h2 className="t-section mt-3 text-[var(--text-1)]">
-              {adaptation.headline}
+              {firstDaySoft
+                ? `Welcome${
+                    state.settings.name?.trim()
+                      ? `, ${state.settings.name.trim()}`
+                      : ""
+                  }.`
+                : adaptation.headline}
             </h2>
             <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-              {adaptation.tone}
+              {firstDaySoft
+                ? "You're joining mid-day — that's fine. Tomorrow's the natural start. For today, do whatever fits; nothing's expected of you yet."
+                : adaptation.tone}
             </p>
 
             {/* Signal chips — the system's read on you */}
@@ -582,40 +628,45 @@ export default function TodayPage() {
               ))}
             </div>
 
-            <div className="mt-5">
-              {prog.essentials > 0 && (
-                <div className="mb-2.5 flex items-center gap-1.5">
-                  {Array.from({ length: prog.essentials }).map((_, i) => (
-                    <motion.span
-                      key={i}
-                      className="h-1.5 flex-1 rounded-full"
-                      initial={false}
-                      animate={{
-                        backgroundColor:
-                          i < prog.essentialsDone
-                            ? accent
-                            : "var(--surface-3)",
-                      }}
-                      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  ))}
-                </div>
-              )}
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[13px] font-medium leading-snug text-[var(--text-2)]">
-                  {progressionPhrase(prog.done, prog.total, cb)}
-                </p>
+            {!firstDaySoft && (
+              <div className="mt-5">
                 {prog.essentials > 0 && (
-                  <span className="shrink-0 text-[12px] font-semibold text-[var(--text-3)]">
-                    {prog.essentialsDone === prog.essentials
-                      ? "Essentials secured"
-                      : prog.essentialsDone === 0
-                      ? `${prog.essentials} essentials`
-                      : `${prog.essentialsDone} of ${prog.essentials} secured`}
-                  </span>
+                  <div className="mb-2.5 flex items-center gap-1.5">
+                    {Array.from({ length: prog.essentials }).map((_, i) => (
+                      <motion.span
+                        key={i}
+                        className="h-1.5 flex-1 rounded-full"
+                        initial={false}
+                        animate={{
+                          backgroundColor:
+                            i < prog.essentialsDone
+                              ? accent
+                              : "var(--surface-3)",
+                        }}
+                        transition={{
+                          duration: 0.5,
+                          ease: [0.22, 1, 0.36, 1],
+                        }}
+                      />
+                    ))}
+                  </div>
                 )}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[13px] font-medium leading-snug text-[var(--text-2)]">
+                    {progressionPhrase(prog.done, prog.total, cb)}
+                  </p>
+                  {prog.essentials > 0 && (
+                    <span className="shrink-0 text-[12px] font-semibold text-[var(--text-3)]">
+                      {prog.essentialsDone === prog.essentials
+                        ? "Essentials secured"
+                        : prog.essentialsDone === 0
+                        ? `${prog.essentials} essentials`
+                        : `${prog.essentialsDone} of ${prog.essentials} secured`}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             {adaptation.reasons.length > 0 && (
               <div className="mt-4">
                 <button
@@ -720,8 +771,73 @@ export default function TodayPage() {
           </motion.div>
         )}
 
+        {/* First-day soft entry — tomorrow's first focus, not today's
+            "up next" pressure. Replaces the standard Up Next card when
+            the user joined mid-day and hasn't checked anything off yet. */}
+        {firstDaySoft && tomorrowFirstFocus && (
+          <div>
+            <div className="mb-3 flex items-center justify-between px-1">
+              <Eyebrow color="var(--text-3)">Tomorrow&apos;s first focus</Eyebrow>
+              <span
+                className="rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--readiness) 16%, var(--surface-2))",
+                  color: "var(--readiness)",
+                }}
+              >
+                MORNING
+              </span>
+            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="relative overflow-hidden rounded-[var(--r-xl)] p-5"
+              style={{
+                background:
+                  "linear-gradient(155deg, color-mix(in srgb, var(--readiness) 12%, var(--surface-1)), var(--surface-1) 70%)",
+                boxShadow: "var(--shadow-soft)",
+              }}
+            >
+              <span
+                className="ambient"
+                style={{
+                  background:
+                    "radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--readiness) 18%, transparent), transparent 60%)",
+                }}
+              />
+              <div className="relative flex items-center gap-4">
+                <span
+                  className="chip h-16 w-16 shrink-0"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--readiness) 22%, var(--surface-3))",
+                    color: "var(--readiness)",
+                  }}
+                >
+                  <Icon
+                    name={tomorrowFirstFocus.icon as IconName}
+                    size={28}
+                    stroke={1.7}
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[17px] font-semibold leading-tight text-[var(--text-1)]">
+                    {tomorrowFirstFocus.title}
+                  </p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-3)]">
+                    Your system kicks off here in the morning. Browse the
+                    rest of today below at your own pace.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {/* Up next — the single intelligent focus */}
-        {isToday && !dayComplete && !partialClose && upNext && (
+        {!firstDaySoft && isToday && !dayComplete && !partialClose && upNext && (
           <div>
             <div className="mb-3 flex items-center justify-between px-1">
               <Eyebrow color="var(--text-3)">Up next</Eyebrow>
