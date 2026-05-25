@@ -195,6 +195,24 @@ export default function LibraryPage() {
                   Remove protocol
                 </Button>
               ) : (
+                <>
+                  {/* Inline cap context so the swap to "Unlock with
+                      Premium" doesn't feel jarring or arbitrary — the
+                      user sees WHY the action button just changed. */}
+                  {atFreeCap && !installedSet.has(open.id) && (
+                    <p
+                      className="rounded-[var(--r-sm)] px-3 py-2.5 text-[12.5px] leading-relaxed"
+                      style={{
+                        background:
+                          "color-mix(in srgb, var(--readiness) 9%, var(--surface-2))",
+                        color: "var(--text-2)",
+                      }}
+                    >
+                      You have {getFreePacks()} of {getFreePacks()} free
+                      protocols installed. Premium unlocks unlimited — or
+                      remove one in your installed list to swap.
+                    </p>
+                  )}
                 <Button
                   full
                   onClick={() => {
@@ -232,6 +250,7 @@ export default function LibraryPage() {
                     ? "Unlock more with Premium"
                     : "Install protocol"}
                 </Button>
+                </>
               )}
             </div>
           </div>

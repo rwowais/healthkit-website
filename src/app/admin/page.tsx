@@ -38,6 +38,8 @@ import {
 import {
   importBuiltin,
   listCmsProtocols,
+  listAllCmsBehaviors,
+  type AllBehaviorRow,
   getProtocolBehaviors,
   saveProtocol,
   saveBehavior,
@@ -331,6 +333,10 @@ export default function AdminHome() {
   // opened so the admin can see exactly what would ship.
   const [diff, setDiff] = useState<BundleDiff | null>(null);
   const [diffBusy, setDiffBusy] = useState(false);
+  // "Show all" expander for the behavior diff lists — by default we cap
+  // at 8 each so a big diff doesn't dominate the screen, but an admin
+  // reviewing a major migration needs to see *everything* about to ship.
+  const [diffShowAll, setDiffShowAll] = useState(false);
   const diffAlive = useRef(true);
   useEffect(
     () => () => {
@@ -361,6 +367,10 @@ export default function AdminHome() {
   const [cmsP, setCmsP] = useState<CmsProtocol[]>([]);
   const [edP, setEdP] = useState<CmsProtocol | null>(null);
   const [edB, setEdB] = useState<CmsBehavior[]>([]);
+  // Flat all-behavior index for the command palette — lazy-loaded the
+  // first time ⌘K opens so the admin can fuzzy-jump by behavior title,
+  // not just by pack. Avoids paying the join cost when nobody's looking.
+  const [allBeh, setAllBeh] = useState<AllBehaviorRow[] | null>(null);
   const loadCms = () => listCmsProtocols().then(setCmsP);
   useEffect(() => {
     if (
@@ -644,6 +654,21 @@ export default function AdminHome() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [gate, paletteOpen]);
+
+  // Lazy-fetch the flat behavior index the first time the palette opens.
+  // The join is cheap but it's still a network round-trip; only paying
+  // for it when the palette is actually used keeps the rest of the admin
+  // page snappy.
+  useEffect(() => {
+    if (!paletteOpen || allBeh !== null) return;
+    let alive = true;
+    listAllCmsBehaviors().then((rows) => {
+      if (alive) setAllBeh(rows);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [paletteOpen, allBeh]);
 
   // Top-of-Edit "describe an idea — AI picks the protocol" entry point.
   const [aiIdea, setAiIdea] = useState("");
@@ -4213,7 +4238,10 @@ export default function AdminHome() {
                       .join(" · ")}{" "}
                     · {diff.unchanged} unchanged
                   </p>
-                  {diff.behaviorsAdded.slice(0, 8).map((b) => (
+                  {(diffShowAll
+                    ? diff.behaviorsAdded
+                    : diff.behaviorsAdded.slice(0, 8)
+                  ).map((b) => (
                     <p
                       key={`+${b.protocolId}/${b.canonicalKey}`}
                       className="text-[var(--vitality)]"
@@ -4224,7 +4252,10 @@ export default function AdminHome() {
                       </span>
                     </p>
                   ))}
-                  {diff.behaviorsChanged.slice(0, 8).map((b) => (
+                  {(diffShowAll
+                    ? diff.behaviorsChanged
+                    : diff.behaviorsChanged.slice(0, 8)
+                  ).map((b) => (
                     <p
                       key={`~${b.protocolId}/${b.canonicalKey}`}
                       className="text-[var(--warm)]"
@@ -4235,7 +4266,10 @@ export default function AdminHome() {
                       </span>
                     </p>
                   ))}
-                  {diff.behaviorsRemoved.slice(0, 8).map((b) => (
+                  {(diffShowAll
+                    ? diff.behaviorsRemoved
+                    : diff.behaviorsRemoved.slice(0, 8)
+                  ).map((b) => (
                     <p
                       key={`-${b.protocolId}/${b.canonicalKey}`}
                       className="text-[var(--alert)]"
@@ -4334,9 +4368,23 @@ export default function AdminHome() {
                     diff.behaviorsChanged.length +
                     diff.behaviorsRemoved.length >
                     24 && (
-                    <p className="t-caption">
-                      (showing first few; refresh for the full set)
-                    </p>
+                    <button
+                      onClick={() => setDiffShowAll((v) => !v)}
+                      className="press t-caption underline-offset-2 hover:underline"
+                      title={
+                        diffShowAll
+                          ? "Cap each behavior list back to 8 rows"
+                          : "Expand all behavior changes — useful for big migrations you want to fully eyeball before shipping"
+                      }
+                    >
+                      {diffShowAll
+                        ? "Show fewer (cap at 8 each)"
+                        : `Show all ${
+                            diff.behaviorsAdded.length +
+                            diff.behaviorsChanged.length +
+                            diff.behaviorsRemoved.length
+                          } behavior changes`}
+                    </button>
                   )}
                 </div>
               )}
@@ -4599,6 +4647,31 @@ export default function AdminHome() {
                 },
               })
             ),
+            // Behavior-level jumps. Only surface when the admin has typed
+            // *something* so a fresh ⌘K open isn't drowned by hundreds of
+            // behavior rows. Once they type, fuzzy-match by title, dose,
+            // canonical key, or protocol name and jump straight to the
+            // owning protocol's edit view.
+            ...(paletteQuery.trim().length >= 2 && allBeh
+              ? allBeh.map(
+                  (r): Cmd => ({
+                    id: `beh:${r.protocolId}/${r.behavior.canonical_key}`,
+                    group: "Behaviors",
+                    label: r.behavior.title,
+                    hint: `${r.protocolName} · ${r.behavior.block}${
+                      r.behavior.dose ? ` · ${r.behavior.dose}` : ""
+                    }`,
+                    run: async () => {
+                      setTab("content");
+                      setContentMode("author");
+                      const target = cmsP.find(
+                        (p) => p.id === r.protocolId
+                      );
+                      if (target) await openProto(target);
+                    },
+                  })
+                )
+              : []),
           ];
 
           const q = paletteQuery.trim().toLowerCase();

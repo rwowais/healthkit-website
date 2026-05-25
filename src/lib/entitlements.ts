@@ -105,6 +105,9 @@ export function maybeExtendTrial(state: AppState): AppState {
     settings: {
       ...state.settings,
       premiumTrialEndsAt: new Date(now + 7 * 86_400_000).toISOString(),
+      // Stamp the extension so Today can surface a calm one-time note —
+      // a silent extension feels invisible; a *seen* one feels generous.
+      trialExtendedAt: new Date(now).toISOString(),
     },
   };
 }

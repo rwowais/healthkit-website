@@ -291,7 +291,11 @@ export interface Adaptation {
 }
 
 function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
-  if (s.gapDays >= 2) {
+  // "Welcome back" requires there to BE a back to welcome to. A user
+  // who finished onboarding 2 days ago, never opened the app, and
+  // returns on day 3 isn't returning — they're starting. The signal
+  // for genuine prior engagement is `trackedDays > 0`.
+  if (s.gapDays >= 2 && s.trackedDays > 0) {
     return {
       mode: "rebuild",
       headline: "Welcome back",

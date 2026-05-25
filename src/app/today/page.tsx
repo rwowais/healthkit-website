@@ -210,6 +210,30 @@ export default function TodayPage() {
     }
   }, [dismissed]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
+  // One-time calm note when the trial auto-extended — surface the
+  // kindness instead of doing it silently. Local-only ack so the cloud
+  // mutation stays minimal; tied to the exact extension timestamp so a
+  // *second* future extension still surfaces fresh.
+  const [trialExtAcked, setTrialExtAcked] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem("pz:trial-ext-ack");
+    } catch {
+      return null;
+    }
+  });
+  const showTrialExtension =
+    !!state.settings.trialExtendedAt &&
+    trialExtAcked !== state.settings.trialExtendedAt;
+  const ackTrialExtension = () => {
+    const t = state.settings.trialExtendedAt ?? "";
+    try {
+      localStorage.setItem("pz:trial-ext-ack", t);
+    } catch {
+      /* non-fatal */
+    }
+    setTrialExtAcked(t);
+  };
   const [offset, setOffset] = useState(0);
   const selectedDate = useMemo(() => {
     const d = new Date();
@@ -279,8 +303,18 @@ export default function TodayPage() {
     if (!isToday) return false;
     const trial = state.settings.trialStartDate;
     if (!trial) return false;
-    const todayKey = new Date().toISOString().slice(0, 10);
-    if (trial.slice(0, 10) !== todayKey) return false;
+    // Compare LOCAL calendar dates, not ISO substrings — a 5pm PT signup
+    // ISO-formats to the next UTC day, which would mis-mark Wednesday's
+    // first-real-day session as "you're joining mid-day."
+    const d = new Date();
+    const localToday = `${d.getFullYear()}-${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const t = new Date(trial);
+    const localTrial = `${t.getFullYear()}-${String(
+      t.getMonth() + 1
+    ).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+    if (localTrial !== localToday) return false;
     if (prog.done > 0) return false; // engaged → resume normal
     const now = nowMinutes();
     return timeline.some((it) => {
@@ -707,8 +741,58 @@ export default function TodayPage() {
         </motion.div>
         )}
 
+        {/* Trial extension — one-time calm note. The engagement-gated
+            auto-extend was silent until now; surfacing it once makes the
+            kindness *felt* (not just unmonetized). Dismissing stamps the
+            local ack so it never reappears for this same extension. */}
+        {isToday && showTrialExtension && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="relative overflow-hidden rounded-[var(--r-xl)] p-5"
+            style={{
+              background:
+                "linear-gradient(155deg, color-mix(in srgb, var(--vitality) 11%, var(--surface-1)), var(--surface-1) 70%)",
+              boxShadow: "var(--shadow-soft)",
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="chip h-9 w-9 shrink-0"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--vitality) 18%, var(--surface-3))",
+                  color: "var(--vitality)",
+                }}
+              >
+                <Icon name="sparkle" size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-semibold text-[var(--text-1)]">
+                  We extended your trial a week
+                </p>
+                <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-2)]">
+                  The patterns aren&apos;t quite ready to read yet — take
+                  a few more days to see what fits before anything changes.
+                </p>
+                <button
+                  onClick={ackTrialExtension}
+                  className="press tr-fast mt-3 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
+                  style={{
+                    background: "var(--surface-2)",
+                    color: "var(--text-2)",
+                  }}
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Daily check-in — feeds the adaptive engine */}
-        {isToday && !checkedIn && (
+        {isToday && !checkedIn && !firstDaySoft && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

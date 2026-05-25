@@ -115,6 +115,12 @@ export interface UserSettings {
   tier?: "free" | "premium";
   /** ISO; reverse-trial: full Premium intelligence until this date. */
   premiumTrialEndsAt?: string;
+  /**
+   * ISO; stamped when the engagement-gated reverse-trial auto-extends.
+   * Surface a one-time calm note on Today so the kindness is felt instead
+   * of being silent (cleared once acknowledged).
+   */
+  trialExtendedAt?: string;
 }
 
 // ── Legacy completion (kept for migration) ────────────────────────

@@ -178,8 +178,13 @@ describe("D2 friction intelligence — suggestions", () => {
       .filter((i) => i.canonicalKey !== skip.canonicalKey)
       .map((i) => i.canonicalKey);
     const allOthers = Object.fromEntries(others.map((o) => [o, true]));
+    // 21+ tracked days are required before the engine will say a
+    // behavior isn't working — short-streak users on week-2 should NOT
+    // get told their behavior doesn't fit yet. Plenty of activity in
+    // recent days satisfies the "5 active days in the last 7" gate.
     const logs: DailyLog[] = [];
-    for (let i = 1; i <= 6; i++) logs.push(log(dk(i), { ...allOthers }, 60));
+    for (let i = 1; i <= 21; i++)
+      logs.push(log(dk(i), { ...allOthers }, 60));
     const sug = suggestions({ ...st, dailyLogs: logs });
     const retime = sug.find((s) => s.action.type === "retime");
     expect(retime).toBeTruthy();
@@ -188,5 +193,26 @@ describe("D2 friction intelligence — suggestions", () => {
       key: skip.canonicalKey,
       block: "anytime",
     });
+  });
+
+  it("does NOT offer to re-time short-streak (< 21 days) intermittent users", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const items = compileTimeline(st, 0);
+    const skip = items.find((i) => i.block !== "anytime")!;
+    const others = items
+      .filter((i) => i.canonicalKey !== skip.canonicalKey)
+      .map((i) => i.canonicalKey);
+    const allOthers = Object.fromEntries(others.map((o) => [o, true]));
+    // 6 days of logs — used to trip the retime branch on the old 14-day
+    // threshold. New 21-day floor must hold the line: a week-2 user
+    // skipping one slot deserves patience, not "this isn't working."
+    const logs: DailyLog[] = [];
+    for (let i = 1; i <= 6; i++) logs.push(log(dk(i), { ...allOthers }, 60));
+    const sug = suggestions({ ...st, dailyLogs: logs });
+    expect(sug.find((s) => s.action.type === "retime")).toBeUndefined();
+    expect(sug.find((s) => s.action.type === "pause")).toBeUndefined();
   });
 });

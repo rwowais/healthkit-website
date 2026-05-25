@@ -319,14 +319,17 @@ export function suggestions(state: AppState): Suggestion[] {
     });
   }
 
-  // 2. Chronically skipped behavior → offer to pause (kills guilt)
+  // 2. Chronically skipped behavior → offer to retime/pause. Gate on
+  // ≥ 21 total tracked days (not 5 active in a 7-day window) — week-3
+  // intermittent users hit "5 active days" without yet having enough
+  // history for "this behavior doesn't work for you" to be honest.
   const items = analyticsItems(state);
   const ks = keystone(state);
   const activeDays = [...state.dailyLogs]
     .filter((l) => l.score > 0)
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 7);
-  if (activeDays.length >= 5) {
+  if (state.dailyLogs.length >= 21 && activeDays.length >= 5) {
     for (const it of items) {
       if (state.behaviorOverrides?.[it.canonicalKey]?.disabled) continue;
       // Never tell the user to pause their own keystone — that's a
@@ -338,11 +341,6 @@ export function suggestions(state: AppState): Suggestion[] {
       if (!everDone) {
         const override = state.behaviorOverrides?.[it.canonicalKey];
         const effectiveBlock = override?.block ?? it.block;
-        // Friction intelligence: don't just offer to pause. If the
-        // behavior is pinned to a clock slot that clearly isn't landing,
-        // first offer to RE-ENGINEER it — drop the time constraint so it
-        // can happen whenever it fits. Pause only when there's nothing
-        // left to re-time (already "anytime").
         if (effectiveBlock !== "anytime") {
           out.push({
             id: `sug-retime-${it.canonicalKey}`,
@@ -350,13 +348,13 @@ export function suggestions(state: AppState): Suggestion[] {
             title: renderTemplate(
               getInsightTemplate(
                 "retime-title",
-                `“{title}” keeps slipping at its time`
+                `“{title}” hasn't found its time yet`
               ),
               { title: it.title }
             ),
             body: getInsightTemplate(
               "retime-body",
-              "Its scheduled slot isn't landing. Free it from the clock — do it whenever it fits, not on a schedule."
+              "Its scheduled slot doesn't seem to fit your day. Try it without a time — let it land whenever feels natural."
             ),
             cta: getInsightTemplate("retime-cta", "Make it anytime"),
             action: {
@@ -372,15 +370,15 @@ export function suggestions(state: AppState): Suggestion[] {
             title: renderTemplate(
               getInsightTemplate(
                 "pause-title",
-                `“{title}” isn't landing`
+                `“{title}” hasn't landed for you`
               ),
               { title: it.title }
             ),
             body: getInsightTemplate(
               "pause-body",
-              "It's been skipped every recent day even unscheduled. Pausing it is not failure — it clears space for what works."
+              "Set it aside for now — your other behaviors will get more room. You can bring it back anytime."
             ),
-            cta: getInsightTemplate("pause-cta", "Pause this behavior"),
+            cta: getInsightTemplate("pause-cta", "Set it aside"),
             action: { type: "pause", key: it.canonicalKey },
           });
         }
@@ -389,28 +387,34 @@ export function suggestions(state: AppState): Suggestion[] {
     }
   }
 
-  // 3. Keystone slipping → gentle awareness (no guilt, no pause)
+  // 3. Keystone in light view → gentle observation (no verdict, no
+  // imperative). Gate on enough HISTORY (≥ 21 tracked days), not just
+  // activity. Also: suppress when the user qualifies for the
+  // "progression" suggestion below — a 78%-adherence user who had two
+  // light-sleep days does not need a "your keystone slipped" nudge.
+  const strongAdherence =
+    activeDays.length >= 6 &&
+    activeDays.reduce((s, l) => s + l.score, 0) / activeDays.length >= 75;
   if (
     ks &&
     !state.behaviorOverrides?.[ks.key]?.disabled &&
-    activeDays.length >= 5
+    state.dailyLogs.length >= 21 &&
+    activeDays.length >= 5 &&
+    !strongAdherence
   ) {
     const stat = behaviorStats(state, ks.key);
     if (stat.last7 < Math.ceil(activeDays.length / 2)) {
       const pointWord = ks.delta === 1 ? "point" : "points";
-      // CMS-overridable copy. Template variables: {title} {delta} {pointWord}.
-      // Default copy preserves the original phrasing byte-for-byte when
-      // no template is published — pure-fallback path is unchanged.
       const tpl = getInsightTemplate(
         "keystone-slipping",
-        `On the days you do “{title}” you keep {delta} {pointWord} more of everything else — but it's been light lately. Re-anchor it tomorrow.`
+        `On the days you anchor “{title}” the rest of the day lands better — about {delta} {pointWord} more of everything else. Light week. Tomorrow is open.`
       );
       out.push({
         id: `sug-keystone-${ks.key}`,
         kind: "progress",
         title: getInsightTemplate(
           "keystone-slipping-title",
-          "Your keystone is slipping"
+          "Your anchor, in view"
         ),
         body: renderTemplate(tpl, {
           title: ks.title,

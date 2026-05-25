@@ -832,6 +832,46 @@ export async function getProtocolBehaviors(
   }
 }
 
+/**
+ * Flat list of every behavior with the protocol(s) it belongs to. Feeds
+ * the command palette's fuzzy search so admins can jump straight to a
+ * behavior by title without picking the protocol first — the original
+ * palette only knew about protocols, which broke down once the catalog
+ * grew past a few packs.
+ */
+export type AllBehaviorRow = {
+  behavior: CmsBehavior;
+  protocolId: string;
+  protocolName: string;
+  protocolSlug: string;
+};
+export async function listAllCmsBehaviors(): Promise<AllBehaviorRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_protocol_behaviors")
+      .select(
+        "protocol_id, cms_protocols(id, name, slug), cms_behaviors(*)"
+      )
+      .order("position");
+    return ((data ?? []) as unknown as Array<{
+      protocol_id: string;
+      cms_protocols: { id: string; name: string; slug: string } | null;
+      cms_behaviors: CmsBehavior | null;
+    }>)
+      .filter((r) => r.cms_behaviors && r.cms_protocols)
+      .map((r) => ({
+        behavior: r.cms_behaviors as CmsBehavior,
+        protocolId: r.protocol_id,
+        protocolName: (r.cms_protocols as { name: string }).name,
+        protocolSlug: (r.cms_protocols as { slug: string }).slug,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function saveProtocol(
   p: Partial<CmsProtocol> & { id: string }
 ): Promise<{ ok: boolean; reason?: string }> {
@@ -970,16 +1010,59 @@ export async function createBehavior(
       .select("id")
       .single();
     if (bErr || !b) return { ok: false, reason: bErr?.message };
-    const { count } = await sb
-      .from("cms_protocol_behaviors")
-      .select("*", { count: "exact", head: true })
-      .eq("protocol_id", protocolId);
+
+    // Find the right insertion position: at the end of the same time
+    // block. Otherwise an AI-drafted morning behavior lands at row 60
+    // of a 60-row protocol and the admin reorders for 30 minutes.
+    // Falls back to "append to end" when block info isn't reachable.
+    let insertPosition = 0;
+    try {
+      const { data: existing } = await sb
+        .from("cms_protocol_behaviors")
+        .select("position, cms_behaviors(block)")
+        .eq("protocol_id", protocolId)
+        .order("position");
+      // Supabase types this as `cms_behaviors: { block }[]` because of
+      // the FK shape, but it's actually a single-object join. Normalize
+      // via unknown so the predicate below is well-typed.
+      const rows = (existing ?? []) as unknown as {
+        position: number;
+        cms_behaviors:
+          | { block: string }
+          | { block: string }[]
+          | null;
+      }[];
+      const rowBlock = (r: (typeof rows)[number]): string | undefined => {
+        const cb = r.cms_behaviors;
+        if (!cb) return undefined;
+        if (Array.isArray(cb)) return cb[0]?.block;
+        return cb.block;
+      };
+      if (rows.length === 0) {
+        insertPosition = 0;
+      } else {
+        // Last position of same block + 1 (so it sits next to peers).
+        // No same-block peers? Append to the end.
+        const sameBlock = rows.filter((r) => rowBlock(r) === fields.block);
+        insertPosition =
+          sameBlock.length > 0
+            ? sameBlock[sameBlock.length - 1].position + 1
+            : rows.length;
+      }
+    } catch {
+      // Fall back to old behavior.
+      const { count } = await sb
+        .from("cms_protocol_behaviors")
+        .select("*", { count: "exact", head: true })
+        .eq("protocol_id", protocolId);
+      insertPosition = count ?? 0;
+    }
     const { error: lErr } = await sb
       .from("cms_protocol_behaviors")
       .insert({
         protocol_id: protocolId,
         behavior_id: b.id,
-        position: count ?? 0,
+        position: insertPosition,
       });
     if (lErr) return { ok: false, reason: lErr.message };
 
@@ -1140,9 +1223,18 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
       .select("*")
       .neq("status", "archived");
     if (!prot || prot.length === 0) return null;
-    const protocols: ProtocolPack[] = [];
-    for (const p of prot as CmsProtocol[]) {
-      const behaviors = (await getProtocolBehaviors(p.id))
+    // Fan out the per-protocol behavior fetches in parallel. The serial
+    // version (one await per protocol) compounded to O(N × roundtrip) and
+    // dominated publish latency once the catalog grew past a handful of
+    // packs; Promise.all collapses that to a single roundtrip ceiling.
+    // We preserve catalog order by zipping the resolved behaviors back
+    // onto the original protocol rows in the same index.
+    const protRows = prot as CmsProtocol[];
+    const behaviorsPerProtocol = await Promise.all(
+      protRows.map((p) => getProtocolBehaviors(p.id))
+    );
+    const protocols: ProtocolPack[] = protRows.map((p, i) => {
+      const behaviors = behaviorsPerProtocol[i]
         .filter(isPublishableBehavior)
         .map(
           (b): BehaviorDef =>
@@ -1159,7 +1251,7 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
               rationale: b.rationale ?? "",
             }) as BehaviorDef
         );
-      protocols.push({
+      return {
         id: p.slug,
         name: p.name,
         tagline: p.tagline ?? "",
@@ -1169,8 +1261,8 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
         source: (p.source ?? "official") as ProtocolPack["source"],
         durationLabel: "Ongoing",
         behaviors,
-      } as ProtocolPack);
-    }
+      } as ProtocolPack;
+    });
 
     // Config overrides from cms_intelligence_config — only numeric /
     // string / boolean values are honored (bundle.config's contract).
