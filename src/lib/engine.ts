@@ -486,6 +486,12 @@ export const CONFLICT_PAIRS: ReadonlyArray<{
   // tell the user "eat now" and "don't eat until 11am" in the same
   // morning block. The restraint wins (it's the active discipline).
   { restraint: "delay-first-meal", target: "protein-breakfast" },
+  // Jetlag Recovery's anchor-meal is semantically the same "eat
+  // breakfast at destination" — also contradicted by the fasting
+  // restraint. Without this entry, a user with Fasted Mornings +
+  // Jetlag installed saw the breakfast card survive while
+  // protein-breakfast was muted.
+  { restraint: "delay-first-meal", target: "anchor-meal" },
   // Weekly Recovery Day's deload-day (Sunday-only avoid) mutes any
   // training behavior that happens to be scheduled the same day —
   // most relevant for Heart Health (strength Tue/Thu/Sun, vo2max

@@ -277,36 +277,46 @@ const DIM_LIGHTS = B({
   kind: "action",
 });
 
-// ── Jetlag-recovery atoms (used by the Jetlag pack and reusable
-// elsewhere when travel/circadian-shift protocols evolve) ──────────
-
-const NEW_TZ_SUNLIGHT = B({
-  canonicalKey: "new-tz-sunlight",
+const EXTRA_SLEEP = B({
+  canonicalKey: "extra-sleep",
+  // Bed-15 (was -30, colliding with wind-down) — "protect 8.5h" is
+  // really a go-to-bed reminder, closer to actual bedtime. Daily in
+  // both Burnout Recovery and Weekly Recovery (the daysActive merge
+  // bug previously collapsed cross-pack day arrays to "every day"
+  // anyway; making it explicit avoids the inconsistency).
   timingReason:
-    "Bright light at the new timezone's morning is the single most powerful signal for shifting your circadian clock to the destination.",
-  title: "Morning light at destination",
-  block: "morning",
-  anchor: "wake",
-  offsetMin: 30,
-  dose: "20–40 min outdoor, no sunglasses",
-  rationale:
-    "Resets the master clock to local time — accelerates adaptation by 1–2 days.",
-  evidence:
-    "Light is the primary zeitgeber; properly timed exposure can shift the circadian phase by ~1h/day.",
-  recommendedBy: ["Clinical research"],
-  icon: "sun",
+    "Set close to bed — protecting the sleep opportunity is the recovery itself.",
+  title: "Protect 8.5h sleep opportunity",
+  block: "evening",
+  anchor: "bed",
+  offsetMin: -15,
+  rationale: "Recovery is built in bed before it's built in the gym.",
+  icon: "bed",
   leverage: 3,
   kind: "action",
 });
 
+// ── Jetlag-recovery atoms (used by the Jetlag pack and reusable
+// elsewhere when travel/circadian-shift protocols evolve) ──────────
+
+// NEW_TZ_SUNLIGHT removed — was a near-duplicate of MORNING_SUNLIGHT.
+// For a jetlagged user, "destination morning" IS their morning; the
+// circadian-anchor framing applies either way. Jetlag Recovery now
+// uses the shared MORNING_SUNLIGHT atom so installing it alongside
+// Longevity Foundation merges into one row instead of rendering two
+// near-identical morning-light cards.
+
 const STRATEGIC_MELATONIN = B({
   canonicalKey: "strategic-melatonin",
+  // Bed-50 (was -45) to step it off magnesium-pm's clock-time and stay
+  // visually distinct in the pre-bed sequence; the 30–60 min window is
+  // still respected.
   timingReason:
     "30–60 min before the NEW timezone's bedtime — its sleep-timing effect depends on being taken near intended sleep.",
   title: "Strategic melatonin",
   block: "evening",
   anchor: "bed",
-  offsetMin: -45,
+  offsetMin: -50,
   dose: "0.3–0.5 mg (low dose)",
   rationale:
     "A small dose helps shift sleep timing; large doses don't help more and disrupt next-morning alertness.",
@@ -505,14 +515,14 @@ export const PACKS: ProtocolPack[] = [
       B({
         canonicalKey: "vitamin-d3",
         timingReason:
-          "With a morning fat-containing meal — fat aids absorption and it suits a daytime rhythm.",
+          "With a morning fat-containing meal — fat aids absorption. If you take warfarin, the K2 component is contraindicated — switch to D3-only.",
         title: "Vitamin D3 + K2",
         block: "morning",
         anchor: "wake",
         offsetMin: 90,
         dose: "2,000–5,000 IU D3 + K2",
         rationale:
-          "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries.",
+          "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries. K2 directly antagonizes warfarin — anyone on warfarin should take D3 alone, not D3+K2.",
         recommendedBy: ["Clinical research"],
         icon: "sun",
         leverage: 2,
@@ -608,19 +618,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "avoid",
       }),
-      B({
-        canonicalKey: "extra-sleep",
-        timingReason:
-          "Set at night — protecting the sleep opportunity is the recovery itself.",
-        title: "Protect 8.5h sleep opportunity",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -30,
-        rationale: "Recovery is built in bed before it's built in the gym.",
-        icon: "bed",
-        leverage: 3,
-        kind: "action",
-      }),
+      EXTRA_SLEEP,
       MAGNESIUM_PM,
       WIND_DOWN,
     ],
@@ -666,26 +664,18 @@ export const PACKS: ProtocolPack[] = [
     source: "official",
     durationLabel: "4–7 days",
     behaviors: [
-      NEW_TZ_SUNLIGHT,
+      // Use the canonical MORNING_SUNLIGHT atom. For a jetlagged user,
+      // destination morning IS their morning — the circadian-anchor
+      // framing applies either way, and merging eliminates a duplicate
+      // card when stacked with Longevity Foundation or Better Sleep.
+      MORNING_SUNLIGHT,
       ANCHOR_MEAL,
       TRAVEL_HYDRATE,
       ARRIVAL_WALK,
-      B({
-        canonicalKey: "delay-caffeine-tz",
-        timingReason:
-          "~90 min after waking at destination — anchors alertness to the new morning instead of pulling you back to departure-time.",
-        title: "Caffeine at new-morning + 90",
-        block: "morning",
-        anchor: "wake",
-        offsetMin: 90,
-        dose: "Normal dose, new timezone",
-        rationale:
-          "Caffeine timing reinforces the new wake-time; off-timezone caffeine prolongs misalignment.",
-        recommendedBy: ["Neuroscience research"],
-        icon: "coffee",
-        leverage: 2,
-        kind: "action",
-      }),
+      // Use the canonical DELAY_CAFFEINE atom. Same intent, same offset,
+      // same advice — the timezone framing was carried in a duplicate
+      // canonicalKey that defeated the merge contract.
+      DELAY_CAFFEINE,
       NO_ARRIVAL_ALCOHOL,
       STRATEGIC_MELATONIN,
       WIND_DOWN,
@@ -795,12 +785,16 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "sauna-pm",
+        // Moved to bed-210 (was -180) so sauna doesn't render at the
+        // same clock-time as last-meal-3h (bed-180). The "finish 1-2h
+        // before bed" guidance is preserved — a 25-min session starting
+        // bed-210 ends ~bed-185, comfortably within the window.
         timingReason:
           "Evening — heat shock lowers cortisol, raises HRV, and supports sleep when finished ~1–2h before bed.",
         title: "Sauna session",
         block: "evening",
         anchor: "bed",
-        offsetMin: -180,
+        offsetMin: -210,
         dose: "15–25 min, 80–90°C, 2–4×/wk",
         rationale:
           "Regular sauna is associated with lower all-cause and cardiovascular mortality.",
@@ -814,12 +808,15 @@ export const PACKS: ProtocolPack[] = [
       }),
       B({
         canonicalKey: "post-sauna-hydrate",
+        // Moved to bed-165 (was -150) to stay just-after-sauna while
+        // not colliding with evening-walk's new bed-135 slot in
+        // Evening Shutdown.
         timingReason:
           "Right after sauna — heavy fluid and electrolyte replacement protects against orthostatic dips and cramping.",
         title: "Replenish electrolytes after sauna",
         block: "evening",
         anchor: "bed",
-        offsetMin: -150,
+        offsetMin: -165,
         dose: "500 ml + sodium/potassium",
         rationale:
           "Sauna sweat loss is mostly water + sodium; replace both.",
@@ -1056,14 +1053,14 @@ export const PACKS: ProtocolPack[] = [
       B({
         canonicalKey: "vitamin-d3",
         timingReason:
-          "With a morning fat-containing meal — fat aids absorption and it suits a daytime rhythm.",
+          "With a morning fat-containing meal — fat aids absorption. If you take warfarin, the K2 component is contraindicated — switch to D3-only.",
         title: "Vitamin D3 + K2",
         block: "morning",
         anchor: "wake",
         offsetMin: 90,
         dose: "2,000–5,000 IU D3 + K2",
         rationale:
-          "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries.",
+          "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries. K2 directly antagonizes warfarin — anyone on warfarin should take D3 alone, not D3+K2.",
         recommendedBy: ["Clinical research"],
         icon: "sun",
         leverage: 2,
@@ -1309,10 +1306,20 @@ export const PACKS: ProtocolPack[] = [
       CAFFEINE_CUTOFF,
       LAST_MEAL_3H,
       // Evening walk at -150 (was -120, which collided with dim-lights
-      // at the same offset). The sequence reads naturally now:
-      // bed-210 alcohol-cutoff → bed-180 last-meal → bed-150 walk →
-      // bed-120 dim-lights → bed-90 cool-room → bed-60 screens-off →
-      // bed-45 magnesium → bed-30 wind-down.
+      // Full pre-bed cadence — every offset distinct so a power-user
+      // installing Cold/Heat + Evening Shutdown + Better Sleep
+      // simultaneously doesn't see clock-time pile-ups:
+      //   bed-240 alcohol-cutoff
+      //   bed-210 sauna-pm (Cold/Heat)
+      //   bed-180 last-meal-3h
+      //   bed-165 post-sauna-hydrate (Cold/Heat)
+      //   bed-135 evening-walk
+      //   bed-120 dim-lights
+      //   bed-90  cool-room
+      //   bed-60  screens-off
+      //   bed-50  strategic-melatonin (Jetlag)
+      //   bed-45  magnesium-pm
+      //   bed-30  wind-down
       B({
         canonicalKey: "evening-walk",
         timingReason:
@@ -1320,7 +1327,7 @@ export const PACKS: ProtocolPack[] = [
         title: "Evening walk",
         block: "evening",
         anchor: "bed",
-        offsetMin: -150,
+        offsetMin: -135,
         dose: "15 min easy pace",
         rationale:
           "Helps digestion, lowers post-meal glucose, and signals end-of-day to the nervous system.",
@@ -1328,18 +1335,14 @@ export const PACKS: ProtocolPack[] = [
         leverage: 2,
         kind: "action",
       }),
-      // alcohol-cutoff at -210 (3.5h before bed) instead of -180 so
-      // it doesn't visually pile on the same line as last-meal-3h
-      // (which is the evening-walk -120 vs last-meal -180 sequence,
-      // already a fixed bed-side cadence).
       B({
         canonicalKey: "alcohol-cutoff",
         timingReason:
-          "Within ~3.5h of bed — alcohol blocks REM even at small doses; close the window before the last meal.",
-        title: "No alcohol within 3h of bed",
+          "4h before bed — alcohol blocks REM even at small doses; close the window early so dinner can land.",
+        title: "No alcohol within 4h of bed",
         block: "evening",
         anchor: "bed",
-        offsetMin: -210,
+        offsetMin: -240,
         rationale:
           "Alcohol fragments sleep architecture and suppresses REM, even at modest doses.",
         recommendedBy: ["Sleep research"],
@@ -1400,20 +1403,11 @@ export const PACKS: ProtocolPack[] = [
       // their deload day, they can disable it on other days via the
       // behavior override sheet.
       NSDR,
-      B({
-        canonicalKey: "extra-sleep",
-        timingReason:
-          "Set at night — protecting the sleep opportunity is the recovery itself.",
-        title: "Protect 8.5h sleep opportunity",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -30,
-        rationale: "Recovery is built in bed before it's built in the gym.",
-        icon: "bed",
-        leverage: 3,
-        kind: "action",
-        daysActive: [false, false, false, false, false, false, true],
-      }),
+      // Use the shared EXTRA_SLEEP atom (daily). The earlier Sun-only
+      // daysActive collapsed to "every day" anyway via the merge rule
+      // when stacked with Burnout Recovery; making it daily-in-both
+      // packs eliminates the merge inconsistency.
+      EXTRA_SLEEP,
     ],
   },
 ];
@@ -1616,15 +1610,19 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   }),
   B({
     canonicalKey: "berberine",
+    // Contraindication moved INTO timingReason so it surfaces on the
+    // Today timeline card, not buried in the long-form rationale that
+    // only opens on tap. Hypoglycemia risk + diabetes meds is the
+    // single most-important real-world interaction here.
     timingReason:
-      "Before carb-heavy meals — peak effect is on the next-meal glucose response.",
+      "Before carb-heavy meals — peak effect is on the next-meal glucose response. Hypoglycemia risk if you take diabetes medication — talk to your clinician first.",
     title: "Berberine",
     block: "anytime",
     anchor: "wake",
     offsetMin: 0,
     dose: "500 mg pre-meal",
     rationale:
-      "Improves insulin sensitivity; talk to a clinician before stacking with other glucose meds.",
+      "Improves insulin sensitivity. Contraindicated with metformin / sulfonylureas / insulin without supervision — additive hypoglycemia is real.",
     icon: "pill",
     leverage: 1,
     kind: "action",
@@ -1793,9 +1791,9 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     block: "morning",
     anchor: "wake",
     offsetMin: 10,
-    dose: "300 mg",
+    dose: "300–500 mg",
     rationale:
-      "Alternative NAD+ precursor; some prefer NR's longer track record over NMN.",
+      "Alternative NAD+ precursor; some prefer NR's longer human-trial track record over NMN. Published trials used 300–1000 mg.",
     icon: "flask",
     leverage: 1,
     kind: "action",
@@ -1823,9 +1821,9 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     block: "morning",
     anchor: "wake",
     offsetMin: 90,
-    dose: "100–200 mg ubiquinol",
+    dose: "100–200 mg",
     rationale:
-      "Mitochondrial electron-transport-chain cofactor; depleted by statins and aging.",
+      "Mitochondrial electron-transport-chain cofactor; depleted by statins and aging. Ubiquinol (reduced form) absorbs better and is preferred for users over 40 or on statins; ubiquinone is fine and cheaper for younger users.",
     icon: "pill",
     leverage: 1,
     kind: "action",
@@ -1833,14 +1831,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "curcumin",
     timingReason:
-      "With a meal containing fat + black pepper — fat-soluble; piperine increases bioavailability ~20x.",
+      "With a fat + black pepper meal for absorption — antiplatelet activity, check with clinician if on blood thinners.",
     title: "Curcumin (with piperine)",
     block: "anytime",
     anchor: "wake",
     offsetMin: 0,
     dose: "500–1000 mg with BioPerine",
     rationale:
-      "Anti-inflammatory; consistent with cardiovascular and joint-health benefits across trials.",
+      "Anti-inflammatory; consistent benefits across cardiovascular + joint-health trials. Contraindicated with warfarin / aspirin / clopidogrel — has measurable antiplatelet effect.",
     icon: "leaf",
     leverage: 1,
     kind: "action",
@@ -1863,14 +1861,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "quercetin",
     timingReason:
-      "Morning with food — antihistamine and senolytic properties; works synergistically with curcumin.",
+      "Morning with food — antihistamine and polyphenol benefits; works synergistically with curcumin.",
     title: "Quercetin",
     block: "morning",
     anchor: "wake",
     offsetMin: 90,
     dose: "250–500 mg",
     rationale:
-      "Polyphenol with antihistamine, senolytic, and metabolic-support evidence.",
+      "Polyphenol with antihistamine and metabolic-support evidence. Note: senolytic effects require *pulsed* dosing (specific intermittent protocols) — daily dosing here is for the antihistamine / polyphenol benefits, not senolysis.",
     icon: "leaf",
     leverage: 1,
     kind: "action",
@@ -1883,9 +1881,9 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     block: "morning",
     anchor: "wake",
     offsetMin: 60,
-    dose: "1–6 mg",
+    dose: "1–3 mg supplement (or wheat germ for higher amounts)",
     rationale:
-      "Triggers autophagy; food sources include wheat germ, aged cheese, mushrooms.",
+      "Triggers autophagy; food sources include wheat germ, aged cheese, mushrooms. Commercial supplements typically 1 mg; wheat-germ-derived can be 5–6 mg.",
     icon: "leaf",
     leverage: 1,
     kind: "action",
@@ -1893,14 +1891,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "nac",
     timingReason:
-      "Morning on empty stomach — glutathione precursor; best absorbed without protein competition.",
+      "Morning on empty stomach — glutathione precursor. Avoid combining with nitroglycerin (rare BP-lowering effect).",
     title: "NAC (N-Acetyl Cysteine)",
     block: "morning",
     anchor: "wake",
     offsetMin: 30,
     dose: "600–1200 mg",
     rationale:
-      "Glutathione precursor; supports detox pathways and lung/liver health.",
+      "Glutathione precursor; supports detox pathways and lung/liver health. Mild blood-pressure-lowering effect — caution if combined with nitroglycerin or other vasodilators.",
     icon: "pill",
     leverage: 1,
     kind: "action",
@@ -2028,14 +2026,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "zinc",
     timingReason:
-      "With dinner (away from coffee/tea) — competes with copper; cycle to prevent imbalance.",
+      "With dinner (away from coffee/tea). Pair with 1–2 mg copper if dosing >15 mg long-term.",
     title: "Zinc",
     block: "evening",
     anchor: "wake",
     offsetMin: 720,
     dose: "15–30 mg picolinate",
     rationale:
-      "Cofactor in 300+ enzymes; supports immune function, testosterone, wound healing.",
+      "Cofactor in 300+ enzymes; supports immune function, testosterone, wound healing. Long-term zinc above 15 mg/day without paired copper (~1–2 mg) can cause copper-deficiency anemia.",
     icon: "pill",
     leverage: 1,
     kind: "action",
@@ -2058,14 +2056,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "iodine",
     timingReason:
-      "Anytime — thyroid hormone backbone; test before supplementing high doses.",
+      "If you have or suspect autoimmune thyroid disease, test TSH/TPO antibodies first — iodine can flare Hashimoto's even at RDA doses.",
     title: "Iodine",
     block: "anytime",
     anchor: "wake",
     offsetMin: 0,
     dose: "150–300 mcg",
     rationale:
-      "Essential for thyroid hormone synthesis; common deficiency outside iodized-salt regions.",
+      "Essential for thyroid hormone synthesis; common deficiency outside iodized-salt regions. Important caveat: in autoimmune thyroiditis (Hashimoto's), even RDA-range iodine can flare disease; test thyroid antibodies first.",
     icon: "pill",
     leverage: 1,
     kind: "action",
@@ -2073,14 +2071,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "probiotics",
     timingReason:
-      "Morning on empty stomach OR pre-bed — both windows have evidence; consistency matters more than time.",
+      "With breakfast — food buffers stomach acid so more live organisms survive transit.",
     title: "Probiotic (multi-strain)",
     block: "morning",
     anchor: "wake",
-    offsetMin: 15,
+    offsetMin: 90,
     dose: "10–50 billion CFU, 5+ strains",
     rationale:
-      "Diversifies the gut microbiome; supports digestion and immune function.",
+      "Diversifies the gut microbiome; supports digestion and immune function. Consistency matters more than perfect timing.",
     icon: "leaf",
     leverage: 1,
     kind: "action",
@@ -2088,14 +2086,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "l-citrulline",
     timingReason:
-      "Pre-workout (30–60 min before) — boosts nitric oxide for blood flow and pump.",
+      "30–60 min pre-workout — boosts nitric oxide for blood flow and pump.",
     title: "L-Citrulline",
     block: "afternoon",
     anchor: "wake",
     offsetMin: 300,
-    dose: "6–8 g malate",
+    dose: "6–8 g citrulline malate (or 3–6 g pure L-citrulline)",
     rationale:
-      "Increases nitric oxide, improving exercise endurance and blood flow.",
+      "Increases nitric oxide, improving exercise endurance and blood flow. Note: 'citrulline malate' is a 1:1 or 2:1 blend; pure L-citrulline doses are roughly half.",
     icon: "flask",
     leverage: 1,
     kind: "action",
@@ -2313,35 +2311,42 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     leverage: 2,
     kind: "action",
   }),
+  // CGM trial + quarterly labs are INTERMITTENT practices — they
+  // shouldn't show as daily todos. Until BehaviorDef gains a proper
+  // cadence field (weekly/monthly/quarterly), we approximate via a
+  // Sunday-only daysActive so they surface once per week as a calm
+  // reminder, not 7×/wk noise. Leverage dropped to 1.
   B({
     canonicalKey: "cgm-tracking",
     timingReason:
-      "Continuous — a 2-week CGM trial reveals individual glucose responses to specific foods.",
-    title: "Continuous glucose monitor trial",
+      "Once a week, review your CGM data window — patterns emerge over weeks, not days.",
+    title: "Review CGM trends",
     block: "anytime",
     anchor: "wake",
     offsetMin: 0,
-    dose: "2 weeks · check post-meal spikes",
+    dose: "10 min · weekly review",
     rationale:
-      "Reveals personal glucose responses, often surprising even for fit, healthy people.",
+      "Trial a CGM for 2 weeks; the value is in patterns across many meals, not single readings.",
     icon: "pulse",
-    leverage: 2,
+    leverage: 1,
     kind: "action",
+    daysActive: [false, false, false, false, false, false, true],
   }),
   B({
     canonicalKey: "quarterly-labs",
     timingReason:
-      "Quarterly — labs reveal trends invisible to symptoms; especially after protocol changes.",
-    title: "Quarterly bloodwork",
+      "Weekly reminder to check whether quarterly bloodwork is due — labs reveal trends invisible to symptoms.",
+    title: "Bloodwork check-in",
     block: "anytime",
     anchor: "wake",
     offsetMin: 0,
-    dose: "Lipids, A1c, hsCRP, vitamin D, ferritin, hormones",
+    dose: "Quarterly · lipids, A1c, hsCRP, vit D, ferritin, hormones",
     rationale:
-      "Most longevity-relevant changes are invisible without measurement; quarterly is the right cadence.",
+      "Most longevity-relevant changes are invisible without measurement. Quarterly is the right cadence; the weekly check-in just prompts you to schedule when due.",
     icon: "pulse",
-    leverage: 2,
+    leverage: 1,
     kind: "action",
+    daysActive: [false, false, false, false, false, false, true],
   }),
   B({
     canonicalKey: "hot-tub",
