@@ -161,32 +161,45 @@ export default function OnboardingPage() {
   const [wakeTime, setWakeTime] = useState("06:30");
 
   // Compute the personalized starting system.
+  //
+  // Calm-system direction: Day-1 floor is ONE starter pack, not two
+  // defaults. Stacking 12+ behaviors on someone who hasn't proved they
+  // can hold one is a behavior-change cliff (median habit automaticity
+  // is ~66 days for a single behavior in willing samples). The system
+  // earns the right to grow — additional packs are one tap away in
+  // /protocols#discover, but we don't impose them.
+  //
+  // Selection: pick the SINGLE pack most aligned with the user's
+  // stated goal/focus/baseline. Longevity Foundation is the catch-all
+  // fallback when no clearer signal exists. "Deep experience" users
+  // can still get a 3-pack starter — they've self-identified as ready.
   const packs = useMemo(() => {
-    const ids = new Set<string>(["longevity-foundation"]);
-    if (
-      goal === "sleep" ||
-      sleepBaseline === "rough" ||
-      focus.includes("sleep")
-    )
-      ids.add("better-sleep");
-    if (goal === "energy" || focus.includes("focus"))
-      ids.add("deep-focus");
-    if (goal === "body" || focus.includes("nutrition"))
-      ids.add("blood-sugar");
-    if (overwhelm === "stretched" && focus.includes("stress"))
-      ids.add("burnout-recovery");
-    if (focus.includes("supplements")) ids.add("daily-essentials");
+    // Prioritized goal → pack mapping. First match wins as the
+    // starter; everything else gets discovered later.
+    let starter = "longevity-foundation"; // default fallback
+    if (sleepBaseline === "rough" || goal === "sleep" || focus.includes("sleep"))
+      starter = "better-sleep";
+    else if (overwhelm === "stretched" && focus.includes("stress"))
+      starter = "burnout-recovery";
+    else if (goal === "energy" || focus.includes("focus"))
+      starter = "deep-focus";
+    else if (goal === "body" || focus.includes("nutrition"))
+      starter = "blood-sugar";
 
-    let list = [...ids];
-    // Reduce overwhelm: cap the starting system for stretched / new users.
-    const cap =
-      overwhelm === "stretched" || experience === "new"
-        ? 2
-        : experience === "deep"
-        ? 5
-        : 3;
-    list = list.slice(0, cap);
-    return list
+    const ids: string[] = [starter];
+    // "Deep into it" users have self-identified as ready for more —
+    // give them up to 3 packs, but still ramp gently.
+    if (experience === "deep") {
+      // Layer in complementary packs based on goal/focus, dedupe.
+      const extras = new Set<string>();
+      if (starter !== "longevity-foundation")
+        extras.add("longevity-foundation");
+      if (focus.includes("supplements")) extras.add("daily-essentials");
+      if (focus.includes("body") || goal === "body")
+        extras.add("metabolic-health");
+      [...extras].slice(0, 2).forEach((id) => ids.push(id));
+    }
+    return ids
       .map((id) => packById(id))
       .filter((p): p is NonNullable<typeof p> => !!p);
   }, [goal, sleepBaseline, focus, overwhelm, experience]);

@@ -19,7 +19,9 @@ import {
   shapeTimeline,
   effectiveKey,
   blockIntelligence,
+  validateAtom,
 } from "@/lib/engine";
+import { PACKS } from "@/lib/packs";
 import {
   listBehaviorAtoms,
   customCanonicalKey,
@@ -193,6 +195,165 @@ describe("CONFLICT_PAIRS — fasting restraint mutes breakfast (not strength)", 
     // Strength is NOT collateral damage from the fasting restraint.
     // Strength is only muted when "no-intense" is active.
     expect(strength?.muted).toBeFalsy();
+  });
+});
+
+describe("validateAtom — invariant checks the type system can't catch", () => {
+  it("accepts every curated atom in the catalog", () => {
+    // Build the full known-key universe (every canonicalKey across all
+    // curated packs) so derivedFrom / targets references can be
+    // validated cross-atom. If any curated atom fails, the test name
+    // surfaces the offender — this is the build-time typo guard.
+    const knownKeys = new Set<string>();
+    for (const p of PACKS) for (const b of p.behaviors) knownKeys.add(b.canonicalKey);
+    const failures: string[] = [];
+    for (const p of PACKS) {
+      for (const b of p.behaviors) {
+        const errs = validateAtom(b, knownKeys);
+        if (errs.length)
+          failures.push(
+            `${p.id}:${b.canonicalKey} → ${errs
+              .map((e) => `${e.field}: ${e.message}`)
+              .join("; ")}`
+          );
+      }
+    }
+    if (failures.length) throw new Error(failures.join("\n"));
+  });
+
+  it("rejects malformed canonicalKey", () => {
+    const errs = validateAtom({
+      canonicalKey: "Has Spaces And Caps",
+      title: "X",
+      block: "morning",
+      anchor: "wake",
+      offsetMin: 0,
+      rationale: "",
+      icon: "sparkle",
+      leverage: 2,
+      kind: "action",
+    });
+    expect(errs.some((e) => e.field === "canonicalKey")).toBe(true);
+  });
+
+  it("rejects daysActive of wrong length", () => {
+    const errs = validateAtom({
+      canonicalKey: "x",
+      title: "X",
+      block: "morning",
+      anchor: "wake",
+      offsetMin: 0,
+      rationale: "",
+      icon: "sparkle",
+      leverage: 2,
+      kind: "action",
+      daysActive: [true, true, true],
+    });
+    expect(errs.some((e) => e.field === "daysActive")).toBe(true);
+  });
+
+  it("rejects out-of-range offsetMin (e.g., -9999)", () => {
+    const errs = validateAtom({
+      canonicalKey: "x",
+      title: "X",
+      block: "morning",
+      anchor: "wake",
+      offsetMin: -9999,
+      rationale: "",
+      icon: "sparkle",
+      leverage: 2,
+      kind: "action",
+    });
+    expect(errs.some((e) => e.field === "offsetMin")).toBe(true);
+  });
+
+  it("rejects block/anchor contradictions (bed-anchored in morning block)", () => {
+    const errs = validateAtom({
+      canonicalKey: "x",
+      title: "X",
+      block: "morning",
+      anchor: "bed",
+      offsetMin: -45,
+      rationale: "",
+      icon: "sparkle",
+      leverage: 2,
+      kind: "action",
+    });
+    expect(errs.some((e) => e.field === "block")).toBe(true);
+  });
+
+  it("rejects derivedFrom/targets that point at unknown keys", () => {
+    const known = new Set(["real-key"]);
+    const errs = validateAtom(
+      {
+        canonicalKey: "x",
+        title: "X",
+        block: "morning",
+        anchor: "wake",
+        offsetMin: 30,
+        rationale: "",
+        icon: "sparkle",
+        leverage: 2,
+        kind: "action",
+        derivedFrom: "ghost-key",
+        targets: ["another-ghost"],
+      },
+      known
+    );
+    expect(errs.find((e) => e.field === "derivedFrom")).toBeTruthy();
+    expect(errs.find((e) => e.field === "targets")).toBeTruthy();
+  });
+});
+
+describe("safety-flag suppression — atoms with contraindications hide from the timeline", () => {
+  it("hides cold-plunge-am from a pregnant user", () => {
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["cold-heat-therapy"],
+      settings: {
+        ...st.settings,
+        safetyFlags: { pregnant: true },
+      },
+    };
+    const tl = compileTimeline(st, 0);
+    expect(tl.find((i) => i.canonicalKey === "cold-plunge-am")).toBeUndefined();
+    expect(tl.find((i) => i.canonicalKey === "sauna-pm")).toBeUndefined();
+  });
+
+  it("hides delay-first-meal from an under-18 user", () => {
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["fasted-mornings"],
+      settings: {
+        ...st.settings,
+        safetyFlags: { "under-18": true },
+      },
+    };
+    const tl = compileTimeline(st, 0);
+    expect(
+      tl.find((i) => i.canonicalKey === "delay-first-meal")
+    ).toBeUndefined();
+  });
+
+  it("leaves non-contraindicated atoms in place", () => {
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["cold-heat-therapy"],
+      settings: {
+        ...st.settings,
+        safetyFlags: { pregnant: true },
+      },
+    };
+    const tl = compileTimeline(st, 0);
+    // The "no-cold-post-lift" rule isn't flagged for pregnancy, so it
+    // should still appear (it's an avoid card, harmless to a pregnant
+    // user — and zero risk to surface).
+    expect(
+      tl.find((i) => i.canonicalKey === "no-cold-post-lift")
+    ).toBeTruthy();
   });
 });
 

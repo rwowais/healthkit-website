@@ -111,6 +111,19 @@ export interface UserSettings {
   experience?: "new" | "some" | "deep";
   hasWearable?: boolean;
 
+  /**
+   * Calm safety gating — these flags suppress contraindicated atoms
+   * from the merged timeline + auto-suggestions. Collected
+   * non-clinically during onboarding (one optional step, skippable).
+   * Empty/undefined = no gating applied (the default for everyone
+   * who skips). Tone is "let us tailor this for you", not "medical
+   * intake." Stored client-side AND synced; never auto-derived.
+   *
+   * Type forward-references SafetyFlag (defined further down in this
+   * module — same-file interface forward refs are fine in TS).
+   */
+  safetyFlags?: Partial<Record<SafetyFlag, boolean>>;
+
   // Monetization (gating + Stripe wired in a later phase)
   tier?: "free" | "premium";
   /** ISO; reverse-trial: full Premium intelligence until this date. */
@@ -229,7 +242,52 @@ export interface BehaviorDef {
    * THAT row" without an engine deciding for them.
    */
   targets?: string[];
+  /**
+   * Evidence tier. Set explicitly on atoms making non-trivial scientific
+   * claims so the surface can frame them with appropriate humility:
+   *   "established"  — well-replicated, mainstream consensus (sleep
+   *                    duration, protein for muscle, hydration)
+   *   "emerging"     — meaningful evidence, still being characterized
+   *                    in humans (cold exposure, sauna, time-restricted
+   *                    eating, NSDR)
+   *   "exploratory"  — mechanistic / observational / animal-heavy basis
+   *                    with thin or null human RCT data (NMN, resveratrol,
+   *                    spermidine, red light, grounding)
+   * Absent = "no claim being made" (e.g., simple lifestyle atoms like
+   * "go for a walk"). Surfaces as a small badge in BehaviorSheet and
+   * tightens the copy in rationale / evidence fields.
+   */
+  evidenceTier?: "established" | "emerging" | "exploratory";
+  /**
+   * Safety flags this atom is contraindicated for. The engine SUPPRESSES
+   * the atom (drops it from the merged timeline AND keeps it out of
+   * auto-suggestions) when the user's settings carry any matching flag.
+   * Calm + quiet: the user never sees a clinical warning; the atom
+   * simply doesn't appear. Library picker still shows the atom with
+   * an "Not recommended for {flag}" hint so a curious user can still
+   * inspect it but has to consciously override.
+   *
+   * Values map to keys in UserSettings.safetyFlags. Adding a new flag
+   * here is the only change needed to wire it through.
+   */
+  contraindications?: SafetyFlag[];
 }
+
+/**
+ * Safety flag identifiers. Kept narrow on purpose — this is calm
+ * gating, not clinical intake. New flags require an explicit data-
+ * model + onboarding decision.
+ */
+export type SafetyFlag =
+  | "pregnant"
+  | "breastfeeding"
+  | "under-18"
+  | "anticoagulants" // warfarin / DOACs / antiplatelets
+  | "diabetes-meds" // metformin / sulfonylureas / insulin
+  | "thyroid-meds" // levothyroxine
+  | "ssri" // SSRIs / SNRIs
+  | "eating-disorder-history"
+  | "cardiac-arrhythmia";
 
 export interface ProtocolPack {
   id: string;

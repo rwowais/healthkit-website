@@ -70,6 +70,20 @@ export function compileTimeline(
   const installed = new Set(state.installedPacks ?? []);
   const paused = new Set(state.pausedPacks ?? []);
   const overrides = state.behaviorOverrides ?? {};
+  // Calm safety gating: if the user has any safetyFlags set, suppress
+  // contraindicated atoms from the merged timeline entirely. The atom
+  // is still installable from the library picker (so a user can choose
+  // to override consciously per-instance), but the system never
+  // foregrounds it. This is the "lightweight safety gating without
+  // clinical intake" the calm-system direction calls for.
+  const userFlags = state.settings?.safetyFlags ?? {};
+  const hasFlag = (b: BehaviorDef): boolean => {
+    if (!b.contraindications || b.contraindications.length === 0)
+      return false;
+    return b.contraindications.some(
+      (flag) => userFlags[flag] === true
+    );
+  };
   // Merge by effectiveKey (derivedFrom ?? canonicalKey) so a forked
   // pack's "wind-down" (canonicalKey: "fork:abc:wind-down", derivedFrom:
   // "wind-down") merges with the curated Better Sleep "wind-down" into
@@ -84,6 +98,10 @@ export function compileTimeline(
     for (const b of pack.behaviors) {
       const ov: BehaviorOverride | undefined = overrides[b.canonicalKey];
       if (ov?.disabled) continue;
+      // Suppress contraindicated atoms. The user toggled a safety flag
+      // during onboarding (or in profile); we honor it without ever
+      // showing a clinical warning. Quiet trust.
+      if (hasFlag(b)) continue;
       const mergeKey = b.derivedFrom ?? b.canonicalKey;
       const existing = merged.get(mergeKey);
       if (!existing) {
@@ -114,8 +132,18 @@ export function compileTimeline(
           ])
         );
         if (!existing.dose && b.dose) existing.dose = b.dose;
-        if (!existing.daysActive || !b.daysActive)
-          existing.daysActive = undefined;
+        // daysActive UNION across packs (was: collapse-to-undefined
+        // when either side was missing or arrays disagreed, which made
+        // Heart Health's Tue/Thu/Sun strength and Longevity Foundation's
+        // Mon/Wed/Fri strength merge into "every day" — quietly more
+        // than either pack actually wanted). Now: missing = all 7 days
+        // by convention; union per-day so a user with both packs gets
+        // strength on Mon/Tue/Wed/Thu/Fri/Sun (everything either pack
+        // requested), not silent collapse.
+        const a = existing.daysActive ?? [true, true, true, true, true, true, true];
+        const c = b.daysActive ?? [true, true, true, true, true, true, true];
+        const union = a.map((v, i) => v || c[i]);
+        existing.daysActive = union.every((v) => v) ? undefined : union;
         // Apply THIS behavior's override even on merge — without
         // this, when a forked pack's `fork:abc:wind-down` merges with
         // the curated `wind-down`, only the first-visited behavior's
@@ -437,6 +465,96 @@ export function adapt(state: AppState): Adaptation {
  */
 export function effectiveKey(it: { canonicalKey: string; derivedFrom?: string }): string {
   return it.derivedFrom ?? it.canonicalKey;
+}
+
+/**
+ * Runtime invariant check on an atom. Returns a list of human-readable
+ * violations (empty = valid). Run at:
+ *   - CMS bundle publish time (reject the bundle if any atom fails)
+ *   - Custom-pack upsert (reject the user input with the violation list)
+ *   - Build-time test (asserts the entire PACKS + STANDALONE_ATOMS set
+ *     is valid; catches typos in newly-added curated atoms)
+ *
+ * The point isn't to encode every possible business rule — it's to
+ * catch the silent-semantic-bug class (typos in canonicalKey, malformed
+ * daysActive, contradictory anchor/block, references to keys that don't
+ * exist) that the TS type system can't see.
+ */
+export interface AtomValidationError {
+  field: string;
+  message: string;
+}
+export function validateAtom(
+  b: BehaviorDef,
+  knownKeys?: Set<string>
+): AtomValidationError[] {
+  const errs: AtomValidationError[] = [];
+  // canonicalKey shape — lowercase, hyphens only, optional namespace
+  // prefix for custom/fork atoms. Curated atoms reject the namespaces.
+  if (!b.canonicalKey || typeof b.canonicalKey !== "string")
+    errs.push({ field: "canonicalKey", message: "missing or not a string" });
+  else if (!/^([a-z][a-z0-9-]*|custom:[^:]+:[a-z0-9-]+|fork:[^:]+:[a-z0-9-]+)$/.test(b.canonicalKey))
+    errs.push({
+      field: "canonicalKey",
+      message: `"${b.canonicalKey}" doesn't match the required shape (lowercase + hyphens, or custom:/fork: namespace)`,
+    });
+  // daysActive must be 7-length boolean if present — the engine indexes
+  // by JS day-of-week (mapped to Mon=0..Sun=6).
+  if (b.daysActive !== undefined) {
+    if (!Array.isArray(b.daysActive) || b.daysActive.length !== 7)
+      errs.push({
+        field: "daysActive",
+        message: `must be a 7-element boolean array (got ${
+          Array.isArray(b.daysActive) ? `length ${b.daysActive.length}` : typeof b.daysActive
+        })`,
+      });
+    else if (b.daysActive.some((v) => typeof v !== "boolean"))
+      errs.push({ field: "daysActive", message: "must contain booleans only" });
+  }
+  // offsetMin sanity — humans don't have wake-relative offsets > 18h
+  // or bed-relative offsets > 12h before/after. Catches typos like -9999.
+  if (typeof b.offsetMin !== "number" || !Number.isFinite(b.offsetMin))
+    errs.push({ field: "offsetMin", message: "must be a finite number" });
+  else if (b.offsetMin < -720 || b.offsetMin > 1080)
+    errs.push({
+      field: "offsetMin",
+      message: `${b.offsetMin} is outside the sensible range (-720..1080)`,
+    });
+  // Block + anchor consistency. A bed-anchored atom in the morning
+  // block is contradictory; flag it.
+  if (b.anchor === "bed" && b.block === "morning")
+    errs.push({
+      field: "block",
+      message: "bed-anchored atoms shouldn't land in the morning block",
+    });
+  if (b.anchor === "wake" && b.block === "evening" && b.offsetMin < 360)
+    errs.push({
+      field: "block",
+      message:
+        "wake-anchored atoms in the evening block need offsetMin >= 360 (6h after wake)",
+    });
+  // leverage typed-but-trust-but-verify
+  if (![1, 2, 3].includes(b.leverage as number))
+    errs.push({ field: "leverage", message: `must be 1, 2, or 3 (got ${b.leverage})` });
+  // derivedFrom / targets reference real keys (when knownKeys provided)
+  if (knownKeys) {
+    if (b.derivedFrom && !knownKeys.has(b.derivedFrom))
+      errs.push({
+        field: "derivedFrom",
+        message: `"${b.derivedFrom}" is not a known canonicalKey`,
+      });
+    for (const t of b.targets ?? []) {
+      if (!knownKeys.has(t))
+        errs.push({
+          field: "targets",
+          message: `target "${t}" is not a known canonicalKey`,
+        });
+    }
+  }
+  // kind === "avoid" should usually have targets — soft warning, not an
+  // error, because some avoids are stand-alone rules (no-liquid-sugar).
+  // Skip.
+  return errs;
 }
 
 export const RECOVERY_DEMOTE = new Set([

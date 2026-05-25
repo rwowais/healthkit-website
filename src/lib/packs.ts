@@ -436,7 +436,7 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: 360,
         dose: "3×/week, compound lifts",
         rationale:
-          "Muscle and strength are protective against nearly every cause of late-life decline.",
+          "Muscle and strength are *associated with* lower risk across nearly every cause of late-life decline. Causal direction is debated; both directions probably hold.",
         recommendedBy: ["Longevity research"],
         icon: "dumbbell",
         leverage: 3,
@@ -696,19 +696,31 @@ export const PACKS: ProtocolPack[] = [
       MORNING_SUNLIGHT,
       B({
         canonicalKey: "delay-first-meal",
+        // Time-restricted eating is *not* appropriate for everyone.
+        // Contraindicated during pregnancy/breastfeeding, in under-18s
+        // (growth), and for anyone with an eating-disorder history —
+        // calorie-restriction structures are a known relapse trigger.
         timingReason:
-          "Push the first calorie ~14–16h after dinner — that's where most autophagy and metabolic flexibility benefits accrue.",
+          "Push the first calorie ~14–16h after dinner. Not recommended during pregnancy/breastfeeding, in adolescents, or with an eating-disorder history.",
         title: "Delay first meal to ~11am–1pm",
         block: "morning",
         anchor: "wake",
         offsetMin: 240,
         dose: "Black coffee / tea / water only",
         rationale:
-          "A long overnight fast supports insulin sensitivity, autophagy, and metabolic flexibility.",
+          "Long overnight fasts are associated with better insulin sensitivity and metabolic flexibility in some studies. Causal claims about autophagy in humans remain less certain than the supplement industry suggests. Don't do this if you have an eating-disorder history.",
         recommendedBy: ["Longevity research"],
         icon: "clock",
         leverage: 3,
         kind: "action",
+        evidenceTier: "emerging",
+        contraindications: [
+          "pregnant",
+          "breastfeeding",
+          "under-18",
+          "eating-disorder-history",
+          "diabetes-meds",
+        ],
       }),
       B({
         canonicalKey: "break-fast-protein",
@@ -749,20 +761,26 @@ export const PACKS: ProtocolPack[] = [
       B({
         canonicalKey: "cold-plunge-am",
         timingReason:
-          "Morning — cold delivers a clean, sustained dopamine and noradrenaline lift that's perfect to start the day, and avoids sleep disruption.",
+          "Morning — cold delivers a sustained dopamine and noradrenaline lift. Avoid with cardiac arrhythmia, pregnancy, or Raynaud's; the cold pressor response is real.",
         title: "Cold plunge or cold shower",
         block: "morning",
         anchor: "wake",
         offsetMin: 30,
         dose: "1–3 min, ~10–15°C",
         rationale:
-          "Dopamine and norepinephrine rise sharply and stay elevated; builds stress resilience.",
+          "Cold exposure raises norepinephrine and dopamine for hours; observational data suggests stress-resilience benefits. Acute hemodynamic stress is significant — not appropriate with cardiac arrhythmia, severe hypertension, pregnancy, or Raynaud's.",
         evidence:
-          "Cold exposure (~14°C, 1 min) elevates norepinephrine ~5×; effect lasts hours.",
+          "Cold exposure (~14°C, 1 min) elevates norepinephrine ~5× in small studies; effect lasts hours.",
         recommendedBy: ["Neuroscience research"],
         icon: "snowflake",
         leverage: 2,
         kind: "action",
+        evidenceTier: "emerging",
+        contraindications: [
+          "cardiac-arrhythmia",
+          "pregnant",
+          "under-18",
+        ],
       }),
       B({
         canonicalKey: "no-cold-post-lift",
@@ -797,13 +815,23 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: -210,
         dose: "15–25 min, 80–90°C, 2–4×/wk",
         rationale:
-          "Regular sauna is associated with lower all-cause and cardiovascular mortality.",
+          "Regular sauna is *associated with* lower cardiovascular and all-cause mortality in observational cohorts — that's a correlation, not a proven cause. The mechanistic case (heat shock, HRV) is plausible.",
         evidence:
-          "Finnish cohort studies show 4–7 sauna sessions/week associated with ~40% lower all-cause mortality.",
-        recommendedBy: ["Longevity research"],
+          "Finnish cohort studies report meaningful mortality differences in high-frequency sauna users — observational, so confounders (income, leisure time, baseline health) explain some of the signal.",
+        recommendedBy: ["Observational research"],
         icon: "thermometer",
         leverage: 3,
         kind: "action",
+        evidenceTier: "emerging",
+        // Contraindicated for cardiac arrhythmia (orthostatic + thermal
+        // stress raises risk), pregnancy (hyperthermia caution),
+        // anticoagulants (bleeding + dehydration interaction). The
+        // engine quietly suppresses this atom when any flag is set.
+        contraindications: [
+          "cardiac-arrhythmia",
+          "pregnant",
+          "under-18",
+        ],
         daysActive: [true, false, true, false, true, true, false],
       }),
       B({
@@ -1229,7 +1257,7 @@ export const PACKS: ProtocolPack[] = [
         offsetMin: 360,
         dose: "2 × 30s farmer's carry",
         rationale:
-          "Grip strength is one of the best predictors of all-cause mortality.",
+          "Grip strength *correlates strongly* with all-cause mortality in observational studies — a marker, not necessarily a lever.",
         recommendedBy: ["Longevity research"],
         icon: "hand",
         leverage: 2,
@@ -1771,17 +1799,22 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "nmn",
     timingReason:
-      "Morning on empty stomach — NAD+ precursors align with the body's daytime energy demand.",
+      "Morning on empty stomach — NAD+ precursors align with the body's daytime energy demand. FDA-NDI status is unresolved; talk to a clinician if you have a personal cancer history.",
     title: "NMN (NAD+ precursor)",
     block: "morning",
     anchor: "wake",
     offsetMin: 10,
     dose: "250–500 mg",
     rationale:
-      "Boosts NAD+ levels, which decline with age and govern mitochondrial function and DNA repair.",
+      "Raises NAD+ on biomarker assays. NAD+ declines with age and is involved in mitochondrial function and DNA repair pathways — but meaningful human clinical outcomes (longevity, healthspan markers) remain unproven in RCTs.",
     icon: "flask",
     leverage: 1,
     kind: "action",
+    evidenceTier: "exploratory",
+    // Pregnancy + breastfeeding: no safety data. Active cancer history:
+    // theoretical concern about NAD+ boosting tumor metabolism, though
+    // not established. The engine quietly suppresses.
+    contraindications: ["pregnant", "breastfeeding", "under-18"],
   }),
   B({
     canonicalKey: "nr",
@@ -1853,10 +1886,16 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     offsetMin: 90,
     dose: "250–500 mg trans-resveratrol",
     rationale:
-      "Polyphenol with sirtuin-activating properties in cell studies; human evidence is more modest.",
+      "Polyphenol with sirtuin-activating properties in cell studies. Honest read of human RCTs: most well-controlled trials have been null on the longevity-relevant endpoints. Some users still take it for hormetic / cardiovascular reasons.",
     icon: "leaf",
     leverage: 1,
     kind: "action",
+    evidenceTier: "exploratory",
+    // Aromatase activity affects estrogen sensitive cancers + drug
+    // metabolism; not recommended during pregnancy or for users on
+    // hormone-modulating cancer therapy. Calm suppression for the
+    // flag we collect (pregnancy + active cancer is a future flag).
+    contraindications: ["pregnant", "breastfeeding", "under-18"],
   }),
   B({
     canonicalKey: "quercetin",
@@ -1883,10 +1922,12 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     offsetMin: 60,
     dose: "1–3 mg supplement (or wheat germ for higher amounts)",
     rationale:
-      "Triggers autophagy; food sources include wheat germ, aged cheese, mushrooms. Commercial supplements typically 1 mg; wheat-germ-derived can be 5–6 mg.",
+      "Linked to autophagy pathways in cell and animal studies; observational human data is suggestive but not conclusive. Food sources (wheat germ, aged cheese, mushrooms) are arguably the better starting point than supplements.",
     icon: "leaf",
     leverage: 1,
     kind: "action",
+    evidenceTier: "exploratory",
+    contraindications: ["pregnant", "breastfeeding", "under-18"],
   }),
   B({
     canonicalKey: "nac",
@@ -2194,47 +2235,54 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "red-light-therapy",
     timingReason:
-      "Morning or post-workout — supports mitochondrial function and skin/joint recovery.",
+      "Morning or post-workout — mechanistic case for mitochondrial / skin / joint effects, though clinical evidence is still maturing.",
     title: "Red light therapy",
     block: "morning",
     anchor: "wake",
     offsetMin: 60,
     dose: "10–20 min on target tissue",
     rationale:
-      "Photobiomodulation supports cellular energy production; growing evidence for skin and joint health.",
+      "Photobiomodulation has plausible cellular mechanisms; small clinical trials show modest effects on skin healing and joint pain. Calling this 'proven' would overstate where the evidence is.",
     icon: "sun",
     leverage: 1,
     kind: "action",
+    evidenceTier: "emerging",
   }),
   B({
     canonicalKey: "grounding",
     timingReason:
-      "Anytime outdoors — barefoot contact with soil/grass may modulate inflammation.",
+      "Anytime outdoors — barefoot contact with soil/grass is *associated* with calmer inflammation markers in early studies; treat as low-cost, low-evidence.",
     title: "Grounding (barefoot outdoors)",
     block: "anytime",
     anchor: "wake",
     offsetMin: 0,
     dose: "10–30 min daily",
     rationale:
-      "Direct contact with earth surface modulates inflammation markers in early research.",
+      "Early studies suggest modulation of inflammation markers; evidence is preliminary and mostly small samples. Low-cost, low-risk — good as an outdoor ritual either way.",
     icon: "leaf",
     leverage: 1,
     kind: "action",
+    evidenceTier: "exploratory",
   }),
   B({
     canonicalKey: "wim-hof-breath",
+    // Wim Hof in water has caused fatal vasovagal syncope cases — never
+    // practice in a pool or bath. Pregnancy + cardiac arrhythmia
+    // contraindicated (peripheral vasoconstriction + breath holds).
     timingReason:
-      "Morning — energizing breathwork; can lower stress and inflammation markers.",
+      "Morning, on land only — never in water (vasovagal syncope risk). Avoid if pregnant or with a cardiac arrhythmia.",
     title: "Wim Hof breathing",
     block: "morning",
     anchor: "wake",
     offsetMin: 30,
     dose: "3 rounds · 30 breaths each",
     rationale:
-      "Hyperventilation + breath holds modulate stress response and oxygen tolerance.",
+      "Hyperventilation + breath holds modulate stress response and oxygen tolerance. Several documented drowning deaths from practicing in water; on land only.",
     icon: "wind",
     leverage: 1,
     kind: "action",
+    evidenceTier: "emerging",
+    contraindications: ["pregnant", "cardiac-arrhythmia", "under-18"],
   }),
   B({
     canonicalKey: "foam-rolling",
@@ -2283,8 +2331,10 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
   }),
   B({
     canonicalKey: "mouth-tape",
+    // Mouth-taping with undiagnosed sleep apnea is dangerous — the
+    // mouth can be a compensatory airway. Get a sleep study first.
     timingReason:
-      "Pre-bed — encourages nasal breathing through the night; only if no respiratory issues.",
+      "Pre-bed — only if you've ruled out sleep apnea. Snoring, gasping, or daytime sleepiness? Get a sleep study before trying this.",
     title: "Mouth tape for sleep",
     block: "evening",
     anchor: "bed",
