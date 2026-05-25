@@ -501,6 +501,22 @@ export default function AdminHome() {
     if (gate === "ok" && tab === "engine" && engineSub === "config")
       refreshCfg();
   }, [gate, tab, engineSub]);
+  // Per-key history (cms_revisions for entity_type='config'). Lazy:
+  // only fetched when the user expands a row.
+  const [cfgHistoryOpen, setCfgHistoryOpen] = useState<
+    Record<string, boolean>
+  >({});
+  const [cfgHistoryBy, setCfgHistoryBy] = useState<
+    Record<string, RevisionRow[]>
+  >({});
+  const toggleCfgHistory = async (key: string) => {
+    const isOpen = !cfgHistoryOpen[key];
+    setCfgHistoryOpen((s) => ({ ...s, [key]: isOpen }));
+    if (isOpen && !cfgHistoryBy[key]) {
+      const rows = await listRevisions("config", key, 12);
+      setCfgHistoryBy((s) => ({ ...s, [key]: rows }));
+    }
+  };
 
   const [insTemplates, setInsTemplates] = useState<InsightTemplateRow[]>(
     []
@@ -1299,10 +1315,11 @@ export default function AdminHome() {
           <div className="space-y-2">
             <p className="t-caption leading-relaxed">
               Runtime tunables that gate trial behavior, free-tier
-              caps, and intelligence thresholds. Each row shows the
-              <b> code default</b> shipped in the binary and the{" "}
-              <b>effective</b> value after any published CMS override.
-              Author overrides below — they take effect the moment you
+              caps, and intelligence thresholds. <b>Effective</b> is
+              what the runtime is using right now; <b>fallback</b> is
+              the value baked into the source — what runs when no
+              override has been published (and what Delete reverts to).
+              Author overrides below; they go live the moment you
               Publish.
             </p>
             {CONFIG_ROWS.map((c) => {
@@ -1316,40 +1333,120 @@ export default function AdminHome() {
                 known &&
                 effective != null &&
                 effective !== known.defaultValue;
+              const historyOpen = !!cfgHistoryOpen[c.key];
+              const historyRows = cfgHistoryBy[c.key];
               return (
                 <div
                   key={c.key}
-                  className="flex items-start justify-between gap-3 rounded-[var(--r-md)] p-3.5"
+                  className="rounded-[var(--r-md)] p-3.5"
                   style={surf}
                   title={`${c.key} — ${c.note}`}
                 >
-                  <div className="min-w-0">
-                    <p className="text-[13.5px] font-semibold text-[var(--text-1)]">
-                      {c.key}
-                    </p>
-                    <p className="t-caption mt-0.5">{c.note}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[14px] font-bold text-[var(--text-1)]">
-                      {c.value}
-                    </p>
-                    <p className="text-[10px] text-[var(--text-4)]">
-                      code default
-                    </p>
-                    {known && (
-                      <p
-                        className="mt-1 text-[12px] font-semibold"
-                        style={{
-                          color: overridden
-                            ? "var(--readiness)"
-                            : "var(--text-3)",
-                        }}
-                      >
-                        effective {effective}
-                        {overridden ? " · live" : ""}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-semibold text-[var(--text-1)]">
+                        {c.key}
                       </p>
-                    )}
+                      <p className="t-caption mt-0.5">{c.note}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {known ? (
+                        <>
+                          {/* Effective is now the primary read — your eye
+                              lands on the value the runtime is serving. */}
+                          <p
+                            className="text-[18px] font-bold leading-none"
+                            style={{
+                              color: overridden
+                                ? "var(--readiness)"
+                                : "var(--text-1)",
+                            }}
+                          >
+                            {effective}
+                          </p>
+                          <p
+                            className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                            style={{
+                              color: overridden
+                                ? "var(--readiness)"
+                                : "var(--text-4)",
+                            }}
+                          >
+                            effective{overridden ? " · live" : ""}
+                          </p>
+                          {effective !== known.defaultValue && (
+                            <p className="mt-1 text-[10.5px] text-[var(--text-4)]">
+                              fallback {known.defaultValue}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {/* Documented-only rows (no runtime reader) —
+                              fall back to the original simple layout. */}
+                          <p className="text-[14px] font-bold text-[var(--text-1)]">
+                            {c.value}
+                          </p>
+                          <p className="text-[10px] text-[var(--text-4)]">
+                            {c.kind}
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
+                  {known && (
+                    <>
+                      <button
+                        onClick={() => toggleCfgHistory(c.key)}
+                        className="press tr-fast mt-2 text-[11px] font-semibold text-[var(--text-3)] hover:text-[var(--text-2)]"
+                        title="Recent changes to this override (cms_revisions)."
+                      >
+                        {historyOpen ? "− Hide history" : "↻ History"}
+                      </button>
+                      {historyOpen && (
+                        <div
+                          className="mt-2 rounded-[var(--r-sm)] p-2.5"
+                          style={{ background: "var(--surface-3)" }}
+                        >
+                          {historyRows === undefined ? (
+                            <p className="t-caption">Loading…</p>
+                          ) : historyRows.length === 0 ? (
+                            <p className="t-caption">
+                              No changes yet — this key is on its{" "}
+                              fallback.
+                            </p>
+                          ) : (
+                            <div className="space-y-1 text-[11.5px]">
+                              {historyRows.map((r) => {
+                                const snap = r.snapshot as
+                                  | Record<string, unknown>
+                                  | undefined;
+                                const v =
+                                  snap && "value" in snap
+                                    ? JSON.stringify(snap.value)
+                                    : "—";
+                                return (
+                                  <div
+                                    key={r.id}
+                                    className="flex items-baseline justify-between gap-3"
+                                  >
+                                    <span className="font-mono text-[var(--text-1)]">
+                                      → {v}
+                                    </span>
+                                    <span className="t-caption">
+                                      {new Date(
+                                        r.created_at
+                                      ).toLocaleString()}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               );
             })}
