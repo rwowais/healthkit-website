@@ -1747,6 +1747,739 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     leverage: 1,
     kind: "action",
   }),
+
+  // ── Longevity supplements ─────────────────────────────────────────
+  // Common stack across longevity communities. Doses are starting
+  // points sourced from published research and clinical practice;
+  // anything beyond foundational supplements should be cleared with
+  // a clinician before stacking. Order roughly by how common they
+  // are in long-term protocols.
+
+  B({
+    canonicalKey: "b-complex",
+    timingReason:
+      "Morning with food — B vitamins are energizing for most people; taking them at night can disrupt sleep.",
+    title: "Methylated B-complex",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "1 capsule (methylated forms)",
+    rationale:
+      "Covers methylation cofactors (methyl-B12, methyl-folate, P-5-P) — especially important for MTHFR variants.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "nmn",
+    timingReason:
+      "Morning on empty stomach — NAD+ precursors align with the body's daytime energy demand.",
+    title: "NMN (NAD+ precursor)",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 10,
+    dose: "250–500 mg",
+    rationale:
+      "Boosts NAD+ levels, which decline with age and govern mitochondrial function and DNA repair.",
+    icon: "flask",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "nr",
+    timingReason:
+      "Morning on empty stomach — NAD+ precursors align with the body's daytime energy demand.",
+    title: "NR (Nicotinamide riboside)",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 10,
+    dose: "300 mg",
+    rationale:
+      "Alternative NAD+ precursor; some prefer NR's longer track record over NMN.",
+    icon: "flask",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "tmg",
+    timingReason:
+      "With NAD+ precursors — TMG donates a methyl group to balance the methylation NAD+ supplementation consumes.",
+    title: "TMG (Trimethylglycine)",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 15,
+    dose: "500–1000 mg",
+    rationale:
+      "Replenishes methyl groups depleted by NAD+ pathway; important when stacking with NMN/NR.",
+    icon: "flask",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "coq10",
+    timingReason:
+      "With a fat-containing meal — fat-soluble; absorption is much better with dietary fat.",
+    title: "CoQ10 / Ubiquinol",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "100–200 mg ubiquinol",
+    rationale:
+      "Mitochondrial electron-transport-chain cofactor; depleted by statins and aging.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "curcumin",
+    timingReason:
+      "With a meal containing fat + black pepper — fat-soluble; piperine increases bioavailability ~20x.",
+    title: "Curcumin (with piperine)",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "500–1000 mg with BioPerine",
+    rationale:
+      "Anti-inflammatory; consistent with cardiovascular and joint-health benefits across trials.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "resveratrol",
+    timingReason:
+      "With breakfast (fat-soluble) — though clinical evidence is mixed compared to other longevity compounds.",
+    title: "Resveratrol",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "250–500 mg trans-resveratrol",
+    rationale:
+      "Polyphenol with sirtuin-activating properties in cell studies; human evidence is more modest.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "quercetin",
+    timingReason:
+      "Morning with food — antihistamine and senolytic properties; works synergistically with curcumin.",
+    title: "Quercetin",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "250–500 mg",
+    rationale:
+      "Polyphenol with antihistamine, senolytic, and metabolic-support evidence.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "spermidine",
+    timingReason:
+      "Morning — supports autophagy (cellular self-cleaning) which compounds across the day.",
+    title: "Spermidine",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 60,
+    dose: "1–6 mg",
+    rationale:
+      "Triggers autophagy; food sources include wheat germ, aged cheese, mushrooms.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "nac",
+    timingReason:
+      "Morning on empty stomach — glutathione precursor; best absorbed without protein competition.",
+    title: "NAC (N-Acetyl Cysteine)",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 30,
+    dose: "600–1200 mg",
+    rationale:
+      "Glutathione precursor; supports detox pathways and lung/liver health.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "glycine",
+    timingReason:
+      "Pre-bed — lowers core body temperature and supports deeper sleep.",
+    title: "Glycine",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -45,
+    dose: "3 g",
+    rationale:
+      "Lowers core body temperature, improves subjective sleep quality, supports collagen synthesis.",
+    icon: "pill",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "taurine",
+    timingReason:
+      "With breakfast OR pre-workout — supports mitochondrial and cardiovascular function.",
+    title: "Taurine",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 30,
+    dose: "1–3 g",
+    rationale:
+      "Conditional amino acid that declines with age; supports mitochondria, heart, and brain.",
+    icon: "flask",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "alpha-lipoic-acid",
+    timingReason:
+      "Morning on empty stomach — competes with other amino acids for absorption.",
+    title: "Alpha-Lipoic Acid (ALA)",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 30,
+    dose: "300–600 mg R-ALA",
+    rationale:
+      "Both water- and fat-soluble antioxidant; supports glucose metabolism and recycles other antioxidants.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "lions-mane",
+    timingReason:
+      "Morning — supports nerve growth factor (NGF) and cognition; energizing for most.",
+    title: "Lion's mane",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 60,
+    dose: "500–1500 mg",
+    rationale:
+      "Mushroom extract with NGF-stimulating compounds; preliminary cognitive benefits.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "rhodiola",
+    timingReason:
+      "Morning — adaptogen for stress; energizing, can disrupt sleep if taken late.",
+    title: "Rhodiola rosea",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 60,
+    dose: "200–400 mg (3% rosavins)",
+    rationale:
+      "Adaptogen with consistent evidence for reducing stress-related fatigue.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "bacopa",
+    timingReason:
+      "With breakfast — fat-soluble; cognitive effects emerge over 4–12 weeks of consistent use.",
+    title: "Bacopa monnieri",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "300 mg (50% bacosides)",
+    rationale:
+      "Strong evidence for memory and cognitive function with sustained use.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "citicoline",
+    timingReason:
+      "Morning — choline precursor; supports focus and acetylcholine synthesis.",
+    title: "Citicoline (CDP-Choline)",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 30,
+    dose: "250–500 mg",
+    rationale:
+      "Brain choline precursor; supports cognition and may benefit recovery from injury.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "phosphatidylserine",
+    timingReason:
+      "Anytime — supports stress response and cognition; PS can lower elevated cortisol.",
+    title: "Phosphatidylserine",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "100–300 mg",
+    rationale:
+      "Phospholipid concentrated in brain cells; modulates the stress response.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "zinc",
+    timingReason:
+      "With dinner (away from coffee/tea) — competes with copper; cycle to prevent imbalance.",
+    title: "Zinc",
+    block: "evening",
+    anchor: "wake",
+    offsetMin: 720,
+    dose: "15–30 mg picolinate",
+    rationale:
+      "Cofactor in 300+ enzymes; supports immune function, testosterone, wound healing.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "selenium",
+    timingReason:
+      "Anytime with food — narrow therapeutic window; one Brazil nut covers a daily dose.",
+    title: "Selenium",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "100–200 mcg (or 1 Brazil nut)",
+    rationale:
+      "Thyroid, antioxidant, and immune cofactor; deficiency is more common than people realize.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "iodine",
+    timingReason:
+      "Anytime — thyroid hormone backbone; test before supplementing high doses.",
+    title: "Iodine",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "150–300 mcg",
+    rationale:
+      "Essential for thyroid hormone synthesis; common deficiency outside iodized-salt regions.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "probiotics",
+    timingReason:
+      "Morning on empty stomach OR pre-bed — both windows have evidence; consistency matters more than time.",
+    title: "Probiotic (multi-strain)",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 15,
+    dose: "10–50 billion CFU, 5+ strains",
+    rationale:
+      "Diversifies the gut microbiome; supports digestion and immune function.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "l-citrulline",
+    timingReason:
+      "Pre-workout (30–60 min before) — boosts nitric oxide for blood flow and pump.",
+    title: "L-Citrulline",
+    block: "afternoon",
+    anchor: "wake",
+    offsetMin: 300,
+    dose: "6–8 g malate",
+    rationale:
+      "Increases nitric oxide, improving exercise endurance and blood flow.",
+    icon: "flask",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "beetroot",
+    timingReason:
+      "Pre-workout — nitric oxide donor; effect kicks in 2–3h after ingestion.",
+    title: "Beetroot powder",
+    block: "afternoon",
+    anchor: "wake",
+    offsetMin: 240,
+    dose: "5–10 g powder OR 1 cup juice",
+    rationale:
+      "Dietary nitrate source; improves endurance, blood pressure, and cognitive performance.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "boron",
+    timingReason:
+      "Anytime with food — supports magnesium, vitamin D, and hormone metabolism.",
+    title: "Boron",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "3–6 mg",
+    rationale:
+      "Trace mineral that supports bone health, hormone balance, and inflammation modulation.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "apigenin",
+    timingReason:
+      "Pre-bed — chamomile compound that supports GABA receptors and sleep.",
+    title: "Apigenin",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -45,
+    dose: "50 mg",
+    rationale:
+      "Chamomile-derived flavonoid; mild sedative via GABA-A receptor; non-habit-forming.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "inositol",
+    timingReason:
+      "Pre-bed — myo-inositol supports calm sleep and insulin sensitivity.",
+    title: "Inositol",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -60,
+    dose: "2 g myo-inositol",
+    rationale:
+      "Supports insulin signaling, mood, and is well-studied for PCOS and anxiety.",
+    icon: "pill",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "lutein-zeaxanthin",
+    timingReason:
+      "With breakfast — fat-soluble; protects eyes from blue light damage.",
+    title: "Lutein + Zeaxanthin",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "10 mg lutein + 2 mg zeaxanthin",
+    rationale:
+      "Concentrated in the retina; protects against macular degeneration and blue-light damage.",
+    icon: "sun",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "astaxanthin",
+    timingReason:
+      "With breakfast — strong antioxidant; fat-soluble.",
+    title: "Astaxanthin",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "4–12 mg",
+    rationale:
+      "Carotenoid antioxidant with skin, eye, and exercise-recovery benefits.",
+    icon: "sun",
+    leverage: 1,
+    kind: "action",
+  }),
+
+  // ── Lifestyle / recovery behaviors ────────────────────────────────
+
+  B({
+    canonicalKey: "red-light-therapy",
+    timingReason:
+      "Morning or post-workout — supports mitochondrial function and skin/joint recovery.",
+    title: "Red light therapy",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 60,
+    dose: "10–20 min on target tissue",
+    rationale:
+      "Photobiomodulation supports cellular energy production; growing evidence for skin and joint health.",
+    icon: "sun",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "grounding",
+    timingReason:
+      "Anytime outdoors — barefoot contact with soil/grass may modulate inflammation.",
+    title: "Grounding (barefoot outdoors)",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "10–30 min daily",
+    rationale:
+      "Direct contact with earth surface modulates inflammation markers in early research.",
+    icon: "leaf",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "wim-hof-breath",
+    timingReason:
+      "Morning — energizing breathwork; can lower stress and inflammation markers.",
+    title: "Wim Hof breathing",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 30,
+    dose: "3 rounds · 30 breaths each",
+    rationale:
+      "Hyperventilation + breath holds modulate stress response and oxygen tolerance.",
+    icon: "wind",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "foam-rolling",
+    timingReason:
+      "Pre-workout (activation) OR post-workout (recovery) — both timings work.",
+    title: "Foam rolling / self-myofascial release",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "5–10 min on major muscle groups",
+    rationale:
+      "Reduces muscle stiffness, improves range of motion, supports recovery.",
+    icon: "stretch",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "yoga-session",
+    timingReason:
+      "Morning OR evening — both windows work for the flexibility + nervous-system benefits.",
+    title: "Yoga session",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "20–60 min · any style",
+    rationale:
+      "Combines mobility, breath, and parasympathetic activation in one practice.",
+    icon: "stretch",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "tongue-scraping",
+    timingReason:
+      "Morning before brushing — removes overnight bacterial film; Ayurvedic practice with modern oral-health backing.",
+    title: "Tongue scraping",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 5,
+    dose: "10 strokes back-to-front",
+    rationale:
+      "Removes nitrogen-rich biofilm; supports oral microbiome and fresh breath.",
+    icon: "sparkle",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "mouth-tape",
+    timingReason:
+      "Pre-bed — encourages nasal breathing through the night; only if no respiratory issues.",
+    title: "Mouth tape for sleep",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -10,
+    dose: "Small piece of micropore tape",
+    rationale:
+      "Promotes nasal breathing during sleep; may reduce snoring and improve oxygenation.",
+    icon: "bed",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "blackout-sleep",
+    timingReason:
+      "All-night — even small amounts of light through eyelids suppress melatonin.",
+    title: "Blackout bedroom",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -15,
+    dose: "Blackout curtains + eye mask",
+    rationale:
+      "Light through closed eyelids suppresses melatonin; full darkness deepens sleep architecture.",
+    icon: "moon",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "cgm-tracking",
+    timingReason:
+      "Continuous — a 2-week CGM trial reveals individual glucose responses to specific foods.",
+    title: "Continuous glucose monitor trial",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "2 weeks · check post-meal spikes",
+    rationale:
+      "Reveals personal glucose responses, often surprising even for fit, healthy people.",
+    icon: "pulse",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "quarterly-labs",
+    timingReason:
+      "Quarterly — labs reveal trends invisible to symptoms; especially after protocol changes.",
+    title: "Quarterly bloodwork",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "Lipids, A1c, hsCRP, vitamin D, ferritin, hormones",
+    rationale:
+      "Most longevity-relevant changes are invisible without measurement; quarterly is the right cadence.",
+    icon: "pulse",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "hot-tub",
+    timingReason:
+      "Evening — heat exposure lowers cortisol; finish ~1h before bed for sleep onset.",
+    title: "Hot tub / hot bath",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -120,
+    dose: "10–20 min · 38–40°C",
+    rationale:
+      "Heat shock raises HRV, lowers blood pressure, and the post-bath temp drop accelerates sleep onset.",
+    icon: "thermometer",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "contrast-shower",
+    timingReason:
+      "Morning — alternating hot/cold finish improves circulation and alertness.",
+    title: "Contrast shower",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 25,
+    dose: "3 rounds: 1 min hot, 30s cold",
+    rationale:
+      "Combines heat and cold benefits in one shower; trains vascular tone.",
+    icon: "snowflake",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "tabata-hiit",
+    timingReason:
+      "Afternoon — high-intensity demands warmth + glycogen; not before bed.",
+    title: "Tabata interval (4 min)",
+    block: "afternoon",
+    anchor: "wake",
+    offsetMin: 360,
+    dose: "8 × 20s on, 10s off",
+    rationale:
+      "Time-efficient way to push VO2 max and metabolic adaptation.",
+    icon: "pulse",
+    leverage: 2,
+    kind: "action",
+    daysActive: [false, false, true, false, false, true, false],
+  }),
+  B({
+    canonicalKey: "extended-walk",
+    timingReason:
+      "Anytime daylight — long walks deliver mitochondrial + mental-health benefits at low intensity.",
+    title: "60-min walk",
+    block: "afternoon",
+    anchor: "wake",
+    offsetMin: 480,
+    dose: "60+ min · easy pace, outdoors",
+    rationale:
+      "Long, slow movement is one of the best predictors of healthspan in observational studies.",
+    icon: "footprints",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "standing-desk",
+    timingReason:
+      "Throughout the workday — alternate sitting/standing to break up sedentary time.",
+    title: "Stand at desk (alternating)",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "Alternate every 30–60 min",
+    rationale:
+      "Reduces total sitting time, which is independently linked to mortality risk.",
+    icon: "stretch",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "mindful-eating",
+    timingReason:
+      "Every meal — slow chewing and no distractions improve digestion and satiety.",
+    title: "Mindful eating (no screens)",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    dose: "Phone away, chew thoroughly",
+    rationale:
+      "Slows eating, improves digestion via cephalic phase, and amplifies satiety signaling.",
+    icon: "utensils",
+    leverage: 1,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "epsom-bath",
+    timingReason:
+      "Pre-bed — magnesium absorption + heat shock primes sleep onset.",
+    title: "Epsom salt bath",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: -120,
+    dose: "20 min · 2 cups Epsom salts",
+    rationale:
+      "Transdermal magnesium + heat exposure; mild relaxant effect plus pre-bed cooling.",
+    icon: "thermometer",
+    leverage: 1,
+    kind: "action",
+    daysActive: [false, true, false, false, true, false, true],
+  }),
+  B({
+    canonicalKey: "caffeine-off-day",
+    timingReason:
+      "1–2 days per week — reset adenosine receptor sensitivity so caffeine keeps working.",
+    title: "Caffeine-free day",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    rationale:
+      "Periodic caffeine breaks prevent tolerance creep and restore the alertness response.",
+    icon: "ban",
+    leverage: 1,
+    kind: "avoid",
+    daysActive: [false, false, false, false, false, true, false],
+  }),
+  B({
+    canonicalKey: "no-alcohol-week",
+    timingReason:
+      "Weeknights — even small amounts of alcohol blunt REM sleep and recovery.",
+    title: "No alcohol Mon–Thu",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 0,
+    rationale:
+      "Most users see meaningful sleep + HRV gains from cutting weekday drinking.",
+    icon: "ban",
+    leverage: 2,
+    kind: "avoid",
+    daysActive: [true, true, true, true, false, false, false],
+  }),
 ];
 
 export function listBehaviorAtoms(): BehaviorAtom[] {

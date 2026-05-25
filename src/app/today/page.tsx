@@ -14,6 +14,7 @@ import {
   shapeTimeline,
   masteredKeys,
   freshlyMastered,
+  blockIntelligence,
   isDone,
   timelineProgress,
   blockLabel,
@@ -1482,6 +1483,33 @@ export default function TodayPage() {
                   </span>
                 </button>
 
+                {/* Calm per-block intelligence note. Fires when the
+                    block is overstuffed (focus on essentials) or when
+                    today has a notable combination (two training
+                    stimuli, cold + sauna stack). One note max — the
+                    helper handles priority. Today-only so historic
+                    timelines aren't littered with calls-to-action. */}
+                {!collapsed &&
+                  isToday &&
+                  (() => {
+                    const note = blockIntelligence(timeline, block, selDayIdx);
+                    if (!note) return null;
+                    return (
+                      <p
+                        className="mb-3 rounded-[var(--r-sm)] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[var(--text-2)]"
+                        style={{
+                          background:
+                            note.kind === "training"
+                              ? "color-mix(in srgb, var(--warm) 11%, var(--surface-2))"
+                              : note.kind === "combo"
+                              ? "color-mix(in srgb, var(--recovery) 11%, var(--surface-2))"
+                              : "color-mix(in srgb, var(--readiness) 9%, var(--surface-2))",
+                        }}
+                      >
+                        {note.text}
+                      </p>
+                    );
+                  })()}
                 {!collapsed && (
                   <div
                     className="relative"

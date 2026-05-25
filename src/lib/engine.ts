@@ -797,6 +797,126 @@ export function timelineProgress(
   };
 }
 
+/**
+ * Calm, per-block intelligence: detect overstuffed blocks and same-day
+ * combinations that benefit from explicit framing. Renders as a single
+ * one-line note above the block's behaviors in Today — not an alert,
+ * not a warning, just acknowledgment that the system sees what's on
+ * the plate.
+ *
+ * Returns `null` when the block is well-balanced; otherwise returns one
+ * concise note. Picks the most-important note when multiple could fire
+ * (overstuffed > training-stacking > general note) so we never stack
+ * two intelligence banners on the same block.
+ */
+export type BlockNote = {
+  kind: "density" | "training" | "combo";
+  text: string;
+};
+
+const TRAINING_KEY_SET = new Set([
+  "strength",
+  "zone2",
+  "vo2max-intervals",
+  "tabata-hiit",
+]);
+const HARD_TRAINING_KEY_SET = new Set([
+  "strength",
+  "vo2max-intervals",
+  "tabata-hiit",
+]);
+const COLD_KEYS = new Set(["cold-plunge-am", "contrast-shower"]);
+
+export function blockIntelligence(
+  allItems: TimelineItem[],
+  block: TimeBlock,
+  dayIndex: number
+): BlockNote | null {
+  const inBlock = allItems.filter((i) => i.block === block && !i.muted);
+  if (inBlock.length === 0) return null;
+
+  // Day-aware filter: skip behaviors whose daysActive excludes today,
+  // so a 3×/wk strength behavior doesn't trigger a "Zone 2 + strength
+  // same day" note on a day strength isn't actually scheduled.
+  const isActiveToday = (it: TimelineItem) =>
+    !it.daysActive || it.daysActive[dayIndex];
+  const today = inBlock.filter(isActiveToday);
+  const essentials = today.filter((i) => i.leverage === 3);
+  const allDayItems = allItems.filter(
+    (i) => !i.muted && isActiveToday(i)
+  );
+
+  // 1. Same-day training stacking — most user-relevant note.
+  // Two HARD training stimuli on the same day = explicit framing so
+  // the user knows to scale one (not both at full intensity).
+  const trainingToday = allDayItems.filter((i) =>
+    TRAINING_KEY_SET.has(effectiveKey(i))
+  );
+  const hardToday = trainingToday.filter((i) =>
+    HARD_TRAINING_KEY_SET.has(effectiveKey(i))
+  );
+  if (hardToday.length >= 2 && block === "afternoon") {
+    const names = hardToday
+      .map((i) => i.title)
+      .slice(0, 2)
+      .join(" + ");
+    return {
+      kind: "training",
+      text: `Two training stimuli today (${names}). Pick one to push, take the other lighter.`,
+    };
+  }
+  // Zone 2 + strength same day: NOT a contradiction (Attia-style
+  // protocols schedule both), but worth flagging so the user sequences
+  // them (strength first, Zone 2 after — or different times of day).
+  if (
+    block === "afternoon" &&
+    trainingToday.some((i) => effectiveKey(i) === "zone2") &&
+    trainingToday.some((i) => effectiveKey(i) === "strength")
+  ) {
+    return {
+      kind: "training",
+      text: "Zone 2 and strength on the same day — lift first, then easy aerobic. Or split across blocks.",
+    };
+  }
+
+  // 2. Cold + sauna same day — pairing benefit, just acknowledge it.
+  const hasColdToday = allDayItems.some((i) =>
+    COLD_KEYS.has(effectiveKey(i))
+  );
+  const hasSaunaToday = allDayItems.some(
+    (i) => effectiveKey(i) === "sauna-pm"
+  );
+  if (block === "morning" && hasColdToday && hasSaunaToday) {
+    return {
+      kind: "combo",
+      text: "Cold this morning, sauna tonight — classic hormesis pairing.",
+    };
+  }
+
+  // 3. Overstuffed block — the catch-all. When more than 5 visible
+  // behaviors land in one block (especially evening), point at the
+  // essentials and let the rest land if they land.
+  if (today.length >= 6) {
+    const essCount = essentials.length;
+    if (essCount > 0) {
+      const labels =
+        essCount === 1
+          ? `the essential here — ${essentials[0].title}`
+          : `the ${essCount} essentials in this block`;
+      return {
+        kind: "density",
+        text: `${today.length} behaviors this ${block}. If time's tight, focus on ${labels}.`,
+      };
+    }
+    return {
+      kind: "density",
+      text: `${today.length} behaviors this ${block}. Pick the 2–3 that feel most important today.`,
+    };
+  }
+
+  return null;
+}
+
 // ── Semantic leverage labels ──────────────────────────────────────
 
 export const CIRCADIAN = new Set([
