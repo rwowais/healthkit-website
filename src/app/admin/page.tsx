@@ -86,6 +86,7 @@ import {
 } from "@/lib/cms/ai";
 import { PACKS } from "@/lib/packs";
 import { RULE_METRICS } from "@/lib/cms/rules";
+import { HELP } from "@/lib/cms/help";
 import type { ProtocolPack } from "@/lib/types";
 import {
   BLOCKS,
@@ -149,31 +150,97 @@ function dk(off: number) {
   )}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** A labelled field row with a hover/tap help tooltip (native title). */
+/**
+ * Click-to-toggle field hint with a one-line summary + a concrete
+ * example. Designed for mobile (hover doesn't work there) and reads
+ * better than the native `title` attribute on every browser.
+ */
+function Hint({
+  k,
+  size = "sm",
+}: {
+  /** Key into the HELP map in src/lib/cms/help.ts. */
+  k: string;
+  size?: "sm" | "md";
+}) {
+  const [open, setOpen] = useState(false);
+  const entry = HELP[k];
+  if (!entry) return null;
+  const dim = size === "md" ? "h-4 w-4 text-[10px]" : "h-3.5 w-3.5 text-[9px]";
+  return (
+    <span className="relative inline-block align-middle">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        aria-label={entry.summary}
+        title={entry.summary}
+        className={`press grid ${dim} cursor-help place-items-center rounded-full font-bold`}
+        style={{
+          background: open ? "var(--readiness)" : "var(--surface-3)",
+          color: open ? "#08090B" : "var(--text-3)",
+        }}
+      >
+        ?
+      </button>
+      {open && (
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="absolute left-0 top-full z-30 mt-1 w-72 rounded-[var(--r-sm)] border p-3 text-[12px] leading-relaxed shadow-2xl"
+          style={{
+            background: "var(--surface-2)",
+            borderColor: "var(--hairline-strong)",
+          }}
+        >
+          <p className="text-[var(--text-1)]">{entry.summary}</p>
+          {entry.example && (
+            <p className="mt-2 text-[var(--text-3)]">
+              <span className="font-semibold text-[var(--text-4)]">
+                Example:{" "}
+              </span>
+              <code className="text-[var(--text-2)]">{entry.example}</code>
+            </p>
+          )}
+        </div>
+      )}
+    </span>
+  );
+}
+
+/** A labelled field row with the Hint popover next to the label. */
 function Field({
   label,
   help,
   children,
 }: {
   label: string;
+  /** Key into the HELP map (preferred), or a plain summary string (legacy). */
   help?: string;
   children: ReactNode;
 }) {
+  const isKey = help && HELP[help] !== undefined;
   return (
     <label className="block">
       <span className="mb-1 flex items-center gap-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
           {label}
         </span>
-        {help && (
-          <span
-            title={help}
-            className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-[var(--surface-3)] text-[9px] font-bold text-[var(--text-3)]"
-            aria-label={help}
-          >
-            ?
-          </span>
-        )}
+        {help &&
+          (isKey ? (
+            <Hint k={help} />
+          ) : (
+            <span
+              title={help}
+              className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-[var(--surface-3)] text-[9px] font-bold text-[var(--text-3)]"
+              aria-label={help}
+            >
+              ?
+            </span>
+          ))}
       </span>
       {children}
     </label>
@@ -1196,35 +1263,43 @@ export default function AdminHome() {
               <div className={card} style={surf}>
                 <Eyebrow>Add rule</Eyebrow>
                 <div className="mt-2 space-y-2">
-                  <input
-                    value={newRuleName}
-                    onChange={(e) => setNewRuleName(e.target.value)}
-                    placeholder="name (e.g. soft-recovery)"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
-                  <input
-                    type="number"
-                    value={newRulePriority}
-                    onChange={(e) =>
-                      setNewRulePriority(Number(e.target.value))
-                    }
-                    placeholder="priority (lower = wins)"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
-                  <textarea
-                    rows={3}
-                    value={newRuleTrigger}
-                    onChange={(e) => setNewRuleTrigger(e.target.value)}
-                    placeholder="trigger JSON"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
-                  />
-                  <textarea
-                    rows={2}
-                    value={newRuleEffect}
-                    onChange={(e) => setNewRuleEffect(e.target.value)}
-                    placeholder="effect JSON"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
-                  />
+                  <Field label="Name" help="rule.name">
+                    <input
+                      value={newRuleName}
+                      onChange={(e) => setNewRuleName(e.target.value)}
+                      placeholder="e.g. soft-recovery"
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
+                  <Field label="Priority" help="rule.priority">
+                    <input
+                      type="number"
+                      value={newRulePriority}
+                      onChange={(e) =>
+                        setNewRulePriority(Number(e.target.value))
+                      }
+                      placeholder="lower = wins (baseline = 1000)"
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
+                  <Field label="Trigger (JSON)" help="rule.trigger">
+                    <textarea
+                      rows={3}
+                      value={newRuleTrigger}
+                      onChange={(e) => setNewRuleTrigger(e.target.value)}
+                      placeholder='{"all":[{"metric":"...", "op":"<", "value":...}]}'
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
+                  <Field label="Effect (JSON)" help="rule.effect">
+                    <textarea
+                      rows={2}
+                      value={newRuleEffect}
+                      onChange={(e) => setNewRuleEffect(e.target.value)}
+                      placeholder='{"setMode":"recovery"}'
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
                   <button
                     disabled={busy || !newRuleName.trim()}
                     onClick={async () => {
@@ -1636,13 +1711,15 @@ export default function AdminHome() {
               <div className={card} style={surf}>
                 <Eyebrow>Add override</Eyebrow>
                 <div className="mt-2 space-y-2">
-                  <input
-                    value={cfgKey}
-                    onChange={(e) => setCfgKey(e.target.value)}
-                    list="known-config-keys"
-                    placeholder="key — e.g. AHA_DAYS (pick from the known list above)"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
+                  <Field label="Key" help="config.key">
+                    <input
+                      value={cfgKey}
+                      onChange={(e) => setCfgKey(e.target.value)}
+                      list="known-config-keys"
+                      placeholder="e.g. AHA_DAYS (pick from the known list above)"
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
                   <datalist id="known-config-keys">
                     {KNOWN_CONFIG_KEYS.map((k) => (
                       <option key={k.key} value={k.key}>
@@ -1650,18 +1727,22 @@ export default function AdminHome() {
                       </option>
                     ))}
                   </datalist>
-                  <input
-                    value={cfgValue}
-                    onChange={(e) => setCfgValue(e.target.value)}
-                    placeholder='value JSON (e.g. 14 or "evening" or true)'
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
-                  <input
-                    value={cfgDesc}
-                    onChange={(e) => setCfgDesc(e.target.value)}
-                    placeholder="description (optional)"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
+                  <Field label="Value" help="config.value">
+                    <input
+                      value={cfgValue}
+                      onChange={(e) => setCfgValue(e.target.value)}
+                      placeholder='e.g. 14 or "evening" or true'
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
+                  <Field label="Description (optional)" help="config.description">
+                    <input
+                      value={cfgDesc}
+                      onChange={(e) => setCfgDesc(e.target.value)}
+                      placeholder="why this override exists"
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
                   <button
                     disabled={busy || !cfgKey.trim() || !cfgValue.trim()}
                     onClick={async () => {
@@ -2050,19 +2131,23 @@ export default function AdminHome() {
               <div className={card} style={surf}>
                 <Eyebrow>Add recommendation template</Eyebrow>
                 <div className="mt-2 space-y-2">
-                  <input
-                    value={newRecCtx}
-                    onChange={(e) => setNewRecCtx(e.target.value)}
-                    placeholder="context (e.g. low-recovery-morning)"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
-                  <textarea
-                    value={newRecCopy}
-                    onChange={(e) => setNewRecCopy(e.target.value)}
-                    rows={2}
-                    placeholder="copy"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
-                  />
+                  <Field label="Context" help="recTpl.context">
+                    <input
+                      value={newRecCtx}
+                      onChange={(e) => setNewRecCtx(e.target.value)}
+                      placeholder="e.g. low-recovery-morning"
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
+                  <Field label="Copy" help="recTpl.copy">
+                    <textarea
+                      value={newRecCopy}
+                      onChange={(e) => setNewRecCopy(e.target.value)}
+                      rows={2}
+                      placeholder="copy with optional {variable} placeholders"
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
                   <button
                     disabled={
                       busy || !newRecCtx.trim() || !newRecCopy.trim()
@@ -2141,12 +2226,16 @@ export default function AdminHome() {
             </div>
             <div className={card} style={surf}>
               <Eyebrow>Add admin</Eyebrow>
-              <input
-                value={newAdminId}
-                onChange={(e) => setNewAdminId(e.target.value)}
-                placeholder="user id (uuid)"
-                className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] font-mono text-[var(--text-1)] outline-none"
-              />
+              <div className="mt-2">
+                <Field label="User id" help="admin.userId">
+                  <input
+                    value={newAdminId}
+                    onChange={(e) => setNewAdminId(e.target.value)}
+                    placeholder="uuid — find under Supabase → Auth → Users"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] font-mono text-[var(--text-1)] outline-none"
+                  />
+                </Field>
+              </div>
               <button
                 disabled={busy || !newAdminId.trim()}
                 onClick={async () => {
@@ -2175,14 +2264,9 @@ export default function AdminHome() {
         {tab === "simulate" && (
           <div className="space-y-4">
             <div className={card} style={surf}>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
                 <Eyebrow>Source</Eyebrow>
-                <span
-                  className="t-caption"
-                  title="Built-in: frozen catalog shipped in the app binary. Drafts: current CMS authoring state. Live: whatever the runtime is currently serving (Built-in unless a newer published bundle has been adopted this session)."
-                >
-                  what to simulate against ?
-                </span>
+                <Hint k="simulate.source" />
               </div>
               <div className="mt-2 flex gap-1.5">
                 {(
@@ -2249,25 +2333,31 @@ export default function AdminHome() {
                 {[
                   {
                     label: "Sleep",
+                    helpKey: "simulate.sleep",
                     val: sleepQ,
                     set: setSleepQ,
                     opts: [2, 3, 5],
                   },
                   {
                     label: "Energy",
+                    helpKey: "simulate.energy",
                     val: energy,
                     set: setEnergy,
                     opts: [2, 3, 5],
                   },
                   {
                     label: "Gap days",
+                    helpKey: "simulate.gapDays",
                     val: gap,
                     set: setGap,
                     opts: [0, 1, 2, 4],
                   },
                 ].map((g) => (
                   <div key={g.label}>
-                    <p className="t-caption mb-1">{g.label}</p>
+                    <p className="t-caption mb-1 flex items-center gap-1">
+                      {g.label}
+                      <Hint k={g.helpKey} />
+                    </p>
                     <div className="flex gap-1">
                       {g.opts.map((o) => (
                         <button
@@ -3216,70 +3306,86 @@ export default function AdminHome() {
                           )
                         )
                       }
-                      placeholder="Title"
+                      placeholder="Title — short name users see"
+                      title={HELP["behavior.title"]?.summary}
                     />
-                    <div className="mt-2 flex gap-2">
-                      <select
-                        className={inp}
-                        value={b.block}
-                        onChange={(e) =>
-                          setEdB((xs) =>
-                            xs.map((x, i) =>
-                              i === idx
-                                ? { ...x, block: e.target.value }
-                                : x
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <label className="flex flex-col gap-1">
+                        <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-4)]">
+                          Block <Hint k="behavior.block" />
+                        </span>
+                        <select
+                          className={inp}
+                          value={b.block}
+                          onChange={(e) =>
+                            setEdB((xs) =>
+                              xs.map((x, i) =>
+                                i === idx
+                                  ? { ...x, block: e.target.value }
+                                  : x
+                              )
                             )
-                          )
-                        }
-                      >
-                        {[
-                          "morning",
-                          "afternoon",
-                          "evening",
-                          "anytime",
-                        ].map((s) => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                      <select
-                        className={inp}
-                        value={b.leverage}
-                        onChange={(e) =>
-                          setEdB((xs) =>
-                            xs.map((x, i) =>
-                              i === idx
-                                ? {
-                                    ...x,
-                                    leverage: Number(e.target.value),
-                                  }
-                                : x
+                          }
+                        >
+                          {[
+                            "morning",
+                            "afternoon",
+                            "evening",
+                            "anytime",
+                          ].map((s) => (
+                            <option key={s}>{s}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-4)]">
+                          Leverage <Hint k="behavior.leverage" />
+                        </span>
+                        <select
+                          className={inp}
+                          value={b.leverage}
+                          onChange={(e) =>
+                            setEdB((xs) =>
+                              xs.map((x, i) =>
+                                i === idx
+                                  ? {
+                                      ...x,
+                                      leverage: Number(e.target.value),
+                                    }
+                                  : x
+                              )
                             )
-                          )
-                        }
-                      >
-                        {[1, 2, 3].map((s) => (
-                          <option key={s} value={s}>
-                            L{s}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        className={inp}
-                        value={b.status}
-                        onChange={(e) =>
-                          setEdB((xs) =>
-                            xs.map((x, i) =>
-                              i === idx
-                                ? { ...x, status: e.target.value }
-                                : x
+                          }
+                        >
+                          {[1, 2, 3].map((s) => (
+                            <option key={s} value={s}>
+                              L{s}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-4)]">
+                          Status <Hint k="behavior.status" />
+                        </span>
+                        <select
+                          className={inp}
+                          value={b.status}
+                          onChange={(e) =>
+                            setEdB((xs) =>
+                              xs.map((x, i) =>
+                                i === idx
+                                  ? { ...x, status: e.target.value }
+                                  : x
+                              )
                             )
-                          )
-                        }
-                      >
-                        {["draft", "published", "archived"].map((s) => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
+                          }
+                        >
+                          {["draft", "published", "archived"].map((s) => (
+                            <option key={s}>{s}</option>
+                          ))}
+                        </select>
+                      </label>
                     </div>
                     <input
                       className={`${inp} mt-2`}
@@ -3293,7 +3399,8 @@ export default function AdminHome() {
                           )
                         )
                       }
-                      placeholder="Dose"
+                      placeholder="Dose (e.g. 300 mg) — blank if none"
+                      title={HELP["behavior.dose"]?.summary}
                     />
                     <textarea
                       className={`${inp} mt-2`}
@@ -3308,7 +3415,8 @@ export default function AdminHome() {
                           )
                         )
                       }
-                      placeholder="Rationale"
+                      placeholder="Rationale — one calm sentence users see"
+                      title={HELP["behavior.rationale"]?.summary}
                     />
                     <button
                       disabled={savingIds[b.id]}
@@ -3699,6 +3807,12 @@ export default function AdminHome() {
                     </p>
                   ) : (
                     <div className="mt-3 space-y-2">
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                          Entity type
+                        </span>
+                        <Hint k="sug.entityType" />
+                      </div>
                       <div className="flex gap-1.5">
                         {(["protocol", "behavior"] as const).map((t) => (
                           <button
@@ -3753,42 +3867,50 @@ export default function AdminHome() {
                           ))}
                         </select>
                       )}
-                      <div className="flex gap-2">
-                        <select
-                          className={inp}
-                          value={dField}
-                          onChange={(e) => setDField(e.target.value)}
-                        >
-                          {(dEntityType === "behavior"
-                            ? [
-                                "title",
-                                "rationale",
-                                "dose",
-                                "block",
-                                "anchor",
-                                "offset_min",
-                                "leverage",
-                                "kind",
-                                "icon",
-                              ]
-                            : ["tagline", "name", "accent", "goal"]
-                          ).map((f) => (
-                            <option key={f}>{f}</option>
-                          ))}
-                        </select>
+                      <div className="flex items-end gap-2">
+                        <Field label="Field" help="sug.field">
+                          <select
+                            className={inp}
+                            value={dField}
+                            onChange={(e) => setDField(e.target.value)}
+                          >
+                            {(dEntityType === "behavior"
+                              ? [
+                                  "title",
+                                  "rationale",
+                                  "dose",
+                                  "block",
+                                  "anchor",
+                                  "offset_min",
+                                  "leverage",
+                                  "kind",
+                                  "icon",
+                                ]
+                              : ["tagline", "name", "accent", "goal"]
+                            ).map((f) => (
+                              <option key={f}>{f}</option>
+                            ))}
+                          </select>
+                        </Field>
+                        <div className="grow">
+                          <Field label="Proposed value" help="sug.value">
+                            <input
+                              className={inp}
+                              value={dValue}
+                              onChange={(e) => setDValue(e.target.value)}
+                              placeholder="new value"
+                            />
+                          </Field>
+                        </div>
+                      </div>
+                      <Field label="Rationale" help="sug.rationale">
                         <input
                           className={inp}
-                          value={dValue}
-                          onChange={(e) => setDValue(e.target.value)}
-                          placeholder="Proposed value"
+                          value={dWhy}
+                          onChange={(e) => setDWhy(e.target.value)}
+                          placeholder="why this change"
                         />
-                      </div>
-                      <input
-                        className={inp}
-                        value={dWhy}
-                        onChange={(e) => setDWhy(e.target.value)}
-                        placeholder="Rationale"
-                      />
+                      </Field>
                       <button
                         disabled={
                           busy ||
@@ -4229,12 +4351,16 @@ export default function AdminHome() {
                 into a new immutable version the app refreshes to when
                 online. Nothing here mutates production automatically.
               </p>
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Change note (what & why)"
-                className="mt-3 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[13px] text-[var(--text-1)] outline-none"
-              />
+              <div className="mt-3">
+                <Field label="Change note" help="publish.note">
+                  <input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="what changed & why"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[13px] text-[var(--text-1)] outline-none"
+                  />
+                </Field>
+              </div>
               <button
                 disabled={busy}
                 onClick={async () => {
