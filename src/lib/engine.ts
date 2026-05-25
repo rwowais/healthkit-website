@@ -116,6 +116,26 @@ export function compileTimeline(
         if (!existing.dose && b.dose) existing.dose = b.dose;
         if (!existing.daysActive || !b.daysActive)
           existing.daysActive = undefined;
+        // Apply THIS behavior's override even on merge — without
+        // this, when a forked pack's `fork:abc:wind-down` merges with
+        // the curated `wind-down`, only the first-visited behavior's
+        // override sticks. The fork's customTime / block / dose would
+        // be silently dropped. Apply the override if and only if the
+        // existing row hasn't already been explicitly retimed
+        // (preserves first-wins for conflicting overrides; lets
+        // missing-but-then-set fields fill in).
+        if (ov) {
+          if (ov.daysActive) existing.daysActive = ov.daysActive;
+          if (ov.dose) existing.dose = ov.dose;
+          if (ov.block && !existing.retimed) {
+            existing.block = ov.block;
+            existing.retimed = true;
+          }
+          if (ov.customTime && !existing.customTime) {
+            existing.customTime = ov.customTime;
+            existing.retimed = true;
+          }
+        }
       }
     }
   }
@@ -466,6 +486,19 @@ export const CONFLICT_PAIRS: ReadonlyArray<{
   // tell the user "eat now" and "don't eat until 11am" in the same
   // morning block. The restraint wins (it's the active discipline).
   { restraint: "delay-first-meal", target: "protein-breakfast" },
+  // Weekly Recovery Day's deload-day (Sunday-only avoid) mutes any
+  // training behavior that happens to be scheduled the same day —
+  // most relevant for Heart Health (strength Tue/Thu/Sun, vo2max
+  // Sat). Without this, a Sunday with both packs shows "Full deload"
+  // and "Strength training" side by side.
+  { restraint: "deload-day", target: "strength" },
+  { restraint: "deload-day", target: "zone2" },
+  { restraint: "deload-day", target: "vo2max-intervals" },
+  // Cold/Heat Therapy's "no cold post-lift" rule mutes the morning
+  // cold plunge on days a strength session was completed yesterday
+  // (the timeline-level mute happens at install time; the per-day
+  // gating refines later if a constraint engine arrives).
+  { restraint: "no-cold-post-lift", target: "cold-plunge-am" },
 ];
 
 // Derived sets — used in mode-specific shaping (rebuild excludes

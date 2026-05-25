@@ -98,7 +98,7 @@ export const HELP: Record<string, HelpEntry> = {
   },
   "evidence.source": {
     summary: "Human-readable source label.",
-    example: "Meta-analysis, 2021 · Andrew Huberman lab review",
+    example: "Meta-analysis, 2021 · Neuroscience lab review",
   },
   "evidence.url": {
     summary: "Optional link to the source. Must be http(s).",

@@ -566,10 +566,10 @@ export default function TodayPage() {
               daily system for you.
             </p>
             <Link
-              href="/library"
+              href="/protocols#discover"
               className="press tr-fast mt-6 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[14px] font-semibold text-[#08090B]"
             >
-              Browse the Library
+              Discover protocols
             </Link>
           </div>
         </div>

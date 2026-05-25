@@ -158,6 +158,125 @@ const OMEGA3_AM = B({
   kind: "action",
 });
 
+// Shared atoms for behaviors that appear in multiple packs — defined
+// ONCE here so the canonicalKey contract holds (same key, identical
+// definition, always merges cleanly). Previously these were inline
+// B({...}) in each pack, and small drifts (offsetMin, daysActive,
+// recommendedBy) made first-install-wins state subtly inconsistent.
+
+const DELAY_CAFFEINE = B({
+  canonicalKey: "delay-caffeine",
+  timingReason:
+    "~90 min after waking — lets adenosine clear first and blunts the afternoon crash.",
+  title: "Delay caffeine 90 min",
+  block: "morning",
+  anchor: "wake",
+  offsetMin: 90,
+  rationale:
+    "Delaying caffeine after waking avoids the afternoon adenosine crash.",
+  recommendedBy: ["Neuroscience research"],
+  icon: "coffee",
+  leverage: 2,
+  kind: "action",
+});
+
+const VEG_FIRST = B({
+  canonicalKey: "veg-first",
+  timingReason:
+    "At each meal — eating fiber before carbs blunts that meal's glucose spike. Applies every time you eat.",
+  title: "Vegetables first",
+  block: "anytime",
+  anchor: "wake",
+  offsetMin: 0,
+  rationale:
+    "Fiber before carbs measurably blunts the post-meal glucose spike.",
+  icon: "leaf",
+  leverage: 2,
+  kind: "action",
+});
+
+const POST_MEAL_WALK = B({
+  canonicalKey: "post-meal-walk",
+  timingReason:
+    "Within ~30 min of any meal — muscle contraction clears glucose without insulin.",
+  title: "Walk after meals",
+  block: "anytime",
+  anchor: "wake",
+  offsetMin: 0,
+  dose: "10 min after eating",
+  rationale: "Muscle contraction clears glucose without insulin.",
+  recommendedBy: ["Longevity research"],
+  icon: "footprints",
+  leverage: 3,
+  kind: "action",
+});
+
+const NSDR = B({
+  canonicalKey: "nsdr",
+  timingReason:
+    "Early afternoon — catches the post-lunch dip and resets you without harming night sleep.",
+  title: "NSDR / yoga nidra",
+  block: "afternoon",
+  anchor: "wake",
+  offsetMin: 420,
+  dose: "10–20 min",
+  rationale:
+    "Non-sleep deep rest restores dopamine and lowers sympathetic load.",
+  recommendedBy: ["Neuroscience research"],
+  icon: "lungs",
+  leverage: 3,
+  kind: "action",
+  // Default: every day. Weekly Recovery Day pack does NOT scope this
+  // to Sunday-only; if a future pack needs Sunday-only NSDR, give it a
+  // separate canonicalKey so it doesn't override the daily default.
+});
+
+const SOCIAL_CONNECTION = B({
+  canonicalKey: "social-connection",
+  timingReason:
+    "Evening tends to be the natural slot — even brief connection (call, in-person) downregulates stress.",
+  title: "One real human connection",
+  block: "evening",
+  anchor: "wake",
+  offsetMin: 600,
+  dose: "10+ min, ideally in person",
+  rationale:
+    "Social connection is one of the strongest predictors of long-term resilience and health.",
+  icon: "user",
+  leverage: 2,
+  kind: "action",
+});
+
+const SCREENS_OFF = B({
+  canonicalKey: "screens-off",
+  timingReason:
+    "~1h before bed — removes the most alerting light source so the wind-down can actually land.",
+  title: "Screens off",
+  block: "evening",
+  anchor: "bed",
+  offsetMin: -60,
+  rationale: "Reduces alerting blue light and cognitive arousal pre-sleep.",
+  icon: "screen",
+  leverage: 2,
+  kind: "avoid",
+});
+
+const DIM_LIGHTS = B({
+  canonicalKey: "dim-lights",
+  timingReason:
+    "~2h before bed — bright evening light is what most delays melatonin.",
+  title: "Dim the lights",
+  block: "evening",
+  anchor: "bed",
+  offsetMin: -120,
+  dose: "Warm, low light only",
+  rationale: "Evening bright light suppresses melatonin and delays sleep.",
+  recommendedBy: ["Neuroscience research"],
+  icon: "moon",
+  leverage: 2,
+  kind: "action",
+});
+
 // ── Jetlag-recovery atoms (used by the Jetlag pack and reusable
 // elsewhere when travel/circadian-shift protocols evolve) ──────────
 
@@ -348,38 +467,8 @@ export const PACKS: ProtocolPack[] = [
     behaviors: [
       MORNING_SUNLIGHT,
       CAFFEINE_CUTOFF,
-      B({
-        canonicalKey: "dim-lights",
-        timingReason:
-          "~2h before bed — bright evening light is what most delays melatonin.",
-        title: "Dim the lights",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -120,
-        dose: "Warm, low light only",
-        rationale: "Evening bright light suppresses melatonin and delays sleep.",
-        recommendedBy: ["Neuroscience research"],
-        icon: "moon",
-        leverage: 2,
-        kind: "action",
-      }),
-      B({
-        canonicalKey: "screens-off",
-        // Bed -60 (was -45) so it sits BEFORE magnesium-pm and the
-        // wind-down ritual — the screens-off cue is a precondition for
-        // those, not parallel to them. See WIND_DOWN comment for the
-        // pre-bed sequence.
-        timingReason:
-          "~1h before bed — removes the most alerting light source so the wind-down can actually land.",
-        title: "Screens off",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -60,
-        rationale: "Reduces alerting blue light and cognitive arousal pre-sleep.",
-        icon: "screen",
-        leverage: 2,
-        kind: "avoid",
-      }),
+      DIM_LIGHTS,
+      SCREENS_OFF,
       B({
         canonicalKey: "cool-room",
         // Bed -90: a real room takes time to cool. Earliest of the
@@ -460,21 +549,7 @@ export const PACKS: ProtocolPack[] = [
     durationLabel: "Ongoing",
     behaviors: [
       MORNING_SUNLIGHT,
-      B({
-        canonicalKey: "delay-caffeine",
-        timingReason:
-          "~90 min after waking — lets adenosine clear first and blunts the afternoon crash.",
-        title: "Delay caffeine 90 min",
-        block: "morning",
-        anchor: "wake",
-        offsetMin: 90,
-        rationale:
-          "Delaying caffeine after waking avoids the afternoon adenosine crash.",
-        recommendedBy: ["Neuroscience research"],
-        icon: "coffee",
-        leverage: 2,
-        kind: "action",
-      }),
+      DELAY_CAFFEINE,
       B({
         canonicalKey: "deep-work",
         timingReason:
@@ -518,22 +593,7 @@ export const PACKS: ProtocolPack[] = [
     durationLabel: "4–6 weeks",
     behaviors: [
       MORNING_SUNLIGHT,
-      B({
-        canonicalKey: "nsdr",
-        timingReason:
-          "Early afternoon — catches the post-lunch dip and resets you without harming night sleep.",
-        title: "NSDR / yoga nidra",
-        block: "afternoon",
-        anchor: "wake",
-        offsetMin: 420,
-        dose: "10–20 min",
-        rationale:
-          "Non-sleep deep rest restores dopamine and lowers sympathetic load.",
-        recommendedBy: ["Neuroscience research"],
-        icon: "lungs",
-        leverage: 3,
-        kind: "action",
-      }),
+      NSDR,
       B({
         canonicalKey: "no-intense",
         timingReason:
@@ -576,40 +636,8 @@ export const PACKS: ProtocolPack[] = [
     durationLabel: "Ongoing",
     behaviors: [
       PROTEIN_BREAKFAST,
-      B({
-        canonicalKey: "veg-first",
-        // "At every meal" is not a specific time block — anytime
-        // keeps the warning honest.
-        timingReason:
-          "At each meal — eating fiber before carbs blunts that meal's glucose spike. Applies every time you eat.",
-        title: "Vegetables first",
-        block: "anytime",
-        anchor: "wake",
-        offsetMin: 330,
-        rationale:
-          "Fiber before carbs measurably blunts the post-meal glucose spike.",
-        icon: "leaf",
-        leverage: 2,
-        kind: "action",
-      }),
-      B({
-        canonicalKey: "post-meal-walk",
-        // After meals — happens whenever the user eats, not locked
-        // to one block. Anytime here preserves the science (walk
-        // within ~30 min of eating) without falsely warning.
-        timingReason:
-          "Within ~30 min of any meal — muscle contraction clears glucose without insulin.",
-        title: "Walk after meals",
-        block: "anytime",
-        anchor: "wake",
-        offsetMin: 360,
-        dose: "10 min after eating",
-        rationale: "Muscle contraction clears glucose without insulin.",
-        recommendedBy: ["Longevity research"],
-        icon: "footprints",
-        leverage: 3,
-        kind: "action",
-      }),
+      VEG_FIRST,
+      POST_MEAL_WALK,
       B({
         canonicalKey: "no-liquid-sugar",
         timingReason:
@@ -864,21 +892,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 2,
         kind: "action",
       }),
-      B({
-        canonicalKey: "social-connection",
-        timingReason:
-          "Evening tends to be the natural slot — even brief connection (call, in-person) downregulates stress.",
-        title: "One real human connection",
-        block: "evening",
-        anchor: "wake",
-        offsetMin: 600,
-        dose: "10+ min, ideally in person",
-        rationale:
-          "Social connection is one of the strongest predictors of long-term resilience and health.",
-        icon: "user",
-        leverage: 2,
-        kind: "action",
-      }),
+      SOCIAL_CONNECTION,
       WIND_DOWN,
       MAGNESIUM_PM,
     ],
@@ -1019,20 +1033,11 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
       }),
-      B({
-        canonicalKey: "no-late-eating",
-        timingReason:
-          "Within ~3h of bed — late eating fragments gut motility and the microbial daily rhythm.",
-        title: "No late-night snacking",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -180,
-        rationale:
-          "Microbes have their own circadian rhythm; late eating disrupts it.",
-        icon: "ban",
-        leverage: 2,
-        kind: "avoid",
-      }),
+      // No-late-eating was a near-duplicate of LAST_MEAL_3H — both
+      // rendered at bed-180 in the same pack, both kind: "avoid", same
+      // intent. Removed to leave only LAST_MEAL_3H so Gut Health stops
+      // showing two near-identical avoid cards stacked on top of each
+      // other.
       LAST_MEAL_3H,
     ],
   },
@@ -1111,20 +1116,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
       }),
-      B({
-        canonicalKey: "delay-caffeine",
-        timingReason:
-          "~90 min after waking — lets adenosine clear first and blunts the afternoon crash.",
-        title: "Delay caffeine 90 min",
-        block: "morning",
-        anchor: "wake",
-        offsetMin: 90,
-        rationale:
-          "Delaying caffeine after waking avoids the afternoon adenosine crash.",
-        icon: "coffee",
-        leverage: 2,
-        kind: "action",
-      }),
+      DELAY_CAFFEINE,
       B({
         canonicalKey: "walking-meditation",
         timingReason:
@@ -1170,35 +1162,8 @@ export const PACKS: ProtocolPack[] = [
     durationLabel: "Ongoing",
     behaviors: [
       PROTEIN_BREAKFAST,
-      B({
-        canonicalKey: "veg-first",
-        timingReason:
-          "At each meal — eating fiber before carbs blunts that meal's glucose spike.",
-        title: "Vegetables first",
-        block: "anytime",
-        anchor: "wake",
-        offsetMin: 0,
-        rationale:
-          "Fiber before carbs measurably blunts the post-meal glucose spike.",
-        icon: "leaf",
-        leverage: 2,
-        kind: "action",
-      }),
-      B({
-        canonicalKey: "post-meal-walk",
-        timingReason:
-          "Within ~30 min of any meal — muscle contraction clears glucose without insulin.",
-        title: "Walk after meals",
-        block: "anytime",
-        anchor: "wake",
-        offsetMin: 0,
-        dose: "10 min after eating",
-        rationale: "Muscle contraction clears glucose without insulin.",
-        recommendedBy: ["Longevity research"],
-        icon: "footprints",
-        leverage: 3,
-        kind: "action",
-      }),
+      VEG_FIRST,
+      POST_MEAL_WALK,
       B({
         canonicalKey: "no-liquid-sugar",
         timingReason:
@@ -1303,36 +1268,31 @@ export const PACKS: ProtocolPack[] = [
         leverage: 2,
         kind: "avoid",
       }),
+      // 60s-cold-finish is conceptually the same as cold-plunge-am
+      // (the Cold & Heat pack's primary cold behavior) — both are
+      // morning cold exposure for an alertness lift. Merging by
+      // canonicalKey means a user with both packs sees ONE row
+      // instead of two redundant cold morning cards. Morning Momentum
+      // ships the lighter dose-default; the merge wins whichever was
+      // installed first.
       B({
-        canonicalKey: "cold-shower-am",
+        canonicalKey: "cold-plunge-am",
         timingReason:
-          "End of morning shower — cold delivers a clean alertness lift without a sleep cost.",
-        title: "End shower cold (60s)",
+          "Morning — cold delivers a clean alertness lift without a sleep cost. Start with 60s at the end of your shower; build to a real plunge.",
+        title: "Cold exposure (60s+)",
         block: "morning",
         anchor: "wake",
-        offsetMin: 25,
-        dose: "60s cold at the end",
+        offsetMin: 30,
+        dose: "60s cold at end of shower OR 1–3 min plunge",
         rationale:
-          "Brief cold exposure raises norepinephrine and alertness for hours.",
+          "Brief cold raises norepinephrine and alertness for hours.",
+        recommendedBy: ["Neuroscience research"],
         icon: "snowflake",
         leverage: 2,
         kind: "action",
       }),
       PROTEIN_BREAKFAST,
-      B({
-        canonicalKey: "delay-caffeine",
-        timingReason:
-          "~90 min after waking — lets adenosine clear first and blunts the afternoon crash.",
-        title: "Delay caffeine 90 min",
-        block: "morning",
-        anchor: "wake",
-        offsetMin: 90,
-        rationale:
-          "Delaying caffeine after waking avoids the afternoon adenosine crash.",
-        icon: "coffee",
-        leverage: 2,
-        kind: "action",
-      }),
+      DELAY_CAFFEINE,
     ],
   },
   {
@@ -1348,6 +1308,11 @@ export const PACKS: ProtocolPack[] = [
     behaviors: [
       CAFFEINE_CUTOFF,
       LAST_MEAL_3H,
+      // Evening walk at -150 (was -120, which collided with dim-lights
+      // at the same offset). The sequence reads naturally now:
+      // bed-210 alcohol-cutoff → bed-180 last-meal → bed-150 walk →
+      // bed-120 dim-lights → bed-90 cool-room → bed-60 screens-off →
+      // bed-45 magnesium → bed-30 wind-down.
       B({
         canonicalKey: "evening-walk",
         timingReason:
@@ -1355,7 +1320,7 @@ export const PACKS: ProtocolPack[] = [
         title: "Evening walk",
         block: "evening",
         anchor: "bed",
-        offsetMin: -120,
+        offsetMin: -150,
         dose: "15 min easy pace",
         rationale:
           "Helps digestion, lowers post-meal glucose, and signals end-of-day to the nervous system.",
@@ -1363,14 +1328,18 @@ export const PACKS: ProtocolPack[] = [
         leverage: 2,
         kind: "action",
       }),
+      // alcohol-cutoff at -210 (3.5h before bed) instead of -180 so
+      // it doesn't visually pile on the same line as last-meal-3h
+      // (which is the evening-walk -120 vs last-meal -180 sequence,
+      // already a fixed bed-side cadence).
       B({
         canonicalKey: "alcohol-cutoff",
         timingReason:
-          "Within ~3h of bed — alcohol blocks REM even at small doses.",
+          "Within ~3.5h of bed — alcohol blocks REM even at small doses; close the window before the last meal.",
         title: "No alcohol within 3h of bed",
         block: "evening",
         anchor: "bed",
-        offsetMin: -180,
+        offsetMin: -210,
         rationale:
           "Alcohol fragments sleep architecture and suppresses REM, even at modest doses.",
         recommendedBy: ["Sleep research"],
@@ -1378,34 +1347,8 @@ export const PACKS: ProtocolPack[] = [
         leverage: 2,
         kind: "avoid",
       }),
-      B({
-        canonicalKey: "dim-lights",
-        timingReason:
-          "~2h before bed — bright evening light is what most delays melatonin.",
-        title: "Dim the lights",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -120,
-        dose: "Warm, low light only",
-        rationale: "Evening bright light suppresses melatonin and delays sleep.",
-        recommendedBy: ["Neuroscience research"],
-        icon: "moon",
-        leverage: 2,
-        kind: "action",
-      }),
-      B({
-        canonicalKey: "screens-off",
-        timingReason:
-          "~1h before bed — removes the most alerting light source so the wind-down can actually land.",
-        title: "Screens off",
-        block: "evening",
-        anchor: "bed",
-        offsetMin: -60,
-        rationale: "Reduces alerting blue light and cognitive arousal pre-sleep.",
-        icon: "screen",
-        leverage: 2,
-        kind: "avoid",
-      }),
+      DIM_LIGHTS,
+      SCREENS_OFF,
       MAGNESIUM_PM,
       WIND_DOWN,
     ],
@@ -1451,23 +1394,12 @@ export const PACKS: ProtocolPack[] = [
         kind: "action",
         daysActive: [false, false, false, false, false, false, true],
       }),
-      B({
-        canonicalKey: "nsdr",
-        timingReason:
-          "Early afternoon — catches the post-lunch dip and resets you without harming night sleep.",
-        title: "NSDR / yoga nidra",
-        block: "afternoon",
-        anchor: "wake",
-        offsetMin: 420,
-        dose: "10–20 min",
-        rationale:
-          "Non-sleep deep rest restores dopamine and lowers sympathetic load.",
-        recommendedBy: ["Neuroscience research"],
-        icon: "lungs",
-        leverage: 3,
-        kind: "action",
-        daysActive: [false, false, false, false, false, false, true],
-      }),
+      // Use the shared NSDR atom (no daysActive) so installing Weekly
+      // Recovery + Burnout Recovery doesn't produce inconsistent
+      // first-install-wins state. If the user wants NSDR strictly on
+      // their deload day, they can disable it on other days via the
+      // behavior override sheet.
+      NSDR,
       B({
         canonicalKey: "extra-sleep",
         timingReason:
@@ -1650,21 +1582,10 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     leverage: 2,
     kind: "action",
   }),
-  B({
-    canonicalKey: "social-connection",
-    timingReason:
-      "Evening tends to be the natural slot — even brief connection downregulates stress.",
-    title: "One real human connection",
-    block: "evening",
-    anchor: "wake",
-    offsetMin: 600,
-    dose: "10+ min, ideally in person",
-    rationale:
-      "Social connection is one of the strongest predictors of long-term resilience and health.",
-    icon: "user",
-    leverage: 2,
-    kind: "action",
-  }),
+  // social-connection lives in the Stress Resilience pack now — the
+  // standalone copy was unreachable (listBehaviorAtoms skips a
+  // standalone if the same canonicalKey exists pack-bound). Removed
+  // to prevent confusion when curating evidence on either copy.
   B({
     canonicalKey: "no-phone-bedroom",
     timingReason:
