@@ -1371,6 +1371,65 @@ export default function AdminHome() {
                 compat) but won&apos;t change behavior.
               </p>
 
+              {/* Diagnostics — what the runtime is ACTUALLY serving
+                  right now. If "active bundle" is v0 after a Publish,
+                  the runtime didn't adopt; click Re-fetch. */}
+              <div
+                className={card}
+                style={{
+                  background: "var(--surface-3)",
+                  border: "1px solid var(--hairline-strong)",
+                }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Eyebrow>Runtime diagnostics</Eyebrow>
+                  <button
+                    onClick={async () => {
+                      resetRefresh();
+                      const ok = await fetchAndApplyPublished();
+                      setMsg(
+                        ok
+                          ? "Runtime re-fetched from cloud."
+                          : "Re-fetch did not apply (already on latest, or integrity check failed)."
+                      );
+                    }}
+                    className="press text-[11.5px] font-semibold text-[var(--readiness)]"
+                    title="Forces this admin session to read the latest published bundle from Supabase and adopt it."
+                  >
+                    ↻ Re-fetch from cloud
+                  </button>
+                </div>
+                <div className="mt-2 space-y-1 text-[11.5px]">
+                  <p className="font-mono text-[var(--text-2)]">
+                    active bundle: v{activeBundleVersion()}
+                  </p>
+                  <p className="font-mono text-[var(--text-2)]">
+                    effective config:{" "}
+                    <code className="text-[var(--text-1)]">
+                      {JSON.stringify(
+                        KNOWN_CONFIG_KEYS.reduce<Record<string, number>>(
+                          (m, k) => {
+                            m[k.key] = getCfgNumber(
+                              k.key,
+                              k.defaultValue
+                            );
+                            return m;
+                          },
+                          {}
+                        )
+                      )}
+                    </code>
+                  </p>
+                  <p className="t-caption mt-1.5 leading-relaxed">
+                    If "active bundle" is <b>v0</b> after Publish, the
+                    runtime didn&apos;t adopt — hit Re-fetch. If it shows
+                    a real version but the values look stale, hard-
+                    refresh (Cmd-Shift-R) — your browser is on an old JS
+                    bundle.
+                  </p>
+                </div>
+              </div>
+
               {/* Effective-value panel: known keys, their default,
                   current override (if any), and the effective value
                   the runtime is using right now. */}
