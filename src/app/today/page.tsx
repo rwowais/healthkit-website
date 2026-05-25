@@ -35,7 +35,7 @@ import {
   type Suggestion,
 } from "@/lib/intel";
 import BehaviorSheet from "@/components/BehaviorSheet";
-import { Skeleton, Eyebrow } from "@/components/ui";
+import { Skeleton, Eyebrow, Sheet, Button } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { TimeBlock } from "@/lib/types";
 
@@ -211,6 +211,98 @@ export default function TodayPage() {
     }
   }, [dismissed]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
+  // Edit-mode for the timeline. Off by default so the primary "tap to
+  // complete" affordance stays uncontaminated; flipping it on reveals
+  // drag handles and multi-select checkboxes. Drag while editing reassigns
+  // a behavior's block; dropping into the *recommended* block doesn't
+  // prompt, but moving away from it surfaces a calm explanation rather
+  // than silently overriding the science behind the timing.
+  const [editMode, setEditMode] = useState(false);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [dragOverBlock, setDragOverBlock] = useState<TimeBlock | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  /**
+   * A move that requires confirmation. Set when the user drags a
+   * behavior to a block that doesn't match its recommendedBlock. Holds
+   * everything we need to commit (or several keys, for bulk moves).
+   */
+  const [pendingMove, setPendingMove] = useState<{
+    keys: { key: string; title: string }[];
+    toBlock: TimeBlock;
+    rationale: string;
+  } | null>(null);
+
+  // Block-specific rationale for the "are you sure" prompt. Stays
+  // calm and educational — no shaming or hard-blocking, just naming
+  // why the system originally placed the behavior where it did.
+  const blockRationale = (block: TimeBlock): string => {
+    switch (block) {
+      case "morning":
+        return "Morning timing anchors the circadian rhythm — the strongest lever for sleep, mood, and energy.";
+      case "afternoon":
+        return "Afternoon timing balances energy across the day and avoids interfering with sleep.";
+      case "evening":
+        return "Evening timing supports wind-down and recovery — earlier slots can blunt the effect.";
+      case "anytime":
+        return "This behavior doesn't depend on a specific time of day.";
+    }
+  };
+
+  /**
+   * Commit a block re-time. Resolves the override structure for each
+   * key — preserving customTime so the user's exact-clock choice isn't
+   * wiped — and writes them all in one pass.
+   */
+  const commitBlockMove = (
+    moves: { key: string; title: string }[],
+    toBlock: TimeBlock
+  ) => {
+    for (const m of moves) {
+      const cur = state.behaviorOverrides?.[m.key] ?? {};
+      setBehaviorOverride(m.key, {
+        ...cur,
+        block: toBlock,
+        // Clearing customTime keeps the move predictable — a 7:30am
+        // morning custom time would otherwise still snap that exact
+        // clock when the user moves it to "evening", which is rarely
+        // what they want.
+        customTime: toBlock === "anytime" ? undefined : cur.customTime,
+      });
+    }
+  };
+
+  /**
+   * Centralized request-to-move. Surfaces the confirm sheet for any
+   * move that contradicts a recommended block; commits immediately
+   * for moves into the recommended block or to anytime (the gentle
+   * fallback).
+   */
+  const requestBlockMove = (
+    moves: {
+      key: string;
+      title: string;
+      recommendedBlock: TimeBlock;
+    }[],
+    toBlock: TimeBlock
+  ) => {
+    if (moves.length === 0) return;
+    const contradicts = moves.filter(
+      (m) =>
+        m.recommendedBlock !== toBlock && m.recommendedBlock !== "anytime"
+    );
+    if (contradicts.length === 0 || toBlock === "anytime") {
+      commitBlockMove(moves, toBlock);
+      return;
+    }
+    setPendingMove({
+      keys: contradicts.map((m) => ({ key: m.key, title: m.title })),
+      toBlock,
+      // Use the first contradicted behavior's recommended block for
+      // the rationale; a mixed-bag bulk move falls back to "different
+      // blocks are recommended" copy below.
+      rationale: blockRationale(contradicts[0].recommendedBlock),
+    });
+  };
   // Acknowledged-mastery set: a behavior that's been graduated to
   // maintenance gets ONE calm celebratory moment, then disappears into
   // the lighter cadence. Local storage so the cloud mutation stays
@@ -1239,6 +1331,40 @@ export default function TodayPage() {
             );
           })()}
 
+        {/* Edit-mode toggle. Tucked above the timeline rather than the
+            page header so it sits next to what it modifies; visible to
+            today only because day-by-day edits to past timelines would
+            mutate historical truth. Past days stay read-only. */}
+        {isToday && timeline.length > 0 && (
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[12px] font-medium text-[var(--text-3)]">
+              {editMode
+                ? "Drag to move across times of day"
+                : "Today's flow"}
+            </span>
+            <button
+              onClick={() => {
+                setEditMode((v) => !v);
+                if (editMode) setSelectedKeys(new Set());
+                setDragKey(null);
+                setDragOverBlock(null);
+              }}
+              className="press tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11.5px] font-semibold"
+              style={{
+                background: editMode ? "var(--text-1)" : "var(--surface-3)",
+                color: editMode ? "#08090B" : "var(--text-2)",
+              }}
+              title={
+                editMode
+                  ? "Exit edit mode"
+                  : "Drag behaviors across times of day · multi-select for bulk actions"
+              }
+            >
+              {editMode ? "Done" : "Edit"}
+            </button>
+          </div>
+        )}
+
         {/* Live, time-aware timeline */}
         <div className="flex flex-col gap-7">
           {BLOCKS.map((block, bIdx) => {
@@ -1262,8 +1388,48 @@ export default function TodayPage() {
             const collapsed =
               isPast && fullyDone && !openBlocks[block];
 
+            const isDropTarget = editMode && dragOverBlock === block;
             return (
-              <section key={block}>
+              <section
+                key={block}
+                onDragOver={(e) => {
+                  if (!editMode || !dragKey) return;
+                  // Allowing the drop is what enables an onDrop; without
+                  // preventDefault the browser rejects the cursor as
+                  // "no-drop" which makes the affordance feel broken.
+                  e.preventDefault();
+                  if (dragOverBlock !== block) setDragOverBlock(block);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const key = dragKey;
+                  setDragKey(null);
+                  setDragOverBlock(null);
+                  if (!editMode || !key) return;
+                  const it = timeline.find((x) => x.canonicalKey === key);
+                  if (!it || it.block === block) return;
+                  requestBlockMove(
+                    [
+                      {
+                        key,
+                        title: it.title,
+                        recommendedBlock: it.recommendedBlock,
+                      },
+                    ],
+                    block
+                  );
+                }}
+                style={
+                  isDropTarget
+                    ? {
+                        outline:
+                          "2px dashed color-mix(in srgb, var(--readiness) 60%, transparent)",
+                        outlineOffset: 6,
+                        borderRadius: "var(--r-xl)",
+                      }
+                    : undefined
+                }
+              >
                 <button
                   onClick={() =>
                     setOpenBlocks((o) => ({ ...o, [block]: !o[block] }))
@@ -1287,7 +1453,9 @@ export default function TodayPage() {
                     )}
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-3)]">
-                    {fullyDone
+                    {editMode
+                      ? `Drop here to move to ${blockLabel(block)}`
+                      : fullyDone
                       ? "Complete"
                       : doneCount > 0
                       ? "In flow"
@@ -1385,22 +1553,83 @@ export default function TodayPage() {
                               className={`group relative flex items-stretch gap-3 ${
                                 lev1 ? "py-1" : "py-1.5"
                               }`}
+                              style={{
+                                opacity:
+                                  dragKey === it.canonicalKey ? 0.4 : 1,
+                                transition: "opacity 120ms ease",
+                              }}
                             >
+                              {/* Drag handle — only in edit mode, only
+                                  for today (past days are read-only).
+                                  Drag is initiated from the handle, not
+                                  the row, so the completion tap target
+                                  stays uncontaminated. */}
+                              {editMode && isToday && (
+                                <span
+                                  role="button"
+                                  tabIndex={-1}
+                                  aria-label={`Drag ${it.title} to a different time of day`}
+                                  title="Drag to move across times of day"
+                                  draggable
+                                  onDragStart={(e) => {
+                                    setDragKey(it.canonicalKey);
+                                    setDragOverBlock(block);
+                                    e.dataTransfer.effectAllowed = "move";
+                                  }}
+                                  onDragEnd={() => {
+                                    setDragKey(null);
+                                    setDragOverBlock(null);
+                                  }}
+                                  className="grid min-h-[44px] w-7 cursor-grab shrink-0 place-items-center text-[var(--text-3)] active:cursor-grabbing"
+                                >
+                                  <span className="font-mono text-[14px] leading-none">
+                                    ⋮⋮
+                                  </span>
+                                </span>
+                              )}
+                              {/* Multi-select checkbox — same surface as
+                                  drag handle, only in edit mode. Lets
+                                  the user bulk-snooze or bulk-move a
+                                  group without dragging each. */}
+                              {editMode && isToday && (
+                                <span className="grid min-h-[44px] w-6 shrink-0 place-items-center">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`Select ${it.title}`}
+                                    checked={selectedKeys.has(it.canonicalKey)}
+                                    onChange={(e) => {
+                                      const next = new Set(selectedKeys);
+                                      if (e.target.checked)
+                                        next.add(it.canonicalKey);
+                                      else next.delete(it.canonicalKey);
+                                      setSelectedKeys(next);
+                                    }}
+                                    className="h-4 w-4 cursor-pointer accent-[var(--readiness)]"
+                                  />
+                                </span>
+                              )}
                               {/* Node on the spine */}
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  // Tap-to-complete is suppressed while
+                                  // editing — the row becomes a
+                                  // manipulation target, not a checklist
+                                  // item. Re-enabling it when the user
+                                  // taps Done.
+                                  if (editMode) return;
                                   toggleBehavior(
                                     selectedDate,
                                     it.canonicalKey
-                                  )
-                                }
+                                  );
+                                }}
                                 aria-label={
                                   done
                                     ? `${it.title} — done`
                                     : `Mark ${it.title} done`
                                 }
                                 aria-pressed={done}
-                                className="press relative z-10 grid min-h-[44px] w-11 shrink-0 place-items-center"
+                                disabled={editMode}
+                                className="press relative z-10 grid min-h-[44px] w-11 shrink-0 place-items-center disabled:opacity-60"
                               >
                                 <span
                                   className={`grid place-items-center rounded-full tr-fast ${
@@ -1450,14 +1679,26 @@ export default function TodayPage() {
 
                               {/* Content — tapping the row completes it
                                   (it's a checklist). Details/editing is a
-                                  deliberate secondary affordance, right. */}
+                                  deliberate secondary affordance, right.
+                                  In edit mode tapping the content toggles
+                                  selection so the entire row is hit-
+                                  target for picking, not just the tiny
+                                  checkbox. */}
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  if (editMode) {
+                                    const next = new Set(selectedKeys);
+                                    if (next.has(it.canonicalKey))
+                                      next.delete(it.canonicalKey);
+                                    else next.add(it.canonicalKey);
+                                    setSelectedKeys(next);
+                                    return;
+                                  }
                                   toggleBehavior(
                                     selectedDate,
                                     it.canonicalKey
-                                  )
-                                }
+                                  );
+                                }}
                                 aria-label={
                                   done
                                     ? `${it.title} — done`
@@ -1617,6 +1858,155 @@ export default function TodayPage() {
           })}
         </div>
       </div>
+
+      {/* Bulk-action bar — appears only when a multi-select has any
+          picks. Sticky to the bottom of the viewport so it can't be
+          scrolled out of reach. Three actions: Snooze (today only),
+          Move to block (re-times the selection together, cross-block
+          warning applies), and Clear. */}
+      {editMode && selectedKeys.size > 0 && (
+        <div
+          className="fixed inset-x-3 bottom-3 z-50 flex flex-wrap items-center gap-2 rounded-[var(--r-xl)] p-3"
+          style={{
+            background:
+              "color-mix(in srgb, var(--readiness) 16%, var(--surface-2))",
+            boxShadow: "var(--shadow-soft)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+          }}
+        >
+          <span className="text-[12.5px] font-semibold text-[var(--text-1)]">
+            {selectedKeys.size} selected
+          </span>
+          <span className="t-caption">·</span>
+          <button
+            onClick={() => {
+              setSnoozed((s) =>
+                Array.from(new Set([...s, ...selectedKeys]))
+              );
+              setSelectedKeys(new Set());
+            }}
+            className="press tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+            style={{
+              background: "var(--surface-3)",
+              color: "var(--text-1)",
+            }}
+            title="Hide these for today only — they come back tomorrow."
+          >
+            Snooze today
+          </button>
+          {(["morning", "afternoon", "evening", "anytime"] as TimeBlock[]).map(
+            (b) => (
+              <button
+                key={b}
+                onClick={() => {
+                  const moves: {
+                    key: string;
+                    title: string;
+                    recommendedBlock: TimeBlock;
+                  }[] = [];
+                  for (const k of selectedKeys) {
+                    const it = timeline.find((x) => x.canonicalKey === k);
+                    if (!it || it.block === b) continue;
+                    moves.push({
+                      key: k,
+                      title: it.title,
+                      recommendedBlock: it.recommendedBlock,
+                    });
+                  }
+                  requestBlockMove(moves, b);
+                  setSelectedKeys(new Set());
+                }}
+                className="press tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+                style={{
+                  background: "var(--surface-3)",
+                  color: "var(--text-1)",
+                }}
+                title={`Move every selected behavior to ${blockLabel(b)}.`}
+              >
+                → {blockLabel(b)}
+              </button>
+            )
+          )}
+          <button
+            onClick={() => setSelectedKeys(new Set())}
+            className="press ml-auto text-[11.5px] text-[var(--text-3)]"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Cross-block move confirmation. The rationale comes from the
+          recommendedBlock of the *first* contradicted behavior — for
+          mixed bulk moves we say "this affects multiple recommendations"
+          to stay honest. The user can still proceed; we're educating,
+          not blocking. */}
+      <Sheet
+        open={!!pendingMove}
+        onClose={() => setPendingMove(null)}
+        title="Move outside the recommended time?"
+      >
+        {pendingMove && (
+          <div>
+            <p className="text-[14px] leading-relaxed text-[var(--text-2)]">
+              {pendingMove.keys.length === 1
+                ? `“${pendingMove.keys[0].title}” is recommended at a different time of day.`
+                : `${pendingMove.keys.length} of your selected behaviors are recommended at different times of day.`}
+            </p>
+            <p
+              className="mt-3 rounded-[var(--r-sm)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--text-2)]"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--warm) 9%, var(--surface-2))",
+              }}
+            >
+              {pendingMove.keys.length === 1
+                ? pendingMove.rationale
+                : "Different behaviors have different ideal times. You can move them all to this block anyway — the override sticks until you reset it."}
+            </p>
+            {pendingMove.keys.length > 1 && (
+              <ul className="mt-3 space-y-1">
+                {pendingMove.keys.slice(0, 6).map((k) => (
+                  <li
+                    key={k.key}
+                    className="flex items-center gap-2 text-[12.5px] text-[var(--text-3)]"
+                  >
+                    <span
+                      className="h-1 w-1 rounded-full"
+                      style={{ background: "var(--warm)" }}
+                    />
+                    {k.title}
+                  </li>
+                ))}
+                {pendingMove.keys.length > 6 && (
+                  <li className="t-caption">
+                    +{pendingMove.keys.length - 6} more
+                  </li>
+                )}
+              </ul>
+            )}
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <Button
+                variant="ghost"
+                full
+                onClick={() => setPendingMove(null)}
+              >
+                Keep as is
+              </Button>
+              <Button
+                full
+                onClick={() => {
+                  commitBlockMove(pendingMove.keys, pendingMove.toBlock);
+                  setPendingMove(null);
+                }}
+              >
+                Move anyway
+              </Button>
+            </div>
+          </div>
+        )}
+      </Sheet>
 
       <BehaviorSheet
         item={detail}
