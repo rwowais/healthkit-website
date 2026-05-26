@@ -349,3 +349,32 @@ drop policy if exists "publish admin only" on public.cms_publications;
 create policy "publish admin only" on public.cms_publications
   for all using (public.cms_is_admin())
   with check (public.cms_is_admin());
+
+-- ── Account self-deletion ─────────────────────────────────────────
+-- SECURITY DEFINER RPC: lets a signed-in user delete their own
+-- auth.users row. RLS would otherwise block this (the auth schema
+-- is locked down). The function only ever operates on auth.uid(),
+-- so a malicious caller can only ever delete THEIR OWN account.
+-- This is the cornerstone of GDPR Article 17 (right to erasure)
+-- and equivalent CCPA/PIPEDA rights.
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  -- Best-effort cleanup of every owned row first. app_states uses
+  -- the user id as the primary key directly; the cms_admins table
+  -- has a user_id column.
+  delete from public.app_states where id = auth.uid();
+  delete from public.cms_admins where user_id = auth.uid();
+  -- Finally remove the auth.users row itself.
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+revoke all on function public.delete_my_account() from public;
+grant execute on function public.delete_my_account() to authenticated;

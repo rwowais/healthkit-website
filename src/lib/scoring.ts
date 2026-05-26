@@ -64,8 +64,17 @@ export function calculateDailyScore(
 /**
  * Calculate the current streak: consecutive days (ending today or yesterday)
  * where any tracking activity occurred.
+ *
+ * @param vacationDates — set of YYYY-MM-DD strings the user was in
+ * vacation mode. Treated as "transparent" days: the streak walks through
+ * them as if they weren't there. A 5-day streak that takes a 3-day
+ * vacation and resumes is still a 5-day streak (the vacation isn't
+ * counted up OR counted as broken).
  */
-export function calculateStreak(logs: DailyLog[]): number {
+export function calculateStreak(
+  logs: DailyLog[],
+  vacationDates?: Set<string>
+): number {
   if (logs.length === 0) return 0;
 
   const sorted = [...logs]
@@ -82,7 +91,16 @@ export function calculateStreak(logs: DailyLog[]): number {
   const todayStr = formatDateKey(today);
   const yesterdayStr = formatDateKey(yesterday);
 
-  if (sorted[0].date !== todayStr && sorted[0].date !== yesterdayStr) {
+  // Allow vacation days to count as "current" for the head check —
+  // a user who's been on vacation today shouldn't have their streak
+  // displayed as 0.
+  const isVacation = (s: string) => vacationDates?.has(s) === true;
+  if (
+    sorted[0].date !== todayStr &&
+    sorted[0].date !== yesterdayStr &&
+    !isVacation(todayStr) &&
+    !isVacation(yesterdayStr)
+  ) {
     return 0;
   }
 
@@ -91,8 +109,12 @@ export function calculateStreak(logs: DailyLog[]): number {
   let usedGrace = false; // forgive one missed day so a single slip
 
   for (let i = 1; i < sorted.length; i++) {
-    const expectedPrev = new Date(currentDate);
+    // Skip backward through vacation days — they're transparent.
+    let expectedPrev = new Date(currentDate);
     expectedPrev.setDate(expectedPrev.getDate() - 1);
+    while (isVacation(formatDateKey(expectedPrev))) {
+      expectedPrev.setDate(expectedPrev.getDate() - 1);
+    }
     const expectedStr = formatDateKey(expectedPrev);
 
     if (sorted[i].date === expectedStr) {

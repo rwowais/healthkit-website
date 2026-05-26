@@ -115,6 +115,11 @@ export function compileTimeline(
   dayIndex: number,
   packsOverride?: ProtocolPack[]
 ): TimelineItem[] {
+  // Vacation mode: returns an empty timeline. The user sees a calm
+  // "you're on a break" surface on Today, no packs auto-resume until
+  // they toggle it off in Profile. Streak math (in scoring.ts) skips
+  // these days so the user isn't penalized for the break.
+  if (state.settings?.vacationMode) return [];
   const installed = new Set(state.installedPacks ?? []);
   const paused = new Set(state.pausedPacks ?? []);
   const overrides = state.behaviorOverrides ?? {};

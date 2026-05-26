@@ -8,6 +8,7 @@ import { useAppState } from "@/hooks/useAppState";
 import { getAccess } from "@/lib/entitlements";
 import { clearAllData, exportState, importState } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
+import { deleteAccount, supabaseEnabled } from "@/lib/auth";
 import {
   Card,
   Eyebrow,
@@ -47,6 +48,9 @@ export default function ProfilePage() {
   const access = getAccess(state);
   const toast = useToast();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (loading) {
@@ -220,6 +224,50 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
+        </Card>
+
+        {/* Taking a break — vacation mode. One toggle pauses every
+            pack, clears Today, and freezes the streak. The user can
+            travel / be sick / take a real rest without watching their
+            streak die or their score crash. */}
+        <Card>
+          <Eyebrow>Taking a break</Eyebrow>
+          <Row label="Pause everything">
+            <button
+              onClick={() =>
+                updateSettings({
+                  vacationMode: !s.vacationMode,
+                  vacationStartedAt: !s.vacationMode
+                    ? new Date().toISOString()
+                    : undefined,
+                })
+              }
+              role="switch"
+              aria-checked={!!s.vacationMode}
+              aria-label="Pause everything"
+              className="tr-fast h-7 w-12 rounded-full p-1"
+              style={{
+                background: s.vacationMode
+                  ? "var(--warm)"
+                  : "var(--surface-3)",
+              }}
+            >
+              <div
+                className="tr-fast h-5 w-5 rounded-full bg-white"
+                style={{
+                  transform: s.vacationMode
+                    ? "translateX(20px)"
+                    : "translateX(0)",
+                }}
+              />
+            </button>
+          </Row>
+          <p className="t-caption mt-1 leading-relaxed">
+            Travel, sick days, or any stretch where you need real rest.
+            Your timeline goes quiet, your streak holds, your data
+            stays intact. Flip it off when you&apos;re ready to come
+            back — everything resumes where you left off.
+          </p>
         </Card>
 
         {/* Preferences */}
@@ -459,22 +507,141 @@ export default function ProfilePage() {
           </button>
         </Card>
 
-        {/* Disclaimer */}
+        {/* Disclaimer + legal links */}
         <Card>
           <Eyebrow>Disclaimer & Privacy</Eyebrow>
-          <p className="t-caption mt-2.5 leading-relaxed">
-            Protocolize is an educational tool — not medical advice, diagnosis,
-            or treatment. Biomarker ranges are general references; interpret all
-            health data with a qualified clinician. Your data stays on this
-            device unless you export it.
+          <div
+            className="mt-2.5 rounded-[var(--r-md)] p-3"
+            style={{
+              background:
+                "color-mix(in srgb, var(--alert) 8%, var(--surface-2))",
+              border:
+                "1px solid color-mix(in srgb, var(--alert) 24%, transparent)",
+            }}
+          >
+            <p className="text-[13px] font-semibold text-[var(--alert)] mb-1">
+              Not medical advice
+            </p>
+            <p className="text-[13px] leading-relaxed text-[var(--text-2)]">
+              Protocolize is an educational tool — not medical advice,
+              diagnosis, or treatment. Biomarker ranges are general
+              references; interpret all health data with a qualified
+              clinician. If you&apos;re pregnant, under 18, on
+              medication, or have any condition, please consult your
+              doctor before changing your routine.
+            </p>
+          </div>
+          <p className="t-caption mt-3 leading-relaxed">
+            Your data stays on this device unless you sign in. With an
+            account, it&apos;s stored in a private row in our database
+            and never shared.
           </p>
+          <div className="mt-4 flex gap-3 text-[13px]">
+            <Link
+              href="/privacy"
+              className="text-[var(--readiness)] underline"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              href="/terms"
+              className="text-[var(--readiness)] underline"
+            >
+              Terms of Service
+            </Link>
+          </div>
         </Card>
+
+        {/* Permanent account deletion — only when cloud sync is active.
+            Local-only users use "Reset all data" above; for them there's
+            no account to delete. */}
+        {supabaseEnabled && (
+          <Card>
+            <Eyebrow color="var(--alert)">Delete account</Eyebrow>
+            <p className="t-caption mt-2 leading-relaxed">
+              Permanently removes your account and every byte of your
+              data from our database. Local data on this device is
+              cleared too. This cannot be undone.
+            </p>
+            <button
+              onClick={() => {
+                setDeleteConfirmText("");
+                setConfirmDeleteAccount(true);
+              }}
+              className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] border border-[var(--alert)] py-3 text-[13px] font-semibold text-[var(--alert)]"
+            >
+              Delete my account
+            </button>
+          </Card>
+        )}
 
         <p className="pb-2 text-center text-[11px] text-[var(--text-4)]">
           Protocolize · Adaptive Protocol OS · build{" "}
           {process.env.NEXT_PUBLIC_BUILD ?? "dev"}
         </p>
       </div>
+
+      {/* Account-deletion confirmation — requires typing DELETE so
+          the user is forced to slow down and read what's about to
+          happen. Better than a single "Are you sure?" button. */}
+      <Sheet
+        open={confirmDeleteAccount}
+        onClose={() => setConfirmDeleteAccount(false)}
+        title="Delete your account?"
+      >
+        <p className="t-body mb-3 text-[var(--text-2)]">
+          This deletes your account row, all your protocol data,
+          biomarkers, logs, and sign-in. It happens immediately and
+          cannot be reversed.
+        </p>
+        <p className="t-body mb-4 text-[var(--text-2)]">
+          If you want a copy of your data first, cancel and use Export.
+        </p>
+        <label className="block text-[12px] font-semibold text-[var(--text-3)] mb-2">
+          Type DELETE to confirm
+        </label>
+        <input
+          value={deleteConfirmText}
+          onChange={(e) => setDeleteConfirmText(e.target.value)}
+          placeholder="DELETE"
+          className="mb-5 w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[15px] text-[var(--text-1)] outline-none"
+          autoFocus
+        />
+        <div className="flex gap-3">
+          <Button
+            variant="ghost"
+            full
+            onClick={() => setConfirmDeleteAccount(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            full
+            disabled={
+              deleteConfirmText !== "DELETE" || deletingAccount
+            }
+            onClick={async () => {
+              setDeletingAccount(true);
+              const r = await deleteAccount();
+              if (!r.ok) {
+                toast.show(r.error ?? "Could not delete account");
+                setDeletingAccount(false);
+                return;
+              }
+              // Wipe local too.
+              try {
+                clearAllData();
+              } catch {}
+              setConfirmDeleteAccount(false);
+              if (r.error) toast.show(r.error);
+              else toast.show("Account deleted");
+              router.push("/");
+            }}
+          >
+            {deletingAccount ? "Deleting…" : "Delete forever"}
+          </Button>
+        </div>
+      </Sheet>
 
       <Sheet
         open={confirmReset}

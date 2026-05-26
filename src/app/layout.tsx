@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorker from "@/components/ServiceWorker";
 import SyncConflictPrompt from "@/components/SyncConflictPrompt";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import StorageSafetyNet from "@/components/StorageSafetyNet";
 
 export const metadata: Metadata = {
   title: "Protocolize — Longevity Intelligence",
@@ -39,9 +41,12 @@ export default function RootLayout({
       style={{ colorScheme: "dark" }}
     >
       <body className="antialiased">
-        {children}
-        <SyncConflictPrompt />
-        <ServiceWorker />
+        <ErrorBoundary>
+          {children}
+          <SyncConflictPrompt />
+          <ServiceWorker />
+          <StorageSafetyNet />
+        </ErrorBoundary>
       </body>
     </html>
   );

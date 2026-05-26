@@ -102,6 +102,13 @@ export const STORAGE_KEY = "protocolize-v3";
 /** Older keys we migrate from / clear on reset. */
 export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 
+/**
+ * Legal document version. Bump this when Terms or Privacy change
+ * materially — the app will then re-prompt accepted users to confirm
+ * the new docs (minor copy fixes don't justify a bump).
+ */
+export const LEGAL_VERSION = 1;
+
 export const TRIAL_DURATION_DAYS = 7;
 
 export const SCORE_WEIGHTS = {

@@ -542,6 +542,9 @@ export default function TodayPage() {
   }
 
   if (timeline.length === 0) {
+    // Two empty-state cases: vacation mode on (intentional break), or
+    // no packs installed (needs onboarding nudge). Different copy + CTA.
+    const onVacation = !!state.settings.vacationMode;
     return (
       <Shell>
         <div className="flex flex-col gap-6">
@@ -555,22 +558,28 @@ export default function TodayPage() {
           <div className="panel flex flex-col items-center px-6 py-14 text-center">
             <span
               className="chip mb-5 h-14 w-14"
-              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+              style={{
+                background: onVacation
+                  ? "color-mix(in srgb, var(--warm) 18%, var(--surface-3))"
+                  : "var(--surface-3)",
+                color: onVacation ? "var(--warm)" : "var(--text-2)",
+              }}
             >
-              <Icon name="compass" size={24} />
+              <Icon name={onVacation ? "moon" : "compass"} size={24} />
             </span>
             <p className="t-section text-[var(--text-1)]">
-              Your day is a blank canvas
+              {onVacation ? "You're on a break" : "Your day is a blank canvas"}
             </p>
-            <p className="t-caption mt-2 max-w-[260px] leading-relaxed">
-              Install a protocol and Protocolize will assemble an adaptive
-              daily system for you.
+            <p className="t-caption mt-2 max-w-[280px] leading-relaxed">
+              {onVacation
+                ? "Your streak is paused, your data is safe, your packs will resume the moment you're ready."
+                : "Install a protocol and Protocolize will assemble an adaptive daily system for you."}
             </p>
             <Link
-              href="/protocols#discover"
+              href={onVacation ? "/profile" : "/protocols#discover"}
               className="press tr-fast mt-6 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[14px] font-semibold text-[#08090B]"
             >
-              Discover protocols
+              {onVacation ? "End break in Profile" : "Discover protocols"}
             </Link>
           </div>
         </div>

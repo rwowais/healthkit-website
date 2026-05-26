@@ -133,6 +133,17 @@ export default function LandingPage() {
           Protocolize is an educational tool, not medical advice. Consult a
           clinician before changing your health routine.
         </p>
+        <div className="mt-6 flex justify-center gap-5 text-[12px] text-[var(--text-4)]">
+          <a href="/privacy" className="hover:text-[var(--text-3)]">
+            Privacy
+          </a>
+          <a href="/terms" className="hover:text-[var(--text-3)]">
+            Terms
+          </a>
+          <a href="mailto:hello@protocolize.com" className="hover:text-[var(--text-3)]">
+            Contact
+          </a>
+        </div>
       </section>
     </div>
   );

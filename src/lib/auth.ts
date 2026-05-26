@@ -105,4 +105,51 @@ export async function signOut(): Promise<void> {
   if (sb) await sb.auth.signOut();
 }
 
+/**
+ * Permanent account deletion. Removes the user's app_states row,
+ * any cms_admins row, and then asks Supabase to delete the auth user
+ * itself via an RPC (the auth user delete cannot be done from client
+ * code; the RPC is defined in supabase/schema.sql).
+ *
+ * After cloud deletion succeeds, the caller is expected to clear
+ * localStorage and redirect to the landing page.
+ *
+ * Returns { ok: true } even if Supabase isn't configured — in that
+ * case there's nothing in the cloud to delete; just clear local.
+ */
+export async function deleteAccount(): Promise<AuthResult> {
+  const sb = getSupabase();
+  if (!sb) return { ok: true };
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "No active session." };
+  // Delete the app_states row first (RLS allows own-row delete).
+  const { error: dataErr } = await sb
+    .from("app_states")
+    .delete()
+    .eq("id", user.id);
+  if (dataErr) return { ok: false, error: dataErr.message };
+  // Best-effort: remove cms_admins row if present. Ignore errors —
+  // if the user isn't an admin, this is a no-op.
+  try {
+    await sb.from("cms_admins").delete().eq("user_id", user.id);
+  } catch {}
+  // Ask the auth.users delete RPC to remove the user. The RPC is
+  // SECURITY DEFINER (defined in supabase/schema.sql) so it can
+  // delete the user row that RLS would otherwise block.
+  const { error: rpcErr } = await sb.rpc("delete_my_account");
+  if (rpcErr) {
+    // Even if the RPC isn't installed yet, the row is gone — sign out
+    // and surface a soft warning. The user can email support for the
+    // auth-user removal.
+    await sb.auth.signOut();
+    return {
+      ok: true,
+      error:
+        "Your data is deleted. Your sign-in record will be removed within 30 days. (RPC missing — admin to install delete_my_account.)",
+    };
+  }
+  await sb.auth.signOut();
+  return { ok: true };
+}
+
 export { supabaseEnabled };

@@ -134,6 +134,33 @@ export interface UserSettings {
    * of being silent (cleared once acknowledged).
    */
   trialExtendedAt?: string;
+
+  /**
+   * Vacation mode — a single toggle that pauses every pack at once,
+   * empties the timeline, and freezes the streak math. For trips,
+   * sick days, or any "I need a break" stretch where the user doesn't
+   * want to be punished by an empty score or watch their streak die.
+   * On = empty Today + Protocols stay paused; off = everything resumes
+   * with the streak picking up where it left off (no zero-days
+   * inserted while paused).
+   */
+  vacationMode?: boolean;
+  /** ISO; stamped when the user toggled vacation mode on. */
+  vacationStartedAt?: string;
+
+  /**
+   * ISO; stamped when the user accepted Terms + Privacy. Required for
+   * EU/UK/CA legal compliance. We don't gate the app on this — we
+   * collect it on first run after the legal pages ship, and surface
+   * a calm one-time banner asking returning users to acknowledge.
+   */
+  legalAcceptedAt?: string;
+  /**
+   * Version of the legal docs the user accepted. Bump LEGAL_VERSION in
+   * lib/constants.ts when Terms or Privacy materially change to
+   * re-prompt without forcing re-acceptance on minor edits.
+   */
+  legalAcceptedVersion?: number;
 }
 
 // ── Legacy completion (kept for migration) ────────────────────────
