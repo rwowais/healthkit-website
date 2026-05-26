@@ -20,8 +20,16 @@ import {
   effectiveKey,
   blockIntelligence,
   validateAtom,
+  trustTier,
 } from "@/lib/engine";
 import { PACKS } from "@/lib/packs";
+import {
+  buildAtomRegistry,
+  auditOntology,
+  explainBehavior,
+  catalogInventory,
+} from "@/lib/governance";
+import { keystone, whatWorks, suggestions } from "@/lib/intel";
 import {
   listBehaviorAtoms,
   customCanonicalKey,
@@ -468,5 +476,352 @@ describe("atom-library (2B) — listBehaviorAtoms + customCanonicalKey", () => {
         i.derivedFrom === "magnesium-pm"
     );
     expect(magRows.length).toBe(1);
+  });
+});
+
+describe("trust tier classification — the governance guardrail", () => {
+  it("classifies curated atoms as curated", () => {
+    expect(trustTier({ canonicalKey: "magnesium-pm" })).toBe("curated");
+    expect(trustTier({ canonicalKey: "morning-sunlight" })).toBe("curated");
+  });
+
+  it("classifies custom + derivedFrom as derived", () => {
+    expect(
+      trustTier({
+        canonicalKey: "custom:p1:magnesium-xyz",
+        derivedFrom: "magnesium-pm",
+      })
+    ).toBe("derived");
+  });
+
+  it("classifies custom WITHOUT derivedFrom as custom", () => {
+    expect(
+      trustTier({ canonicalKey: "custom:p1:vagus-massage-xyz" })
+    ).toBe("custom");
+  });
+
+  it("classifies forks as derived (they always carry derivedFrom)", () => {
+    expect(
+      trustTier({
+        canonicalKey: "fork:abc:wind-down",
+        derivedFrom: "wind-down",
+      })
+    ).toBe("derived");
+  });
+
+  it("compileTimeline stamps trustTier on every row", () => {
+    let st = getDefaultState();
+    st = { ...st, installedPacks: ["longevity-foundation"] };
+    const tl = compileTimeline(st, 0);
+    for (const item of tl) {
+      expect(item.trustTier).toBeDefined();
+      // All curated packs ship curated atoms.
+      expect(item.trustTier).toBe("curated");
+    }
+  });
+
+  it("merge picks the most-authoritative tier (custom < derived < curated)", () => {
+    const customMagnesium = {
+      canonicalKey: customCanonicalKey("user-pack-1", "Magnesium glycinate"),
+      derivedFrom: "magnesium-pm",
+      title: "Magnesium glycinate",
+      block: "evening" as const,
+      anchor: "bed" as const,
+      offsetMin: -45,
+      rationale: "Custom dose",
+      icon: "pill",
+      leverage: 2 as const,
+      kind: "action" as const,
+    };
+    const customPack: ProtocolPack = {
+      id: "user-pack-1",
+      name: "My Sleep",
+      tagline: "t",
+      goal: "custom",
+      accent: "x",
+      icon: "moon",
+      source: "custom",
+      durationLabel: "Custom",
+      behaviors: [customMagnesium],
+    };
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["better-sleep", customPack.id],
+      customPacks: [customPack],
+    };
+    const tl = compileTimeline(st, 0);
+    const magRow = tl.find(
+      (i) =>
+        i.canonicalKey === "magnesium-pm" ||
+        i.derivedFrom === "magnesium-pm"
+    );
+    expect(magRow).toBeTruthy();
+    // The merged row gets the curated atom's tier — NOT the derived
+    // tier from the user-namespaced canonical key visited second.
+    expect(magRow!.trustTier).toBe("curated");
+  });
+});
+
+describe("governance: custom behaviors NEVER become 'trusted system knowledge'", () => {
+  // Local helpers — packs.test.ts doesn't have the log/dk helpers
+  // intel.test.ts uses; inline them here so the governance tests
+  // don't depend on the other file.
+  const dkLocal = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const logLocal = (
+    date: string,
+    bc: Record<string, boolean>,
+    score: number
+  ): DailyLog =>
+    ({
+      date,
+      behaviorCompletions: bc,
+      score,
+      sleepLog: {},
+      energyLevel: null,
+      moodLevel: null,
+      exerciseEntries: [],
+      supplementEntries: [],
+      sleepCompletions: [],
+      completions: [],
+      nutritionScorecard: { customItems: [], note: "" },
+    }) as unknown as DailyLog;
+
+  // Build a state with 30 days of consistent custom-behavior completion
+  // — strong enough that, without the trust-tier gate, the engine
+  // would name this user's custom as the keystone.
+  function buildCustomKeystoneCandidate(): AppState {
+    const customPack: ProtocolPack = {
+      id: "user-magic",
+      name: "User's Magic Trick",
+      tagline: "t",
+      goal: "custom",
+      accent: "x",
+      icon: "sparkle",
+      source: "custom",
+      durationLabel: "Custom",
+      behaviors: [
+        {
+          canonicalKey: "custom:user-magic:magic-trick-xyz",
+          title: "Aunt Mary's herbal blend",
+          block: "morning",
+          anchor: "wake",
+          offsetMin: 30,
+          rationale: "Custom behavior.",
+          icon: "sparkle",
+          leverage: 3,
+          kind: "action",
+        },
+      ],
+    };
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["longevity-foundation", "user-magic"],
+      customPacks: [customPack],
+    };
+    // 30 days of strong correlation: custom done = high score; skipped = low.
+    const logs: DailyLog[] = [];
+    for (let i = 1; i <= 30; i++) {
+      const customDone = i % 2 === 0;
+      const bc: Record<string, boolean> = {
+        "custom:user-magic:magic-trick-xyz": customDone,
+      };
+      logs.push(logLocal(dkLocal(i), bc, customDone ? 85 : 25));
+    }
+    return { ...st, dailyLogs: logs };
+  }
+
+  it("custom behavior never becomes the keystone, no matter how strong the signal", () => {
+    const st = buildCustomKeystoneCandidate();
+    const ks = keystone(st);
+    // Either no keystone (insufficient other behaviors) or one of the
+    // curated atoms — but NEVER the user's free-text custom.
+    expect(ks?.key).not.toBe("custom:user-magic:magic-trick-xyz");
+  });
+
+  it("whatWorks does not surface a free-text custom as 'proven by your data'", () => {
+    // Use feltIndex-driving signals so whatWorks can fire.
+    const st = buildCustomKeystoneCandidate();
+    const logsWithEnergy: DailyLog[] = st.dailyLogs.map((l, i) => ({
+      ...l,
+      energyLevel: i % 2 === 0 ? 5 : 2,
+    }));
+    const ww = whatWorks({ ...st, dailyLogs: logsWithEnergy });
+    if (ww) {
+      expect(ww.key).not.toBe("custom:user-magic:magic-trick-xyz");
+    }
+  });
+
+  it("suggestions does not auto-recommend retiming/pausing a custom behavior", () => {
+    // 21+ days, 5+ active, custom never completed → would trigger
+    // retime/pause WITHOUT the trust-tier gate.
+    const customPack: ProtocolPack = {
+      id: "user-skip",
+      name: "Skip Pack",
+      tagline: "t",
+      goal: "custom",
+      accent: "x",
+      icon: "sparkle",
+      source: "custom",
+      durationLabel: "Custom",
+      behaviors: [
+        {
+          canonicalKey: "custom:user-skip:never-done-xyz",
+          title: "Thing user never does",
+          block: "morning",
+          anchor: "wake",
+          offsetMin: 90,
+          rationale: "Custom behavior.",
+          icon: "sparkle",
+          leverage: 2,
+          kind: "action",
+        },
+      ],
+    };
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["longevity-foundation", "user-skip"],
+      customPacks: [customPack],
+    };
+    const logs: DailyLog[] = [];
+    for (let i = 1; i <= 25; i++)
+      logs.push(
+        logLocal(
+          dkLocal(i),
+          { "hydrate-am": true, "morning-sunlight": true },
+          60
+        )
+      );
+    const sug = suggestions({ ...st, dailyLogs: logs });
+    expect(
+      sug.find(
+        (s) =>
+          s.action.type === "retime" &&
+          s.action.key === "custom:user-skip:never-done-xyz"
+      )
+    ).toBeUndefined();
+    expect(
+      sug.find(
+        (s) =>
+          s.action.type === "pause" &&
+          s.action.key === "custom:user-skip:never-done-xyz"
+      )
+    ).toBeUndefined();
+  });
+});
+
+describe("governance: atom registry + ontology audit", () => {
+  it("buildAtomRegistry returns every curated atom in the live catalog", () => {
+    const registry = buildAtomRegistry();
+    expect(registry.size).toBeGreaterThan(50);
+    // Sanity: known atoms are present and tagged curated.
+    expect(registry.get("morning-sunlight")?.trustTier).toBe("curated");
+    expect(registry.get("magnesium-pm")?.trustTier).toBe("curated");
+  });
+
+  it("auditOntology reports zero errors against the live catalog", () => {
+    const issues = auditOntology();
+    const errors = issues.filter((i) => i.severity === "error");
+    if (errors.length) {
+      throw new Error(
+        "Ontology errors:\n" +
+          errors.map((e) => ` - ${e.kind}: ${e.message}`).join("\n")
+      );
+    }
+  });
+
+  it("catalogInventory counts atoms by trust tier + evidence tier", () => {
+    const inv = catalogInventory();
+    expect(inv.totalCurated).toBeGreaterThan(50);
+    expect(inv.byTrustTier.curated).toBe(inv.totalCurated);
+    expect(inv.byTrustTier.derived).toBe(0); // Registry doesn't include user-derived
+    expect(inv.byTrustTier.custom).toBe(0);
+    // Some atoms have evidenceTier (the ones we hedged); some don't.
+    const tiered =
+      (inv.byEvidenceTier.established ?? 0) +
+      (inv.byEvidenceTier.emerging ?? 0) +
+      (inv.byEvidenceTier.exploratory ?? 0);
+    expect(tiered).toBeGreaterThan(5);
+  });
+});
+
+describe("explainBehavior — provenance + suppression reasons surface", () => {
+  it("returns provenance for a curated atom in the timeline", () => {
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["longevity-foundation", "better-sleep"],
+    };
+    const exp = explainBehavior(st, "morning-sunlight", 0);
+    expect(exp).toBeTruthy();
+    expect(exp!.trustTier).toBe("curated");
+    expect(exp!.recommendationEligible).toBe(true);
+    expect(exp!.keystoneEligible).toBe(true);
+    // Morning sunlight appears in both packs — should show merged.
+    expect(exp!.mergedFromMultiple).toBe(true);
+  });
+
+  it("explains why an atom is muted by a conflict pair", () => {
+    let st = getDefaultState();
+    // Install Fasted Mornings → delay-first-meal restraint active →
+    // protein-breakfast mutes.
+    st = {
+      ...st,
+      installedPacks: ["fasted-mornings", "longevity-foundation"],
+    };
+    const exp = explainBehavior(st, "protein-breakfast", 0);
+    expect(exp).toBeTruthy();
+    expect(exp!.muted).toBe(true);
+    expect(exp!.muteReason).toContain("conflict pair");
+    expect(exp!.muteReason).toContain("delay-first-meal");
+  });
+
+  it("flags a custom behavior as recommendation-ineligible", () => {
+    const customPack: ProtocolPack = {
+      id: "user-custom",
+      name: "Custom",
+      tagline: "t",
+      goal: "custom",
+      accent: "x",
+      icon: "sparkle",
+      source: "custom",
+      durationLabel: "Custom",
+      behaviors: [
+        {
+          canonicalKey: "custom:user-custom:thing-xyz",
+          title: "Thing",
+          block: "morning",
+          anchor: "wake",
+          offsetMin: 30,
+          rationale: "Custom",
+          icon: "sparkle",
+          leverage: 2,
+          kind: "action",
+        },
+      ],
+    };
+    let st = getDefaultState();
+    st = {
+      ...st,
+      installedPacks: ["user-custom"],
+      customPacks: [customPack],
+    };
+    const exp = explainBehavior(st, "custom:user-custom:thing-xyz", 0);
+    expect(exp).toBeTruthy();
+    expect(exp!.trustTier).toBe("custom");
+    expect(exp!.recommendationEligible).toBe(false);
+    expect(exp!.keystoneEligible).toBe(false);
+    expect(exp!.notes.some((n) => n.toLowerCase().includes("custom"))).toBe(
+      true
+    );
   });
 });

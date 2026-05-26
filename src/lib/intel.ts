@@ -120,6 +120,14 @@ export function keystone(state: AppState): Keystone | null {
 
   let best: (Keystone & { d: number }) | null = null;
   for (const it of items) {
+    // Trust-tier gate: the keystone is the system's strongest claim
+    // about a behavior's importance. A user's free-text custom
+    // behavior — no curated lineage, no review — should never be
+    // promoted to keystone (the system would be amplifying its own
+    // unverified content as "the one thing that matters"). Derived
+    // and curated behaviors are eligible; they have a canonical
+    // identity we stand behind.
+    if (it.trustTier === "custom") continue;
     const k = it.canonicalKey;
     const otherDone: number[] = [];
     const otherNot: number[] = [];
@@ -223,6 +231,15 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
 
   let best: (OutcomeInsight & { d: number }) | null = null;
   for (const it of items) {
+    // Trust-tier gate: the "Proven by your data" insight is a
+    // first-person claim — the system is telling the user "your own
+    // data shows X works for you". For curated/derived behaviors that
+    // claim sits on top of a curated definition we've reviewed. For
+    // pure customs (free-text), the system would be making a claim
+    // about a behavior it can't even define. Skip — the user's own
+    // logs still flow into mastery and other surfaces, just not this
+    // one which speaks authoritatively.
+    if (it.trustTier === "custom") continue;
     const k = it.canonicalKey;
     const done: number[] = [];
     const not: number[] = [];
@@ -335,6 +352,13 @@ export function suggestions(state: AppState): Suggestion[] {
       // Never tell the user to pause their own keystone — that's a
       // self-contradicting, trust-destroying suggestion.
       if (ks && it.canonicalKey === ks.key) continue;
+      // Trust-tier gate: the system shouldn't auto-recommend changes
+      // to a user's own free-text custom behavior. They created it,
+      // we don't know what it really is, we won't pretend to know
+      // why their skipping pattern matters. Derived (atom-library
+      // picks) ARE eligible — they share canonical identity with a
+      // curated atom we understand.
+      if (it.trustTier === "custom") continue;
       const everDone = activeDays.some(
         (l) => l.behaviorCompletions?.[it.canonicalKey]
       );

@@ -14,6 +14,7 @@ import type {
   DailyLog,
   ProtocolPack,
   TimeBlock,
+  TrustTier,
 } from "./types";
 import { activePacks, activeAdaptationRules } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
@@ -29,6 +30,53 @@ export interface TimelineItem extends BehaviorDef {
   recommendedBlock: TimeBlock;
   /** True when the user moved it off the recommended block/time. */
   retimed: boolean;
+  /**
+   * Governance class — computed at compile time. Downstream consumers
+   * (keystone, suggestions, mastery, leverageTag) can branch on this
+   * to enforce trust-tier semantics consistently across the engine.
+   */
+  trustTier: TrustTier;
+  /**
+   * Reason this item is muted, if it is. Populated by shapeTimeline
+   * during the various mute passes (mode demotion, CONFLICT_PAIRS,
+   * mastery graduation). Surfaced via explainBehavior() — gives the
+   * user (or admin) a concrete "why isn't this on Today?" answer
+   * instead of silent disappearance.
+   */
+  muteReason?: string;
+}
+
+/**
+ * Classify a behavior into its trust tier without needing AppState.
+ * The shape of canonicalKey is load-bearing here:
+ *   - `custom:*`  → fully custom (no curated lineage)
+ *   - `fork:*`    → user fork of a curated pack; treated like derived
+ *   - anything else with a `derivedFrom` pointer → derived
+ *   - anything else → curated
+ *
+ * Why derived from the data, not stored: keeps tier classification a
+ * single-source-of-truth invariant. A custom atom that gains a
+ * `derivedFrom` (via the atom-library picker) automatically promotes
+ * itself; one that loses it (impossible today, but defensible) demotes.
+ */
+export function trustTier(b: {
+  canonicalKey: string;
+  derivedFrom?: string;
+}): TrustTier {
+  if (b.canonicalKey.startsWith("custom:")) {
+    // A custom atom WITH a derivedFrom (the atom-library pick path) is
+    // "derived" — it inherits curated metadata via effectiveKey. A
+    // custom atom WITHOUT one (free-text escape hatch) is "custom".
+    return b.derivedFrom ? "derived" : "custom";
+  }
+  if (b.canonicalKey.startsWith("fork:")) {
+    // Forks always carry derivedFrom (storage.ts ensures this); they're
+    // derived for governance purposes.
+    return b.derivedFrom ? "derived" : "custom";
+  }
+  // Anything else is curated (in PACKS or STANDALONE_ATOMS, or an
+  // admin-authored protocol that passed validateAtom at publish time).
+  return "curated";
 }
 
 const BLOCK_ORDER: Record<TimeBlock, number> = {
@@ -117,6 +165,14 @@ export function compileTimeline(
           retimed,
           fromPacks: [pack.name],
           muted: false,
+          // Trust tier — derived from the originating behavior's
+          // canonicalKey + derivedFrom. Two atoms merging by
+          // effectiveKey may have different tiers (a custom-derived
+          // copy + the curated original); the first-wins rule gives
+          // curated precedence in practice (the curated atom is
+          // visited first via pack-iteration order). Downstream code
+          // branches on this — keystone, suggestions, mastery, etc.
+          trustTier: trustTier(b),
         });
       } else {
         existing.leverage = Math.max(existing.leverage, b.leverage) as
@@ -125,6 +181,19 @@ export function compileTimeline(
           | 3;
         if (!existing.fromPacks.includes(pack.name))
           existing.fromPacks.push(pack.name);
+        // Trust tier on merge: ALWAYS prefer the most-authoritative
+        // tier (curated > derived > custom). A user's custom-derived
+        // "Magnesium glycinate" merging with the curated `magnesium-pm`
+        // should expose curated governance (contraindications,
+        // evidenceTier, recommendation eligibility), not the user's.
+        // This is the central guardrail against ontology pollution.
+        const incomingTier = trustTier(b);
+        if (
+          (existing.trustTier === "custom" && incomingTier !== "custom") ||
+          (existing.trustTier === "derived" && incomingTier === "curated")
+        ) {
+          existing.trustTier = incomingTier;
+        }
         existing.recommendedBy = Array.from(
           new Set([
             ...(existing.recommendedBy ?? []),
@@ -768,7 +837,11 @@ export function shapeTimeline(
   let shaped: TimelineItem[];
 
   if (mode === "essentials") {
-    shaped = items.map((it) => ({ ...it, muted: it.leverage < 3 }));
+    shaped = items.map((it) =>
+      it.leverage < 3
+        ? { ...it, muted: true, muteReason: "essentials mode: only leverage-3 behaviors" }
+        : { ...it, muted: false, muteReason: undefined }
+    );
     shaped = guaranteePerBlock(shaped);
     // Ceiling: if "essentials" still shows a wall (power users with many
     // leverage-3 behaviors), keep the strongest 7 and rest the others —
@@ -781,7 +854,11 @@ export function shapeTimeline(
       shaped = shaped.map((it) =>
         it.muted || keep.has(it.canonicalKey)
           ? it
-          : { ...it, muted: true }
+          : {
+              ...it,
+              muted: true,
+              muteReason: "essentials mode: 7-behavior ceiling",
+            }
       );
     }
   } else if (mode === "recovery") {
@@ -790,10 +867,16 @@ export function shapeTimeline(
     // demote correctly in recovery — without it, custom-derived
     // training behaviors silently slip through the mute.
     shaped = items
-      .map((it) => ({
-        ...it,
-        muted: RECOVERY_DEMOTE.has(effectiveKey(it)),
-      }))
+      .map((it) => {
+        const demoted = RECOVERY_DEMOTE.has(effectiveKey(it));
+        return {
+          ...it,
+          muted: demoted,
+          muteReason: demoted
+            ? "recovery mode: training/cognitive demands eased"
+            : undefined,
+        };
+      })
       .sort(
         (a, b) =>
           (RECOVERY_PROMOTE.has(effectiveKey(b)) ? 1 : 0) -
@@ -844,12 +927,25 @@ export function shapeTimeline(
       keep.add(it.canonicalKey);
       perBlock.set(it.block, n + 1);
     }
-    shaped = items.map((it) => ({
-      ...it,
-      muted: !keep.has(it.canonicalKey),
-    }));
+    shaped = items.map((it) =>
+      keep.has(it.canonicalKey)
+        ? { ...it, muted: false, muteReason: undefined }
+        : {
+            ...it,
+            muted: true,
+            muteReason: "rebuild mode: keeping 3 high-leverage behaviors",
+          }
+    );
   } else if (mode === "lighter") {
-    shaped = items.map((it) => ({ ...it, muted: it.leverage === 1 }));
+    shaped = items.map((it) =>
+      it.leverage === 1
+        ? {
+            ...it,
+            muted: true,
+            muteReason: "lighter mode: optional behaviors muted",
+          }
+        : { ...it, muted: false, muteReason: undefined }
+    );
     shaped = guaranteePerBlock(shaped);
   } else {
     shaped = items;
@@ -873,14 +969,21 @@ export function shapeTimeline(
       .map((it) => effectiveKey(it))
   );
   if (activeRestraints.size > 0) {
-    const targetsToMute = new Set<string>();
+    const targetsToMute = new Map<string, string>(); // key → restraint key
     for (const pair of CONFLICT_PAIRS) {
       if (activeRestraints.has(pair.restraint))
-        targetsToMute.add(pair.target);
+        targetsToMute.set(pair.target, pair.restraint);
     }
-    shaped = shaped.map((it) =>
-      targetsToMute.has(effectiveKey(it)) ? { ...it, muted: true } : it
-    );
+    shaped = shaped.map((it) => {
+      const restraint = targetsToMute.get(effectiveKey(it));
+      return restraint
+        ? {
+            ...it,
+            muted: true,
+            muteReason: `conflict pair: "${restraint}" rule is active`,
+          }
+        : it;
+    });
   }
 
   // Graduate mastered behaviors to maintenance (collapsed) — never the
@@ -889,7 +992,11 @@ export function shapeTimeline(
     shaped = shaped.map((it) =>
       opts.mastered!.has(it.canonicalKey) &&
       it.canonicalKey !== opts.keystoneKey
-        ? { ...it, muted: true }
+        ? {
+            ...it,
+            muted: true,
+            muteReason: "graduated to maintenance (21+ day streak, high adherence)",
+          }
         : it
     );
   }

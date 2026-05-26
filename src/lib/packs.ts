@@ -1484,6 +1484,11 @@ export interface BehaviorAtom extends BehaviorDef {
  * pointer so merging, conflict resolution, mastery, and adaptive
  * shaping all work normally.
  */
+/**
+ * Exported for the governance + admin dashboard to inspect. The atom
+ * library reads STANDALONE_ATOMS internally via the same const; the
+ * `_REGISTRY` alias below is what cross-module callers should use.
+ */
 const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
     canonicalKey: "gratitude-journal",
@@ -2536,6 +2541,14 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     daysActive: [true, true, true, true, false, false, false],
   }),
 ];
+
+/**
+ * Read-side alias for cross-module consumers (governance.ts, admin
+ * dashboard). Keeps the internal const private-ish while exposing a
+ * stable name we can keep even if the underlying shape evolves.
+ */
+export const STANDALONE_ATOMS_REGISTRY: ReadonlyArray<BehaviorDef> =
+  STANDALONE_ATOMS;
 
 export function listBehaviorAtoms(): BehaviorAtom[] {
   const byKey = new Map<string, BehaviorAtom>();

@@ -274,6 +274,39 @@ export interface BehaviorDef {
 }
 
 /**
+ * Trust tier — the *governance class* of a behavior. The system uses
+ * this internally to decide what role a behavior plays in the
+ * intelligence layer. Users never see these labels directly; the
+ * consequences (system recommendations, keystone eligibility, evidence
+ * surfacing) are felt as natural product behavior.
+ *
+ *   "curated"  — Shipped in the official PACKS or STANDALONE_ATOMS
+ *                library. Reviewed by us. Carries evidenceTier,
+ *                contraindications, rationale, timingReason. Full
+ *                participation in recommendations, keystone analysis,
+ *                CONFLICT_PAIRS, adaptive shaping, mastery, etc.
+ *
+ *   "derived"  — User picked a curated atom from the library and
+ *                customized it (different dose / time / days). Has a
+ *                `derivedFrom` pointer to the canonical atom. Inherits
+ *                the curated atom's governance metadata (contraindications,
+ *                evidenceTier, conflict pairs via effectiveKey). Counted
+ *                as the curated behavior for cross-pack merge + analysis.
+ *
+ *   "custom"   — User free-typed a behavior the catalog doesn't
+ *                cover. No `derivedFrom`, no curated lineage. The
+ *                engine MUST NOT treat this as authoritative — it
+ *                does not auto-recommend, doesn't become a keystone,
+ *                doesn't propagate as scientific knowledge. The user's
+ *                own outcome data still flows (it's their behavior),
+ *                but the system never *claims* it works.
+ *
+ * Classification is derived (not stored) from canonicalKey + derivedFrom
+ * presence so it can't drift out of sync with the data.
+ */
+export type TrustTier = "curated" | "derived" | "custom";
+
+/**
  * Safety flag identifiers. Kept narrow on purpose — this is calm
  * gating, not clinical intake. New flags require an explicit data-
  * model + onboarding decision.
