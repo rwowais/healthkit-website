@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAppState } from "@/hooks/useAppState";
 import { getLogForDate } from "@/lib/storage";
 import {
@@ -10,22 +10,82 @@ import {
   isDone,
 } from "@/lib/engine";
 import { resolveMinutes, nowMinutes } from "@/lib/time";
-
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import { getTz, dateKeyInTz, dayIndexInTz } from "@/lib/tz";
+import {
+  pushAvailable,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "@/lib/push";
 
 /**
- * Best-effort foreground reminders. While Protocolize is open in a tab,
- * schedules a notification at each upcoming behavior's anchored time.
- * (Full background reminders require the native app — communicated in UI.)
+ * Foreground + background reminders. While Protocolize is open in a
+ * tab, schedules in-tab notifications at each upcoming behavior's
+ * anchored time (zero-latency, no server round-trip).
+ *
+ * For background — including iOS installed PWAs — the user is
+ * subscribed to Web Push via the VAPID flow in lib/push.ts when they
+ * have notifications enabled. The server-side cron in
+ * /api/push/send-due then sends reminders at the user's local times
+ * even with the tab closed.
+ *
+ * Both can fire on the same minute on rare occasion; the service
+ * worker dedupes via `tag` (renotify:false).
  */
 export default function Reminders() {
   const { state, loading } = useAppState();
+  const lastSubKeyRef = useRef<string>("");
 
+  // Effect 1 — keep the server push subscription in sync with the
+  // user's notifications-enabled toggle, reminder times (today's
+  // anchored minutes), and their tz. Re-syncs only when the relevant
+  // inputs change, not on every render.
+  useEffect(() => {
+    if (loading || typeof window === "undefined") return;
+    if (!pushAvailable()) return;
+    const tz = getTz(state.settings);
+    const enabled = !!state.settings.notificationsEnabled;
+    if (!enabled) {
+      unsubscribeFromPush().catch(() => {});
+      lastSubKeyRef.current = "";
+      return;
+    }
+    // Build today's anchored times — these are the times we want the
+    // server to ping at. Limit to the next 12 hours so we don't
+    // schedule e.g. tomorrow morning's wake-anchor today.
+    const dayIdx = dayIndexInTz(tz);
+    const items = shapeTimeline(
+      compileTimeline(state, dayIdx),
+      adapt(state).mode
+    );
+    const times: string[] = [];
+    for (const it of items) {
+      if (it.muted) continue;
+      const t = resolveMinutes(it, state.settings);
+      if (t == null) continue;
+      const h = Math.floor(t / 60) % 24;
+      const m = t % 60;
+      const hm = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      if (!times.includes(hm)) times.push(hm);
+    }
+    // Cap at 6 reminders/day so power-user stacks don't spam.
+    const reminderTimes = times.sort().slice(0, 6);
+    const key = `${tz}|${reminderTimes.join(",")}`;
+    if (key === lastSubKeyRef.current) return;
+    lastSubKeyRef.current = key;
+    subscribeToPush({ reminderTimes, timezone: tz }).catch(() => {});
+  }, [
+    state.settings.notificationsEnabled,
+    state.settings.timezone,
+    state.settings.bedtime,
+    state.settings.wakeTime,
+    state.installedPacks?.length,
+    state.customPacks?.length,
+    loading,
+    state,
+  ]);
+
+  // Effect 2 — in-tab foreground reminders. Fires when the user has
+  // the app open. Server pushes handle the background case.
   useEffect(() => {
     if (
       loading ||
@@ -37,9 +97,9 @@ export default function Reminders() {
     )
       return;
 
-    const today = dateKey(new Date());
-    const j = new Date().getDay();
-    const dayIdx = j === 0 ? 6 : j - 1;
+    const tz = getTz(state.settings);
+    const today = dateKeyInTz(tz);
+    const dayIdx = dayIndexInTz(tz);
     const log = getLogForDate(state, today);
     const items = shapeTimeline(
       compileTimeline(state, dayIdx),
@@ -55,7 +115,7 @@ export default function Reminders() {
       const t = resolveMinutes(it, state.settings);
       if (t == null) continue;
       const deltaMin = t - now;
-      if (deltaMin <= 0 || deltaMin > 12 * 60) continue; // next 12h only
+      if (deltaMin <= 0 || deltaMin > 12 * 60) continue;
       scheduled++;
       const id = window.setTimeout(() => {
         navigator.serviceWorker.ready

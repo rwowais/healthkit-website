@@ -20,6 +20,7 @@ import { activePacks, activeAdaptationRules } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
 import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
+import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
@@ -92,15 +93,23 @@ function allPacks(state: AppState): ProtocolPack[] {
   return [...activePacks(), ...(state.customPacks ?? [])];
 }
 
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")}`;
+/**
+ * Local-day key. Was: device-clock parts. Now: timezone-aware so a
+ * user in NY late at night doesn't get UTC's "tomorrow" key, and a
+ * user who travels keeps writing logs against the timezone they chose
+ * in onboarding (or their device's current resolved tz as fallback).
+ */
+function dateKey(d: Date, tz: string) {
+  return dateKeyInTz(tz, d);
 }
-function isoDayOf(dateStr: string) {
-  const j = new Date(dateStr + "T00:00:00").getDay();
-  return j === 0 ? 6 : j - 1;
+/**
+ * Weekday (Mon=0..Sun=6) of a YYYY-MM-DD key as seen in the user's
+ * timezone. Replaces `new Date(dateStr + "T00:00:00").getDay()` which
+ * silently used the device's local tz and could disagree with the
+ * user's stored tz for a stored log near midnight.
+ */
+function isoDayOf(dateStr: string, tz: string) {
+  return dayIndexOfKeyInTz(tz, dateStr);
 }
 
 /** Intelligent merge: same canonicalKey → one behavior, union of context. */
@@ -350,11 +359,12 @@ function logHasActivity(l: DailyLog): boolean {
 
 export function getSignals(state: AppState): Signals {
   const logs = state.dailyLogs ?? [];
+  const tz = getTz(state.settings);
   const today = new Date();
-  const tKey = dateKey(today);
+  const tKey = dateKey(today, tz);
   const y = new Date();
   y.setDate(y.getDate() - 1);
-  const yLog = logs.find((l) => l.date === dateKey(y));
+  const yLog = logs.find((l) => l.date === dateKey(y, tz));
   const tLog = logs.find((l) => l.date === tKey);
 
   const recent = [...logs]
@@ -401,7 +411,7 @@ export function getSignals(state: AppState): Signals {
   // evening adherence yesterday
   let eveningMissedYesterday = false;
   if (yLog && logHasActivity(yLog)) {
-    const yItems = compileTimeline(state, isoDayOf(yLog.date)).filter(
+    const yItems = compileTimeline(state, isoDayOf(yLog.date, tz)).filter(
       (i) => i.block === "evening"
     );
     if (yItems.length >= 2) {
@@ -768,8 +778,14 @@ function guaranteePerBlock(items: TimelineItem[]): TimelineItem[] {
  * long-term systems light instead of plateauing into noise.
  */
 function daysSinceEpoch(dayKey: string): number {
+  // dayKey is YYYY-MM-DD in the user's local calendar. Convert to a
+  // UTC-anchored day index that doesn't drift across DST or device
+  // timezone changes. Used only for the weekly spot-check modulo, so
+  // it just needs to be stable — not aligned with any particular zone.
+  const [y, m, d] = dayKey.split("-").map(Number);
+  if (!y || !m || !d) return 0;
   return Math.floor(
-    new Date(dayKey + "T00:00:00").getTime() / 86_400_000
+    Date.UTC(y, m - 1, d, 12, 0, 0) / 86_400_000
   );
 }
 function hashKey(s: string): number {
@@ -791,11 +807,9 @@ export function freshlyMastered(
 ): Set<string> {
   const today = masteredKeys(state, dayKey);
   if (today.size === 0) return new Set();
-  const d = new Date(dayKey + "T00:00:00");
-  d.setDate(d.getDate() - 1);
-  const yesterdayKey = `${d.getFullYear()}-${String(
-    d.getMonth() + 1
-  ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Step back one calendar day in a tz-stable way (addDaysToKey uses
+  // noon-UTC anchoring, so DST and device-tz don't matter).
+  const yesterdayKey = addDaysToKey(dayKey, -1);
   const yesterday = masteredKeys(state, yesterdayKey);
   const out = new Set<string>();
   for (const k of today) if (!yesterday.has(k)) out.add(k);
@@ -841,15 +855,12 @@ export function masteredKeys(
 
   for (const k of keys) {
     if (isCustomTier(k)) continue;
-    // current streak up to (but not requiring) today
+    // current streak up to (but not requiring) today — step back
+    // through calendar days using addDaysToKey so DST + tz changes
+    // don't accidentally skip or duplicate a day.
     let streak = 0;
     for (let i = 1; i <= 365; i++) {
-      const d = new Date(dayKey + "T00:00:00");
-      d.setDate(d.getDate() - i);
-      const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-        2,
-        "0"
-      )}-${String(d.getDate()).padStart(2, "0")}`;
+      const dk = addDaysToKey(dayKey, -i);
       if (byDate.get(dk)?.behaviorCompletions?.[k]) streak++;
       else break;
     }
@@ -858,12 +869,7 @@ export function masteredKeys(
     let active = 0;
     let did = 0;
     for (let i = 1; i <= 30; i++) {
-      const d = new Date(dayKey + "T00:00:00");
-      d.setDate(d.getDate() - i);
-      const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-        2,
-        "0"
-      )}-${String(d.getDate()).padStart(2, "0")}`;
+      const dk = addDaysToKey(dayKey, -i);
       const lg = byDate.get(dk);
       if (!lg) continue;
       const anyActivity =

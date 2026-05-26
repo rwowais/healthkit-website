@@ -9,6 +9,7 @@ import { getAccess } from "@/lib/entitlements";
 import { clearAllData, exportState, importState } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
 import { deleteAccount, supabaseEnabled } from "@/lib/auth";
+import { sendTestPush } from "@/lib/push";
 import {
   Card,
   Eyebrow,
@@ -297,9 +298,10 @@ export default function ProfilePage() {
             </button>
           </Row>
           <p className="t-caption mt-1 leading-relaxed">
-            Reminders fire at each behavior&apos;s scheduled time while
-            Protocolize is open in a tab. Always-on background reminders
-            arrive with the native app.
+            Reminders fire at each behavior&apos;s scheduled time —
+            including when the app is closed, if you&apos;ve added
+            Protocolize to your home screen. iOS Safari requires
+            installing to the home screen first.
           </p>
           {s.notificationsEnabled && (
             <button
@@ -312,14 +314,25 @@ export default function ProfilePage() {
                   toast.show("Enable reminders first");
                   return;
                 }
+                // First try the server-side push (works with tab
+                // closed). Fall back to a local in-tab notification
+                // if push isn't configured server-side.
+                try {
+                  const r = await sendTestPush();
+                  if (r.ok) {
+                    toast.show("Test push sent");
+                    return;
+                  }
+                  // Fall through to local fallback.
+                } catch {}
                 try {
                   const reg = await navigator.serviceWorker.ready;
                   await reg.showNotification("Protocolize", {
-                    body: "Test reminder — you're all set.",
+                    body: "Test reminder — you're all set (foreground only).",
                     icon: "/icon.svg",
                     tag: "pz-test",
                   });
-                  toast.show("Test sent");
+                  toast.show("Test shown (foreground only)");
                 } catch {
                   toast.show("Could not send");
                 }

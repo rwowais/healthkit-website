@@ -1,4 +1,5 @@
 import { STORAGE_KEY, LEGACY_STORAGE_KEYS } from "./constants";
+import { getTz, dayIndexOfKeyInTz, dateKeyInTz } from "./tz";
 import { calculateStreak } from "./scoring";
 import type {
   AppState,
@@ -37,12 +38,17 @@ import { defaultSupplementsProtocol } from "./defaults/supplements";
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function getDateString(date?: Date): string {
-  const d = date ?? new Date();
-  const y = d.getFullYear();
-  const m = (d.getMonth() + 1).toString().padStart(2, "0");
-  const day = d.getDate().toString().padStart(2, "0");
-  return `${y}-${m}-${day}`;
+/**
+ * YYYY-MM-DD for the user's local calendar day. Pass `tz` (from
+ * getTz(state.settings)) to ensure logs belong to the user's local
+ * day regardless of device clock; falls back to device tz when tz
+ * isn't available (cold paths that don't have state).
+ */
+function getDateString(date?: Date, tz?: string): string {
+  return dateKeyInTz(tz || (() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone; }
+    catch { return "UTC"; }
+  })(), date ?? new Date());
 }
 
 function createEmptySleepLog(): SleepLog {
@@ -444,7 +450,7 @@ export function saveState(state: AppState): boolean {
 // ── Accessors ─────────────────────────────────────────────────────
 
 export function getTodayLog(state: AppState): DailyLog {
-  const today = getDateString();
+  const today = getDateString(undefined, getTz(state.settings));
   const existing = state.dailyLogs.find((log) => log.date === today);
   if (existing) return existing;
   return createEmptyDailyLog(today, state.protocols);
@@ -463,9 +469,14 @@ export function getLogForDate(state: AppState, date: string): DailyLog {
 
 // ── Protocol OS: behaviors & packs ────────────────────────────────
 
-function isoDayIndex(dateStr: string): number {
-  const j = new Date(dateStr + "T00:00:00").getDay();
-  return j === 0 ? 6 : j - 1;
+/**
+ * Map a stored YYYY-MM-DD key to Mon=0..Sun=6 in the user's timezone.
+ * Was: device-clock based; now: timezone-aware via dayIndexOfKeyInTz.
+ * `state` is passed in so we use the same tz the engine used when the
+ * key was minted.
+ */
+function isoDayIndex(state: AppState, dateStr: string): number {
+  return dayIndexOfKeyInTz(getTz(state.settings), dateStr);
 }
 
 /**
@@ -480,8 +491,9 @@ export function computeBehaviorScore(
   date: string,
   behaviorCompletions: Record<string, boolean>
 ): number {
-  const isToday = date === getDateString();
-  const compiled = compileTimeline(state, isoDayIndex(date));
+  const tz = getTz(state.settings);
+  const isToday = date === getDateString(undefined, tz);
+  const compiled = compileTimeline(state, isoDayIndex(state, date));
   const shaped = shapeTimeline(
     compiled,
     isToday ? adapt(state).mode : "normal",
@@ -628,7 +640,7 @@ export function addBiomarker(
 ): AppState {
   // A future-dated reading would sort as "latest" forever and poison
   // every band/insight that reads the most recent value — clamp it.
-  const today = getDateString();
+  const today = getDateString(undefined, getTz(state.settings));
   const e: BiomarkerEntry = {
     ...entry,
     date: entry.date && entry.date <= today ? entry.date : today,

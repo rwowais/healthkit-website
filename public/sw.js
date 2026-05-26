@@ -20,17 +20,55 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+/**
+ * Push event handler — fires when a Web Push arrives, even with the
+ * tab closed (on iOS only when installed as a PWA, on every other
+ * platform always). Without this handler, every push the server
+ * sends would silently arrive and disappear.
+ *
+ * Payload shape (JSON): { title, body, url?, tag? }. Server defaults
+ * the tag to "pz-reminder" so multiple reminders coalesce into one
+ * notification slot instead of stacking.
+ */
+self.addEventListener("push", (e) => {
+  let data = {};
+  try {
+    data = e.data ? e.data.json() : {};
+  } catch {
+    data = { title: "Protocolize", body: e.data ? e.data.text() : "" };
+  }
+  const title = data.title || "Protocolize";
+  const opts = {
+    body: data.body || "",
+    icon: "/icon.svg",
+    badge: "/icon.svg",
+    tag: data.tag || "pz-reminder",
+    data: { url: data.url || "/today" },
+    renotify: false,
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
+
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "/today";
   e.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((cl) => {
         for (const c of cl) {
-          if ("focus" in c) return c.focus();
+          if ("focus" in c) {
+            // Honor the per-notification URL if the client is on a
+            // different route — better than always re-anchoring to
+            // /today regardless of context.
+            if ("navigate" in c && url !== c.url) {
+              try { c.navigate(url); } catch {}
+            }
+            return c.focus();
+          }
         }
         return self.clients.openWindow
-          ? self.clients.openWindow("/today")
+          ? self.clients.openWindow(url)
           : undefined;
       })
   );

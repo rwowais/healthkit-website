@@ -4,6 +4,7 @@ import ServiceWorker from "@/components/ServiceWorker";
 import SyncConflictPrompt from "@/components/SyncConflictPrompt";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StorageSafetyNet from "@/components/StorageSafetyNet";
+import TimezoneSentry from "@/components/TimezoneSentry";
 
 export const metadata: Metadata = {
   title: "Protocolize — Longevity Intelligence",
@@ -46,6 +47,7 @@ export default function RootLayout({
           <SyncConflictPrompt />
           <ServiceWorker />
           <StorageSafetyNet />
+          <TimezoneSentry />
         </ErrorBoundary>
       </body>
     </html>

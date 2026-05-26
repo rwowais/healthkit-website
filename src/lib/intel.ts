@@ -10,6 +10,7 @@ import { packById } from "./packs";
 import { activePacks } from "./knowledge";
 import { effectiveMinutes, nowMinutes } from "./time";
 import { getInsightTemplate, renderTemplate } from "./knowledge";
+import { getTz, dateKeyInTz, addDaysToKey, dayIndexOfKeyInTz } from "./tz";
 
 export {
   resolveMinutes,
@@ -36,13 +37,6 @@ function analyticsItems(state: AppState): TimelineItem[] {
 
 // ── Per-behavior streaks ──────────────────────────────────────────
 
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export interface BehaviorStat {
   streak: number;
   last7: number;
@@ -52,12 +46,15 @@ export function behaviorStats(
   state: AppState,
   key: string
 ): BehaviorStat {
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
   const logs = new Map(state.dailyLogs.map((l) => [l.date, l]));
   let streak = 0;
   for (let i = 0; i < 365; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const log = logs.get(dateKey(d));
+    // Step back through calendar days using addDaysToKey so DST + tz
+    // changes don't skip or duplicate a day in the streak walk.
+    const dk = i === 0 ? today : addDaysToKey(today, -i);
+    const log = logs.get(dk);
     const done = !!log?.behaviorCompletions?.[key];
     if (done) streak++;
     else if (i === 0) continue; // today not done yet — don't break
@@ -65,9 +62,8 @@ export function behaviorStats(
   }
   let last7 = 0;
   for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    if (logs.get(dateKey(d))?.behaviorCompletions?.[key]) last7++;
+    const dk = i === 0 ? today : addDaysToKey(today, -i);
+    if (logs.get(dk)?.behaviorCompletions?.[key]) last7++;
   }
   return { streak, last7 };
 }
@@ -520,12 +516,13 @@ const DOW = [
 
 export function weeklyReview(state: AppState): WeeklyReview | null {
   const logs = state.dailyLogs ?? [];
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
   const dayList = (offset: number) => {
     const out: DailyLog[] = [];
     for (let i = offset; i < offset + 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const l = logs.find((x) => x.date === dateKey(d));
+      const dk = i === 0 ? today : addDaysToKey(today, -i);
+      const l = logs.find((x) => x.date === dk);
       if (l) out.push(l);
     }
     return out;
@@ -546,8 +543,11 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
 
   // best day
   const best = [...tracked].sort((a, b) => b.score - a.score)[0];
+  // DOW is Sunday=0..Saturday=6 (JS native getDay). Translate from
+  // our Mon=0..Sun=6 via (idx + 1) % 7. Noon-UTC anchoring inside
+  // dayIndexOfKeyInTz keeps the weekday stable across DST.
   const bestName = best
-    ? DOW[new Date(best.date + "T00:00:00").getDay()]
+    ? DOW[(dayIndexOfKeyInTz(tz, best.date) + 1) % 7]
     : null;
 
   // most-kept behavior this week

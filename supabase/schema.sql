@@ -378,3 +378,53 @@ end;
 $$;
 revoke all on function public.delete_my_account() from public;
 grant execute on function public.delete_my_account() to authenticated;
+
+-- ── Web Push subscriptions ────────────────────────────────────────
+-- One row per (user, endpoint). When a user enables reminders, the
+-- client subscribes via VAPID and POSTs the subscription here. A
+-- server cron then walks this table at reminder time and sends the
+-- pushes. RLS ensures users can only see/manage their own rows.
+create table if not exists public.push_subscriptions (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  -- Per-user reminder times (HH:MM, local to the user's tz). Empty =
+  -- no schedule attached (the user can still receive ad-hoc pushes
+  -- like trial-ending alerts). Stored as a string array; the cron
+  -- worker resolves these against the user's settings.timezone.
+  reminder_times text[] not null default array[]::text[],
+  -- Optional explicit timezone snapshot — used by the cron worker so
+  -- it doesn't need to fetch the app_states row on every tick. Kept
+  -- in sync by the client on subscribe + when the user changes tz.
+  timezone text,
+  created_at timestamptz not null default now(),
+  last_pinged_at timestamptz,
+  -- Soft-deletion: set when the push provider returns 410 (gone).
+  -- The cron skips these but keeps the row briefly for debugging.
+  disabled_at timestamptz,
+  constraint push_subscriptions_user_endpoint_unique
+    unique (user_id, endpoint)
+);
+
+create index if not exists push_subscriptions_user_idx
+  on public.push_subscriptions(user_id);
+create index if not exists push_subscriptions_active_idx
+  on public.push_subscriptions(disabled_at) where disabled_at is null;
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "own subs select" on public.push_subscriptions;
+create policy "own subs select" on public.push_subscriptions
+  for select using (auth.uid() = user_id);
+drop policy if exists "own subs insert" on public.push_subscriptions;
+create policy "own subs insert" on public.push_subscriptions
+  for insert with check (auth.uid() = user_id);
+drop policy if exists "own subs update" on public.push_subscriptions;
+create policy "own subs update" on public.push_subscriptions
+  for update using (auth.uid() = user_id);
+drop policy if exists "own subs delete" on public.push_subscriptions;
+create policy "own subs delete" on public.push_subscriptions
+  for delete using (auth.uid() = user_id);
