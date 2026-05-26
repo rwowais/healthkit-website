@@ -17,8 +17,30 @@
  * at build time, push is silently disabled.
  */
 
+import { getSupabase } from "./supabase";
+
 const VAPID_PUBLIC_KEY =
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+
+/**
+ * Helper: grab the caller's current Supabase access token and return
+ * it as an Authorization header. Push API routes use the same pattern
+ * as the CMS routes — token in the header, server validates + reads
+ * own-row via RLS. Returns null when not signed in, in which case the
+ * routes will reject with 401.
+ */
+async function authHeaders(): Promise<Record<string, string> | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const {
+    data: { session },
+  } = await sb.auth.getSession();
+  if (!session?.access_token) return null;
+  return {
+    "content-type": "application/json",
+    authorization: `Bearer ${session.access_token}`,
+  };
+}
 
 export function pushAvailable(): boolean {
   if (typeof window === "undefined") return false;
@@ -93,9 +115,14 @@ export async function subscribeToPush(opts: {
       timezone: opts.timezone,
       userAgent: navigator.userAgent.slice(0, 240),
     };
+    const headers = await authHeaders();
+    if (!headers) {
+      console.warn("[push] subscribe skipped — not signed in");
+      return false;
+    }
     const r = await fetch("/api/push/subscribe", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
     if (!r.ok) {
@@ -123,11 +150,14 @@ export async function unsubscribeFromPush(): Promise<boolean> {
     if (!sub) return true;
     const endpoint = sub.endpoint;
     await sub.unsubscribe();
-    await fetch("/api/push/unsubscribe", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ endpoint }),
-    });
+    const headers = await authHeaders();
+    if (headers) {
+      await fetch("/api/push/unsubscribe", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ endpoint }),
+      });
+    }
     return true;
   } catch {
     return false;
@@ -140,7 +170,14 @@ export async function sendTestPush(): Promise<{
   reason?: string;
 }> {
   try {
-    const r = await fetch("/api/push/test", { method: "POST" });
+    const headers = await authHeaders();
+    if (!headers) {
+      return { ok: false, reason: "Sign in required." };
+    }
+    const r = await fetch("/api/push/test", {
+      method: "POST",
+      headers,
+    });
     if (!r.ok) {
       const text = await r.text().catch(() => "");
       return { ok: false, reason: text || `HTTP ${r.status}` };

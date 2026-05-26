@@ -13,6 +13,7 @@
  * subscription, forcing re-prompts.
  */
 import webpush from "web-push";
+import { webcrypto } from "node:crypto";
 
 const keys = webpush.generateVAPIDKeys();
 console.log("\nGenerated VAPID keys. Add to .env.local + Vercel:\n");
@@ -43,9 +44,9 @@ function cryptoRandom(len) {
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let out = "";
   const bytes = new Uint8Array(len);
-  // Node 19+ has globalThis.crypto; fall back to require for older.
-  const c = globalThis.crypto ?? (await import("node:crypto"));
-  c.getRandomValues(bytes);
+  // Use Node's webcrypto — globalThis.crypto isn't available in all
+  // Node versions without --experimental-global-webcrypto.
+  webcrypto.getRandomValues(bytes);
   for (const b of bytes) out += chars[b % chars.length];
   return out;
 }
