@@ -19,6 +19,7 @@ import {
 } from "../knowledge";
 import type { ProtocolPack } from "../types";
 import { assembleBundleFromCMS } from "./authoring";
+import { validateAtom } from "../engine";
 
 const PUB_TABLE = "cms_publications";
 
@@ -113,6 +114,13 @@ export interface BundleDiff {
   hasChanges: boolean;
 }
 
+// P0: extended to cover every field on BehaviorDef that admins can
+// edit. Today's commits added evidenceTier, contraindications,
+// derivedFrom, targets, evidence, timingReason, recommendedBy —
+// any of those changing on a curated atom NEEDS to appear in the
+// publish diff so an admin can review the change before shipping.
+// Without these, an admin can flip an atom from `evidenceTier:
+// "established"` to `"exploratory"` and the diff says "unchanged."
 const BEHAVIOR_FIELDS: (keyof ProtocolPack["behaviors"][number])[] = [
   "title",
   "block",
@@ -123,6 +131,14 @@ const BEHAVIOR_FIELDS: (keyof ProtocolPack["behaviors"][number])[] = [
   "leverage",
   "kind",
   "icon",
+  "evidence",
+  "evidenceTier",
+  "timingReason",
+  "recommendedBy",
+  "contraindications",
+  "derivedFrom",
+  "targets",
+  "daysActive",
 ];
 
 const PROTOCOL_FIELDS: (keyof ProtocolPack)[] = [
@@ -446,6 +462,23 @@ export async function publishBundle(
       ok: false,
       reason: "No changes since the last published bundle.",
     };
+  // P0 GOVERNANCE GUARD: validate every atom + audit the assembled
+  // ontology before letting the bundle ship. assembleBundleFromCMS
+  // reads canonical_key straight from cms_behaviors with no shape
+  // enforcement; without this gate, a row hand-edited to
+  // `custom:malicious:fake-curated-key` would publish as a curated
+  // atom and pollute every user's runtime registry. Errors block
+  // publish; warnings surface in the reason text so the admin sees
+  // them and can decide whether to address before shipping.
+  const validation = validateBundleGovernance(bundle);
+  if (validation.errors.length > 0) {
+    return {
+      ok: false,
+      reason: `Bundle failed validation:\n${validation.errors
+        .map((e) => `• ${e}`)
+        .join("\n")}`,
+    };
+  }
   try {
     const { error } = await sb.from(PUB_TABLE).insert({
       bundle_version: version,
@@ -463,6 +496,87 @@ export async function publishBundle(
       reason: e instanceof Error ? e.message : "Publish failed.",
     };
   }
+}
+
+/**
+ * Pre-publish governance validation. Runs `validateAtom` over every
+ * behavior in every protocol + `auditOntology` over the assembled
+ * registry equivalent. Returns errors (blocking) and warnings
+ * (surfaced but non-blocking). Pure: doesn't mutate state, doesn't
+ * touch the network.
+ */
+export interface BundleValidationResult {
+  errors: string[];
+  warnings: string[];
+}
+export function validateBundleGovernance(
+  bundle: KnowledgeBundle
+): BundleValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  // Build the registry equivalent inline — every canonicalKey across
+  // every official protocol in the bundle. We don't import governance
+  // module's buildAtomRegistry here because that reads activePacks()
+  // (live runtime) — the BUNDLE being validated may not be live yet.
+  const knownKeys = new Set<string>();
+  for (const p of bundle.protocols ?? []) {
+    if (p.source !== "official") continue;
+    for (const b of p.behaviors) knownKeys.add(b.canonicalKey);
+  }
+  for (const p of bundle.protocols ?? []) {
+    if (p.source !== "official") continue;
+    for (const b of p.behaviors) {
+      const errs = validateAtom(b, knownKeys);
+      for (const e of errs) {
+        errors.push(`${p.id}:${b.canonicalKey} ${e.field}: ${e.message}`);
+      }
+      // Reserved-namespace check at publish time — curated atoms
+      // shipping in a CMS bundle MUST NOT use the custom: or fork:
+      // prefixes (those are user-space). The classifier would
+      // otherwise treat them as user content at runtime.
+      if (
+        b.canonicalKey.startsWith("custom:") ||
+        b.canonicalKey.startsWith("fork:")
+      ) {
+        errors.push(
+          `${p.id}:${b.canonicalKey}: curated atoms cannot use the custom: or fork: namespace.`
+        );
+      }
+      // Empty rationale is a quality issue — atom would render blank
+      // in surfaces that fall back to rationale (Up Next message,
+      // BehaviorSheet body).
+      if (!b.rationale || !b.rationale.trim()) {
+        warnings.push(
+          `${p.id}:${b.canonicalKey}: empty rationale — will render blank in some surfaces.`
+        );
+      }
+      // Evidence text without evidenceTier — claim with no humility
+      // framing.
+      if (b.evidence && b.evidence.trim() && !b.evidenceTier) {
+        warnings.push(
+          `${p.id}:${b.canonicalKey}: has evidence text but no evidenceTier — humility framing won't apply.`
+        );
+      }
+      // avoid-kind without targets — the avoid card can't link to
+      // the behavior it references.
+      if (b.kind === "avoid" && (!b.targets || b.targets.length === 0)) {
+        warnings.push(
+          `${p.id}:${b.canonicalKey}: avoid-kind atom without targets[] — no visual link to the referenced behavior.`
+        );
+      }
+      // All-false daysActive — atom never renders. Probably a bug.
+      if (
+        b.daysActive &&
+        b.daysActive.length === 7 &&
+        b.daysActive.every((v) => v === false)
+      ) {
+        errors.push(
+          `${p.id}:${b.canonicalKey}: daysActive is all-false — atom would never render.`
+        );
+      }
+    }
+  }
+  return { errors, warnings };
 }
 
 /** Re-publish a prior version as a NEW version (immutable history). */

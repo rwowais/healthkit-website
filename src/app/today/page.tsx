@@ -1823,45 +1823,46 @@ export default function TodayPage() {
                                       {st.streak}
                                     </span>
                                   )}
-                                  {/* "Personal" pill — quiet ownership cue
-                                      on user-created (custom) behaviors.
-                                      The asymmetry is the design: curated
-                                      atoms wear no badge (they're the
-                                      default); custom rows get this tiny
-                                      neutral marker so the user knows it's
-                                      theirs, not ours. Color is muted —
-                                      this is a label, not an alert. */}
-                                  {it.trustTier === "custom" && !done && (
-                                    <span
-                                      className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium tracking-wide"
-                                      style={{
-                                        background: "var(--surface-3)",
-                                        color: "var(--text-3)",
-                                      }}
-                                      title="Your personal behavior — kept just for you, not part of our recommendations."
-                                    >
-                                      Personal
-                                    </span>
-                                  )}
                                 </div>
-                                {!lev1 && (
+                                {/* Sub-line: time · dose/source + the
+                                    optional "Personal" cue. Moved out
+                                    of the title row to keep the header
+                                    visual hierarchy clean (KEYSTONE /
+                                    ESSENTIAL / streak count are the
+                                    important attention slots; the
+                                    Personal ownership marker is calmer
+                                    and belongs on the sub-line). */}
+                                {(!lev1 || it.trustTier === "custom") && (
                                   <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">
-                                    {t != null && !it.muted && (
+                                    {!lev1 && t != null && !it.muted && (
                                       <span className="tabular-nums">
                                         {fmtClock(t)}
                                       </span>
                                     )}
-                                    {t != null && !it.muted && (
+                                    {!lev1 && t != null && !it.muted && (
                                       <span>·</span>
                                     )}
-                                    {it.kind === "avoid" && (
+                                    {!lev1 && it.kind === "avoid" && (
                                       <Icon name="ban" size={11} />
                                     )}
-                                    <span className="truncate">
-                                      {it.muted
-                                        ? "Resting today"
-                                        : it.dose || it.fromPacks[0]}
-                                    </span>
+                                    {!lev1 && (
+                                      <span className="truncate">
+                                        {it.muted
+                                          ? "Resting today"
+                                          : it.dose || it.fromPacks[0]}
+                                      </span>
+                                    )}
+                                    {it.trustTier === "custom" && !done && (
+                                      <>
+                                        {!lev1 && <span>·</span>}
+                                        <span
+                                          className="shrink-0 italic text-[var(--text-4)]"
+                                          title="Your personal behavior — kept just for you, not part of our recommendations."
+                                        >
+                                          Personal
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                                 {lev3 && !done && !it.muted && (

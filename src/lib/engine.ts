@@ -188,11 +188,36 @@ export function compileTimeline(
         // evidenceTier, recommendation eligibility), not the user's.
         // This is the central guardrail against ontology pollution.
         const incomingTier = trustTier(b);
-        if (
+        const upgrading =
           (existing.trustTier === "custom" && incomingTier !== "custom") ||
-          (existing.trustTier === "derived" && incomingTier === "curated")
-        ) {
+          (existing.trustTier === "derived" && incomingTier === "curated");
+        if (upgrading) {
           existing.trustTier = incomingTier;
+          // Governance metadata copy on tier upgrade. Without this, a
+          // row first seeded by a custom-derived atom would keep the
+          // user's free-text rationale + zero contraindications, even
+          // after merging with the curated atom that has full
+          // governance data. The trust tier would claim "curated" but
+          // the surfaces (BehaviorSheet, safety gating, evidence
+          // hedging) would render against custom-quality metadata.
+          // Only copy when curated metadata exists — preserves a
+          // user-provided rationale on a curated atom whose own
+          // rationale field happens to be empty.
+          if (b.rationale && b.rationale.trim())
+            existing.rationale = b.rationale;
+          if (b.evidence && b.evidence.trim())
+            existing.evidence = b.evidence;
+          if (b.evidenceTier) existing.evidenceTier = b.evidenceTier;
+          if (b.contraindications && b.contraindications.length > 0)
+            existing.contraindications = b.contraindications;
+          if (b.targets && b.targets.length > 0)
+            existing.targets = b.targets;
+          if (b.timingReason && b.timingReason.trim())
+            existing.timingReason = b.timingReason;
+          // Title comes from the curated source on upgrade too — a
+          // user's typo'd "Magnezium" should display as the curated
+          // "Magnesium PM" once merged.
+          if (b.title) existing.title = b.title;
         }
         existing.recommendedBy = Array.from(
           new Set([
@@ -787,7 +812,30 @@ export function masteredKeys(
     for (const k in l.behaviorCompletions ?? {})
       if (l.behaviorCompletions![k]) keys.add(k);
 
+  // Trust-tier gate: graduation to maintenance is a SYSTEM CLAIM
+  // ("you've mastered this — we'll background it"). For curated and
+  // derived atoms we own the definition and stand behind the claim.
+  // For a free-text custom ("Aunt Mary's herbal blend"), the system
+  // would be claiming authority over a behavior it can't even define;
+  // the right move is to keep custom-tier behaviors visible on the
+  // timeline every day, no matter how consistent the user is.
+  // Build a per-key derivedFrom lookup from customPacks to classify.
+  const derivedLookup = new Map<string, string | undefined>();
+  for (const pack of state.customPacks ?? []) {
+    for (const b of pack.behaviors ?? []) {
+      derivedLookup.set(b.canonicalKey, b.derivedFrom);
+    }
+  }
+  const isCustomTier = (k: string): boolean => {
+    if (!k.startsWith("custom:") && !k.startsWith("fork:")) return false;
+    // For namespaced keys: only custom-tier when no derivedFrom is set.
+    // Atom-library picks (derived) and forks (always have derivedFrom)
+    // remain mastery-eligible.
+    return !derivedLookup.get(k);
+  };
+
   for (const k of keys) {
+    if (isCustomTier(k)) continue;
     // current streak up to (but not requiring) today
     let streak = 0;
     for (let i = 1; i <= 365; i++) {

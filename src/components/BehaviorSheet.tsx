@@ -71,9 +71,12 @@ export default function BehaviorSheet({
             <p className="t-body leading-relaxed text-[var(--text-1)]">
               {item.rationale}
             </p>
-            <p className="mt-1 text-[12px] text-[var(--text-3)]">
-              From {item.fromPacks.join(" · ")}
-            </p>
+            {/* Pack-list moved to AboutThisBehavior — the provenance
+                helper formats it more carefully ("From Better Sleep"
+                vs "Common across X protocols you've installed") with
+                proper trust-tier framing. Showing both in the header
+                AND in About duplicated the line and exposed raw pack
+                names without context. */}
           </div>
         </div>
 
@@ -334,8 +337,8 @@ function AboutThisBehavior({ item }: { item: TimelineItem }) {
         )}
         {hasContra && (
           <p className="text-[var(--text-3)]">
-            Tailored — not auto-suggested for some users (
-            {(item.contraindications ?? []).join(", ")}).
+            Some people skip this one based on a few personal factors —
+            we leave it to you. (You can adjust those in Profile.)
           </p>
         )}
       </div>
@@ -361,6 +364,6 @@ function humanizeMuteReason(reason: string): string {
   if (reason.startsWith("lighter mode"))
     return "Lighter day — optional behaviors muted.";
   if (reason.startsWith("graduated to maintenance"))
-    return "Graduated to maintenance — you've held this consistently.";
+    return "You've held this consistently — we're easing it into the background so it doesn't crowd your day. It still shows up about once a week as a calm check-in.";
   return reason; // Unknown reason — surface verbatim, better than empty.
 }

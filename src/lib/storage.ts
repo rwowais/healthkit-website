@@ -171,14 +171,82 @@ function normalize(s: AppState): AppState {
   // `custom-<digits>:` prefix off custom-pack behavior keys so an
   // existing "(yours)" pack merges with the original instead of
   // duplicating every behavior. Idempotent (no prefix → unchanged).
+  //
+  // P0 GOVERNANCE GUARD: After the legacy heal, FORCE every customPack
+  // behavior into the `custom:` namespace. Without this, a user can
+  // import an AppState JSON with `canonicalKey: "morning-sunlight"`
+  // inside a customPack, and the engine's trustTier classifier
+  // (which keys off the canonical key shape) will report "curated"
+  // for a row whose body is entirely user-authored. That's the
+  // ontology pollution the governance contract is supposed to
+  // prevent. We rewrite to `custom:<packId>:<base>-<rand>` so:
+  //   - trustTier classifies it as "custom" (or "derived" if
+  //     derivedFrom is set)
+  //   - the recommendation gates in intel.ts catch it
+  //   - the engine never claims authority over user content
+  // Behaviors already namespaced (custom:, fork:) pass through.
+  // Set of all curated canonicalKeys — used to distinguish legacy forks
+  // (bare key that matches a real curated atom) from free-text customs
+  // (bare key that doesn't). Legacy forks transition to fork: namespace
+  // with derivedFrom pointing at the curated original. Free-text
+  // customs get rewritten into the custom: namespace.
+  const curatedKeySet = new Set<string>();
+  for (const pack of PACKS) {
+    for (const b of pack.behaviors) curatedKeySet.add(b.canonicalKey);
+  }
   const customPacks = (
     Array.isArray(s.customPacks) ? s.customPacks : []
   ).map((p) => ({
     ...p,
-    behaviors: (p.behaviors ?? []).map((b) => ({
-      ...b,
-      canonicalKey: b.canonicalKey.replace(/^custom-\d+:/, ""),
-    })),
+    behaviors: (p.behaviors ?? []).map((b) => {
+      // Strip legacy `custom-<digits>:` first (idempotent)
+      const dehealed = b.canonicalKey.replace(/^custom-\d+:/, "");
+      // Already in a reserved namespace? Trust it.
+      if (
+        dehealed.startsWith("custom:") ||
+        dehealed.startsWith("fork:")
+      ) {
+        return { ...b, canonicalKey: dehealed };
+      }
+      // Legacy fork: the bare key matches a curated atom AND the prefix
+      // strip changed something (so we know the original was a legacy
+      // fork format). Convert to the new fork: namespace with
+      // derivedFrom set to the curated original — the fork still
+      // merges with the curated via effectiveKey, but the namespace
+      // makes the trust tier classify it as "derived" (not
+      // ontologically polluting "curated").
+      const wasLegacyFork = b.canonicalKey !== dehealed;
+      if (wasLegacyFork && curatedKeySet.has(dehealed)) {
+        return {
+          ...b,
+          canonicalKey: `fork:${p.id}:${dehealed}`,
+          derivedFrom: b.derivedFrom ?? dehealed,
+        };
+      }
+      // Bare key inside a customPack — force into custom namespace.
+      // Use the pack id (deterministic) + a derived slug + a short
+      // stable suffix so two different packs with the same bare key
+      // don't collide on the way in. The suffix is derived from the
+      // bare key itself so the rewrite is stable across reloads —
+      // we want the same input to namespace to the same output.
+      const slug = dehealed
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 40) || "item";
+      const stableSuffix = Math.abs(
+        Array.from(dehealed).reduce(
+          (h, c) => (h * 31 + c.charCodeAt(0)) | 0,
+          0
+        )
+      )
+        .toString(36)
+        .slice(0, 4);
+      return {
+        ...b,
+        canonicalKey: `custom:${p.id}:${slug}-${stableSuffix}`,
+      };
+    }),
   }));
 
   // Prune behaviorOverrides that no longer belong to any installed pack —
@@ -195,7 +263,27 @@ function normalize(s: AppState): AppState {
       : {};
   const behaviorOverrides: Record<string, BehaviorOverride> = {};
   for (const [k, v] of Object.entries(rawOverrides)) {
-    if (validKeys.has(k)) behaviorOverrides[k] = v;
+    if (!validKeys.has(k)) continue;
+    // Healing pass: a behaviorOverride with daysActive set to all-false
+    // is semantically "disabled on every day" — but the timeline filter
+    // honors daysActive[dayIndex] strictly, so this leaves the behavior
+    // permanently muted with no UI indication. Convert to an explicit
+    // `disabled: true` override so the user sees it correctly as paused
+    // (and can re-enable from the BehaviorSheet).
+    const ov = v as BehaviorOverride;
+    if (
+      Array.isArray(ov.daysActive) &&
+      ov.daysActive.length === 7 &&
+      ov.daysActive.every((d) => d === false)
+    ) {
+      behaviorOverrides[k] = {
+        ...ov,
+        daysActive: undefined,
+        disabled: true,
+      };
+      continue;
+    }
+    behaviorOverrides[k] = ov;
   }
 
   return {

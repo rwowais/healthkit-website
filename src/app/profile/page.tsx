@@ -283,6 +283,89 @@ export default function ProfilePage() {
           )}
         </Card>
 
+        {/* Personal factors — what the system suppresses without
+            saying anything clinical. The engine reads safetyFlags
+            and silently drops contraindicated atoms from the
+            timeline (cold plunge on a pregnant user, intermittent
+            fasting on someone under-18, etc.). Toggling here updates
+            the timeline immediately on the next compile. No alarms,
+            no popups; the affected behaviors just don't appear. */}
+        <Card>
+          <Eyebrow>Personal factors</Eyebrow>
+          <p className="t-caption mt-1 mb-3 leading-relaxed">
+            We use these to quietly leave out behaviors that aren&apos;t
+            right for your situation. We never share or display these
+            elsewhere.
+          </p>
+          {(
+            [
+              { key: "pregnant", label: "Pregnant" },
+              { key: "breastfeeding", label: "Breastfeeding" },
+              { key: "under-18", label: "Under 18" },
+              {
+                key: "anticoagulants",
+                label: "Taking blood thinners (warfarin, DOACs, antiplatelets)",
+              },
+              {
+                key: "diabetes-meds",
+                label: "Taking diabetes medication (metformin, sulfonylureas, insulin)",
+              },
+              {
+                key: "thyroid-meds",
+                label: "Taking thyroid medication (levothyroxine)",
+              },
+              { key: "ssri", label: "Taking SSRIs or SNRIs" },
+              {
+                key: "eating-disorder-history",
+                label: "History with disordered eating",
+              },
+              {
+                key: "cardiac-arrhythmia",
+                label: "Cardiac arrhythmia",
+              },
+            ] as const
+          ).map((f) => {
+            const on =
+              (s.safetyFlags as Record<string, boolean> | undefined)?.[
+                f.key
+              ] === true;
+            return (
+              <div
+                key={f.key}
+                className="flex items-center justify-between gap-3 py-2.5 border-b border-[var(--hairline)] last:border-0"
+              >
+                <span className="text-[13.5px] leading-snug text-[var(--text-2)]">
+                  {f.label}
+                </span>
+                <button
+                  onClick={() =>
+                    updateSettings({
+                      safetyFlags: {
+                        ...(s.safetyFlags ?? {}),
+                        [f.key]: !on,
+                      },
+                    })
+                  }
+                  role="switch"
+                  aria-checked={on}
+                  aria-label={f.label}
+                  className="tr-fast h-7 w-12 rounded-full p-1 shrink-0"
+                  style={{
+                    background: on ? "var(--vitality)" : "var(--surface-3)",
+                  }}
+                >
+                  <div
+                    className="tr-fast h-5 w-5 rounded-full bg-white"
+                    style={{
+                      transform: on ? "translateX(20px)" : "translateX(0)",
+                    }}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </Card>
+
         {/* Membership */}
         <Card>
           <Eyebrow color="var(--readiness)">Membership</Eyebrow>
