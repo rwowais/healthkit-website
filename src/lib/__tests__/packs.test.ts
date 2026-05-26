@@ -34,7 +34,7 @@ import {
   listBehaviorAtoms,
   customCanonicalKey,
 } from "@/lib/packs";
-import type { AppState, ProtocolPack } from "@/lib/types";
+import type { AppState, DailyLog, ProtocolPack } from "@/lib/types";
 
 const v3 = (over: Record<string, unknown>) =>
   JSON.stringify({ ...getDefaultState(), version: 3, ...over });

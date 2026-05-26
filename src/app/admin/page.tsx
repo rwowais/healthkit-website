@@ -89,6 +89,16 @@ import {
   generateBehaviorDraftAndSuggestProtocol,
 } from "@/lib/cms/ai";
 import { PACKS } from "@/lib/packs";
+import {
+  buildAtomRegistry,
+  auditOntology,
+  catalogInventory,
+  explainBehavior,
+  type AtomRegistryEntry,
+  type OntologyIssue,
+  type CatalogInventory,
+  type BehaviorExplanation,
+} from "@/lib/governance";
 import { RULE_METRICS } from "@/lib/cms/rules";
 import { HELP } from "@/lib/cms/help";
 import type { ProtocolPack } from "@/lib/types";
@@ -113,7 +123,13 @@ import type { AppState, DailyLog } from "@/lib/types";
 import { Eyebrow, Skeleton } from "@/components/ui";
 
 type Gate = "checking" | "denied" | "ok";
-type Tab = "home" | "content" | "engine" | "simulate" | "publish";
+type Tab =
+  | "home"
+  | "content"
+  | "engine"
+  | "simulate"
+  | "publish"
+  | "intelligence";
 type ContentMode = "author" | "review";
 type EngineSub = "rules" | "config" | "intelligence" | "access";
 
@@ -132,6 +148,11 @@ const TABS: { id: Tab; label: string; hint: string }[] = [
     id: "engine",
     label: "Engine",
     hint: "Adaptation rules, runtime config, intelligence honesty gates.",
+  },
+  {
+    id: "intelligence",
+    label: "Intelligence",
+    hint: "Atom registry, trust tiers, ontology audit, behavior provenance.",
   },
   {
     id: "simulate",
@@ -257,6 +278,49 @@ export default function AdminHome() {
   const [tab, setTab] = useState<Tab>("home");
   const [contentMode, setContentMode] = useState<ContentMode>("author");
   const [engineSub, setEngineSub] = useState<EngineSub>("rules");
+
+  // Intelligence dashboard state — registry / inventory / ontology
+  // issues are computed on-demand from in-memory catalogs (cheap, no
+  // network). The explainer holds the most-recently-inspected
+  // explanation so admins can click rows to drill in.
+  const intelData = useMemo(() => {
+    if (tab !== "intelligence")
+      return null as
+        | null
+        | {
+            registry: Map<string, AtomRegistryEntry>;
+            inventory: CatalogInventory;
+            issues: OntologyIssue[];
+          };
+    const registry = buildAtomRegistry();
+    return {
+      registry,
+      inventory: catalogInventory(registry),
+      issues: auditOntology(registry),
+    };
+  }, [tab]);
+  const [intelFilter, setIntelFilter] = useState("");
+  const [intelTierFilter, setIntelTierFilter] = useState<
+    "all" | "established" | "emerging" | "exploratory" | "untiered"
+  >("all");
+  const [intelInspect, setIntelInspect] =
+    useState<BehaviorExplanation | null>(null);
+  const [intelInspectKey, setIntelInspectKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!intelInspectKey || !intelData) {
+      setIntelInspect(null);
+      return;
+    }
+    // Build a synthetic "all packs installed" state so explainBehavior
+    // can resolve the behavior's full merge state and any conflict-
+    // pair mutes that would fire. The dashboard is for inspection —
+    // we want to see what WOULD happen, not just what the current
+    // user has installed.
+    const synthetic = getDefaultState();
+    synthetic.installedPacks = PACKS.map((p) => p.id);
+    const exp = explainBehavior(synthetic, intelInspectKey, 0);
+    setIntelInspect(exp);
+  }, [intelInspectKey, intelData]);
 
   useEffect(() => {
     let alive = true;
@@ -2301,6 +2365,524 @@ export default function AdminHome() {
               </b> → <b>Users</b> → click the user → copy the{" "}
               <code>id</code> column.
             </p>
+          </div>
+        )}
+
+        {tab === "intelligence" && intelData && (
+          <div className="space-y-5">
+            {/* Inventory summary — at-a-glance health of the catalog */}
+            <div className={card} style={surf}>
+              <Eyebrow>Catalog inventory</Eyebrow>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  {
+                    label: "Curated atoms",
+                    value: intelData.inventory.totalCurated,
+                  },
+                  {
+                    label: "Across packs",
+                    value: intelData.inventory.totalPacks,
+                  },
+                  {
+                    label: "Library standalones",
+                    value: intelData.inventory.totalStandalones,
+                  },
+                  {
+                    label: "With contraindications",
+                    value: intelData.inventory.withContraindications,
+                  },
+                ].map((m) => (
+                  <div
+                    key={m.label}
+                    className="rounded-[var(--r-sm)] p-3"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <p className="text-[22px] font-bold text-[var(--text-1)]">
+                      {m.value}
+                    </p>
+                    <p className="t-caption mt-0.5">{m.label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {(["established", "emerging", "exploratory", "none"] as const).map(
+                  (tier) => (
+                    <div
+                      key={tier}
+                      className="rounded-[var(--r-sm)] p-3"
+                      style={{
+                        background:
+                          tier === "exploratory"
+                            ? "color-mix(in srgb, var(--alert) 12%, var(--surface-3))"
+                            : tier === "emerging"
+                            ? "color-mix(in srgb, var(--warm) 11%, var(--surface-3))"
+                            : "var(--surface-3)",
+                      }}
+                    >
+                      <p className="text-[18px] font-bold text-[var(--text-1)]">
+                        {intelData.inventory.byEvidenceTier[tier] ?? 0}
+                      </p>
+                      <p className="t-caption mt-0.5 capitalize">
+                        {tier === "none" ? "No evidence tier" : tier}
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Ontology audit — any catalog-level issues */}
+            <div className={card} style={surf}>
+              <div className="flex items-center justify-between">
+                <Eyebrow
+                  color={
+                    intelData.issues.some((i) => i.severity === "error")
+                      ? "var(--alert)"
+                      : intelData.issues.length > 0
+                      ? "var(--warm)"
+                      : "var(--vitality)"
+                  }
+                >
+                  Ontology audit
+                </Eyebrow>
+                <span className="t-caption">
+                  {intelData.issues.length === 0
+                    ? "All checks pass"
+                    : `${intelData.issues.filter((i) => i.severity === "error").length} errors · ${intelData.issues.filter((i) => i.severity === "warning").length} warnings`}
+                </span>
+              </div>
+              {intelData.issues.length === 0 ? (
+                <p className="mt-2 text-[13px] text-[var(--text-3)]">
+                  Catalog passes every cross-cutting invariant (canonicalKey
+                  shape, derivedFrom/targets reference real keys, no
+                  duplicate titles across canonical atoms, every atom with
+                  evidence text has an evidenceTier).
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {intelData.issues.slice(0, 20).map((issue, i) => (
+                    <div
+                      key={i}
+                      className="rounded-[var(--r-sm)] p-3 text-[12.5px]"
+                      style={{
+                        background:
+                          issue.severity === "error"
+                            ? "color-mix(in srgb, var(--alert) 12%, var(--surface-3))"
+                            : "color-mix(in srgb, var(--warm) 10%, var(--surface-3))",
+                      }}
+                    >
+                      <p className="font-semibold text-[var(--text-1)]">
+                        <span
+                          className="mr-2 rounded-full px-2 py-0.5 text-[10px] uppercase"
+                          style={{
+                            background:
+                              issue.severity === "error"
+                                ? "var(--alert)"
+                                : "var(--warm)",
+                            color: "#08090B",
+                          }}
+                        >
+                          {issue.severity}
+                        </span>
+                        {issue.kind}
+                      </p>
+                      <p className="mt-1 text-[var(--text-2)]">
+                        {issue.message}
+                      </p>
+                      {issue.canonicalKey && (
+                        <button
+                          onClick={() =>
+                            setIntelInspectKey(issue.canonicalKey!)
+                          }
+                          className="press mt-1 text-[11.5px] underline-offset-2 hover:underline"
+                          style={{ color: "var(--readiness)" }}
+                        >
+                          Inspect {issue.canonicalKey}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Contraindication coverage */}
+            <div className={card} style={surf}>
+              <Eyebrow>Safety coverage</Eyebrow>
+              <p className="mt-1 t-caption leading-relaxed">
+                How many curated atoms declare each contraindication flag
+                — the engine quietly suppresses these for users with the
+                matching settings flag (not a clinical warning, just
+                tailoring).
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {Object.entries(
+                  intelData.inventory.contraindicationCounts
+                )
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([flag, n]) => (
+                    <div
+                      key={flag}
+                      className="rounded-[var(--r-sm)] p-2.5"
+                      style={{ background: "var(--surface-3)" }}
+                    >
+                      <p className="text-[15px] font-bold text-[var(--text-1)]">
+                        {n}
+                      </p>
+                      <p className="t-caption mt-0.5">{flag}</p>
+                    </div>
+                  ))}
+                {Object.keys(intelData.inventory.contraindicationCounts)
+                  .length === 0 && (
+                  <p className="t-caption">No contraindication metadata yet.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Atom inventory — full registry with filter + drill-down */}
+            <div className={card} style={surf}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Eyebrow>Atom registry</Eyebrow>
+                <span className="t-caption">
+                  Click any atom to inspect its provenance, merge state,
+                  and governance metadata.
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  value={intelFilter}
+                  onChange={(e) => setIntelFilter(e.target.value)}
+                  placeholder="Search atoms by key, title, or pack…"
+                  className="flex-1 min-w-[200px] rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
+                />
+                <div className="flex gap-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] p-0.5">
+                  {(
+                    [
+                      "all",
+                      "established",
+                      "emerging",
+                      "exploratory",
+                      "untiered",
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setIntelTierFilter(t)}
+                      className="press tr-fast rounded-[var(--r-pill)] px-2.5 py-1 text-[10.5px] font-semibold capitalize"
+                      style={{
+                        background:
+                          intelTierFilter === t
+                            ? "var(--text-1)"
+                            : "transparent",
+                        color:
+                          intelTierFilter === t ? "#08090B" : "var(--text-3)",
+                      }}
+                    >
+                      {t === "untiered" ? "no tier" : t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-3 max-h-[480px] space-y-1 overflow-y-auto">
+                {(() => {
+                  const q = intelFilter.trim().toLowerCase();
+                  const rows = [...intelData.registry.values()]
+                    .filter((a) => {
+                      if (intelTierFilter === "untiered")
+                        return !a.evidenceTier;
+                      if (intelTierFilter !== "all")
+                        return a.evidenceTier === intelTierFilter;
+                      return true;
+                    })
+                    .filter((a) => {
+                      if (!q) return true;
+                      return (
+                        a.canonicalKey.toLowerCase().includes(q) ||
+                        a.title.toLowerCase().includes(q) ||
+                        a.fromPacks.some((p) =>
+                          p.toLowerCase().includes(q)
+                        )
+                      );
+                    })
+                    .sort((a, b) => a.title.localeCompare(b.title));
+                  if (rows.length === 0)
+                    return (
+                      <p className="px-3 py-4 text-[12.5px] text-[var(--text-3)]">
+                        No atoms match the current filter.
+                      </p>
+                    );
+                  return rows.map((a) => (
+                    <button
+                      key={a.canonicalKey}
+                      onClick={() => setIntelInspectKey(a.canonicalKey)}
+                      className="press tr-fast flex w-full items-start gap-3 rounded-[var(--r-sm)] p-2.5 text-left"
+                      style={{
+                        background:
+                          intelInspectKey === a.canonicalKey
+                            ? "var(--surface-3)"
+                            : "transparent",
+                      }}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13.5px] font-semibold text-[var(--text-1)]">
+                          {a.title}
+                          {a.contraindications.length > 0 && (
+                            <span
+                              className="ml-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                              style={{
+                                background:
+                                  "color-mix(in srgb, var(--alert) 18%, var(--surface-3))",
+                                color: "var(--alert)",
+                              }}
+                            >
+                              {a.contraindications.length} contra
+                            </span>
+                          )}
+                        </span>
+                        <span className="t-caption mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <code>{a.canonicalKey}</code>
+                          <span>·</span>
+                          <span className="capitalize">{a.block}</span>
+                          <span>·</span>
+                          <span>L{a.leverage}</span>
+                          {a.evidenceTier && (
+                            <>
+                              <span>·</span>
+                              <span
+                                className="rounded-full px-1.5 py-0 text-[9.5px] font-semibold uppercase"
+                                style={{
+                                  background:
+                                    a.evidenceTier === "exploratory"
+                                      ? "color-mix(in srgb, var(--alert) 16%, var(--surface-3))"
+                                      : a.evidenceTier === "emerging"
+                                      ? "color-mix(in srgb, var(--warm) 16%, var(--surface-3))"
+                                      : "color-mix(in srgb, var(--vitality) 16%, var(--surface-3))",
+                                  color:
+                                    a.evidenceTier === "exploratory"
+                                      ? "var(--alert)"
+                                      : a.evidenceTier === "emerging"
+                                      ? "var(--warm)"
+                                      : "var(--vitality)",
+                                }}
+                              >
+                                {a.evidenceTier}
+                              </span>
+                            </>
+                          )}
+                          {a.isStandalone && (
+                            <>
+                              <span>·</span>
+                              <span>standalone</span>
+                            </>
+                          )}
+                          {a.fromPacks.length > 0 && (
+                            <>
+                              <span>·</span>
+                              <span>
+                                {a.fromPacks.length} pack
+                                {a.fromPacks.length === 1 ? "" : "s"}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                  ));
+                })()}
+              </div>
+            </div>
+
+            {/* Behavior provenance inspector */}
+            {intelInspect && (
+              <div className={card} style={surf}>
+                <div className="flex items-center justify-between">
+                  <Eyebrow color="var(--readiness)">Inspector</Eyebrow>
+                  <button
+                    onClick={() => {
+                      setIntelInspect(null);
+                      setIntelInspectKey(null);
+                    }}
+                    className="press text-[11.5px] text-[var(--text-3)] hover:text-[var(--text-2)]"
+                  >
+                    Close
+                  </button>
+                </div>
+                <p className="mt-2 text-[18px] font-bold text-[var(--text-1)]">
+                  {intelInspect.title}
+                </p>
+                <p className="t-caption mt-0.5">
+                  <code>{intelInspect.canonicalKey}</code>
+                  {intelInspect.derivedFrom && (
+                    <>
+                      {" "}
+                      derived from <code>{intelInspect.derivedFrom}</code>
+                    </>
+                  )}
+                </p>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div
+                    className="rounded-[var(--r-sm)] p-2.5"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <p className="t-caption">Trust tier</p>
+                    <p className="mt-1 text-[13.5px] font-bold capitalize text-[var(--text-1)]">
+                      {intelInspect.trustTier}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-[var(--r-sm)] p-2.5"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <p className="t-caption">Recommendation eligible</p>
+                    <p className="mt-1 text-[13.5px] font-bold text-[var(--text-1)]">
+                      {intelInspect.recommendationEligible ? "Yes" : "No"}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-[var(--r-sm)] p-2.5"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <p className="t-caption">Keystone eligible</p>
+                    <p className="mt-1 text-[13.5px] font-bold text-[var(--text-1)]">
+                      {intelInspect.keystoneEligible ? "Yes" : "No"}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-[var(--r-sm)] p-2.5"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <p className="t-caption">Current state</p>
+                    <p className="mt-1 text-[13.5px] font-bold text-[var(--text-1)]">
+                      {intelInspect.muted ? "Muted" : "Visible"}
+                    </p>
+                  </div>
+                </div>
+
+                {intelInspect.muteReason && (
+                  <div
+                    className="mt-3 rounded-[var(--r-sm)] p-3 text-[12.5px]"
+                    style={{
+                      background:
+                        "color-mix(in srgb, var(--warm) 12%, var(--surface-3))",
+                      color: "var(--text-2)",
+                    }}
+                  >
+                    <span className="font-semibold text-[var(--text-1)]">
+                      Suppression reason:
+                    </span>{" "}
+                    {intelInspect.muteReason}
+                  </div>
+                )}
+
+                {intelInspect.fromPacks.length > 0 && (
+                  <div className="mt-3">
+                    <p className="t-caption">Source packs</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {intelInspect.fromPacks.map((p) => (
+                        <span
+                          key={p}
+                          className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          style={{
+                            background: "var(--surface-3)",
+                            color: "var(--text-2)",
+                          }}
+                        >
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                    {intelInspect.mergedFromMultiple && (
+                      <p className="t-caption mt-1.5">
+                        Merged from multiple packs — single row in the
+                        timeline.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {intelInspect.contraindications.length > 0 && (
+                  <div className="mt-3">
+                    <p className="t-caption">Contraindications</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {intelInspect.contraindications.map((c) => (
+                        <span
+                          key={c}
+                          className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          style={{
+                            background:
+                              "color-mix(in srgb, var(--alert) 18%, var(--surface-3))",
+                            color: "var(--alert)",
+                          }}
+                        >
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {intelInspect.mutesByConflictPair.length > 0 && (
+                  <div className="mt-3">
+                    <p className="t-caption">
+                      Mutes (when this is active)
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {intelInspect.mutesByConflictPair.map((k) => (
+                        <button
+                          key={k}
+                          onClick={() => setIntelInspectKey(k)}
+                          className="press rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          style={{
+                            background:
+                              "color-mix(in srgb, var(--warm) 12%, var(--surface-3))",
+                            color: "var(--warm)",
+                          }}
+                        >
+                          → {k}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {intelInspect.mutedByRestraints.length > 0 && (
+                  <div className="mt-3">
+                    <p className="t-caption">Muted by</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {intelInspect.mutedByRestraints.map((k) => (
+                        <button
+                          key={k}
+                          onClick={() => setIntelInspectKey(k)}
+                          className="press rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          style={{
+                            background:
+                              "color-mix(in srgb, var(--warm) 12%, var(--surface-3))",
+                            color: "var(--warm)",
+                          }}
+                        >
+                          ← {k}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {intelInspect.notes.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {intelInspect.notes.map((n, i) => (
+                      <p
+                        key={i}
+                        className="rounded-[var(--r-sm)] p-2.5 text-[12.5px] leading-relaxed text-[var(--text-2)]"
+                        style={{ background: "var(--surface-3)" }}
+                      >
+                        {n}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
