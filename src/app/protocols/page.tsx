@@ -924,10 +924,9 @@ export default function ProtocolsPage() {
                         className="press underline-offset-2 hover:underline"
                         style={{ color: "var(--readiness)" }}
                       >
-                        adding it as custom
+                        adding it as personal
                       </button>{" "}
-                      — it won't participate in the cross-protocol
-                      intelligence, but the basics still work.
+                      — yours to define, kept just for you.
                     </p>
                   )}
                   {filteredAtoms.map((a) => (
@@ -1043,10 +1042,10 @@ export default function ProtocolsPage() {
                   className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
                 />
                 <p className="t-caption leading-relaxed">
-                  Custom behaviors work, but they sit outside the
-                  cross-protocol intelligence (no merging, no adaptive
-                  mute, no scientific timing copy). Use this for things
-                  the library doesn&apos;t cover.
+                  This will be a personal behavior. We&apos;ll track it
+                  and let you shape it however you want — things
+                  we&apos;ve reviewed appear in our recommendations,
+                  yours stays just for you.
                 </p>
                 <button
                   onClick={addBehaviorToDraft}

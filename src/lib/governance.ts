@@ -394,6 +394,110 @@ export function explainTimelineItem(
   };
 }
 
+// ── User-facing provenance signals ────────────────────────────────
+
+/**
+ * Calm provenance language for a single behavior. The user never sees
+ * the words "tier" or "governance" — this helper translates the
+ * internal trust system into asymmetric ownership cues:
+ *
+ *   Curated  → no pill on the row; the line in About-this-behavior
+ *              names the source ("From your Better Sleep protocol.")
+ *   Derived  → no pill; line says "Adapted from Morning sunlight."
+ *   Custom   → tiny "Personal" pill on the row; line in About says
+ *              "Your personal behavior — kept just for you, not part
+ *              of our recommendations."
+ *
+ * Asymmetry is the design: curated is the *default*; non-curated
+ * wears the gentle ownership badge.
+ *
+ * `atomRegistry` is optional; when omitted, derived items show
+ * their derivedFrom key as fallback. Callers that have the registry
+ * handy should pass it so the line reads with the human title.
+ */
+export interface ProvenanceLabel {
+  /** Short pill text shown on the Today timeline row. null = no pill. */
+  shortLabel: string | null;
+  /**
+   * Calm one-line provenance for the BehaviorSheet "About this
+   * behavior" section. null = the row already speaks for itself.
+   */
+  fullLine: string | null;
+}
+
+export function provenanceLabel(
+  b: {
+    canonicalKey: string;
+    title?: string;
+    derivedFrom?: string;
+    fromPacks?: string[];
+    trustTier?: TrustTier;
+  },
+  atomRegistry?: Map<string, AtomRegistryEntry>
+): ProvenanceLabel {
+  // If trustTier wasn't pre-computed (e.g., raw BehaviorDef, not a
+  // TimelineItem), derive it from the canonical key shape.
+  const tier =
+    b.trustTier ??
+    (b.canonicalKey.startsWith("custom:")
+      ? b.derivedFrom
+        ? "derived"
+        : "custom"
+      : b.canonicalKey.startsWith("fork:")
+        ? "derived"
+        : "curated");
+
+  if (tier === "custom") {
+    return {
+      shortLabel: "Personal",
+      fullLine:
+        "Your personal behavior — kept just for you, not part of our recommendations.",
+    };
+  }
+  if (tier === "derived" && b.derivedFrom) {
+    const originalTitle =
+      atomRegistry?.get(b.derivedFrom)?.title ?? b.derivedFrom;
+    return {
+      shortLabel: null,
+      fullLine: `Adapted from ${originalTitle}.`,
+    };
+  }
+  // Curated — name the protocol(s) it came from so the user can
+  // anchor the recommendation to their own installed system.
+  if (b.fromPacks && b.fromPacks.length > 0) {
+    if (b.fromPacks.length === 1) {
+      return {
+        shortLabel: null,
+        fullLine: `From your ${b.fromPacks[0]} protocol.`,
+      };
+    }
+    return {
+      shortLabel: null,
+      fullLine: `Common across ${b.fromPacks.length} of your protocols.`,
+    };
+  }
+  return { shortLabel: null, fullLine: null };
+}
+
+/**
+ * One-sentence evidence framing appended to the rationale. Lives here
+ * so the language is auditable and consistent — the calm "humility"
+ * voice that should never feel clinical or anxiety-inducing.
+ *
+ * Returns null for "established" / undefined — the rationale itself
+ * is enough; no need to qualify it.
+ */
+export function evidenceFraming(
+  evidenceTier?: BehaviorDef["evidenceTier"]
+): string | null {
+  if (!evidenceTier || evidenceTier === "established") return null;
+  if (evidenceTier === "emerging")
+    return "The evidence here is encouraging but still maturing.";
+  if (evidenceTier === "exploratory")
+    return "This sits in earlier research — treat it as experimental.";
+  return null;
+}
+
 // ── Inventory + counts (for admin dashboard) ──────────────────────
 
 export interface CatalogInventory {

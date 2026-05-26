@@ -28,6 +28,8 @@ import {
   auditOntology,
   explainBehavior,
   catalogInventory,
+  provenanceLabel,
+  evidenceFraming,
 } from "@/lib/governance";
 import { keystone, whatWorks, suggestions } from "@/lib/intel";
 import {
@@ -751,6 +753,80 @@ describe("governance: atom registry + ontology audit", () => {
       (inv.byEvidenceTier.emerging ?? 0) +
       (inv.byEvidenceTier.exploratory ?? 0);
     expect(tiered).toBeGreaterThan(5);
+  });
+});
+
+describe("user-facing provenance — calm language, not enterprise jargon", () => {
+  it("custom behavior gets the 'Personal' pill + kept-just-for-you line", () => {
+    const prov = provenanceLabel({
+      canonicalKey: "custom:p1:thing-xyz",
+      trustTier: "custom",
+    });
+    expect(prov.shortLabel).toBe("Personal");
+    expect(prov.fullLine).toContain("personal behavior");
+    // Forbid enterprise/clinical language anywhere
+    expect(prov.fullLine?.toLowerCase()).not.toMatch(
+      /tier|governance|validated|verified|trust|class/
+    );
+  });
+
+  it("derived behavior names the curated original it's adapted from", () => {
+    const registry = buildAtomRegistry();
+    const prov = provenanceLabel(
+      {
+        canonicalKey: "custom:p1:my-magnesium-xyz",
+        derivedFrom: "magnesium-pm",
+        trustTier: "derived",
+      },
+      registry
+    );
+    expect(prov.shortLabel).toBeNull();
+    expect(prov.fullLine).toMatch(/Adapted from .*[Mm]agnesium/);
+  });
+
+  it("curated behavior names the protocol(s) it came from", () => {
+    const prov = provenanceLabel({
+      canonicalKey: "magnesium-pm",
+      trustTier: "curated",
+      fromPacks: ["Better Sleep"],
+    });
+    expect(prov.shortLabel).toBeNull();
+    expect(prov.fullLine).toContain("Better Sleep");
+    expect(prov.fullLine).toContain("From your");
+  });
+
+  it("curated behavior across multiple packs uses the 'common across' framing", () => {
+    const prov = provenanceLabel({
+      canonicalKey: "morning-sunlight",
+      trustTier: "curated",
+      fromPacks: ["Better Sleep", "Longevity Foundation", "Cognitive Performance"],
+    });
+    expect(prov.fullLine).toContain("Common across");
+    expect(prov.fullLine).toContain("3");
+  });
+
+  it("derives trustTier from canonicalKey shape when not provided", () => {
+    // Custom-namespaced key without trustTier → treated as custom.
+    const prov = provenanceLabel({ canonicalKey: "custom:p1:thing-xyz" });
+    expect(prov.shortLabel).toBe("Personal");
+  });
+
+  it("evidenceFraming returns null for established + undefined", () => {
+    expect(evidenceFraming(undefined)).toBeNull();
+    expect(evidenceFraming("established")).toBeNull();
+  });
+
+  it("evidenceFraming hedges emerging + exploratory tiers calmly", () => {
+    const emerging = evidenceFraming("emerging");
+    const exploratory = evidenceFraming("exploratory");
+    expect(emerging).toContain("encouraging");
+    expect(exploratory).toContain("experimental");
+    // Forbid clinical/anxiety language
+    for (const text of [emerging, exploratory]) {
+      expect(text?.toLowerCase()).not.toMatch(
+        /tier|level|grade|class|warning|danger|unproven|unsafe/
+      );
+    }
   });
 });
 

@@ -1823,6 +1823,26 @@ export default function TodayPage() {
                                       {st.streak}
                                     </span>
                                   )}
+                                  {/* "Personal" pill — quiet ownership cue
+                                      on user-created (custom) behaviors.
+                                      The asymmetry is the design: curated
+                                      atoms wear no badge (they're the
+                                      default); custom rows get this tiny
+                                      neutral marker so the user knows it's
+                                      theirs, not ours. Color is muted —
+                                      this is a label, not an alert. */}
+                                  {it.trustTier === "custom" && !done && (
+                                    <span
+                                      className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium tracking-wide"
+                                      style={{
+                                        background: "var(--surface-3)",
+                                        color: "var(--text-3)",
+                                      }}
+                                      title="Your personal behavior — kept just for you, not part of our recommendations."
+                                    >
+                                      Personal
+                                    </span>
+                                  )}
                                 </div>
                                 {!lev1 && (
                                   <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--text-3)]">

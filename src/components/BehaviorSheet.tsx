@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Sheet, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { blockLabel, type TimelineItem } from "@/lib/engine";
+import {
+  buildAtomRegistry,
+  evidenceFraming,
+  provenanceLabel,
+} from "@/lib/governance";
 import type { BehaviorOverride, TimeBlock } from "@/lib/types";
 
 const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
@@ -221,7 +226,10 @@ export default function BehaviorSheet({
           />
         </div>
 
-        {/* Evidence */}
+        {/* Evidence — with calm evidence-tier framing appended when
+            the underlying claim sits in emerging or exploratory
+            research. Keeps the rationale section honest without
+            adding clinical jargon. */}
         {item.evidence && (
           <div
             className="rounded-[var(--r-md)] p-4"
@@ -231,6 +239,11 @@ export default function BehaviorSheet({
             <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--text-2)]">
               {item.evidence}
             </p>
+            {evidenceFraming(item.evidenceTier) && (
+              <p className="mt-2 text-[12px] italic leading-relaxed text-[var(--text-3)]">
+                {evidenceFraming(item.evidenceTier)}
+              </p>
+            )}
           </div>
         )}
         {item.recommendedBy && item.recommendedBy.length > 0 && (
@@ -247,6 +260,15 @@ export default function BehaviorSheet({
           </div>
         )}
 
+        {/* About this behavior — calm provenance + suppression context.
+            Collapsed by default; one tap reveals provenance ("From your
+            Better Sleep protocol" / "Adapted from Morning sunlight" /
+            "Your personal behavior — kept just for you"). The section
+            ONLY renders when there's something meaningful to say
+            (provenance line OR muteReason OR contraindication list);
+            otherwise stays out of the way. */}
+        <AboutThisBehavior item={item} />
+
         {onToggleEnabled && (
           <button
             onClick={onToggleEnabled}
@@ -259,4 +281,86 @@ export default function BehaviorSheet({
       </div>
     </Sheet>
   );
+}
+
+/**
+ * "About this behavior" — the lightweight provenance + suppression
+ * surface inside BehaviorSheet. Pulls from the engine's `trustTier`,
+ * `fromPacks`, `muteReason`, and `contraindications` fields plus the
+ * governance `provenanceLabel()` helper. Renders nothing unless at
+ * least one line is meaningful for the user.
+ *
+ * Voice rules:
+ *   - Never says "tier", "governance", "validated", "verified"
+ *   - Curated atoms: name the protocol it came from
+ *   - Derived atoms: "Adapted from X"
+ *   - Custom atoms: "Your personal behavior — kept just for you, not
+ *     part of our recommendations."
+ *   - Muted atoms: explain WHY in plain language ("Resting — recovery
+ *     mode", "Conflict with your fasting protocol", etc.)
+ */
+function AboutThisBehavior({ item }: { item: TimelineItem }) {
+  // Build the atom registry once per open — cheap (it's an in-memory
+  // walk) but we still memoize so re-renders don't rebuild it.
+  const registry = useMemo(() => buildAtomRegistry(), []);
+  const prov = provenanceLabel(
+    {
+      canonicalKey: item.canonicalKey,
+      title: item.title,
+      derivedFrom: item.derivedFrom,
+      fromPacks: item.fromPacks,
+      trustTier: item.trustTier,
+    },
+    registry
+  );
+  const hasContra = (item.contraindications ?? []).length > 0;
+  // Skip rendering entirely when there's nothing useful to say.
+  if (!prov.fullLine && !item.muteReason && !hasContra) return null;
+  return (
+    <div
+      className="rounded-[var(--r-md)] p-4"
+      style={{ background: "var(--surface-2)" }}
+    >
+      <Eyebrow>About this behavior</Eyebrow>
+      <div className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-[var(--text-2)]">
+        {prov.fullLine && <p>{prov.fullLine}</p>}
+        {item.muteReason && (
+          <p className="text-[var(--text-3)]">
+            <span className="font-semibold text-[var(--text-2)]">
+              Currently resting:
+            </span>{" "}
+            {humanizeMuteReason(item.muteReason)}
+          </p>
+        )}
+        {hasContra && (
+          <p className="text-[var(--text-3)]">
+            Tailored — not auto-suggested for some users (
+            {(item.contraindications ?? []).join(", ")}).
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Translate engine-internal muteReason strings to calm user-facing
+ * copy. The engine writes diagnostic phrases ("conflict pair:
+ * 'no-intense' rule is active"); this maps them to one-line calm
+ * versions that don't expose internal vocabulary.
+ */
+function humanizeMuteReason(reason: string): string {
+  if (reason.startsWith("conflict pair"))
+    return "Another protocol you have installed asks you to skip this today.";
+  if (reason.startsWith("recovery mode"))
+    return "Recovery mode — eased so you can rest.";
+  if (reason.startsWith("essentials mode"))
+    return "Essentials mode — focusing on the highest-leverage items.";
+  if (reason.startsWith("rebuild mode"))
+    return "Rebuild mode — keeping a small, focused set today.";
+  if (reason.startsWith("lighter mode"))
+    return "Lighter day — optional behaviors muted.";
+  if (reason.startsWith("graduated to maintenance"))
+    return "Graduated to maintenance — you've held this consistently.";
+  return reason; // Unknown reason — surface verbatim, better than empty.
 }
