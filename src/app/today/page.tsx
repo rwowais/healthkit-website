@@ -1942,7 +1942,22 @@ export default function TodayPage() {
                                   selection so the entire row is hit-
                                   target for picking, not just the tiny
                                   checkbox. */}
-                              <button
+                              {/* Row body is a role=button div, NOT a
+                                  <button> — it contains nested interactive
+                                  controls (the Swap-workout chip + Undo),
+                                  and a button-inside-button is invalid HTML
+                                  that throws a hydration error. div +
+                                  role/tabIndex/onKeyDown preserves the
+                                  tap-to-complete + keyboard a11y exactly. */}
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    (e.currentTarget as HTMLElement).click();
+                                  }
+                                }}
                                 onClick={() => {
                                   if (editMode) {
                                     const next = new Set(selectedKeys);
@@ -2185,7 +2200,7 @@ export default function TodayPage() {
                                     {fmtClock(t)}
                                   </span>
                                 )}
-                              </button>
+                              </div>
 
                               {/* Details / edit — explicit, not the
                                   accidental default tap target. Hidden
