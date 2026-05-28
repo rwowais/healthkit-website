@@ -4,7 +4,7 @@
  * Time anchoring, current-block awareness, per-behavior streaks,
  * keystone-habit detection, and proactive (calm) suggestions.
  */
-import type { AppState, DailyLog, TimeBlock } from "./types";
+import type { AppState, DailyLog, TimeBlock, TrustTier } from "./types";
 import { compileTimeline, type TimelineItem } from "./engine";
 import { packById } from "./packs";
 import { activePacks } from "./knowledge";
@@ -33,6 +33,64 @@ function analyticsItems(state: AppState): TimelineItem[] {
     }
   }
   return [...map.values()];
+}
+
+/**
+ * A unit the outcome-reflection layer can correlate against the
+ * user's felt check-in. Abstracts over behaviors (read from
+ * behaviorCompletions) and supplements (read from
+ * supplementCompletions) so whatWorks() can answer "does magnesium
+ * help my sleep?" the same way it answers "does morning sunlight
+ * help my energy?".
+ */
+interface OutcomeCandidate {
+  key: string;
+  title: string;
+  trustTier: TrustTier;
+  /** Was this candidate completed on the given day's log? */
+  isDoneOn: (l: DailyLog) => boolean;
+}
+
+/**
+ * The full candidate set for outcome reflection: every installed
+ * behavior PLUS every supplement in the user's stack.
+ *
+ * Why supplements belong here: they were architecturally separated
+ * from behaviors (into state.supplements + supplementCompletions),
+ * and the intelligence layer was never re-wired to see them. A user
+ * taking magnesium nightly for a year got zero "does this work for
+ * me" feedback — the single biggest "the app doesn't know my data"
+ * gap the year-long persona simulations surfaced. This closes it.
+ *
+ * Trust tiers mirror the behavior policy: curated supplements (from
+ * the catalog) can make a first-person "proven by your data" claim
+ * because we own their definition; free-text custom supplements are
+ * tagged "custom" and the whatWorks gate skips them (the system
+ * shouldn't speak authoritatively about something it can't define).
+ * Their completions still flow into adherence + the grid — just not
+ * the authoritative claim surface.
+ */
+function outcomeCandidates(state: AppState): OutcomeCandidate[] {
+  const out: OutcomeCandidate[] = [];
+  for (const it of analyticsItems(state)) {
+    const key = it.canonicalKey;
+    out.push({
+      key,
+      title: it.title,
+      trustTier: it.trustTier,
+      isDoneOn: (l) => !!l.behaviorCompletions?.[key],
+    });
+  }
+  for (const s of state.supplements ?? []) {
+    const id = s.id;
+    out.push({
+      key: id,
+      title: s.name,
+      trustTier: s.source === "custom" ? "custom" : "curated",
+      isDoneOn: (l) => !!l.supplementCompletions?.[id],
+    });
+  }
+  return out;
 }
 
 // ── Per-behavior streaks ──────────────────────────────────────────
@@ -201,7 +259,10 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
     (l) => feltIndex(l) != null
   );
   if (logs.length < 10) return null;
-  const items = analyticsItems(state);
+  // Candidates now include supplements alongside behaviors — same
+  // correlation math, same honesty gates, just a wider net so the
+  // "proven by your data" surface can speak to the user's stack.
+  const items = outcomeCandidates(state);
   if (items.length < 1) return null;
 
   const mean = (xs: number[]) =>
@@ -236,7 +297,7 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
     // logs still flow into mastery and other surfaces, just not this
     // one which speaks authoritatively.
     if (it.trustTier === "custom") continue;
-    const k = it.canonicalKey;
+    const k = it.key;
     const done: number[] = [];
     const not: number[] = [];
     const dimVals: Record<
@@ -248,7 +309,7 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
     };
     for (const l of logs) {
       const f = feltIndex(l)!;
-      const isDone = !!l.behaviorCompletions?.[k];
+      const isDone = it.isDoneOn(l);
       (isDone ? done : not).push(f);
       for (const dim of ["energy", "sleep"] as const) {
         const dv = dimIndex(l, dim);

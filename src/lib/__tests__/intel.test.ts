@@ -132,6 +132,80 @@ describe("outcome reflection — whatWorks", () => {
     );
     expect(whatWorks({ ...base, dailyLogs: logs })).toBeNull();
   });
+
+  // A supplement-aware felt log: lets a test mark a supplement done
+  // for a day (the field the intelligence layer was previously blind
+  // to).
+  const suppLog = (
+    date: string,
+    supp: Record<string, boolean>,
+    energy: number | null,
+    sleepQ: number | null
+  ): DailyLog =>
+    ({
+      date,
+      behaviorCompletions: {},
+      supplementCompletions: supp,
+      score: 50,
+      sleepLog: { sleepQuality: sleepQ },
+      energyLevel: energy,
+      moodLevel: null,
+      exerciseEntries: [],
+      supplementEntries: [],
+      sleepCompletions: [],
+      completions: [],
+      nutritionScorecard: { customItems: [], note: "" },
+    }) as unknown as DailyLog;
+
+  it("surfaces a CURATED supplement that tracks with the user's better days", () => {
+    // No installed packs → behaviors can't win; only the supplement
+    // is a candidate, isolating the new supplement path.
+    const base: AppState = {
+      ...getDefaultState(),
+      installedPacks: [],
+      supplements: [
+        {
+          id: "magnesium-pm",
+          name: "Magnesium glycinate",
+          block: "evening",
+          source: "curated",
+        },
+      ],
+    };
+    const logs: DailyLog[] = [];
+    for (let i = 0; i < 9; i++)
+      logs.push(suppLog(dk(i + 1), { "magnesium-pm": true }, 5, 5));
+    for (let i = 0; i < 5; i++)
+      logs.push(suppLog(dk(i + 11), { "magnesium-pm": false }, 2, 2));
+    const w = whatWorks({ ...base, dailyLogs: logs });
+    expect(w).not.toBeNull();
+    expect(w!.key).toBe("magnesium-pm");
+    expect(w!.title).toBe("Magnesium glycinate");
+    expect(w!.delta).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does NOT make a first-person claim about a CUSTOM (free-text) supplement", () => {
+    const base: AppState = {
+      ...getDefaultState(),
+      installedPacks: [],
+      supplements: [
+        {
+          id: "supp:aunt-mary-blend",
+          name: "Aunt Mary's herbal blend",
+          block: "morning",
+          source: "custom",
+        },
+      ],
+    };
+    const logs: DailyLog[] = [];
+    for (let i = 0; i < 9; i++)
+      logs.push(suppLog(dk(i + 1), { "supp:aunt-mary-blend": true }, 5, 5));
+    for (let i = 0; i < 5; i++)
+      logs.push(suppLog(dk(i + 11), { "supp:aunt-mary-blend": false }, 2, 2));
+    // Even with a perfect correlation, a free-text custom supplement
+    // is trust-tier "custom" and gated out of the authoritative claim.
+    expect(whatWorks({ ...base, dailyLogs: logs })).toBeNull();
+  });
 });
 
 describe("D1 periodization — masteredKeys", () => {
