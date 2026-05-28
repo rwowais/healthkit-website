@@ -100,6 +100,88 @@ export function isSupplementKey(canonicalKey: string): boolean {
 }
 
 /**
+ * Title-keyword fallback. Used when canonical-key matching misses —
+ * e.g. CMS-published bundles where an admin edited the title, or
+ * legacy custom behaviors created before derivedFrom was tracked,
+ * or imports from external sources. We deliberately list whole
+ * words / phrases so common health terms like "vitamin" don't sweep
+ * up unrelated behaviors.
+ */
+const SUPPLEMENT_TITLE_PATTERNS: readonly RegExp[] = [
+  /\bmelatonin\b/i,
+  /\bvitamin\s*[abcdek]\d?\b/i, // Vitamin A/B/C/D/E/K with optional digit
+  /\bvitamin d3?\b/i,
+  /\bcreatine\b/i,
+  /\bmagnesium\b/i,
+  /\bomega[- ]?3\b/i,
+  /\bcoq10\b/i,
+  /\bubiquin(ol|one)\b/i,
+  /\bnmn\b/i,
+  /\bnicotinamide\b/i,
+  /\btmg\b/i,
+  /\btrimethylglycine\b/i,
+  /\bberberine\b/i,
+  /\bashwagandha\b/i,
+  /\brhodiola\b/i,
+  /\bl-?theanine\b/i,
+  /\btaurine\b/i,
+  /\bglycine\b/i,
+  /\bnac\b/i,
+  /\balpha[- ]?lipoic\b/i,
+  /\bspermidine\b/i,
+  /\bresveratrol\b/i,
+  /\bcurcumin\b/i,
+  /\bquercetin\b/i,
+  /\bastaxanthin\b/i,
+  /\blutein\b/i,
+  /\bzeaxanthin\b/i,
+  /\bbacopa\b/i,
+  /\blion'?s? mane\b/i,
+  /\bciticoline\b/i,
+  /\bphosphatidyl/i,
+  /\bprobiotic/i,
+  /\bcitrulline\b/i,
+  /\bbeetroot\b/i,
+  /\bb[- ]?complex\b/i,
+  /\bboron\b/i,
+  /\bapigenin\b/i,
+  /\binositol\b/i,
+  /\bselenium\b/i,
+  /\biodine\b/i,
+  /\bzinc\b/i,
+];
+
+/**
+ * Robust supplement detector — works whether the behavior comes from
+ * the local catalog, the CMS-published bundle (which may have edited
+ * titles / shifted canonical keys), or a user's custom pack. Order
+ * matters: cheapest most-reliable check first.
+ *
+ * Strategy:
+ *  1. Canonical-key match (the SUPPLEMENT_CANONICAL_KEYS set).
+ *  2. derivedFrom match (fork of a curated supplement).
+ *  3. icon === "pill" (a strong format signal).
+ *  4. Title regex match against known supplement words/phrases.
+ */
+export function isSupplementBehavior(b: {
+  canonicalKey: string;
+  derivedFrom?: string;
+  icon?: string;
+  title?: string;
+}): boolean {
+  if (SUPPLEMENT_CANONICAL_KEYS.has(b.canonicalKey)) return true;
+  if (b.derivedFrom && SUPPLEMENT_CANONICAL_KEYS.has(b.derivedFrom))
+    return true;
+  if (b.icon === "pill") return true;
+  if (b.title) {
+    for (const pat of SUPPLEMENT_TITLE_PATTERNS) {
+      if (pat.test(b.title)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Look up a curated supplement's BehaviorDef from the catalog (packs
  * + standalone atoms). Used by the migration to extract metadata
  * (dose, rationale, contraindications, evidence) when creating

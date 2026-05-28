@@ -1,6 +1,9 @@
 import { STORAGE_KEY, LEGACY_STORAGE_KEYS } from "./constants";
 import { getTz, dayIndexOfKeyInTz, dateKeyInTz } from "./tz";
-import { SUPPLEMENT_CANONICAL_KEYS } from "./supplements";
+import {
+  SUPPLEMENT_CANONICAL_KEYS,
+  isSupplementBehavior,
+} from "./supplements";
 import { calculateStreak } from "./scoring";
 import type {
   AppState,
@@ -316,7 +319,11 @@ function normalize(s: AppState): AppState {
   for (const p of PACKS) {
     if (!installedSetSupp.has(p.id)) continue;
     for (const b of p.behaviors) {
-      if (SUPPLEMENT_CANONICAL_KEYS.has(b.canonicalKey)) {
+      // Use the broad detector so CMS-renamed titles + icon=pill
+      // entries that escaped the canonical-key registry still get
+      // extracted into state.supplements. Keys not in the strict
+      // registry are still tracked by their canonicalKey.
+      if (isSupplementBehavior(b)) {
         installedSupplementKeys.add(b.canonicalKey);
         if (!packForSupplementKey.has(b.canonicalKey))
           packForSupplementKey.set(b.canonicalKey, p.id);

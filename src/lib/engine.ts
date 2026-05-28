@@ -21,7 +21,7 @@ import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
 import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
-import { SUPPLEMENT_CANONICAL_KEYS } from "./supplements";
+import { isSupplementBehavior } from "./supplements";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
@@ -163,16 +163,11 @@ export function compileTimeline(
       if (ov?.disabled) continue;
       // Supplements have their own surface (state.supplements +
       // SupplementBlockCard on Today). Skip them here so they don't
-      // ALSO appear as inline behavior rows — that would be the
-      // pre-refactor double-display. We also skip custom behaviors
-      // that derivedFrom a supplement key (so a user's custom
-      // "Magnesium glycinate" derived from magnesium-pm appears in
-      // the supplement card, not the behavior timeline).
-      if (
-        SUPPLEMENT_CANONICAL_KEYS.has(b.canonicalKey) ||
-        (b.derivedFrom && SUPPLEMENT_CANONICAL_KEYS.has(b.derivedFrom))
-      )
-        continue;
+      // ALSO appear as inline behavior rows. Detection is broad —
+      // canonical key, derivedFrom, icon=pill, and title regex
+      // patterns — so CMS-edited bundles with renamed titles and
+      // legacy forks without derivedFrom both get caught.
+      if (isSupplementBehavior(b)) continue;
       // Suppress contraindicated atoms. The user toggled a safety flag
       // during onboarding (or in profile); we honor it without ever
       // showing a clinical warning. Quiet trust.
