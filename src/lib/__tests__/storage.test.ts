@@ -635,10 +635,12 @@ describe("engine — workout-aware adaptation", () => {
   it("easierDayFromSwap is true when high→low intensity", async () => {
     const { easierDayFromSwap } = await import("@/lib/workouts");
     const today = new Date().toISOString().slice(0, 10);
+    // Cast through unknown — the helper only needs `swaps` and
+    // `date`, full DailyLog shape isn't relevant here.
     const log = {
       date: today,
       swaps: { strength: "extended-walk" }, // high → low
-    } as Parameters<typeof easierDayFromSwap>[0];
+    } as unknown as Parameters<typeof easierDayFromSwap>[0];
     expect(easierDayFromSwap(log)).toBe(true);
   });
 
@@ -650,11 +652,13 @@ describe("engine — workout-aware adaptation", () => {
       easierDayFromSwap({
         date: today,
         swaps: { "extended-walk": "strength" },
-      } as Parameters<typeof easierDayFromSwap>[0])
+      } as unknown as Parameters<typeof easierDayFromSwap>[0])
     ).toBe(false);
     // No swaps at all
     expect(
-      easierDayFromSwap({ date: today } as Parameters<typeof easierDayFromSwap>[0])
+      easierDayFromSwap({
+        date: today,
+      } as unknown as Parameters<typeof easierDayFromSwap>[0])
     ).toBe(false);
   });
 

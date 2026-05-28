@@ -233,7 +233,10 @@ export function useAppState() {
   // ── Ratings ─────────────────────────────────────────────────
 
   const updateRatings = useCallback(
-    (date: string, updates: { energy?: number; mood?: number }) => {
+    (
+      date: string,
+      updates: { energy?: number; mood?: number; note?: string }
+    ) => {
       setState((prev) => updateDailyRatingsFn(prev, date, updates));
     },
     []

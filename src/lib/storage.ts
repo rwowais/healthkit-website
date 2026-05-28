@@ -1333,13 +1333,14 @@ export function updateSleepLog(
 export function updateDailyRatings(
   state: AppState,
   date: string,
-  updates: { energy?: number; mood?: number }
+  updates: { energy?: number; mood?: number; note?: string }
 ): AppState {
   const log = getOrCreateLog(state, date);
   const updatedLog = {
     ...log,
     ...(updates.energy !== undefined && { energyLevel: updates.energy }),
     ...(updates.mood !== undefined && { moodLevel: updates.mood }),
+    ...(updates.note !== undefined && { dayNote: updates.note }),
   };
   return saveDailyLog(state, updatedLog);
 }

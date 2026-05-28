@@ -9,6 +9,7 @@ import * as haptic from "@/lib/haptics";
 import { setBadge } from "@/lib/appBadge";
 import { supplementsForBlock } from "@/lib/supplements";
 import SupplementBlockCard from "@/components/SupplementBlockCard";
+import DailyReflection from "@/components/DailyReflection";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -2314,6 +2315,27 @@ export default function TodayPage() {
             );
           })}
         </div>
+
+        {/* Daily reflection — the engagement loop. Once the day is
+            mostly done (60%+) OR the evening block has started, the
+            user gets a calm one-tap mood + optional one-line note.
+            Builds the journal-like trail that strengthens identity
+            reflection AND gives Insights a sentiment dimension over
+            time. The card auto-dismisses once mood is recorded, so
+            a user who reflects in the morning isn't nagged again.
+            Skipped for past/future scrubber views (only "today" gets
+            the reflection prompt — old logs are read-only). */}
+        {isToday &&
+          log.moodLevel == null &&
+          (cb === "evening" ||
+            (prog.total > 0 && prog.done / prog.total >= 0.6)) && (
+            <DailyReflection
+              date={selectedDate}
+              currentNote={log.dayNote ?? ""}
+              onMood={(m) => updateRatings(selectedDate, { mood: m })}
+              onNote={(note) => updateRatings(selectedDate, { note })}
+            />
+          )}
       </div>
 
       {/* Bulk-action bar — appears only when a multi-select has any
