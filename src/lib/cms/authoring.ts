@@ -390,17 +390,32 @@ export async function listExplanations(
 // ── Admin allowlist ─────────────────────────────────────────────────
 export interface AdminRow {
   user_id: string;
+  /** Captured at invite time; null for legacy rows inserted before the
+   * email column existed (operator can re-invite to populate). */
+  email: string | null;
   added_at: string;
 }
 export async function listAdmins(): Promise<AdminRow[]> {
   const sb = getSupabase();
   if (!sb) return [];
   try {
-    const { data } = await sb
+    // Try with the email column first (post-migration shape).
+    const withEmail = await sb
+      .from("cms_admins")
+      .select("user_id, email, added_at")
+      .order("added_at");
+    if (!withEmail.error) return (withEmail.data ?? []) as AdminRow[];
+    // Fallback for projects that haven't re-run schema.sql yet — the
+    // email column doesn't exist there, so explicitly request only the
+    // legacy fields and synthesize email=null.
+    const legacy = await sb
       .from("cms_admins")
       .select("user_id, added_at")
       .order("added_at");
-    return (data ?? []) as AdminRow[];
+    if (legacy.error) return [];
+    return ((legacy.data ?? []) as Array<{ user_id: string; added_at: string }>).map(
+      (r) => ({ ...r, email: null })
+    );
   } catch {
     return [];
   }
@@ -423,6 +438,46 @@ export async function addAdmin(
     return {
       ok: false,
       reason: e instanceof Error ? e.message : "Add failed.",
+    };
+  }
+}
+/**
+ * Grant admin access by email. Uses the security-definer
+ * `cms_resolve_email` RPC to look up the auth.users row (the anon role
+ * can't read auth.users directly). The user must already have an
+ * account in this Supabase project — we don't create accounts on their
+ * behalf, in line with the rule against silent account creation.
+ */
+export async function addAdminByEmail(
+  email: string
+): Promise<{ ok: boolean; reason?: string; userId?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  const e = email.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))
+    return { ok: false, reason: "That doesn't look like an email." };
+  try {
+    const { data, error } = await sb.rpc("cms_resolve_email", {
+      p_email: e,
+    });
+    if (error) return { ok: false, reason: error.message };
+    if (!data) {
+      return {
+        ok: false,
+        reason:
+          "No account with that email yet. Ask them to sign up at /auth first, then try again.",
+      };
+    }
+    const uid = String(data);
+    const { error: insErr } = await sb
+      .from("cms_admins")
+      .insert({ user_id: uid, email: e });
+    if (insErr) return { ok: false, reason: insErr.message };
+    return { ok: true, userId: uid };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : "Add failed.",
     };
   }
 }

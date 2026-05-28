@@ -98,6 +98,36 @@ set search_path = public as $$
   select exists (select 1 from public.cms_admins where user_id = auth.uid())
 $$;
 
+-- Denormalize email onto cms_admins for human-readable display in the
+-- admin UI. user_id remains the primary key / source of truth; email
+-- is captured at invite time. Idempotent — safe to re-run.
+alter table public.cms_admins
+  add column if not exists email text;
+
+-- Email → user id resolver. Lives behind security definer so it can
+-- read auth.users (anon role cannot), and gated to admins only so a
+-- regular signed-in user can't enumerate emails. Used by the
+-- "Add admin (by email)" flow in /admin to avoid forcing the operator
+-- to dig up Supabase UUIDs in the dashboard.
+create or replace function public.cms_resolve_email(p_email text)
+returns uuid
+language plpgsql security definer
+set search_path = public, auth as $$
+declare
+  uid uuid;
+begin
+  if not public.cms_is_admin() then
+    raise exception 'Only admins can resolve emails.';
+  end if;
+  select id into uid from auth.users
+    where lower(email) = lower(trim(p_email))
+    limit 1;
+  return uid;
+end $$;
+
+revoke all on function public.cms_resolve_email(text) from public;
+grant execute on function public.cms_resolve_email(text) to authenticated;
+
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end $$;

@@ -58,6 +58,7 @@ import {
   assembleBundleFromCMS,
   listAdmins,
   addAdmin,
+  addAdminByEmail,
   removeAdmin,
   listAuditLog,
   listConfigOverrides,
@@ -645,7 +646,12 @@ export default function AdminHome() {
   }, [gate, tab, auditOpen]);
 
   const [admins, setAdmins] = useState<AdminRow[]>([]);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  // Power-user fallback: paste a uuid directly when the email lookup
+  // can't reach the user (e.g. you're inviting an account that hasn't
+  // signed in yet, or the auth schema has been customized).
   const [newAdminId, setNewAdminId] = useState("");
+  const [showAdminAdvanced, setShowAdminAdvanced] = useState(false);
   const refreshAdmins = () => listAdmins().then(setAdmins);
   useEffect(() => {
     if (gate === "ok" && tab === "engine" && engineSub === "access")
@@ -2254,11 +2260,10 @@ export default function AdminHome() {
         {tab === "engine" && engineSub === "access" && (
           <div className="space-y-3">
             <p className="t-caption leading-relaxed">
-              Manage who can reach <code>/admin</code>. Each entry is a
-              Supabase user id (uuid). The signed-in user creates their
-              account through the normal app sign-up first; you then
-              paste their uid here. Anyone in this list gets full admin
-              access — there are no sub-roles.
+              Anyone you add here gets full <code>/admin</code> access —
+              no sub-roles. Type their email; they need to have already
+              signed up at <code>/auth</code>. (If they haven&apos;t,
+              the lookup will tell you.)
             </p>
             <div className="space-y-1.5">
               {admins.length === 0 && (
@@ -2266,58 +2271,70 @@ export default function AdminHome() {
                   No admins yet (you must already be one to see this).
                 </p>
               )}
-              {admins.map((a) => (
-                <div
-                  key={a.user_id}
-                  className="flex items-center justify-between gap-3 rounded-[var(--r-md)] p-3"
-                  style={surf}
-                  title={`Added ${new Date(a.added_at).toLocaleString()}`}
-                >
-                  <p className="truncate font-mono text-[11.5px] text-[var(--text-2)]">
-                    {a.user_id}
-                  </p>
-                  <button
-                    onClick={async () => {
-                      if (
-                        !window.confirm(
-                          `Remove ${a.user_id.slice(0, 8)}… from the admin allowlist? They lose /admin access immediately.`
-                        )
-                      )
-                        return;
-                      const r = await removeAdmin(a.user_id);
-                      setMsg(
-                        r.ok ? "Removed." : r.reason ?? "Failed"
-                      );
-                      if (r.ok) refreshAdmins();
-                    }}
-                    className="press shrink-0 text-[11px] font-semibold text-[var(--alert)]"
+              {admins.map((a) => {
+                const display = a.email ?? a.user_id;
+                const sub = a.email ? a.user_id.slice(0, 8) + "…" : null;
+                return (
+                  <div
+                    key={a.user_id}
+                    className="flex items-center justify-between gap-3 rounded-[var(--r-md)] p-3"
+                    style={surf}
+                    title={`Added ${new Date(a.added_at).toLocaleString()}\nUser id: ${a.user_id}`}
                   >
-                    Remove
-                  </button>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <p className="truncate text-[12.5px] text-[var(--text-1)]">
+                        {display}
+                      </p>
+                      {sub && (
+                        <p className="truncate font-mono text-[10.5px] text-[var(--text-4)]">
+                          {sub}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (
+                          !window.confirm(
+                            `Remove ${display} from the admin allowlist? They lose /admin access immediately.`
+                          )
+                        )
+                          return;
+                        const r = await removeAdmin(a.user_id);
+                        setMsg(
+                          r.ok ? "Removed." : r.reason ?? "Failed"
+                        );
+                        if (r.ok) refreshAdmins();
+                      }}
+                      className="press shrink-0 text-[11px] font-semibold text-[var(--alert)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
             </div>
             <div className={card} style={surf}>
-              <Eyebrow>Add admin</Eyebrow>
+              <Eyebrow>Invite admin</Eyebrow>
               <div className="mt-2">
-                <Field label="User id" help="admin.userId">
+                <Field label="Email" help="admin.email">
                   <input
-                    value={newAdminId}
-                    onChange={(e) => setNewAdminId(e.target.value)}
-                    placeholder="uuid — find under Supabase → Auth → Users"
-                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[12.5px] font-mono text-[var(--text-1)] outline-none"
+                    type="email"
+                    value={newAdminEmail}
+                    onChange={(e) => setNewAdminEmail(e.target.value)}
+                    placeholder="teammate@example.com"
+                    className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
                   />
                 </Field>
               </div>
               <button
-                disabled={busy || !newAdminId.trim()}
+                disabled={busy || !newAdminEmail.trim()}
                 onClick={async () => {
                   setBusy(true);
-                  const r = await addAdmin(newAdminId);
+                  const r = await addAdminByEmail(newAdminEmail);
                   setBusy(false);
-                  setMsg(r.ok ? "Added." : r.reason ?? "Failed");
+                  setMsg(r.ok ? "Admin granted." : r.reason ?? "Failed");
                   if (r.ok) {
-                    setNewAdminId("");
+                    setNewAdminEmail("");
                     refreshAdmins();
                   }
                 }}
@@ -2325,12 +2342,45 @@ export default function AdminHome() {
               >
                 {busy ? "…" : "Grant admin"}
               </button>
+              <button
+                onClick={() => setShowAdminAdvanced((v) => !v)}
+                className="press mt-2 text-[10.5px] text-[var(--text-4)] hover:text-[var(--text-3)]"
+              >
+                {showAdminAdvanced ? "Hide" : "Show"} advanced (paste
+                user id instead)
+              </button>
+              {showAdminAdvanced && (
+                <div
+                  className="mt-2 rounded-[var(--r-sm)] p-2.5"
+                  style={{ background: "var(--surface-3)" }}
+                >
+                  <Field label="User id" help="admin.userId">
+                    <input
+                      value={newAdminId}
+                      onChange={(e) => setNewAdminId(e.target.value)}
+                      placeholder="uuid — find under Supabase → Auth → Users"
+                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3 py-2 text-[12.5px] font-mono text-[var(--text-1)] outline-none"
+                    />
+                  </Field>
+                  <button
+                    disabled={busy || !newAdminId.trim()}
+                    onClick={async () => {
+                      setBusy(true);
+                      const r = await addAdmin(newAdminId);
+                      setBusy(false);
+                      setMsg(r.ok ? "Added." : r.reason ?? "Failed");
+                      if (r.ok) {
+                        setNewAdminId("");
+                        refreshAdmins();
+                      }
+                    }}
+                    className="press tr-fast mt-2 w-full rounded-[var(--r-pill)] bg-[var(--surface-2)] py-2 text-[11.5px] font-semibold text-[var(--text-1)] disabled:opacity-40"
+                  >
+                    {busy ? "…" : "Grant by user id"}
+                  </button>
+                </div>
+              )}
             </div>
-            <p className="t-caption leading-relaxed">
-              Tip: find a user&apos;s uid in Supabase → <b>Authentication
-              </b> → <b>Users</b> → click the user → copy the{" "}
-              <code>id</code> column.
-            </p>
           </div>
         )}
 

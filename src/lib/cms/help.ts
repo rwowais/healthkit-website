@@ -204,9 +204,14 @@ export const HELP: Record<string, HelpEntry> = {
   },
 
   // ── Admin allowlist ───────────────────────────────────────────────
+  "admin.email": {
+    summary:
+      "The teammate's account email. They need to have already signed up at /auth — if not, the lookup will tell you and they can sign up first.",
+    example: "teammate@example.com",
+  },
   "admin.userId": {
     summary:
-      "Supabase user uuid. Find under Supabase → Authentication → Users → click the user → copy the `id` field.",
+      "Supabase user uuid. Use this only if the email lookup can't reach them. Find it under Supabase → Authentication → Users.",
     example: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
   },
 
