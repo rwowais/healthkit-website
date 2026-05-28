@@ -643,7 +643,7 @@ export default function TodayPage() {
                 : "Install a protocol and Protocolize will assemble an adaptive daily system for you."}
             </p>
             <Link
-              href={onVacation ? "/profile" : "/protocols#discover"}
+              href={onVacation ? "/profile#break" : "/protocols#discover"}
               className="press tr-fast mt-6 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[14px] font-semibold text-[#08090B]"
             >
               {onVacation ? "End break in Profile" : "Discover protocols"}

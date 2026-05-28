@@ -44,6 +44,7 @@ function SupplementsInner() {
     addSupplement,
     updateSupplement,
     removeSupplement,
+    updateSettings,
   } = useAppState();
   const [view, setView] = useState<ViewMode>("stack");
   const [editing, setEditing] = useState<Supplement | null>(null);
@@ -145,6 +146,7 @@ function SupplementsInner() {
             onEdit={setEditing}
             onAdd={() => setCreating(true)}
             onBrowse={() => setView("browse")}
+            onHideTab={() => updateSettings({ hideSupplementsTab: true })}
             today={today}
             completions={
               state.dailyLogs.find((l) => l.date === today)
@@ -233,6 +235,7 @@ function StackView({
   onEdit,
   onAdd,
   onBrowse,
+  onHideTab,
   today,
   completions,
   stateSupplements,
@@ -242,6 +245,9 @@ function StackView({
   onEdit: (s: Supplement) => void;
   onAdd: () => void;
   onBrowse: () => void;
+  /** Optional: hide-tab callback. When present we surface the
+   * "Don't take supplements? Hide this tab" link in empty state. */
+  onHideTab?: () => void;
   today: string;
   completions: Record<string, boolean>;
   stateSupplements: Supplement[];
@@ -265,6 +271,18 @@ function StackView({
             Add custom
           </Button>
         </div>
+        {/* In-context escape hatch — a user who doesn't take supplements
+            shouldn't have to dig through Profile → Preferences to make
+            the tab go away. Surface the toggle right where the empty
+            state lives. */}
+        {onHideTab && (
+          <button
+            onClick={onHideTab}
+            className="press tr-fast mt-4 w-full text-center text-[12px] text-[var(--text-4)] underline-offset-2 hover:text-[var(--text-3)] hover:underline"
+          >
+            Don&apos;t take supplements? Hide this tab.
+          </button>
+        )}
       </Card>
     );
   }

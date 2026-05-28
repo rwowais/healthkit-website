@@ -231,8 +231,10 @@ export default function ProfilePage() {
         {/* Taking a break — vacation mode. One toggle pauses every
             pack, clears Today, and freezes the streak. The user can
             travel / be sick / take a real rest without watching their
-            streak die or their score crash. */}
-        <Card>
+            streak die or their score crash. id="break" so Today's
+            "End break in Profile" link can scroll the user straight
+            here via /profile#break instead of dumping them at the top. */}
+        <Card id="break">
           <Eyebrow>Taking a break</Eyebrow>
           <Row label="Pause everything">
             <button

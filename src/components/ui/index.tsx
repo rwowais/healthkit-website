@@ -20,15 +20,20 @@ export function Card({
   pad = "p-6",
   onClick,
   style,
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
   pad?: string;
   onClick?: () => void;
   style?: React.CSSProperties;
+  /** Optional DOM id — useful for in-page anchor links like
+   * `/profile#break` to scroll to the vacation toggle directly. */
+  id?: string;
 }) {
   return (
     <div
+      id={id}
       onClick={onClick}
       style={style}
       className={`card inset ${pad} ${

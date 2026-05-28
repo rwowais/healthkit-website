@@ -519,12 +519,18 @@ export default function OnboardingPage() {
                   <Button full onClick={() => finish(true)}>
                     Keep my system across devices
                   </Button>
-                  <button
+                  {/* Equal-weight secondary so the choice reads as a
+                      genuine fork (not "click the big button to
+                      proceed"). A non-technical user testing the
+                      flow reported the ghost text felt like fine
+                      print they had to ignore. */}
+                  <Button
+                    full
+                    variant="ghost"
                     onClick={() => finish(false)}
-                    className="press tr-fast w-full py-2 text-center text-[13px] font-medium text-[var(--text-3)]"
                   >
                     Continue without an account
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

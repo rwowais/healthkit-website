@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
@@ -37,6 +38,7 @@ function dateKeyOf(d: Date) {
 const LAG_DAYS = 3;
 
 export default function InsightsPage() {
+  const router = useRouter();
   const { state, loading } = useAppState();
   const access = getAccess(state);
 
@@ -427,13 +429,58 @@ export default function InsightsPage() {
         )}
 
         {nothing ? (
-          <div className="panel">
-            <EmptyState
-              icon={<Icon name="bulb" size={24} />}
-              title="Patterns are forming"
-              body="Track consistently for about a week and your first personalized correlations will appear here."
-            />
-          </div>
+          <>
+            <div className="panel">
+              <EmptyState
+                icon={<Icon name="bulb" size={24} />}
+                title="Patterns are forming"
+                body="Track consistently for about a week and your first personalized correlations will appear here."
+              />
+            </div>
+            {/* Premium preview for free users on the empty page — they
+                otherwise see a dead screen and may assume the tab is
+                broken. Tell them what's coming (live + biomarker-aware)
+                and offer the upgrade path now, while interest is fresh. */}
+            {!access.premium && (
+              <UpgradeCTA
+                title="Insights is a Premium feature"
+                line="Once you have a week of data, Premium shows your patterns the moment they form — live, biomarker-aware, with weekly review and identity reflection."
+              />
+            )}
+            {/* Cross-link to Biomarkers so users discover the bloodwork
+                surface from the same intelligence-y page. Biomarkers
+                has no nav-bar tab; without this card, returning users
+                have to dig through Profile to find it. */}
+            <button
+              onClick={() => router.push("/biomarkers")}
+              className="press tr-fast panel flex w-full items-center gap-3 p-4 text-left"
+            >
+              <span
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--r-sm)]"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--vitality) 14%, var(--surface-3))",
+                  color: "var(--vitality)",
+                }}
+              >
+                <Icon name="pulse" size={18} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold text-[var(--text-1)]">
+                  Body & bloodwork
+                </span>
+                <span className="mt-0.5 block text-[12px] text-[var(--text-3)]">
+                  Track weight, HRV, lipids, glucose — the inputs that
+                  make Insights smarter over time.
+                </span>
+              </span>
+              <Icon
+                name="chevron"
+                size={13}
+                className="shrink-0 text-[var(--text-4)]"
+              />
+            </button>
+          </>
         ) : (
           insights.length > 0 && (
             <div>
