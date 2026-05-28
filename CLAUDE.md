@@ -311,5 +311,33 @@ onboarding guard handles new vs returning).
 - ✅ Email/password + magic link + password reset; OAuth built, disabled
   until providers configured.
 - ✅ Freemium gating + reverse-trial engine.
-- ⏳ Stripe: Payment Links env-gated, inert until the owner adds keys.
-- ⏳ Legal pages (ToS / Privacy), custom domain, analytics — not yet.
+- ✅ Legal pages — `/terms` and `/privacy` shipped; LEGAL_VERSION-gated
+  acceptance banner re-prompts on material changes.
+- ✅ Analytics — Plausible env-gated via `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`.
+  Cookie-less; inert until the owner adds the env var.
+- ✅ OG + Twitter card metadata on every route via `metadataBase` +
+  `NEXT_PUBLIC_SITE_URL`.
+- ⏳ Stripe: Payment Links env-gated, inert until the owner adds
+  `NEXT_PUBLIC_STRIPE_CHECKOUT_{MONTHLY,ANNUAL,LIFETIME}`.
+- ⏳ Custom domain (`protocolize.com`) — owner needs to purchase + point
+  DNS at Vercel.
+
+### Owner action to flip the launch switch (≈10 minutes)
+
+All app code is launch-ready. The remaining steps live in the owner's
+accounts, not the codebase:
+
+1. **Buy `protocolize.com`**, add it as a Vercel domain, follow the DNS
+   instructions. Set `NEXT_PUBLIC_SITE_URL=https://protocolize.com` in
+   Vercel env vars so OG previews resolve absolutely.
+2. **Plausible** — sign up at plausible.io (free 30-day trial), add
+   `protocolize.com` as a site, then set
+   `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=protocolize.com` in Vercel.
+3. **Stripe Payment Links** — in Stripe Dashboard → Payment Links,
+   create three links matching the pricing in `src/lib/billing.ts`,
+   then add as `NEXT_PUBLIC_STRIPE_CHECKOUT_MONTHLY`,
+   `_ANNUAL`, `_LIFETIME` in Vercel.
+
+After redeploy, monetization is live, analytics is live, social
+previews resolve, and the legal pages render at the production
+domain.

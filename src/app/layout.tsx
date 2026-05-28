@@ -6,12 +6,37 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import StorageSafetyNet from "@/components/StorageSafetyNet";
 import TimezoneSentry from "@/components/TimezoneSentry";
 import InstallPrompt from "@/components/InstallPrompt";
+import Analytics from "@/components/Analytics";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://protocolize.com"
+  ),
   title: "Protocolize — Longevity Intelligence",
   description:
     "Your adaptive daily protocol. Track behaviors, biomarkers, and the calm intelligence layer that shapes your longevity routine.",
   applicationName: "Protocolize",
+  // OG + Twitter cards so shared links render as a branded preview
+  // (logo + title + line) instead of a barren URL. Image is the
+  // existing 512×512 icon; if/when we ship a dedicated 1200×630
+  // social image, swap it in here.
+  openGraph: {
+    type: "website",
+    siteName: "Protocolize",
+    title: "Protocolize — Longevity Intelligence",
+    description:
+      "Your adaptive daily protocol. Sleep, training, nutrition, supplements — calmly orchestrated into one day that reshapes itself around your recovery.",
+    images: [
+      { url: "/icons/icon-512.png", width: 512, height: 512, alt: "Protocolize" },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Protocolize — Longevity Intelligence",
+    description:
+      "An adaptive daily protocol that calmly reshapes itself around your recovery.",
+    images: ["/icons/icon-512.png"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -139,6 +164,7 @@ export default function RootLayout({
           <StorageSafetyNet />
           <TimezoneSentry />
           <InstallPrompt />
+          <Analytics />
         </ErrorBoundary>
       </body>
     </html>
