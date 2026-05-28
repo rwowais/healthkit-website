@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import * as haptic from "@/lib/haptics";
 import { setBadge } from "@/lib/appBadge";
+import { groupBlockItems, isSupplement } from "@/lib/grouping";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -1490,8 +1491,45 @@ export default function TodayPage() {
             const visibleItems = items.filter((i) => !i.muted);
             const optionalItems = items.filter((i) => i.muted);
             const optKey = `opt:${block}`;
+            const suppKey = `supp:${block}`;
             const showOpt = !!openBlocks[optKey];
-            const rendered = items.filter((i) => !i.muted || showOpt);
+            const showSupp = !!openBlocks[suppKey];
+            // Decide which supplement run (if any) qualifies for
+            // grouping in this block. A run is GROUPABLE when 3+
+            // supplement-icon behaviors sit back-to-back after sort.
+            // Below that threshold, supplements stay inline.
+            const preFilter = items.filter((i) => !i.muted || showOpt);
+            const suppRunMembers = new Set<string>();
+            let suppRunFirstKey: string | null = null;
+            {
+              const groups = groupBlockItems(preFilter);
+              for (const g of groups) {
+                if (g.kind === "supplements" && g.items.length >= 3) {
+                  if (suppRunFirstKey == null)
+                    suppRunFirstKey = g.items[0].canonicalKey;
+                  for (const it of g.items)
+                    suppRunMembers.add(it.canonicalKey);
+                }
+              }
+            }
+            // When the supplements pill is collapsed, hide the
+            // individual supplement rows. The pill itself renders
+            // inline below as a single row at the position of the
+            // first supplement.
+            const rendered = preFilter.filter((i) => {
+              if (showSupp) return true;
+              return !suppRunMembers.has(i.canonicalKey);
+            });
+            // Supplements aggregate: count + done state for the
+            // pill. Computed off the FULL run, not the filtered
+            // rendered, so the pill shows true progress even when
+            // expanded.
+            const suppItems = preFilter.filter((i) =>
+              suppRunMembers.has(i.canonicalKey)
+            );
+            const suppDone = suppItems.filter((i) =>
+              isDone(log, i.canonicalKey)
+            ).length;
             const baseItems =
               visibleItems.length > 0 ? visibleItems : items;
             const doneCount = baseItems.filter((i) =>
@@ -1644,6 +1682,58 @@ export default function TodayPage() {
                           }}
                         />
                       </>
+                    )}
+                    {/* Supplement group pill — when the block has
+                        3+ consecutive supplements, collapse them
+                        into one row so 10-supplement stacks don't
+                        crowd the day. Tap to expand inline. The
+                        check on suppItems.length avoids rendering
+                        an empty pill when supplements move out
+                        (e.g. via override). */}
+                    {suppItems.length >= 3 && (
+                      <button
+                        onClick={() => {
+                          haptic.light();
+                          setOpenBlocks((o) => ({
+                            ...o,
+                            [suppKey]: !o[suppKey],
+                          }));
+                        }}
+                        className="press tr-fast relative mb-2 flex w-full items-center gap-3 rounded-[var(--r-md)] py-2.5 pl-3 pr-3 text-left"
+                        style={{
+                          background: "var(--surface-2)",
+                          border: "1px solid var(--hairline)",
+                        }}
+                        aria-expanded={showSupp}
+                      >
+                        <span
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                          style={{
+                            background:
+                              "color-mix(in srgb, var(--warm) 18%, var(--surface-3))",
+                            color: "var(--warm)",
+                          }}
+                        >
+                          <Icon name="pill" size={16} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13.5px] font-semibold text-[var(--text-1)]">
+                            {block.charAt(0).toUpperCase() + block.slice(1)}{" "}
+                            supplements
+                          </p>
+                          <p className="mt-0.5 text-[11.5px] text-[var(--text-3)]">
+                            {suppDone}/{suppItems.length}{" "}
+                            {showSupp ? "· tap to collapse" : "· tap to expand"}
+                          </p>
+                        </div>
+                        <Icon
+                          name="chevron"
+                          size={14}
+                          className={`text-[var(--text-3)] tr-fast ${
+                            showSupp ? "rotate-90" : ""
+                          }`}
+                        />
+                      </button>
                     )}
                     {(() => {
                       const now = nowMinutes();

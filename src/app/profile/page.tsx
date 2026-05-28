@@ -9,6 +9,7 @@ import { getAccess } from "@/lib/entitlements";
 import { clearAllData, exportState, importState } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
 import { deleteAccount, supabaseEnabled } from "@/lib/auth";
+import { getUserId } from "@/lib/supabase";
 import { sendTestPush } from "@/lib/push";
 import {
   Card,
@@ -673,12 +674,49 @@ export default function ProfilePage() {
           <Button
             full
             onClick={async () => {
-              clearAllData();
-              // Also wipe the cloud row, or load() re-hydrates it.
+              // Reset all data, but if the user is signed in we
+              // preserve their identity: pre-seed a fresh local
+              // state that already has completedOnboarding=true and
+              // their name (so they land back on /today, not on
+              // the "what's your name" screen). Signed-out users
+              // get the full fresh-start path.
+              const hasSession =
+                supabaseEnabled && (await getUserId()) !== null;
               await activeDataSource.clearRemote();
+              clearAllData();
+              if (hasSession) {
+                // Mint a minimal state that skips onboarding so the
+                // returning signed-in user lands on /today instead
+                // of the "what's your name" screen.
+                try {
+                  const seed = {
+                    version: 3,
+                    settings: {
+                      name: s.name || "",
+                      bedtime: "23:00",
+                      wakeTime: "07:00",
+                      timezone: s.timezone || "",
+                      subscriptionStatus: "trial",
+                      trialStartDate: new Date().toISOString(),
+                      notificationsEnabled: false,
+                      weekStartsOn: 1,
+                      completedOnboarding: true,
+                    },
+                  };
+                  localStorage.setItem(
+                    "protocolize-v3",
+                    JSON.stringify(seed)
+                  );
+                } catch {}
+              }
               setConfirmReset(false);
-              toast.show("Data reset");
-              setTimeout(() => window.location.reload(), 800);
+              toast.show(
+                hasSession ? "Data cleared — fresh start" : "Data reset"
+              );
+              setTimeout(
+                () => (window.location.href = hasSession ? "/today" : "/"),
+                800
+              );
             }}
             className="!bg-[var(--alert)] !text-[#08090B]"
           >

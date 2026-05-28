@@ -57,14 +57,33 @@ export function currentBlock(settings: {
   wakeTime: string;
   bedtime: string;
 }): TimeBlock {
+  // Compute the user's current block by mapping "now" into a
+  // wake-aligned frame: minutes elapsed since their most recent
+  // wake (0..1439). This gives a single linear coordinate for
+  // every time of day, including overnight.
+  //
+  // Why the rewrite: the old logic mapped pre-wake times to
+  // (now + 1440) and ran them past every break, so anything before
+  // wake fell into "evening." For a 4:30 AM session, that meant
+  // the app showed yesterday's evening block as "NOW" when the
+  // user was clearly starting a new day. Fix splits the overnight
+  // window 60/40 — first 60% is winding-down ("evening"), last
+  // 40% is pre-dawn ("morning") so a 4:30 AM user sees morning.
   const now = nowMinutes();
   const wake = parseHM(settings.wakeTime);
   let bed = parseHM(settings.bedtime);
   if (bed <= wake) bed += 1440;
-  const n = now < wake ? now + 1440 : now;
-  const morningEnd = wake + 300;
-  const eveningStart = bed - 180;
-  if (n < morningEnd) return "morning";
-  if (n < eveningStart) return "afternoon";
-  return "evening";
+  const dayLength = bed - wake;
+  let sinceWake = now - wake;
+  if (sinceWake < 0) sinceWake += 1440;
+
+  const morningEnd = 300; // first 5h after wake
+  const eveningStart = dayLength - 180; // last 3h before bed
+  if (sinceWake < morningEnd) return "morning";
+  if (sinceWake < eveningStart) return "afternoon";
+  if (sinceWake < dayLength) return "evening";
+  // Overnight: 60/40 split between bed and next wake.
+  const nightLength = 1440 - dayLength;
+  const sinceBed = sinceWake - dayLength;
+  return sinceBed > nightLength * 0.6 ? "morning" : "evening";
 }

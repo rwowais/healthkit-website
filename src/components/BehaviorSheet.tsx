@@ -352,9 +352,34 @@ function AboutThisBehavior({ item }: { item: TimelineItem }) {
  * 'no-intense' rule is active"); this maps them to one-line calm
  * versions that don't expose internal vocabulary.
  */
+/**
+ * Friendly labels for restraint rule keys — what the user actually
+ * understands the rule to be doing. Anything not listed falls back
+ * to a generic explanation.
+ */
+const RESTRAINT_LABEL: Record<string, string> = {
+  "no-intense": "no intense training",
+  "delay-first-meal": "delay your first meal",
+  "deload-day": "a full deload day",
+  "no-cold-post-lift": "no cold post-lift",
+};
+
 function humanizeMuteReason(reason: string): string {
-  if (reason.startsWith("conflict pair"))
+  if (reason.startsWith("conflict pair")) {
+    // Parse the encoded reason: 'conflict pair: "no-intense" | from: Burnout Recovery'
+    const ruleMatch = reason.match(/"([^"]+)"/);
+    const packMatch = reason.match(/\| from:\s*(.+)$/);
+    const rule = ruleMatch?.[1] ?? "";
+    const pack = packMatch?.[1]?.trim() ?? "";
+    const ruleLabel = RESTRAINT_LABEL[rule] ?? `the "${rule}" rule`;
+    if (pack && ruleLabel) {
+      return `Your ${pack} protocol is currently asking for ${ruleLabel} — so this one is on pause today. It'll come back when that protocol does.`;
+    }
+    if (pack) {
+      return `Your ${pack} protocol is currently asking you to skip this one today.`;
+    }
     return "Another protocol you have installed asks you to skip this today.";
+  }
   if (reason.startsWith("recovery mode"))
     return "Recovery mode — eased so you can rest.";
   if (reason.startsWith("essentials mode"))

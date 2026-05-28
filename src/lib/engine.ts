@@ -283,12 +283,23 @@ export function compileTimeline(
   };
   return [...merged.values()]
     .filter((it) => !it.daysActive || it.daysActive[dayIndex])
-    .sort(
-      (a, b) =>
-        BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block] ||
-        clock(a) - clock(b) ||
-        b.leverage - a.leverage
-    );
+    .sort((a, b) => {
+      const blockDiff = BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block];
+      if (blockDiff !== 0) return blockDiff;
+      // Near-time tiebreaker: items within 5 minutes of each other
+      // are treated as visually concurrent — break by leverage desc
+      // so an Essential (lev 3) like Morning sunlight floats above
+      // a stack of lev-1 supplements that happen to land 1-2 min
+      // earlier on the clock. Without this, sunlight at 8:01 sat
+      // below six supplements at 8:00, even though it's the
+      // headline behavior of the block.
+      const dt = clock(a) - clock(b);
+      if (Math.abs(dt) < 5) {
+        const levDiff = b.leverage - a.leverage;
+        if (levDiff !== 0) return levDiff;
+      }
+      return dt || b.leverage - a.leverage;
+    });
 }
 
 // ── Signals (from the new behavior model + check-in) ──────────────
@@ -1033,15 +1044,31 @@ export function shapeTimeline(
       if (activeRestraints.has(pair.restraint))
         targetsToMute.set(pair.target, pair.restraint);
     }
+    // Index restraints by their source pack so we can name the
+    // protocol responsible when surfacing the mute reason. A user
+    // who installs Burnout Recovery and sees strength training
+    // "Resting today" deserves to know WHICH protocol asked for it
+    // — that's the entire point of provenance.
+    const restraintPack = new Map<string, string>(); // restraint key → pack name
+    for (const it of shaped) {
+      const k = effectiveKey(it);
+      if (RESTRAINT_KEYS.has(k) && !it.muted && it.fromPacks?.[0]) {
+        if (!restraintPack.has(k)) restraintPack.set(k, it.fromPacks[0]);
+      }
+    }
     shaped = shaped.map((it) => {
       const restraint = targetsToMute.get(effectiveKey(it));
-      return restraint
-        ? {
-            ...it,
-            muted: true,
-            muteReason: `conflict pair: "${restraint}" rule is active`,
-          }
-        : it;
+      if (!restraint) return it;
+      // Encode both the rule key and the source pack name so the
+      // sheet can surface a specific "Your Burnout Recovery
+      // protocol asks you to skip..." line. Pipe-delimited so the
+      // humanizer can parse without ambiguity.
+      const pack = restraintPack.get(restraint) ?? "";
+      return {
+        ...it,
+        muted: true,
+        muteReason: `conflict pair: "${restraint}"${pack ? ` | from: ${pack}` : ""}`,
+      };
     });
   }
 
