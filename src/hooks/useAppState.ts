@@ -296,6 +296,24 @@ export function useAppState() {
     setState((prev) => setPackPausedFn(prev, id, paused));
   }, []);
 
+  /**
+   * Re-load state from the active source. Used by pull-to-refresh on
+   * Today and by the timezone/safety prompts after the user changes a
+   * setting via a different surface. The reload respects the same
+   * trial-extension path as initial load so we don't lose engagement
+   * stamps on refresh.
+   */
+  const refresh = useCallback(async () => {
+    try {
+      const raw = await activeDataSource.load();
+      const loaded = maybeExtendTrial(raw);
+      lastJson.current = stableStringify(raw);
+      setState(loaded);
+    } catch {
+      /* offline / transient — keep current state */
+    }
+  }, []);
+
   return {
     state,
     loading,
@@ -326,5 +344,7 @@ export function useAppState() {
     // Config
     updateSettings,
     updateProtocols,
+    // Manual refresh — pull-to-refresh, etc.
+    refresh,
   };
 }

@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
+import * as haptic from "@/lib/haptics";
 import { useAppState } from "@/hooks/useAppState";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { getLogForDate } from "@/lib/storage";
 import { getPendingConflict } from "@/lib/datasource";
 import {
@@ -150,10 +152,22 @@ export default function TodayPage() {
     updateRatings,
     installPack,
     setBehaviorOverride,
+    refresh,
   } = useAppState();
   const router = useRouter();
   const settings = state.settings;
   const redirectedRef = useRef(false);
+
+  // Pull-to-refresh: at scroll-top, dragging down triggers a cloud
+  // reload + a soft haptic. The hook handles all the gesture
+  // mechanics (rubber-banding, threshold, minimum-show window).
+  const { containerRef: pullRef, state: pullState } = usePullToRefresh(
+    async () => {
+      haptic.light();
+      await refresh();
+      haptic.success();
+    }
+  );
 
   // Onboarding guard — a returning user lands here after auth, but a
   // genuinely new account (cloud-loaded, no onboarding) gets sent to
@@ -591,7 +605,63 @@ export default function TodayPage() {
 
   return (
     <Shell>
-      <div className="flex flex-col gap-7">
+      <div
+        ref={pullRef}
+        className="flex flex-col gap-7"
+        style={{
+          // Translate the entire day surface down by the pull amount
+          // so the user feels they're dragging the content, not
+          // pulling against an invisible barrier.
+          transform: pullState.pulling
+            ? `translateY(${Math.min(80, pullState.progress * 70)}px)`
+            : pullState.refreshing
+            ? "translateY(60px)"
+            : undefined,
+          transition: pullState.pulling
+            ? "none"
+            : "transform 220ms cubic-bezier(0.32, 0.72, 0, 1)",
+          overscrollBehavior: "contain",
+        }}
+      >
+        {/* Pull-to-refresh indicator — calm spinner that materializes
+            above the content as the user drags. Hidden when synced. */}
+        {(pullState.pulling || pullState.refreshing) && (
+          <div
+            aria-live="polite"
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-12 transition-opacity"
+            style={{
+              top: 0,
+              opacity: Math.min(1, pullState.progress),
+            }}
+          >
+            <span
+              className="grid place-items-center h-9 w-9 rounded-full"
+              style={{
+                background: "var(--surface-3)",
+                color: "var(--readiness)",
+                transform: pullState.refreshing
+                  ? undefined
+                  : `rotate(${pullState.progress * 360}deg)`,
+                animation: pullState.refreshing
+                  ? "ptr-spin 0.8s linear infinite"
+                  : undefined,
+              }}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              >
+                <path d="M21 12a9 9 0 1 1-6.22-8.56" />
+                <polyline points="21 4 21 11 14 11" />
+              </svg>
+            </span>
+          </div>
+        )}
         {/* Greeting + date scrubber */}
         <div>
           <Eyebrow>{displayDate}</Eyebrow>
@@ -1198,9 +1268,10 @@ export default function TodayPage() {
                 }}
               />
               <button
-                onClick={() =>
-                  toggleBehavior(selectedDate, upNext.canonicalKey)
-                }
+                onClick={() => {
+                  haptic.medium();
+                  toggleBehavior(selectedDate, upNext.canonicalKey);
+                }}
                 className="press relative flex w-full items-center gap-4 text-left"
               >
                 <span
@@ -1670,6 +1741,11 @@ export default function TodayPage() {
                                   // item. Re-enabling it when the user
                                   // taps Done.
                                   if (editMode) return;
+                                  // Haptic feedback: medium pulse on
+                                  // marking done (definitive), light
+                                  // tap on un-marking (correction).
+                                  if (done) haptic.light();
+                                  else haptic.medium();
                                   toggleBehavior(
                                     selectedDate,
                                     it.canonicalKey
@@ -1745,8 +1821,11 @@ export default function TodayPage() {
                                       next.delete(it.canonicalKey);
                                     else next.add(it.canonicalKey);
                                     setSelectedKeys(next);
+                                    haptic.light();
                                     return;
                                   }
+                                  if (done) haptic.light();
+                                  else haptic.medium();
                                   toggleBehavior(
                                     selectedDate,
                                     it.canonicalKey

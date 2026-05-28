@@ -292,6 +292,15 @@ body {
 }
 .anim-node-pulse { animation: nodePulse 0.9s var(--ease) 1; }
 
+/* Pull-to-refresh spinner. Used by the indicator on Today while the
+   refresh callback is in flight. Kept simple so reduced-motion gets
+   to nuke it without losing meaning (we also stop the refresh window
+   short in the hook when reduced-motion is on). */
+@keyframes ptr-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,

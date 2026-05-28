@@ -223,6 +223,16 @@ export function Sheet({
     onCloseRef.current = onClose;
   });
 
+  // Swipe-down-to-dismiss state. Native-feel: finger follows the
+  // sheet, releases below threshold → snaps back, above threshold →
+  // closes. Tracked in transient state so we don't re-render the
+  // children on every frame; the wrapper div's transform updates
+  // directly via inline style.
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dragStartRef = useRef<{ y: number; t: number } | null>(null);
+  const closingRef = useRef(false);
+
   useEffect(() => {
     if (!open) return;
     const prevFocus = document.activeElement as HTMLElement | null;
@@ -236,14 +246,72 @@ export function Sheet({
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKey);
       prevFocus?.focus?.();
+      // Reset drag state for next open.
+      setDragY(0);
+      setDragging(false);
+      closingRef.current = false;
     };
   }, [open]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only start a drag from the handle area or the panel itself,
+    // not from interactive children (buttons, inputs). The hit-test
+    // is "if the target is inside a scrollable region with scrollTop
+    // > 0, treat as scroll, not drag" — otherwise dragging interferes
+    // with content scrolling.
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    // If the user is touching scrolled-down content, let them scroll.
+    if (panel.scrollTop > 0) return;
+    dragStartRef.current = { y: e.clientY, t: Date.now() };
+    setDragging(true);
+    panel.setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging || !dragStartRef.current) return;
+    const dy = e.clientY - dragStartRef.current.y;
+    // Only allow downward drag; no rubber-band up.
+    setDragY(Math.max(0, dy));
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging || !dragStartRef.current) {
+      setDragging(false);
+      return;
+    }
+    const start = dragStartRef.current;
+    const dy = Math.max(0, e.clientY - start.y);
+    const dt = Math.max(1, Date.now() - start.t);
+    const velocity = dy / dt; // px / ms
+    const panelH = panelRef.current?.offsetHeight ?? 400;
+    // Dismiss on either: dragged > 35% of sheet height, OR a fast
+    // flick (>0.7 px/ms downward). Matches iOS / Android native feel.
+    const shouldDismiss = dy > panelH * 0.35 || velocity > 0.7;
+    setDragging(false);
+    dragStartRef.current = null;
+    if (shouldDismiss && !closingRef.current) {
+      closingRef.current = true;
+      // Snap the rest of the way off-screen for a frame so the
+      // dismissal animation reads cleanly, then close.
+      setDragY(panelH);
+      setTimeout(() => onCloseRef.current(), 160);
+    } else {
+      setDragY(0);
+    }
+  };
 
   if (!open) return null;
   return (
     <div
       className="anim-fade fixed inset-0 z-[100] flex items-end justify-center sm:items-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{
+        background: `rgba(0,0,0,${
+          dragging ? Math.max(0.2, 0.6 - dragY / 800) : 0.6
+        })`,
+        transition: dragging ? "none" : "background 160ms ease",
+      }}
       onClick={onClose}
     >
       <div
@@ -252,10 +320,24 @@ export function Sheet({
         aria-modal="true"
         aria-label={title ?? "Dialog"}
         tabIndex={-1}
-        className="anim-sheet glass no-scrollbar max-h-[88vh] w-full max-w-[480px] overflow-y-auto rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:max-h-[85vh] sm:rounded-[var(--r-xl)] sm:border"
+        className="anim-sheet glass no-scrollbar max-h-[88vh] w-full max-w-[480px] overflow-y-auto rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:max-h-[85vh] sm:rounded-[var(--r-xl)] sm:border touch-pan-y"
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: dragging
+            ? "none"
+            : "transform 220ms cubic-bezier(0.32, 0.72, 0, 1)",
+          willChange: dragging ? "transform" : undefined,
+        }}
       >
-        <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden" />
+        <div
+          className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden"
+          aria-hidden="true"
+        />
         {title && (
           <h3 className="t-section mb-5 text-[var(--text-1)]">{title}</h3>
         )}
