@@ -196,7 +196,12 @@ export function compileTimeline(
           daysActive: ov?.daysActive ?? b.daysActive,
           dose: ov?.dose ?? b.dose,
           block: ov?.block ?? b.block,
-          customTime: ov?.customTime,
+          // Honor a user override first, then the behavior's OWN baked
+          // clock time. Previously this was `ov?.customTime` alone, which
+          // silently dropped a behavior's intrinsic customTime (e.g. a
+          // custom behavior authored with an exact time) — so it fell
+          // back to anchor math and mis-sorted on Today.
+          customTime: ov?.customTime ?? b.customTime,
           recommendedBlock: b.block,
           retimed,
           fromPacks: [pack.name],

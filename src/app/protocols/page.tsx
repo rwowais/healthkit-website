@@ -97,6 +97,7 @@ export default function ProtocolsPage() {
   const [bDraft, setBDraft] = useState({
     title: "",
     block: "morning" as TimeBlock,
+    time: "", // optional exact clock time (HH:MM) → stored as customTime
     dose: "",
     rationale: "",
     timingReason: "",
@@ -264,6 +265,23 @@ export default function ProtocolsPage() {
   const addBehaviorToDraft = () => {
     if (!bDraft.title.trim()) return;
     const packId = editingId ?? "draft";
+    // Timing: an exact clock time (customTime) drives where the behavior
+    // sorts on Today; if left blank we fall back to a block-sensible
+    // anchor + offset so the behavior lands in the *middle* of its block
+    // rather than piling at wake time (the old offsetMin:0 default put
+    // every custom behavior at the very top of its block).
+    const anchor: "wake" | "bed" =
+      bDraft.block === "evening" ? "bed" : "wake";
+    const offsetMin =
+      bDraft.block === "morning"
+        ? 60 // ~1h after waking
+        : bDraft.block === "afternoon"
+        ? 360 // ~6h after waking (early afternoon)
+        : bDraft.block === "evening"
+        ? -120 // ~2h before bed
+        : 0; // anytime (untimed)
+    const customTime =
+      bDraft.block !== "anytime" && bDraft.time ? bDraft.time : undefined;
     setDraft((d) => ({
       ...d,
       behaviors: [
@@ -272,8 +290,9 @@ export default function ProtocolsPage() {
           canonicalKey: customCanonicalKey(packId, bDraft.title),
           title: bDraft.title.trim(),
           block: bDraft.block,
-          anchor: bDraft.block === "evening" ? "bed" : "wake",
-          offsetMin: 0,
+          anchor,
+          offsetMin,
+          customTime,
           dose: bDraft.dose.trim() || undefined,
           rationale: bDraft.rationale.trim() || "Custom behavior.",
           timingReason: bDraft.timingReason.trim() || undefined,
@@ -286,6 +305,7 @@ export default function ProtocolsPage() {
     setBDraft({
       title: "",
       block: "morning",
+      time: "",
       dose: "",
       rationale: "",
       timingReason: "",
@@ -1017,6 +1037,27 @@ export default function ProtocolsPage() {
                     </button>
                   ))}
                 </div>
+                {/* Exact time (optional) — sets the behavior's clock slot
+                    so it sorts to the right place on Today. Hidden for
+                    "anytime" (which is untimed by definition). Left blank,
+                    the behavior lands mid-block via a block-sensible
+                    default rather than at wake time. */}
+                {bDraft.block !== "anytime" && (
+                  <label className="flex items-center justify-between gap-3 rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5">
+                    <span className="text-[13px] text-[var(--text-3)]">
+                      Time of day{" "}
+                      <span className="text-[var(--text-4)]">(optional)</span>
+                    </span>
+                    <input
+                      type="time"
+                      value={bDraft.time}
+                      onChange={(e) =>
+                        setBDraft((b) => ({ ...b, time: e.target.value }))
+                      }
+                      className="bg-transparent text-[14px] font-semibold text-[var(--text-1)] outline-none"
+                    />
+                  </label>
+                )}
                 <input
                   value={bDraft.rationale}
                   onChange={(e) =>
