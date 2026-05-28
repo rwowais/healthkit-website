@@ -7,7 +7,8 @@ import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import * as haptic from "@/lib/haptics";
 import { setBadge } from "@/lib/appBadge";
-import { groupBlockItems, isSupplement } from "@/lib/grouping";
+import { supplementsForBlock } from "@/lib/supplements";
+import SupplementBlockCard from "@/components/SupplementBlockCard";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -151,6 +152,8 @@ export default function TodayPage() {
     state,
     loading,
     toggleBehavior,
+    toggleSupplement,
+    bulkCheckSupplements,
     updateSleepLog,
     updateRatings,
     installPack,
@@ -1491,31 +1494,18 @@ export default function TodayPage() {
             const visibleItems = items.filter((i) => !i.muted);
             const optionalItems = items.filter((i) => i.muted);
             const optKey = `opt:${block}`;
-            const suppKey = `supp:${block}`;
             const showOpt = !!openBlocks[optKey];
-            const showSupp = !!openBlocks[suppKey];
-            // Supplement grouping (block-wide): per-supplement clock
-            // times are noise — a user with 6 supplements at 8:00 AM
-            // doesn't take them at staggered minutes, they take them
-            // together. Treat ALL supplements in a block as one
-            // bundle, regardless of where they fall in the sort. The
-            // pill renders once per block at the end (essentials and
-            // habits surface first; supplements are bundle-and-do).
-            const preFilter = items.filter((i) => !i.muted || showOpt);
-            const suppItems = preFilter.filter((i) => isSupplement(i));
-            const suppKeySet = new Set(
-              suppItems.map((i) => i.canonicalKey)
+            // Supplements live in their own state.supplements array
+            // now (separated from behaviors) and render via the
+            // SupplementBlockCard below. The timeline filter no
+            // longer needs to deal with them.
+            const rendered = items.filter((i) => !i.muted || showOpt);
+            const blockSupplements = supplementsForBlock(
+              state.supplements ?? [],
+              block,
+              selDayIdx,
+              state.settings.safetyFlags ?? {}
             );
-            const suppDone = suppItems.filter((i) =>
-              isDone(log, i.canonicalKey)
-            ).length;
-            // Hide supplements from the individual-row render when
-            // the pill is collapsed. The pill itself renders below
-            // the timeline rows.
-            const rendered = preFilter.filter((i) => {
-              if (showSupp) return true;
-              return !suppKeySet.has(i.canonicalKey);
-            });
             const baseItems =
               visibleItems.length > 0 ? visibleItems : items;
             const doneCount = baseItems.filter((i) =>
@@ -2067,61 +2057,24 @@ export default function TodayPage() {
                       });
                     })()}
 
-                    {/* Supplement bundle pill — one card per block
-                        regardless of how many supplements you take.
-                        Sits at the END of the block since essentials
-                        and habits surface first; supplements are
-                        bundle-and-do. Tap to expand inline; expanded
-                        rows render with their normal completion
-                        check and tap-for-detail flow. We render the
-                        pill for 2+ supplements (one supplement
-                        doesn't gain anything from grouping). */}
-                    {suppItems.length >= 2 && (
-                      <button
-                        onClick={() => {
-                          haptic.light();
-                          setOpenBlocks((o) => ({
-                            ...o,
-                            [suppKey]: !o[suppKey],
-                          }));
-                        }}
-                        className="press tr-fast relative mt-1 flex w-full items-center gap-3 rounded-[var(--r-md)] py-3 pl-3 pr-3 text-left"
-                        style={{
-                          background: "var(--surface-2)",
-                          border: "1px solid var(--hairline)",
-                        }}
-                        aria-expanded={showSupp}
-                      >
-                        <span
-                          className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
-                          style={{
-                            background:
-                              "color-mix(in srgb, var(--warm) 18%, var(--surface-3))",
-                            color: "var(--warm)",
-                          }}
-                        >
-                          <Icon name="pill" size={18} />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[14px] font-semibold text-[var(--text-1)]">
-                            {block.charAt(0).toUpperCase() + block.slice(1)}{" "}
-                            supplements
-                          </p>
-                          <p className="mt-0.5 text-[12px] text-[var(--text-3)]">
-                            {suppDone}/{suppItems.length}{" "}
-                            <span className="text-[var(--text-4)]">
-                              · {showSupp ? "tap to collapse" : "tap to see all"}
-                            </span>
-                          </p>
-                        </div>
-                        <Icon
-                          name="chevron"
-                          size={14}
-                          className={`text-[var(--text-3)] tr-fast ${
-                            showSupp ? "rotate-90" : ""
-                          }`}
-                        />
-                      </button>
+                    {/* Supplement bundle — single card per block.
+                        Reads from state.supplements (separated from
+                        behaviors) so curated/custom supplements all
+                        flow through the same surface. Hidden when
+                        the user has no supplements in this block. */}
+                    {blockSupplements.length > 0 && (
+                      <SupplementBlockCard
+                        block={block}
+                        supplements={blockSupplements}
+                        completions={log.supplementCompletions ?? {}}
+                        onToggle={(id) => toggleSupplement(selectedDate, id)}
+                        onBulkCheck={() =>
+                          bulkCheckSupplements(
+                            selectedDate,
+                            blockSupplements.map((s) => s.id)
+                          )
+                        }
+                      />
                     )}
 
                     {optionalItems.length > 0 && (

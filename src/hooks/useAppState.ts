@@ -24,6 +24,11 @@ import {
   addBiomarker as addBiomarkerFn,
   deleteBiomarker as deleteBiomarkerFn,
   toggleBehavior as toggleBehaviorFn,
+  toggleSupplement as toggleSupplementFn,
+  bulkCheckSupplements as bulkCheckSupplementsFn,
+  addSupplement as addSupplementFn,
+  updateSupplement as updateSupplementFn,
+  removeSupplement as removeSupplementFn,
   installPack as installPackFn,
   uninstallPack as uninstallPackFn,
   setBehaviorOverride as setBehaviorOverrideFn,
@@ -268,6 +273,28 @@ export function useAppState() {
 
   // ── Protocol OS ─────────────────────────────────────────────
 
+  const toggleSupplement = useCallback((date: string, id: string) => {
+    setState((prev) => toggleSupplementFn(prev, date, id));
+  }, []);
+  const bulkCheckSupplements = useCallback(
+    (date: string, ids: string[]) => {
+      setState((prev) => bulkCheckSupplementsFn(prev, date, ids));
+    },
+    []
+  );
+  const addSupplement = useCallback((supp: Parameters<typeof addSupplementFn>[1]) => {
+    setState((prev) => addSupplementFn(prev, supp));
+  }, []);
+  const updateSupplement = useCallback(
+    (id: string, patch: Parameters<typeof updateSupplementFn>[2]) => {
+      setState((prev) => updateSupplementFn(prev, id, patch));
+    },
+    []
+  );
+  const removeSupplement = useCallback((id: string) => {
+    setState((prev) => removeSupplementFn(prev, id));
+  }, []);
+
   const toggleBehavior = useCallback((date: string, key: string) => {
     setState((prev) => toggleBehaviorFn(prev, date, key));
   }, []);
@@ -332,6 +359,12 @@ export function useAppState() {
     // Biomarkers
     addBiomarker,
     deleteBiomarker,
+    // Supplements
+    toggleSupplement,
+    bulkCheckSupplements,
+    addSupplement,
+    updateSupplement,
+    removeSupplement,
     // Protocol OS
     toggleBehavior,
     installPack,

@@ -163,6 +163,79 @@ export interface UserSettings {
   legalAcceptedVersion?: number;
 }
 
+// ── Supplements (separated from behaviors) ────────────────────────
+//
+// Supplements are a distinct concept from behaviors:
+//   - Behaviors are practices to build (training, meditation, wind-down).
+//   - Supplements are items to take (pills, capsules, powders).
+//
+// Treating them the same conflated UX patterns that have different
+// best forms. Behaviors deserve their own row, dose, time-anchored
+// reminder, and progress streak. Supplements deserve a bundle ("take
+// the morning stack"), inventory tracking, and a weekly grid view.
+//
+// The shape captures everything we need for both curated catalog
+// items and user-created customs.
+
+export interface SupplementInventory {
+  /** Remaining doses (counts down on each completion). */
+  count: number;
+  /** Suggest refill when count falls below this threshold. */
+  refillAt?: number;
+  /** Last edited timestamp (ISO) for stale-value detection. */
+  updatedAt?: string;
+}
+
+export interface Supplement {
+  /**
+   * Stable id. For curated supplements, the canonical key from the
+   * legacy behavior atom (so existing completions migrate cleanly).
+   * For user-created supplements, a generated id like `supp:<rand>`.
+   */
+  id: string;
+  /** User-facing name (e.g. "Magnesium glycinate"). */
+  name: string;
+  /** Dose label (e.g. "200–400 mg" or "1 capsule"). */
+  dose?: string;
+  /** Block the supplement belongs to. */
+  block: TimeBlock;
+  /**
+   * Optional friendly timing hint shown beneath the dose (e.g.
+   * "with breakfast" or "before bed"). NOT used for clock-time
+   * sorting — supplements are bundle-and-do.
+   */
+  timing?: string;
+  /** Optional brand or product name. */
+  brand?: string;
+  /** Optional user notes (e.g. "out of stock at Costco"). */
+  notes?: string;
+  /**
+   * Days of week active. Mon=0..Sun=6, undefined = every day.
+   * Used by cycle-on/cycle-off supplements like creatine.
+   */
+  daysActive?: boolean[];
+  /** Optional inventory + refill tracking. */
+  inventory?: SupplementInventory;
+  /**
+   * Pointer to the curated atom this was derived from (atom-library
+   * pick or migration). Lets the system surface curated metadata
+   * (rationale, contraindications, evidence tier) on a user's custom
+   * row without freezing them into the curated values.
+   */
+  derivedFrom?: string;
+  /** Safety flags this supplement is contraindicated for. */
+  contraindications?: SafetyFlag[];
+  /** Long-form evidence/explanation text. */
+  evidence?: string;
+  evidenceTier?: "established" | "emerging" | "exploratory";
+  /** Short rationale ("why take it") shown in the detail sheet. */
+  rationale?: string;
+  /** Provenance. */
+  source: "curated" | "custom";
+  /** Pack id this was installed from (curated only). Cleanup hint. */
+  installedFromPack?: string;
+}
+
 // ── Legacy completion (kept for migration) ────────────────────────
 
 export interface ItemCompletion {
@@ -204,6 +277,12 @@ export interface DailyLog {
   // Scoring
   score: number; // 0-100
   pillarScores: Record<Pillar, number>; // per-pillar 0-100
+
+  // Supplement tracking (id -> done). Kept in its own field, not
+  // co-mingled with behaviorCompletions, since supplements are a
+  // distinct concept (see Supplement type). Empty by default so
+  // older logs without it parse cleanly.
+  supplementCompletions?: Record<string, boolean>;
 
   // Protocol-OS behavior tracking (canonicalKey -> done)
   behaviorCompletions?: Record<string, boolean>;
@@ -404,4 +483,18 @@ export interface AppState {
   pausedPacks: string[];
   customPacks: ProtocolPack[];
   behaviorOverrides: Record<string, BehaviorOverride>;
+
+  // Supplements (separated from behaviors — see Supplement type).
+  // Default empty; populated either by the v3.5 migration (existing
+  // supplement behaviors get extracted into Supplement entries) or
+  // by user adds via the Supplements surface.
+  supplements?: Supplement[];
+  /**
+   * One-time supplement-extraction marker. Set to the LEGAL_VERSION
+   * equivalent for supplements (a single integer that we bump if we
+   * need to re-run extraction for some reason). Prevents the
+   * migration from running twice and double-creating supplement
+   * entries when a user re-loads.
+   */
+  supplementsMigratedAt?: number;
 }

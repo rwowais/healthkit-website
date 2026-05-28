@@ -1,5 +1,6 @@
 import { STORAGE_KEY, LEGACY_STORAGE_KEYS } from "./constants";
 import { getTz, dayIndexOfKeyInTz, dateKeyInTz } from "./tz";
+import { SUPPLEMENT_CANONICAL_KEYS } from "./supplements";
 import { calculateStreak } from "./scoring";
 import type {
   AppState,
@@ -27,9 +28,11 @@ import {
 } from "./engine";
 import { keystone } from "./intel";
 import type {
+  BehaviorDef,
   BehaviorOverride,
   Insight,
   ProtocolPack,
+  Supplement,
 } from "./types";
 import { defaultSleepProtocol } from "./defaults/sleep";
 import { defaultExerciseProtocol } from "./defaults/exercise";
@@ -292,12 +295,112 @@ function normalize(s: AppState): AppState {
     behaviorOverrides[k] = ov;
   }
 
+  // ── Supplement separation (one-time migration + sync) ─────────────
+  // First load after this schema lands: existing users have supplement
+  // behaviors mixed into installed packs and behaviorCompletions. We
+  // pull those into a separate `supplements` array + per-day
+  // supplementCompletions, then mark the migration done so it never
+  // runs again. On every subsequent load we also SYNC any newly-
+  // installed-pack supplements that haven't yet been added (so a
+  // user who installs Daily Essentials post-migration gets its
+  // supplements auto-populated). See lib/supplements.ts for the
+  // canonical-key set + helpers.
+  const installedSetSupp = new Set(installedPacks);
+  // Build the set of curated supplement keys CURRENTLY available to
+  // this user (i.e., they belong to an installed pack or appear as
+  // a standalone — note: standalones aren't auto-added unless the
+  // user explicitly picks them via the library, so we only sync
+  // pack-bound supplements automatically).
+  const installedSupplementKeys = new Set<string>();
+  const packForSupplementKey = new Map<string, string>();
+  for (const p of PACKS) {
+    if (!installedSetSupp.has(p.id)) continue;
+    for (const b of p.behaviors) {
+      if (SUPPLEMENT_CANONICAL_KEYS.has(b.canonicalKey)) {
+        installedSupplementKeys.add(b.canonicalKey);
+        if (!packForSupplementKey.has(b.canonicalKey))
+          packForSupplementKey.set(b.canonicalKey, p.id);
+      }
+    }
+  }
+  // Preserve any existing supplements the user has (including their
+  // overrides, brand notes, inventory tracking).
+  const priorSupplements: Supplement[] = Array.isArray(s.supplements)
+    ? s.supplements
+    : [];
+  const priorSuppById = new Map(priorSupplements.map((x) => [x.id, x]));
+  const nextSupplements: Supplement[] = [];
+  // 1. Existing user customs / previously-migrated rows survive as-is.
+  for (const sp of priorSupplements) {
+    // Curated supplement from a pack the user has since uninstalled?
+    // Drop it — its presence is now stale. Customs always survive.
+    if (
+      sp.source === "curated" &&
+      sp.installedFromPack &&
+      !installedSetSupp.has(sp.installedFromPack)
+    ) {
+      continue;
+    }
+    nextSupplements.push(sp);
+  }
+  // 2. New pack-installed supplements that aren't yet in state get
+  //    auto-added with their curated defaults.
+  for (const key of installedSupplementKeys) {
+    if (priorSuppById.has(key)) continue;
+    const packId = packForSupplementKey.get(key);
+    // Find the behavior def in the catalog (deduped across packs).
+    let def: BehaviorDef | undefined;
+    for (const p of PACKS) {
+      def = p.behaviors.find((b) => b.canonicalKey === key);
+      if (def) break;
+    }
+    if (!def) continue;
+    nextSupplements.push({
+      id: def.canonicalKey,
+      name: def.title,
+      dose: def.dose,
+      block: def.block,
+      timing: def.timingReason,
+      daysActive: def.daysActive,
+      derivedFrom: def.canonicalKey,
+      contraindications: def.contraindications,
+      evidence: def.evidence,
+      evidenceTier: def.evidenceTier,
+      rationale: def.rationale,
+      source: "curated",
+      installedFromPack: packId,
+    });
+  }
+
+  // Migrate completions: walk every daily log; for each
+  // behaviorCompletions key that's a supplement, copy it into
+  // supplementCompletions. Only runs the first time (gated on
+  // supplementsMigratedAt) so we don't keep rewriting logs forever.
+  const SUPPLEMENT_MIGRATION_VERSION = 1;
+  const alreadyMigrated =
+    (s.supplementsMigratedAt ?? 0) >= SUPPLEMENT_MIGRATION_VERSION;
+  const rawLogs: DailyLog[] = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
+  const migratedLogs: DailyLog[] = alreadyMigrated
+    ? rawLogs
+    : rawLogs.map((l) => {
+        const bc = l.behaviorCompletions ?? {};
+        const existingSuppDone = l.supplementCompletions ?? {};
+        const nextSuppDone: Record<string, boolean> = { ...existingSuppDone };
+        for (const [key, done] of Object.entries(bc)) {
+          if (!done) continue;
+          if (SUPPLEMENT_CANONICAL_KEYS.has(key)) {
+            nextSuppDone[key] = true;
+          }
+        }
+        return { ...l, supplementCompletions: nextSuppDone };
+      });
+
   return {
     ...s,
     settings: { ...d.settings, ...s.settings },
     protocols: s.protocols ?? d.protocols,
     supplementMeta: s.supplementMeta ?? d.supplementMeta,
-    dailyLogs: Array.isArray(s.dailyLogs) ? s.dailyLogs : [],
+    dailyLogs: migratedLogs,
     biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
     insights: Array.isArray(s.insights) ? s.insights : [],
     currentStreak: s.currentStreak ?? 0,
@@ -305,6 +408,8 @@ function normalize(s: AppState): AppState {
     pausedPacks,
     customPacks,
     behaviorOverrides,
+    supplements: nextSupplements,
+    supplementsMigratedAt: SUPPLEMENT_MIGRATION_VERSION,
   };
 }
 
@@ -531,6 +636,134 @@ export function toggleBehavior(
     ...state,
     dailyLogs,
     currentStreak: calculateStreak(dailyLogs),
+  };
+}
+
+// ── Supplement actions ────────────────────────────────────────────
+//
+// Supplements live in state.supplements, with per-day completion
+// tracked in dailyLog.supplementCompletions. These mirror the
+// behavior actions but operate on the supplement-specific surfaces.
+
+/** Toggle a single supplement's completion for a given day. */
+export function toggleSupplement(
+  state: AppState,
+  date: string,
+  id: string
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const sc = { ...(log.supplementCompletions ?? {}) };
+  sc[id] = !sc[id];
+  // Inventory: if the supplement has inventory tracking enabled,
+  // decrement (or restore) by 1 on this toggle. Only affects the
+  // count when the toggle goes 0→1; un-checking restores +1 so
+  // accidental taps don't desync the count.
+  const wasDone = (log.supplementCompletions ?? {})[id] === true;
+  const isDone = sc[id] === true;
+  let supplements = state.supplements;
+  if (supplements?.some((s) => s.id === id && s.inventory)) {
+    supplements = supplements.map((s) => {
+      if (s.id !== id || !s.inventory) return s;
+      const delta = wasDone === isDone ? 0 : isDone ? -1 : +1;
+      if (delta === 0) return s;
+      return {
+        ...s,
+        inventory: {
+          ...s.inventory,
+          count: Math.max(0, s.inventory.count + delta),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+  }
+  const updated: DailyLog = { ...log, supplementCompletions: sc };
+  const idx = state.dailyLogs.findIndex((l) => l.date === date);
+  const dailyLogs =
+    idx >= 0
+      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
+      : [...state.dailyLogs, updated];
+  return { ...state, dailyLogs, supplements };
+}
+
+/**
+ * Bulk-check every supplement in a block for the given day. The
+ * "take stack" affordance — one tap to confirm the morning bundle.
+ * Returns state unchanged if the supplement list is empty.
+ */
+export function bulkCheckSupplements(
+  state: AppState,
+  date: string,
+  ids: string[]
+): AppState {
+  if (ids.length === 0) return state;
+  const log = getOrCreateLog(state, date);
+  const sc = { ...(log.supplementCompletions ?? {}) };
+  const newlyDone = new Set<string>();
+  for (const id of ids) {
+    if (!sc[id]) newlyDone.add(id);
+    sc[id] = true;
+  }
+  // Inventory decrement for each newly-completed supplement.
+  let supplements = state.supplements;
+  if (supplements && newlyDone.size > 0) {
+    supplements = supplements.map((s) => {
+      if (!newlyDone.has(s.id) || !s.inventory) return s;
+      return {
+        ...s,
+        inventory: {
+          ...s.inventory,
+          count: Math.max(0, s.inventory.count - 1),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+  }
+  const updated: DailyLog = { ...log, supplementCompletions: sc };
+  const idx = state.dailyLogs.findIndex((l) => l.date === date);
+  const dailyLogs =
+    idx >= 0
+      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
+      : [...state.dailyLogs, updated];
+  return { ...state, dailyLogs, supplements };
+}
+
+/** Add a new supplement (custom or curated catalog pick). */
+export function addSupplement(
+  state: AppState,
+  supp: Supplement
+): AppState {
+  const list = state.supplements ?? [];
+  if (list.some((s) => s.id === supp.id)) return state;
+  return { ...state, supplements: [...list, supp] };
+}
+
+/** Update an existing supplement by id (partial patch). */
+export function updateSupplement(
+  state: AppState,
+  id: string,
+  patch: Partial<Supplement>
+): AppState {
+  const list = state.supplements ?? [];
+  return {
+    ...state,
+    supplements: list.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+  };
+}
+
+/** Remove a supplement by id. Removes its completion history too. */
+export function removeSupplement(state: AppState, id: string): AppState {
+  const list = state.supplements ?? [];
+  return {
+    ...state,
+    supplements: list.filter((s) => s.id !== id),
+    // Clean up completion data so deleting + re-adding doesn't
+    // resurrect old check states.
+    dailyLogs: state.dailyLogs.map((l) => {
+      if (!l.supplementCompletions || !l.supplementCompletions[id]) return l;
+      const sc = { ...l.supplementCompletions };
+      delete sc[id];
+      return { ...l, supplementCompletions: sc };
+    }),
   };
 }
 

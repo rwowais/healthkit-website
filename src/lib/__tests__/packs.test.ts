@@ -450,15 +450,19 @@ describe("atom-library (2B) — listBehaviorAtoms + customCanonicalKey", () => {
   });
 
   it("a custom behavior with derivedFrom merges with the curated atom via effectiveKey", () => {
-    const customMagnesium = {
-      canonicalKey: customCanonicalKey("user-pack-1", "Magnesium glycinate"),
-      derivedFrom: "magnesium-pm",
-      title: "Magnesium glycinate",
+    // Use wind-down here — magnesium-pm is now classed as a
+    // supplement and routed to state.supplements (not the behavior
+    // timeline). The effectiveKey-merge invariant still matters for
+    // every non-supplement atom.
+    const customWindDown = {
+      canonicalKey: customCanonicalKey("user-pack-1", "My wind-down"),
+      derivedFrom: "wind-down",
+      title: "My wind-down",
       block: "evening" as const,
       anchor: "bed" as const,
-      offsetMin: -45,
-      rationale: "Custom dose",
-      icon: "pill",
+      offsetMin: -60,
+      rationale: "Custom",
+      icon: "moon",
       leverage: 2 as const,
       kind: "action" as const,
     };
@@ -471,7 +475,7 @@ describe("atom-library (2B) — listBehaviorAtoms + customCanonicalKey", () => {
       icon: "moon",
       source: "custom",
       durationLabel: "Custom",
-      behaviors: [customMagnesium],
+      behaviors: [customWindDown],
     };
     let st = getDefaultState();
     st = {
@@ -480,11 +484,11 @@ describe("atom-library (2B) — listBehaviorAtoms + customCanonicalKey", () => {
       customPacks: [customPack],
     };
     const tl = compileTimeline(st, 0);
-    // The custom Magnesium and curated magnesium-pm merge into one row.
+    // The custom and curated wind-down merge into one row.
     const magRows = tl.filter(
       (i) =>
-        effectiveKey(i) === "magnesium-pm" ||
-        i.derivedFrom === "magnesium-pm"
+        effectiveKey(i) === "wind-down" ||
+        i.derivedFrom === "wind-down"
     );
     expect(magRows.length).toBe(1);
   });
@@ -532,15 +536,19 @@ describe("trust tier classification — the governance guardrail", () => {
   });
 
   it("merge picks the most-authoritative tier (custom < derived < curated)", () => {
-    const customMagnesium = {
-      canonicalKey: customCanonicalKey("user-pack-1", "Magnesium glycinate"),
-      derivedFrom: "magnesium-pm",
-      title: "Magnesium glycinate",
+    // Use wind-down here, not magnesium-pm — supplements are now
+    // filtered out of the behavior timeline (they live in their own
+    // state.supplements surface). The merge-precedence invariant
+    // still matters for non-supplement atoms.
+    const customWindDown = {
+      canonicalKey: customCanonicalKey("user-pack-1", "My wind-down"),
+      derivedFrom: "wind-down",
+      title: "My wind-down",
       block: "evening" as const,
       anchor: "bed" as const,
-      offsetMin: -45,
-      rationale: "Custom dose",
-      icon: "pill",
+      offsetMin: -60,
+      rationale: "Custom version",
+      icon: "moon",
       leverage: 2 as const,
       kind: "action" as const,
     };
@@ -553,7 +561,7 @@ describe("trust tier classification — the governance guardrail", () => {
       icon: "moon",
       source: "custom",
       durationLabel: "Custom",
-      behaviors: [customMagnesium],
+      behaviors: [customWindDown],
     };
     let st = getDefaultState();
     st = {
@@ -562,15 +570,15 @@ describe("trust tier classification — the governance guardrail", () => {
       customPacks: [customPack],
     };
     const tl = compileTimeline(st, 0);
-    const magRow = tl.find(
+    const row = tl.find(
       (i) =>
-        i.canonicalKey === "magnesium-pm" ||
-        i.derivedFrom === "magnesium-pm"
+        i.canonicalKey === "wind-down" ||
+        i.derivedFrom === "wind-down"
     );
-    expect(magRow).toBeTruthy();
+    expect(row).toBeTruthy();
     // The merged row gets the curated atom's tier — NOT the derived
     // tier from the user-namespaced canonical key visited second.
-    expect(magRow!.trustTier).toBe("curated");
+    expect(row!.trustTier).toBe("curated");
   });
 });
 

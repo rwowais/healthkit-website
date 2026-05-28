@@ -522,21 +522,21 @@ describe("months-of-usage simulation — engine holds across personas", () => {
       behaviors: [
         {
           canonicalKey: "custom:user-derived:my-magnesium-abcd",
-          title: "Magnesium glycinate (my brand)",
+          title: "My wind-down (custom)",
           block: "evening",
           anchor: "bed",
-          offsetMin: -30,
-          rationale: "Better Sleep • my brand.",
+          offsetMin: -60,
+          rationale: "Better Sleep • my version.",
           icon: "sparkle",
           leverage: 2,
           kind: "action",
-          derivedFrom: "magnesium-pm",
+          derivedFrom: "wind-down",
         },
       ],
     };
     const p = makePersona(
       "power-derived",
-      ["longevity-foundation", "user-derived"],
+      ["longevity-foundation", "better-sleep", "user-derived"],
       [derivedPack],
       undefined,
       60,
@@ -551,18 +551,16 @@ describe("months-of-usage simulation — engine holds across personas", () => {
         `${p.name} day ${offset}`
       );
     }
-    // The derived custom merges with magnesium-pm via effectiveKey.
-    // Its trust tier in the timeline should classify as "derived"
-    // (not "custom"), making it eligible for mastery.
+    // The derived custom merges with wind-down via effectiveKey.
+    // (We use wind-down here instead of magnesium-pm because
+    // supplements are now routed to state.supplements and skipped
+    // by compileTimeline — a derived supplement custom doesn't
+    // appear in the behavior timeline anymore.)
     const today = compileTimeline(p.state, isoDayOf(dk(0)));
-    // The atom-library-derived behavior merges with the curated
-    // magnesium-pm row, which is sourced from a curated pack —
-    // the merge prefers the curated tier. So we just verify the
-    // merged row exists and has a defensible tier.
     const mergedRow = today.find(
       (it) =>
-        it.canonicalKey === "magnesium-pm" ||
-        it.canonicalKey === "custom:user-derived:my-magnesium-abcd"
+        it.canonicalKey === "wind-down" ||
+        it.derivedFrom === "wind-down"
     );
     expect(mergedRow).toBeDefined();
     expect(["curated", "derived"]).toContain(mergedRow!.trustTier);
