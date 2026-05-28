@@ -121,6 +121,7 @@ import {
 } from "@/lib/cms/suggestions";
 import type { AppState, DailyLog } from "@/lib/types";
 import { Eyebrow, Skeleton } from "@/components/ui";
+import RuleEditor from "@/components/admin/RuleEditor";
 
 type Gate = "checking" | "denied" | "ok";
 type Tab =
@@ -703,12 +704,15 @@ export default function AdminHome() {
   const refreshRules = () => listAdaptationRules().then(setRules);
   const [newRuleName, setNewRuleName] = useState("");
   const [newRulePriority, setNewRulePriority] = useState(50);
-  const [newRuleTrigger, setNewRuleTrigger] = useState(
-    '{"all":[{"metric":"recoveryProxy","op":"<","value":45}]}'
-  );
-  const [newRuleEffect, setNewRuleEffect] = useState(
-    '{"setMode":"recovery"}'
-  );
+  // Rule body lives as parsed objects so the visual RuleEditor can edit
+  // them directly. The Advanced JSON drawer inside RuleEditor keeps the
+  // power-user escape hatch.
+  const [newRuleTrigger, setNewRuleTrigger] = useState<unknown>({
+    all: [{ metric: "recoveryProxy", op: "<", value: 45 }],
+  });
+  const [newRuleEffect, setNewRuleEffect] = useState<unknown>({
+    setMode: "recovery",
+  });
   useEffect(() => {
     if (gate === "ok" && tab === "engine" && engineSub === "rules")
       refreshRules();
@@ -1213,12 +1217,10 @@ export default function AdminHome() {
                   ))}
                 </div>
                 <p className="t-caption mt-2 leading-relaxed">
-                  Trigger shape:{" "}
-                  <code>{`{ "all": [{metric, op, value}, ...], "any": [...] }`}</code>
-                  . Effect shape:{" "}
-                  <code>{`{ "setMode": "recovery" | "lighter" | "primed" | ..., "headline": "...", "tone": "...", "reason": "..." }`}</code>
-                  . Only published rules apply at runtime; drafts stay
-                  in the CMS until promoted.
+                  Use the visual editor below to compose conditions and
+                  effects. Need raw JSON? Open the &ldquo;Advanced&rdquo;
+                  drawer inside any rule. Only published rules apply at
+                  runtime — drafts stay in the CMS until promoted.
                 </p>
               </div>
               <div className="space-y-1.5">
@@ -1267,44 +1269,25 @@ export default function AdminHome() {
                         }
                       />
                     </div>
-                    <textarea
-                      className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[11.5px] text-[var(--text-1)] outline-none"
-                      rows={3}
-                      value={JSON.stringify(r.trigger, null, 2)}
-                      onChange={(e) => {
-                        try {
-                          const parsed = JSON.parse(e.target.value);
+                    <div className="mt-3">
+                      <RuleEditor
+                        trigger={r.trigger}
+                        effect={r.effect}
+                        onChange={(next) =>
                           setRules((rs) =>
                             rs.map((x) =>
                               x.id === r.id
-                                ? { ...x, trigger: parsed }
+                                ? {
+                                    ...x,
+                                    trigger: next.trigger,
+                                    effect: next.effect,
+                                  }
                                 : x
                             )
-                          );
-                        } catch {
-                          /* keep stale until valid JSON */
+                          )
                         }
-                      }}
-                    />
-                    <textarea
-                      className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[11.5px] text-[var(--text-1)] outline-none"
-                      rows={2}
-                      value={JSON.stringify(r.effect, null, 2)}
-                      onChange={(e) => {
-                        try {
-                          const parsed = JSON.parse(e.target.value);
-                          setRules((rs) =>
-                            rs.map((x) =>
-                              x.id === r.id
-                                ? { ...x, effect: parsed }
-                                : x
-                            )
-                          );
-                        } catch {
-                          /* keep stale until valid JSON */
-                        }
-                      }}
-                    />
+                      />
+                    </div>
                     <div className="mt-2 flex items-center gap-2">
                       <select
                         value={r.status}
@@ -1389,53 +1372,36 @@ export default function AdminHome() {
                       className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
                     />
                   </Field>
-                  <Field label="Trigger (JSON)" help="rule.trigger">
-                    <textarea
-                      rows={3}
-                      value={newRuleTrigger}
-                      onChange={(e) => setNewRuleTrigger(e.target.value)}
-                      placeholder='{"all":[{"metric":"...", "op":"<", "value":...}]}'
-                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
-                    />
-                  </Field>
-                  <Field label="Effect (JSON)" help="rule.effect">
-                    <textarea
-                      rows={2}
-                      value={newRuleEffect}
-                      onChange={(e) => setNewRuleEffect(e.target.value)}
-                      placeholder='{"setMode":"recovery"}'
-                      className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[12px] text-[var(--text-1)] outline-none"
-                    />
-                  </Field>
+                  <RuleEditor
+                    trigger={newRuleTrigger}
+                    effect={newRuleEffect}
+                    onChange={(next) => {
+                      setNewRuleTrigger(next.trigger);
+                      setNewRuleEffect(next.effect);
+                    }}
+                  />
                   <button
                     disabled={busy || !newRuleName.trim()}
                     onClick={async () => {
-                      let trigger: unknown;
-                      let effect: unknown;
-                      try {
-                        trigger = JSON.parse(newRuleTrigger);
-                      } catch {
-                        setMsg("Trigger isn't valid JSON.");
-                        return;
-                      }
-                      try {
-                        effect = JSON.parse(newRuleEffect);
-                      } catch {
-                        setMsg("Effect isn't valid JSON.");
-                        return;
-                      }
                       setBusy(true);
                       const r = await saveAdaptationRule({
                         name: newRuleName,
                         priority: newRulePriority,
-                        trigger,
-                        effect,
+                        trigger: newRuleTrigger,
+                        effect: newRuleEffect,
                       });
                       setBusy(false);
                       setMsg(r.ok ? "Added." : r.reason ?? "Failed");
                       if (r.ok) {
                         setNewRuleName("");
                         setNewRulePriority(50);
+                        // Reset to sensible defaults so the next rule starts blank.
+                        setNewRuleTrigger({
+                          all: [
+                            { metric: "recoveryProxy", op: "<", value: 45 },
+                          ],
+                        });
+                        setNewRuleEffect({ setMode: "recovery" });
                         refreshRules();
                       }
                     }}
