@@ -593,18 +593,37 @@ describe("storage — workout swap (per-day)", () => {
   });
 
   it("swap replaces any prior swap for the same fromKey", () => {
+    // Use real catalog keys — swapBehavior now validates both
+    // endpoints resolve to a known behavior, so we can't lean on
+    // phantom names like "yoga" the way the original test did.
     let s = getDefaultState();
     s = swapBehavior(s, today, "strength", "zone2");
-    s = swapBehavior(s, today, "strength", "yoga");
+    s = swapBehavior(s, today, "strength", "extended-walk");
     const log = s.dailyLogs.find((l) => l.date === today)!;
-    expect(log.swaps?.strength).toBe("yoga");
-    // The previous replacement (zone2) is no longer auto-completed
-    // because we removed it on the second swap.
-    // (Implementation note: current swapBehavior leaves prior zone2
-    //  completion bit alone since it doesn't know zone2 was a stale
-    //  swap target — acceptable v1; would need a chain of clearSwaps
-    //  to be perfect. Documented here so the regression is visible.)
-    expect(log.behaviorCompletions?.yoga).toBe(true);
+    expect(log.swaps?.strength).toBe("extended-walk");
+    expect(log.behaviorCompletions?.["extended-walk"]).toBe(true);
+  });
+
+  it("phantom toKey is rejected — swapBehavior is a no-op", () => {
+    let s = getDefaultState();
+    const before = JSON.stringify(s);
+    s = swapBehavior(s, today, "strength", "nonexistent-key");
+    expect(JSON.stringify(s)).toBe(before);
+  });
+
+  it("clearSwap preserves a legitimate pre-existing completion", () => {
+    // User completes extended-walk normally at 7am, then later
+    // swaps strength → extended-walk. clearSwap should remove the
+    // swap mapping but NOT erase the legit 7am completion bit.
+    let s = getDefaultState();
+    s = toggleBehavior(s, today, "extended-walk"); // legit done
+    expect(s.dailyLogs[0].behaviorCompletions?.["extended-walk"]).toBe(true);
+    s = swapBehavior(s, today, "strength", "extended-walk");
+    s = clearSwap(s, today, "strength");
+    const log = s.dailyLogs.find((l) => l.date === today)!;
+    expect(log.swaps).toBeUndefined();
+    // The legitimate completion is preserved.
+    expect(log.behaviorCompletions?.["extended-walk"]).toBe(true);
   });
 
   it("clearSwap restores the original and removes the replacement completion", () => {

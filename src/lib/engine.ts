@@ -1060,10 +1060,48 @@ export function masteredKeys(
   const out = new Set<string>();
   const dayNum = daysSinceEpoch(dayKey);
 
+  // Build a per-key daysActive lookup from the live catalog. A
+  // behavior scheduled only Mon/Wed/Fri shouldn't have its streak
+  // broken every Tuesday — we need to walk the streak in scheduled
+  // days, not calendar days. Falls back to "every day" when a key
+  // isn't found (custom atoms without explicit scheduling).
+  const allBehaviors = activePacks().flatMap((p) => p.behaviors);
+  const daysActiveFor = new Map<string, boolean[] | undefined>();
+  for (const b of allBehaviors) {
+    if (!daysActiveFor.has(b.canonicalKey)) {
+      daysActiveFor.set(b.canonicalKey, b.daysActive);
+    }
+  }
+  // Day-of-week helper — must match engine's Mon=0..Sun=6 convention.
+  const isoDow = (k: string): number => {
+    const j = new Date(k + "T00:00:00").getDay();
+    return j === 0 ? 6 : j - 1;
+  };
+  const isScheduledOn = (k: string, dkey: string): boolean => {
+    const d = daysActiveFor.get(k);
+    if (!d || d.length !== 7) return true;
+    return d[isoDow(dkey)] === true;
+  };
+
+  // Swap-aware completion check: a behavior credited via swapBehavior
+  // (auto-completed as the replacement) should NOT count toward
+  // mastery for that day. Per the DailyLog.swaps contract in
+  // types.ts: "the replacement is a one-off — neither should
+  // accumulate streak credit for the other." Without this, repeated
+  // strength→walk swaps would silently master "walk."
+  const wasGenuinelyCompleted = (l: DailyLog, k: string): boolean => {
+    if (!l.behaviorCompletions?.[k]) return false;
+    const swaps = l.swaps;
+    if (!swaps) return true;
+    // If this key is the TO of a swap, the completion was auto-set.
+    return !Object.values(swaps).includes(k);
+  };
+
   const keys = new Set<string>();
   for (const l of logs)
     for (const k in l.behaviorCompletions ?? {})
-      if (l.behaviorCompletions![k]) keys.add(k);
+      if (l.behaviorCompletions![k] && wasGenuinelyCompleted(l, k))
+        keys.add(k);
 
   // Trust-tier gate: graduation to maintenance is a SYSTEM CLAIM
   // ("you've mastered this — we'll background it"). For curated and
@@ -1089,32 +1127,64 @@ export function masteredKeys(
 
   for (const k of keys) {
     if (isCustomTier(k)) continue;
-    // current streak up to (but not requiring) today — step back
-    // through calendar days using addDaysToKey so DST + tz changes
-    // don't accidentally skip or duplicate a day.
+    // Streak walk: step back through SCHEDULED days only — bp-check
+    // (Mon-only) shouldn't have its streak broken every Tue–Sun. Un-
+    // scheduled days are transparent (mirrors how vacation days
+    // already work). 365 calendar days bounds the walk; for a weekly
+    // behavior this naturally yields ~52 scheduled days, well above
+    // the 21-day mastery threshold.
     let streak = 0;
     for (let i = 1; i <= 365; i++) {
       const dk = addDaysToKey(dayKey, -i);
-      if (byDate.get(dk)?.behaviorCompletions?.[k]) streak++;
+      if (!isScheduledOn(k, dk)) continue; // transparent skip
+      const lg = byDate.get(dk);
+      if (lg && wasGenuinelyCompleted(lg, k)) streak++;
       else break;
     }
     if (streak < 21) continue;
-    // recent adherence over the last 30 *active* days
-    let active = 0;
-    let did = 0;
+    // Two separate gates over the last 30 calendar days:
+    //
+    //  (a) GENERAL ENGAGEMENT — user opened the app + did *anything*
+    //      on at least 14 days. Confirms the user is still showing up;
+    //      protects against "21 days completed → silent disappearance
+    //      → mastery decision based on no current data."
+    //
+    //  (b) THIS-KEY ADHERENCE — of the days this key was SCHEDULED in
+    //      the last 30 calendar days, ≥85% were genuinely completed.
+    //      Scales naturally with cadence: a Mon-only key needs ≥85%
+    //      of its 4 Mondays, a daily key needs ≥85% of 30 days.
+    //
+    // Was previously one combined check that required ≥14 active
+    // SCHEDULED days, unreachable for weekly behaviors (max ~4
+    // Mondays in 30 days). bp-check / vo2max-intervals could never
+    // master, no matter how perfectly the user adhered.
+    let engagedDays = 0;
+    let scheduledForKey = 0;
+    let didForKey = 0;
     for (let i = 1; i <= 30; i++) {
       const dk = addDaysToKey(dayKey, -i);
       const lg = byDate.get(dk);
       if (!lg) continue;
       const anyActivity =
         lg.score > 0 ||
-        Object.values(lg.behaviorCompletions ?? {}).some(Boolean);
-      if (!anyActivity) continue;
-      active++;
-      if (lg.behaviorCompletions?.[k]) did++;
+        Object.values(lg.behaviorCompletions ?? {}).some(Boolean) ||
+        lg.energyLevel != null ||
+        lg.moodLevel != null ||
+        lg.sleepLog?.sleepQuality != null;
+      if (anyActivity) engagedDays++;
+      if (isScheduledOn(k, dk)) {
+        scheduledForKey++;
+        if (wasGenuinelyCompleted(lg, k)) didForKey++;
+      }
     }
-    if (active < 14 || did / active < 0.85) continue;
-    // weekly spot-check: this key resurfaces ~1 day in 7
+    if (engagedDays < 14) continue;
+    // For low-cadence keys with very few scheduled days in the
+    // window, require an absolute minimum sample (3 instances) before
+    // declaring mastery. Otherwise a Mon-only key with 1 scheduled
+    // day in 30 (DST month boundaries) could over-fit.
+    if (scheduledForKey < 3 || didForKey / scheduledForKey < 0.85)
+      continue;
+    // Weekly spot-check: this key resurfaces ~1 day in 7
     if ((dayNum + hashKey(k)) % 7 === 0) continue;
     out.add(k);
   }

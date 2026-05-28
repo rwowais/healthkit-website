@@ -28,6 +28,7 @@ import {
   getFreeBiomarkers,
   getFreePacks,
 } from "./entitlements";
+import { resolveBehaviorByKey } from "./workouts";
 import { activePacks } from "./knowledge";
 import {
   compileTimeline,
@@ -636,12 +637,21 @@ export function swapBehavior(
   toKey: string
 ): AppState {
   if (fromKey === toKey) return state;
+  // Validate both keys resolve to real behaviors. Without this,
+  // calling swapBehavior(s, today, "zone2", "nonexistent-key-xyz")
+  // would write the swap + auto-complete the phantom key, which
+  // leaks into score and mastery downstream.
+  if (!resolveBehaviorByKey(toKey)) return state;
+  if (!resolveBehaviorByKey(fromKey)) return state;
   const log = getOrCreateLog(state, date);
   const swaps = { ...(log.swaps ?? {}), [fromKey]: toKey };
   const bc = { ...(log.behaviorCompletions ?? {}) };
-  // Auto-complete the replacement — the user is telling us they DID
-  // do the alternative. If they undo via clearSwap we'll roll this
-  // back too.
+  // Preserve any LEGITIMATE pre-existing completion of the
+  // replacement (e.g. user did extended-walk at 7am normally, then
+  // swapped strength → extended-walk at 5pm). The auto-complete is
+  // only persisted if the replacement wasn't already done — and
+  // clearSwap below mirrors this so undo doesn't erase the legit one.
+  const replacementWasAlreadyDone = !!bc[toKey];
   bc[toKey] = true;
   // The original is no longer something they did/skipped — it's
   // replaced. Clear its completion bit so a previously-toggled
@@ -653,6 +663,13 @@ export function swapBehavior(
     swaps,
     behaviorCompletions: bc,
     score,
+    // Track which keys were auto-completed by THIS swap (so
+    // clearSwap can roll back surgically without erasing legit
+    // completions). Encoded as a sidecar field on the log.
+    swapAutoCompleted: {
+      ...(log.swapAutoCompleted ?? {}),
+      [fromKey]: replacementWasAlreadyDone ? false : true,
+    },
   };
   const idx = state.dailyLogs.findIndex((l) => l.date === date);
   const dailyLogs =
@@ -683,13 +700,27 @@ export function clearSwap(
   const swaps = { ...log.swaps };
   delete swaps[fromKey];
   const bc = { ...(log.behaviorCompletions ?? {}) };
-  delete bc[toKey];
+  // Only delete the replacement's completion if THIS swap set it.
+  // The swapAutoCompleted sidecar records that intent. If the
+  // replacement was already legitimately completed before the swap
+  // (e.g. user walked at 7am, then swapped strength→walk at 5pm),
+  // leave the completion intact.
+  const autoCompleted = log.swapAutoCompleted?.[fromKey] === true;
+  if (autoCompleted) {
+    delete bc[toKey];
+  }
+  const swapAutoCompleted = { ...(log.swapAutoCompleted ?? {}) };
+  delete swapAutoCompleted[fromKey];
   const score = computeBehaviorScore(state, date, bc);
   const updated: DailyLog = {
     ...log,
     swaps: Object.keys(swaps).length > 0 ? swaps : undefined,
     behaviorCompletions: bc,
     score,
+    swapAutoCompleted:
+      Object.keys(swapAutoCompleted).length > 0
+        ? swapAutoCompleted
+        : undefined,
   };
   const dailyLogs = state.dailyLogs.map((l) =>
     l.date === date ? updated : l

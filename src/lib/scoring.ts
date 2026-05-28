@@ -1,4 +1,5 @@
 import { SCORE_WEIGHTS } from "./constants";
+import { addDaysToKey, dateKeyInTz, getTz } from "./tz";
 import type { DailyLog, ProtocolItem, UserSettings } from "./types";
 
 /**
@@ -73,7 +74,15 @@ export function calculateDailyScore(
  */
 export function calculateStreak(
   logs: DailyLog[],
-  vacationDates?: Set<string>
+  vacationDates?: Set<string>,
+  /**
+   * Caller can pass settings so the "today / yesterday" anchor uses
+   * the user's tz (matches the rest of the engine, which is tz-aware
+   * via dateKeyInTz). When omitted, falls back to device-local
+   * midnight — the previous behavior, kept as default for callers
+   * (tests, legacy paths) that don't have settings handy.
+   */
+  settings?: UserSettings
 ): number {
   if (logs.length === 0) return 0;
 
@@ -83,13 +92,24 @@ export function calculateStreak(
 
   if (sorted.length === 0) return 0;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  const todayStr = formatDateKey(today);
-  const yesterdayStr = formatDateKey(yesterday);
+  // Anchor today/yesterday in the user's tz when settings provided —
+  // a traveler crossing midnight in another tz shouldn't see their
+  // streak flicker because the device clock rolled over earlier
+  // than the engine's stored YYYY-MM-DD keys. Falls back to device-
+  // local for backward compatibility.
+  let todayStr: string;
+  let yesterdayStr: string;
+  if (settings) {
+    todayStr = dateKeyInTz(getTz(settings));
+    yesterdayStr = addDaysToKey(todayStr, -1);
+  } else {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    todayStr = formatDateKey(today);
+    yesterdayStr = formatDateKey(yesterday);
+  }
 
   // Allow vacation days to count as "current" for the head check —
   // a user who's been on vacation today shouldn't have their streak

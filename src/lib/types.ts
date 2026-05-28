@@ -333,6 +333,18 @@ export interface DailyLog {
    * accumulate streak credit for the other).
    */
   swaps?: Record<string, string>;
+
+  /**
+   * Sidecar to `swaps`: for each fromKey, did the swap operation
+   * also auto-complete the replacement (true) or was the
+   * replacement already legitimately done before the swap (false)?
+   *
+   * Used by clearSwap to undo surgically: when the user reverses
+   * a swap, we only delete the replacement's completion bit if WE
+   * set it. A walk completed independently at 7am stays completed
+   * after the user undoes a 5pm "strength → walk" swap.
+   */
+  swapAutoCompleted?: Record<string, boolean>;
 }
 
 // ── Insights ──────────────────────────────────────────────────────
