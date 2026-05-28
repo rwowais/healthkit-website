@@ -115,12 +115,22 @@ export function calculateStreak(
   // a user who's been on vacation today shouldn't have their streak
   // displayed as 0.
   const isVacation = (s: string) => vacationDates?.has(s) === true;
-  if (
-    sorted[0].date !== todayStr &&
-    sorted[0].date !== yesterdayStr &&
-    !isVacation(todayStr) &&
-    !isVacation(yesterdayStr)
-  ) {
+  // When settings is supplied (tz-aware caller), grant a 2-day head
+  // grace instead of 1. A forward tz crossing (PST → Tokyo, +16h)
+  // makes "yesterday in destination tz" = 2 calendar days after the
+  // last log written in source tz. Without this grace, the streak
+  // collapses to 0 the moment a traveler lands — visible UX bug
+  // surfaced by the shift-and-travel persona. The expanded grace
+  // only kicks in for tz-aware callers (settings provided); legacy
+  // callers without settings keep the strict 1-day check.
+  const twoAgoStr = settings ? addDaysToKey(todayStr, -2) : null;
+  const headOk =
+    sorted[0].date === todayStr ||
+    sorted[0].date === yesterdayStr ||
+    (twoAgoStr !== null && sorted[0].date === twoAgoStr) ||
+    isVacation(todayStr) ||
+    isVacation(yesterdayStr);
+  if (!headOk) {
     return 0;
   }
 

@@ -569,6 +569,25 @@ export function getSignals(state: AppState): Signals {
       // increment for real "I forgot to open the app" gaps.
       if (!vacays.has(cursor)) gapDays++;
     }
+    // Tz-crossing grace: forward crossing (PST → Tokyo, +16h)
+    // makes the "yesterday-in-destination-tz" calendar key be 2
+    // days after the last log key written in the source tz, even
+    // though no actual logging gap exists. Without correction this
+    // shows up as gapDays=1 on arrival day (and ratchets toward 2,
+    // which would tip the rebuild branch). Squelch a 1-day gap
+    // when the user has been continuously active just before —
+    // i.e., the second-most-recent log is itself within 1 calendar
+    // day of the last log. This preserves the signal for genuine
+    // gaps (longer than 1 day OR not preceded by recent activity).
+    if (gapDays === 1 && active.length >= 2) {
+      const prevKey = active[1].date;
+      // If the two most-recent logs are calendar-adjacent (no real
+      // gap between them), the apparent 1-day gap today is a
+      // tz-crossing artifact, not a real absence.
+      if (addDaysToKey(lastKey, -1) === prevKey) {
+        gapDays = 0;
+      }
+    }
   }
 
   // Prefer *today's* check-in the moment it exists — otherwise the whole
