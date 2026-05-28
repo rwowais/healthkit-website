@@ -154,7 +154,7 @@ const TABS: { id: Tab; label: string; hint: string }[] = [
   {
     id: "intelligence",
     label: "Intelligence",
-    hint: "Atom registry, trust tiers, ontology audit, behavior provenance.",
+    hint: "Behavior registry, trust tiers, catalog audit, provenance.",
   },
   {
     id: "simulate",
@@ -981,12 +981,12 @@ function AdminHomeInner() {
       <Eyebrow color="var(--readiness)">
         Internal · Protocol Intelligence
       </Eyebrow>
-      <h1 className="t-title mt-2 text-[var(--text-1)]">Knowledge CMS</h1>
+      <h1 className="t-title mt-2 text-[var(--text-1)]">Knowledge</h1>
       <p className="t-caption mt-2 leading-relaxed">
         Authoring + governance for the protocol catalog. Edits live as
-        drafts until you <b>Publish</b> a bundle — the app currently
-        serves the built-in v{activeBundleVersion()} catalog unless a
-        newer published bundle exists.
+        drafts until you <b>Publish</b> — the app currently serves the
+        built-in v{activeBundleVersion()} catalog unless a newer
+        published edition exists.
       </p>
 
       <div className="no-scrollbar mt-6 flex gap-1.5 overflow-x-auto">
@@ -1020,12 +1020,12 @@ function AdminHomeInner() {
                 {
                   k: "Live behaviors",
                   v: behaviorCount,
-                  hint: "Distinct canonical keys across the live bundle.",
+                  hint: "Distinct behaviors across the live catalog.",
                 },
                 {
-                  k: "Live bundle",
+                  k: "Catalog version",
                   v: `v${activeBundleVersion()}`,
-                  hint: "Built-in version unless a newer published bundle has been adopted this session.",
+                  hint: "Built-in version unless a newer edition has been published and adopted this session.",
                 },
               ].map((s) => (
                 <div
@@ -1088,9 +1088,17 @@ function AdminHomeInner() {
                       <span className="text-[var(--text-2)]">
                         {b.title}
                       </span>
-                      <span className="shrink-0 text-[var(--text-4)]">
-                        {b.block} · L{b.leverage} ·{" "}
-                        <code>{b.canonicalKey}</code>
+                      <span
+                        className="shrink-0 text-[var(--text-4)]"
+                        title={`Leverage ${b.leverage} / 3`}
+                      >
+                        {b.block} ·{" "}
+                        {b.leverage === 3
+                          ? "high"
+                          : b.leverage === 2
+                          ? "medium"
+                          : "low"}{" "}
+                        impact · <code>{b.canonicalKey}</code>
                       </span>
                     </div>
                   ))}
@@ -1674,7 +1682,7 @@ function AdminHomeInner() {
                 </div>
                 <div className="mt-2 space-y-1 text-[11.5px]">
                   <p className="font-mono text-[var(--text-2)]">
-                    active bundle: v{activeBundleVersion()}
+                    active catalog: v{activeBundleVersion()}
                   </p>
                   <p className="font-mono text-[var(--text-2)]">
                     effective config:{" "}
@@ -1694,11 +1702,11 @@ function AdminHomeInner() {
                     </code>
                   </p>
                   <p className="t-caption mt-1.5 leading-relaxed">
-                    If "active bundle" is <b>v0</b> after Publish, the
-                    runtime didn&apos;t adopt — hit Re-fetch. If it shows
-                    a real version but the values look stale, hard-
-                    refresh (Cmd-Shift-R) — your browser is on an old JS
-                    bundle.
+                    If &ldquo;active catalog&rdquo; is <b>v0</b> after
+                    Publish, the runtime didn&apos;t adopt — hit
+                    Re-fetch. If it shows a real version but the values
+                    look stale, hard-refresh (Cmd-Shift-R) — your
+                    browser is on an old JS build.
                   </p>
                 </div>
               </div>
@@ -2411,7 +2419,7 @@ function AdminHomeInner() {
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   {
-                    label: "Curated atoms",
+                    label: "Curated behaviors",
                     value: intelData.inventory.totalCurated,
                   },
                   {
@@ -2466,7 +2474,7 @@ function AdminHomeInner() {
               </div>
             </div>
 
-            {/* Ontology audit — any catalog-level issues */}
+            {/* Catalog audit — any catalog-level issues */}
             <div className={card} style={surf}>
               <div className="flex items-center justify-between">
                 <Eyebrow
@@ -2478,7 +2486,7 @@ function AdminHomeInner() {
                       : "var(--vitality)"
                   }
                 >
-                  Ontology audit
+                  Catalog audit
                 </Eyebrow>
                 <span className="t-caption">
                   {intelData.issues.length === 0
@@ -2488,10 +2496,10 @@ function AdminHomeInner() {
               </div>
               {intelData.issues.length === 0 ? (
                 <p className="mt-2 text-[13px] text-[var(--text-3)]">
-                  Catalog passes every cross-cutting invariant (canonicalKey
-                  shape, derivedFrom/targets reference real keys, no
-                  duplicate titles across canonical atoms, every atom with
-                  evidence text has an evidenceTier).
+                  Catalog passes every cross-cutting check: behavior ids
+                  are well-formed, derivedFrom/targets reference real
+                  ids, no duplicate titles across curated behaviors,
+                  every behavior with evidence text has an evidence tier.
                 </p>
               ) : (
                 <div className="mt-3 space-y-2">
@@ -2545,10 +2553,10 @@ function AdminHomeInner() {
             <div className={card} style={surf}>
               <Eyebrow>Safety coverage</Eyebrow>
               <p className="mt-1 t-caption leading-relaxed">
-                How many curated atoms declare each contraindication flag
-                — the engine quietly suppresses these for users with the
-                matching settings flag (not a clinical warning, just
-                tailoring).
+                How many curated behaviors declare each contraindication
+                flag — the engine quietly suppresses these for users
+                with the matching settings flag (not a clinical warning,
+                just tailoring).
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {Object.entries(
@@ -2574,20 +2582,20 @@ function AdminHomeInner() {
               </div>
             </div>
 
-            {/* Atom inventory — full registry with filter + drill-down */}
+            {/* Behavior inventory — full registry with filter + drill-down */}
             <div className={card} style={surf}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Eyebrow>Atom registry</Eyebrow>
+                <Eyebrow>Behavior registry</Eyebrow>
                 <span className="t-caption">
-                  Click any atom to inspect its provenance, merge state,
-                  and governance metadata.
+                  Click any behavior to inspect its provenance, merge
+                  state, and governance metadata.
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <input
                   value={intelFilter}
                   onChange={(e) => setIntelFilter(e.target.value)}
-                  placeholder="Search atoms by key, title, or pack…"
+                  placeholder="Search behaviors by id, title, or pack…"
                   className="flex-1 min-w-[200px] rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2 text-[13px] text-[var(--text-1)] outline-none"
                 />
                 <div className="flex gap-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] p-0.5">
@@ -2643,7 +2651,7 @@ function AdminHomeInner() {
                   if (rows.length === 0)
                     return (
                       <p className="px-3 py-4 text-[12.5px] text-[var(--text-3)]">
-                        No atoms match the current filter.
+                        No behaviors match the current filter.
                       </p>
                     );
                   return rows.map((a) => (
@@ -2679,7 +2687,13 @@ function AdminHomeInner() {
                           <span>·</span>
                           <span className="capitalize">{a.block}</span>
                           <span>·</span>
-                          <span>L{a.leverage}</span>
+                          <span title={`Leverage ${a.leverage} / 3`}>
+                            {a.leverage === 3
+                              ? "high impact"
+                              : a.leverage === 2
+                              ? "medium"
+                              : "low"}
+                          </span>
                           {a.evidenceTier && (
                             <>
                               <span>·</span>
