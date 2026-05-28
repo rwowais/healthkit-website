@@ -103,5 +103,25 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
     ],
-  };
+    // Web Share Target — lets other apps share content TO Protocolize.
+    // When the user picks Protocolize from their OS share sheet, the
+    // shared text/url/title lands on /share via GET parameters; the
+    // page then offers to file it as a note attached to a biomarker
+    // entry or as a custom behavior reminder.
+    //
+    // The cast is because Next's typed Manifest doesn't include
+    // share_target yet — but every browser that honors the field
+    // accepts this exact shape (per the W3C spec).
+    share_target: {
+      action: "/share",
+      method: "GET",
+      params: {
+        title: "title",
+        text: "text",
+        url: "url",
+      },
+    },
+    // Type assertion: Next's MetadataRoute.Manifest type lags behind
+    // the W3C spec for share_target. The shape above is valid HTML5.
+  } as MetadataRoute.Manifest;
 }

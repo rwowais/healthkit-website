@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import * as haptic from "@/lib/haptics";
+import { setBadge } from "@/lib/appBadge";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
 import { getLogForDate } from "@/lib/storage";
 import { getPendingConflict } from "@/lib/datasource";
 import {
@@ -168,6 +170,14 @@ export default function TodayPage() {
       haptic.success();
     }
   );
+
+  // Visibility refresh: when the user returns to the app after being
+  // away for 30s+, silently re-fetch state so the timeline reflects
+  // whatever they did on another device (or the latest mastery /
+  // suggestions / adapt mode).
+  useVisibilityRefresh(() => {
+    refresh();
+  });
 
   // Onboarding guard — a returning user lands here after auth, but a
   // genuinely new account (cloud-loaded, no onboarding) gets sent to
@@ -451,6 +461,17 @@ export default function TodayPage() {
     () => timelineProgress(timeline, log),
     [timeline, log]
   );
+
+  // App icon badge: number of behaviors still to do today. Only set
+  // for *today* (past/future scrubber views don't represent
+  // actionable now-work). Cleared on day-complete so the user sees
+  // a clean icon as their reward, not a "0" sitting there. The
+  // helper is no-op on platforms that don't support the API.
+  useEffect(() => {
+    if (!isToday) return;
+    const remaining = Math.max(0, prog.total - prog.done);
+    setBadge(remaining);
+  }, [isToday, prog.done, prog.total]);
   const ksItem = useMemo(
     () =>
       ks ? timeline.find((i) => i.canonicalKey === ks.key) ?? null : null,
