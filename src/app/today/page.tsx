@@ -10,6 +10,9 @@ import { setBadge } from "@/lib/appBadge";
 import { supplementsForBlock } from "@/lib/supplements";
 import SupplementBlockCard from "@/components/SupplementBlockCard";
 import DailyReflection from "@/components/DailyReflection";
+import DailyCheckInCard from "@/components/today/DailyCheckInCard";
+import BulkMoveSheet from "@/components/today/BulkMoveSheet";
+import WorkoutSwapSheet from "@/components/today/WorkoutSwapSheet";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -1184,66 +1187,12 @@ export default function TodayPage() {
 
         {/* Daily check-in — feeds the adaptive engine */}
         {isToday && !checkedIn && !firstDaySoft && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="card p-5"
-          >
-            <Eyebrow>Morning check-in</Eyebrow>
-            <p className="t-caption mt-1.5">
-              Two taps. This is what makes tomorrow adapt to you.
-            </p>
-            <p className="mt-4 mb-2 text-[13px] font-medium text-[var(--text-2)]">
-              How did you sleep?
-            </p>
-            <div className="flex gap-2">
-              {[
-                { l: "Poor", q: 2 },
-                { l: "OK", q: 3 },
-                { l: "Great", q: 5 },
-              ].map((o) => (
-                <button
-                  key={o.l}
-                  onClick={() =>
-                    updateSleepLog(selectedDate, { sleepQuality: o.q })
-                  }
-                  className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
-                  style={{
-                    background:
-                      sleepQ === o.q ? "var(--sleep)" : "var(--surface-2)",
-                    color: sleepQ === o.q ? "#08090B" : "var(--text-3)",
-                  }}
-                >
-                  {o.l}
-                </button>
-              ))}
-            </div>
-            <p className="mt-4 mb-2 text-[13px] font-medium text-[var(--text-2)]">
-              Energy right now?
-            </p>
-            <div className="flex gap-2">
-              {[
-                { l: "Low", e: 2 },
-                { l: "Steady", e: 3 },
-                { l: "High", e: 5 },
-              ].map((o) => (
-                <button
-                  key={o.l}
-                  onClick={() => updateRatings(selectedDate, { energy: o.e })}
-                  className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
-                  style={{
-                    background:
-                      energy === o.e
-                        ? "var(--readiness)"
-                        : "var(--surface-2)",
-                    color: energy === o.e ? "#08090B" : "var(--text-3)",
-                  }}
-                >
-                  {o.l}
-                </button>
-              ))}
-            </div>
-          </motion.div>
+          <DailyCheckInCard
+            sleepQ={sleepQ}
+            energy={energy}
+            onSleep={(q) => updateSleepLog(selectedDate, { sleepQuality: q })}
+            onEnergy={(e) => updateRatings(selectedDate, { energy: e })}
+          />
         )}
 
         {/* First-day soft entry — tomorrow's first focus, not today's
@@ -2398,73 +2347,32 @@ export default function TodayPage() {
 
       {/* Bulk move destination sheet — replaces the four inline block
           pills that overflowed the bar on narrow screens. */}
-      {bulkMoveOpen && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center"
-          onClick={() => setBulkMoveOpen(false)}
-          style={{
-            background: "color-mix(in srgb, #000 60%, transparent)",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[420px] rounded-t-[var(--r-xl)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--hairline-strong)",
-              borderBottom: "none",
-            }}
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--text-4)]" />
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
-              Move {selectedKeys.size} to
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {(
-                ["morning", "afternoon", "evening", "anytime"] as TimeBlock[]
-              ).map((b) => (
-                <button
-                  key={b}
-                  onClick={() => {
-                    const moves: {
-                      key: string;
-                      title: string;
-                      recommendedBlock: TimeBlock;
-                      timingReason?: string;
-                    }[] = [];
-                    for (const k of selectedKeys) {
-                      const it = timeline.find((x) => x.canonicalKey === k);
-                      if (!it || it.block === b) continue;
-                      moves.push({
-                        key: k,
-                        title: it.title,
-                        recommendedBlock: it.recommendedBlock,
-                        timingReason: it.timingReason,
-                      });
-                    }
-                    requestBlockMove(moves, b);
-                    setSelectedKeys(new Set());
-                    setBulkMoveOpen(false);
-                  }}
-                  className="press tr-fast rounded-[var(--r-md)] py-3 text-[13.5px] font-semibold"
-                  style={{
-                    background: "var(--surface-3)",
-                    color: "var(--text-1)",
-                  }}
-                >
-                  {blockLabel(b)}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setBulkMoveOpen(false)}
-              className="press tr-fast mt-3 w-full py-2 text-[12.5px] text-[var(--text-3)]"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      <BulkMoveSheet
+        open={bulkMoveOpen}
+        count={selectedKeys.size}
+        onClose={() => setBulkMoveOpen(false)}
+        onSelectBlock={(b) => {
+          const moves: {
+            key: string;
+            title: string;
+            recommendedBlock: TimeBlock;
+            timingReason?: string;
+          }[] = [];
+          for (const k of selectedKeys) {
+            const it = timeline.find((x) => x.canonicalKey === k);
+            if (!it || it.block === b) continue;
+            moves.push({
+              key: k,
+              title: it.title,
+              recommendedBlock: it.recommendedBlock,
+              timingReason: it.timingReason,
+            });
+          }
+          requestBlockMove(moves, b);
+          setSelectedKeys(new Set());
+          setBulkMoveOpen(false);
+        }}
+      />
 
       {/* Workout swap sheet — appears when the user taps "Swap
           workout" on a scheduled workout row. Lists every workout
@@ -2472,99 +2380,28 @@ export default function TodayPage() {
           standalone library), excluding the original itself. Tapping
           one swaps for today only and auto-marks complete (the user
           is telling us they DID the alternative). */}
-      {swapForKey && (() => {
-        const original = timeline.find(
-          (x) => x.canonicalKey === swapForKey
-        );
-        const alternatives = availableWorkoutAlternatives(state).filter(
-          (b) => b.canonicalKey !== swapForKey
-        );
-        return (
-          <div
-            className="fixed inset-0 z-[60] flex items-end justify-center"
-            onClick={() => setSwapForKey(null)}
-            style={{
-              background: "color-mix(in srgb, #000 60%, transparent)",
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[420px] rounded-t-[var(--r-xl)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--hairline-strong)",
-                borderBottom: "none",
-                maxHeight: "82vh",
-                overflowY: "auto",
-              }}
-            >
-              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--text-4)]" />
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
-                Swap for today
-              </p>
-              <h3 className="mt-1 text-[18px] font-bold text-[var(--text-1)]">
-                {original?.title ?? "Workout"} → ?
-              </h3>
-              <p className="t-caption mt-1 leading-relaxed">
-                Pick what you actually did. We&apos;ll mark it complete
-                for today; your original schedule is unchanged.
-              </p>
-              {alternatives.length === 0 ? (
-                <p className="mt-4 text-[13px] text-[var(--text-3)]">
-                  No other workouts available. Install another protocol
-                  pack from Library to unlock swaps.
-                </p>
-              ) : (
-                <div className="mt-4 space-y-1.5">
-                  {alternatives.map((alt) => (
-                    <button
-                      key={alt.canonicalKey}
-                      onClick={() => {
-                        swapBehavior(
-                          selectedDate,
-                          swapForKey,
-                          alt.canonicalKey
-                        );
-                        setSwapForKey(null);
-                        haptic.medium();
-                      }}
-                      className="press tr-fast flex w-full items-center gap-3 rounded-[var(--r-md)] p-3 text-left"
-                      style={{ background: "var(--surface-3)" }}
-                    >
-                      <span
-                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
-                        style={{
-                          background:
-                            "color-mix(in srgb, var(--readiness) 14%, var(--surface-3))",
-                          color: "var(--readiness)",
-                        }}
-                      >
-                        <Icon name={alt.icon as IconName} size={15} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-semibold text-[var(--text-1)]">
-                          {alt.title}
-                        </span>
-                        {alt.dose && (
-                          <span className="mt-0.5 block text-[11.5px] text-[var(--text-3)]">
-                            {alt.dose}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setSwapForKey(null)}
-                className="press tr-fast mt-4 w-full py-2 text-[12.5px] text-[var(--text-3)]"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        );
-      })()}
+      <WorkoutSwapSheet
+        swapForKey={swapForKey}
+        originalTitle={
+          swapForKey
+            ? timeline.find((x) => x.canonicalKey === swapForKey)?.title
+            : undefined
+        }
+        alternatives={
+          swapForKey
+            ? availableWorkoutAlternatives(state).filter(
+                (b) => b.canonicalKey !== swapForKey
+              )
+            : []
+        }
+        onClose={() => setSwapForKey(null)}
+        onSelect={(altKey) => {
+          if (!swapForKey) return;
+          swapBehavior(selectedDate, swapForKey, altKey);
+          setSwapForKey(null);
+          haptic.medium();
+        }}
+      />
 
       {/* Cross-block move confirmation. Each contradicted behavior
           surfaces ITS OWN scientific rationale — melatonin says
