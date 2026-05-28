@@ -909,6 +909,35 @@ export function bulkCheckSupplements(
   return { ...state, dailyLogs, supplements };
 }
 
+/**
+ * Mark a set of supplements skipped (or un-skipped) for a given day.
+ * Powers the "skip today" affordance on a block's stack so a day you're
+ * deliberately not taking supplements can still close cleanly — without
+ * recording them as taken. No inventory effect (a skip consumes
+ * nothing). Idempotent and order-independent.
+ */
+export function setSupplementsSkipped(
+  state: AppState,
+  date: string,
+  ids: string[],
+  skipped: boolean
+): AppState {
+  if (ids.length === 0) return state;
+  const log = getOrCreateLog(state, date);
+  const next = new Set(log.supplementSkips ?? []);
+  for (const id of ids) {
+    if (skipped) next.add(id);
+    else next.delete(id);
+  }
+  const updated: DailyLog = { ...log, supplementSkips: [...next] };
+  const idx = state.dailyLogs.findIndex((l) => l.date === date);
+  const dailyLogs =
+    idx >= 0
+      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
+      : [...state.dailyLogs, updated];
+  return { ...state, dailyLogs };
+}
+
 /** Add a new supplement (custom or curated catalog pick). */
 export function addSupplement(
   state: AppState,

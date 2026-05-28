@@ -5,7 +5,14 @@
  * strong, real signal is detected, not that the bar is gone.
  */
 import { describe, it, expect } from "vitest";
-import { keystone, whatWorks, suggestions } from "@/lib/intel";
+import {
+  keystone,
+  whatWorks,
+  suggestions,
+  compareUpNext,
+  isActionable,
+  type UpNextRank,
+} from "@/lib/intel";
 import {
   compileTimeline,
   masteredKeys,
@@ -335,5 +342,62 @@ describe("D2 friction intelligence — suggestions", () => {
     const sug = suggestions({ ...st, dailyLogs: logs });
     expect(sug.find((s) => s.action.type === "retime")).toBeUndefined();
     expect(sug.find((s) => s.action.type === "pause")).toBeUndefined();
+  });
+});
+
+describe("Up Next ranking — compareUpNext / isActionable", () => {
+  const r = (
+    tier: 0 | 1 | 2,
+    lev: number,
+    diff: number
+  ): UpNextRank => ({ tier, lev, diff });
+
+  const sortRanks = (xs: UpNextRank[]) => [...xs].sort(compareUpNext);
+
+  it("due/overdue beats upcoming beats anytime", () => {
+    const overdue = r(0, 1, -10);
+    const upcoming = r(1, 3, 30);
+    const anytime = r(2, 3, 0);
+    expect(sortRanks([anytime, upcoming, overdue])).toEqual([
+      overdue,
+      upcoming,
+      anytime,
+    ]);
+  });
+
+  it("THE reported case: an overdue Essential outranks a less-overdue lower-leverage item", () => {
+    // Zone 2 movement (Essential, 60 min overdue) vs Fiber (leverage 2,
+    // 30 min overdue). Caffeine cutoff (a guardrail) is excluded upstream
+    // by isActionable, so the hero must be Zone 2 — not the just-due item
+    // the old discount-overdue math surfaced.
+    const zone2 = r(0, 3, -60);
+    const fiber = r(0, 2, -30);
+    expect(sortRanks([fiber, zone2])[0]).toEqual(zone2);
+  });
+
+  it("within due/overdue, leverage dominates over how-overdue", () => {
+    const slightlyOverdueEssential = r(0, 3, -5);
+    const veryOverdueSupporting = r(0, 2, -300);
+    expect(sortRanks([veryOverdueSupporting, slightlyOverdueEssential])[0]).toEqual(
+      slightlyOverdueEssential
+    );
+  });
+
+  it("within due/overdue at equal leverage, the more-overdue comes first", () => {
+    const a = r(0, 3, -60);
+    const b = r(0, 3, -10);
+    expect(sortRanks([b, a])[0]).toEqual(a);
+  });
+
+  it("within upcoming, soonest comes first (time beats leverage)", () => {
+    const soonLowLev = r(1, 1, 10);
+    const laterEssential = r(1, 3, 90);
+    expect(sortRanks([laterEssential, soonLowLev])[0]).toEqual(soonLowLev);
+  });
+
+  it("isActionable excludes guardrails (avoid / reminder), keeps actions", () => {
+    expect(isActionable({ kind: "action" })).toBe(true);
+    expect(isActionable({ kind: "avoid" })).toBe(false);
+    expect(isActionable({ kind: "reminder" })).toBe(false);
   });
 });

@@ -313,6 +313,14 @@ export interface DailyLog {
   // older logs without it parse cleanly.
   supplementCompletions?: Record<string, boolean>;
 
+  // Supplements explicitly skipped for this day (ids). "Skip today" on
+  // a block's stack lets a day you're not taking supplements still
+  // reach "Complete" without lying about having taken them. A
+  // supplement counts as "handled" for completion if it's either taken
+  // (supplementCompletions) or skipped here. Per-day — skipping today
+  // never affects another day.
+  supplementSkips?: string[];
+
   // Protocol-OS behavior tracking (canonicalKey -> done)
   behaviorCompletions?: Record<string, boolean>;
 

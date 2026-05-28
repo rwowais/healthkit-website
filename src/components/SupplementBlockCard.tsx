@@ -36,6 +36,8 @@ export default function SupplementBlockCard({
   onToggle,
   onBulkCheck,
   onOpenDetail,
+  blockSkipped = false,
+  onToggleSkip,
 }: {
   block: TimeBlock;
   supplements: Supplement[];
@@ -43,12 +45,18 @@ export default function SupplementBlockCard({
   onToggle: (id: string) => void;
   onBulkCheck: () => void;
   onOpenDetail?: (supp: Supplement) => void;
+  /** True when the un-taken supplements in this block are skipped today. */
+  blockSkipped?: boolean;
+  /** Toggle skip-today for the block's remaining supplements. */
+  onToggleSkip?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (supplements.length === 0) return null;
   const done = supplements.filter((s) => completions[s.id] === true).length;
   const total = supplements.length;
   const allDone = done === total;
+  // "Handled" = every supplement either taken or (for the rest) skipped.
+  const effectivelyComplete = allDone || blockSkipped;
   const blockLabel = block.charAt(0).toUpperCase() + block.slice(1);
 
   return (
@@ -71,14 +79,19 @@ export default function SupplementBlockCard({
         <span
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
           style={{
-            background:
-              allDone
-                ? "color-mix(in srgb, var(--vitality) 22%, var(--surface-3))"
-                : "color-mix(in srgb, var(--warm) 18%, var(--surface-3))",
-            color: allDone ? "var(--vitality)" : "var(--warm)",
+            background: allDone
+              ? "color-mix(in srgb, var(--vitality) 22%, var(--surface-3))"
+              : blockSkipped
+              ? "var(--surface-3)"
+              : "color-mix(in srgb, var(--warm) 18%, var(--surface-3))",
+            color: allDone
+              ? "var(--vitality)"
+              : blockSkipped
+              ? "var(--text-3)"
+              : "var(--warm)",
           }}
         >
-          {allDone ? (
+          {effectivelyComplete ? (
             <Icon name="check" size={18} />
           ) : (
             <Icon name="pill" size={18} />
@@ -92,7 +105,13 @@ export default function SupplementBlockCard({
             {done}/{total}
             <span className="text-[var(--text-4)]">
               {" · "}
-              {expanded ? "tap to collapse" : allDone ? "all done" : "tap to see all"}
+              {expanded
+                ? "tap to collapse"
+                : allDone
+                ? "all done"
+                : blockSkipped
+                ? "skipped today"
+                : "tap to see all"}
             </span>
           </p>
         </div>
@@ -119,7 +138,7 @@ export default function SupplementBlockCard({
               Manage →
             </Link>
           </div>
-          {!allDone && (
+          {!allDone && !blockSkipped && (
             <button
               onClick={() => {
                 haptic.medium();
@@ -134,6 +153,26 @@ export default function SupplementBlockCard({
             >
               <Icon name="check" size={14} />
               Take all ({total - done} left)
+            </button>
+          )}
+          {/* Skip-today: lets a day you're not taking the rest still
+              close cleanly, without recording them as taken. */}
+          {!allDone && onToggleSkip && (
+            <button
+              onClick={() => {
+                haptic.light();
+                onToggleSkip();
+              }}
+              className="press tr-fast mb-1 flex w-full items-center justify-center gap-1.5 py-1.5 text-[12px] font-medium text-[var(--text-3)]"
+            >
+              {blockSkipped ? (
+                <>
+                  <Icon name="check" size={13} />
+                  Skipped today · Undo
+                </>
+              ) : (
+                "Skip the rest today"
+              )}
             </button>
           )}
           {supplements.map((s) => {

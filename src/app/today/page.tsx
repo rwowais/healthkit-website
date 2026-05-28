@@ -45,7 +45,9 @@ import {
   fmtClock,
   behaviorStats,
   suggestions,
-  dueRank,
+  upNextRank,
+  compareUpNext,
+  isActionable,
   keystone,
   nowMinutes,
   type Suggestion,
@@ -165,6 +167,7 @@ export default function TodayPage() {
     clearSwap,
     toggleSupplement,
     bulkCheckSupplements,
+    setSupplementsSkipped,
     updateSleepLog,
     updateRatings,
     installPack,
@@ -538,8 +541,31 @@ export default function TodayPage() {
       ks ? timeline.find((i) => i.canonicalKey === ks.key) ?? null : null,
     [ks, timeline]
   );
+  // A day isn't "fully closed" until its supplement stacks are handled
+  // too — every scheduled supplement either taken or skipped today.
+  // Mirrors the per-block rule so the day-level celebration never fires
+  // over an untouched stack.
+  const allSuppHandledToday = useMemo(() => {
+    const comp = log.supplementCompletions ?? {};
+    const skips = new Set(log.supplementSkips ?? []);
+    for (const block of BLOCKS) {
+      const supps = supplementsForBlock(
+        state.supplements ?? [],
+        block,
+        selDayIdx,
+        state.settings.safetyFlags ?? {}
+      );
+      for (const s of supps) {
+        if (!comp[s.id] && !skips.has(s.id)) return false;
+      }
+    }
+    return true;
+  }, [log, state.supplements, state.settings.safetyFlags, selDayIdx]);
   const dayComplete =
-    isToday && prog.total > 0 && prog.done === prog.total;
+    isToday &&
+    prog.total > 0 &&
+    prog.done === prog.total &&
+    allSuppHandledToday;
 
   /**
    * First-day soft entry: if the user finished onboarding mid-day, the
@@ -605,11 +631,15 @@ export default function TodayPage() {
       (i) =>
         !i.muted &&
         !isDone(log, i.canonicalKey) &&
-        !snoozed.includes(i.canonicalKey)
+        !snoozed.includes(i.canonicalKey) &&
+        // Guardrail / "avoid" / reminder behaviors (e.g. caffeine cutoff)
+        // are constraints you hold, not actions you tap to do next — they
+        // stay in the timeline but never become the Up Next hero.
+        isActionable(i)
     );
     if (candidates.length === 0) return null;
-    return [...candidates].sort(
-      (a, b) => dueRank(a, settings) - dueRank(b, settings)
+    return [...candidates].sort((a, b) =>
+      compareUpNext(upNextRank(a, settings), upNextRank(b, settings))
     )[0];
   }, [timeline, log, settings, snoozed]);
 
@@ -1512,14 +1542,33 @@ export default function TodayPage() {
             );
             const baseItems =
               visibleItems.length > 0 ? visibleItems : items;
-            const doneCount = baseItems.filter((i) =>
+            const behaviorDone = baseItems.filter((i) =>
               isDone(log, i.canonicalKey)
             ).length;
+            // Supplements are part of the block: it isn't "Complete"
+            // until the stack is handled (each supplement taken OR
+            // skipped today). Tracked separately from behaviorDone so
+            // the timeline thread still fills on behaviors only.
+            const suppSkips = new Set(log.supplementSkips ?? []);
+            const suppTaken = blockSupplements.filter(
+              (s) => log.supplementCompletions?.[s.id]
+            ).length;
+            const suppHandled = blockSupplements.filter(
+              (s) =>
+                log.supplementCompletions?.[s.id] || suppSkips.has(s.id)
+            ).length;
+            // "Skipped" (for the card affordance) = the remaining
+            // un-taken supplements are all skipped.
+            const blockSuppSkipped =
+              blockSupplements.length > 0 &&
+              suppTaken < blockSupplements.length &&
+              suppHandled === blockSupplements.length;
+            const blockDone = behaviorDone + suppHandled;
+            const blockTotal = baseItems.length + blockSupplements.length;
             const cbIdx = BLOCKS.indexOf(cb);
             const isCurrent = block === cb;
             const isPast = bIdx < cbIdx;
-            const fullyDone =
-              baseItems.length > 0 && doneCount === baseItems.length;
+            const fullyDone = blockTotal > 0 && blockDone === blockTotal;
             const collapsed =
               isPast && fullyDone && !openBlocks[block];
 
@@ -1593,7 +1642,7 @@ export default function TodayPage() {
                       ? `Drop here to move to ${blockLabel(block)}`
                       : fullyDone
                       ? "Complete"
-                      : doneCount > 0
+                      : blockDone > 0
                       ? "In flow"
                       : "Open"}
                     {collapsed && (
@@ -1652,7 +1701,8 @@ export default function TodayPage() {
                           initial={false}
                           animate={{
                             height: `${
-                              (doneCount / Math.max(baseItems.length, 1)) *
+                              (behaviorDone /
+                                Math.max(baseItems.length, 1)) *
                               100
                             }%`,
                           }}
@@ -2240,6 +2290,23 @@ export default function TodayPage() {
                             blockSupplements.map((s) => s.id)
                           )
                         }
+                        blockSkipped={blockSuppSkipped}
+                        onToggleSkip={() => {
+                          // Skip (or un-skip) the supplements not already
+                          // taken, so a day you're not taking them can
+                          // still reach "Complete" — without recording
+                          // them as taken.
+                          const untaken = blockSupplements
+                            .filter(
+                              (s) => !log.supplementCompletions?.[s.id]
+                            )
+                            .map((s) => s.id);
+                          setSupplementsSkipped(
+                            selectedDate,
+                            untaken,
+                            !blockSuppSkipped
+                          );
+                        }}
                         // Tap a row → route to /supplements with the
                         // intent to edit. /supplements stack-view is
                         // the proper editor; rather than inlining a

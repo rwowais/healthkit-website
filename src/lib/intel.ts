@@ -794,14 +794,63 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
 }
 
 
-/** Due-aware ordering helper for the live timeline. */
-export function dueRank(
+/**
+ * Up Next ranking — answers "what should I actually do next?".
+ *
+ * The old dueRank() got two things wrong: it *discounted* overdue items
+ * (× 0.4), so an undone Essential you were an hour late on lost to a
+ * guardrail that had only just come due; and it ignored leverage and
+ * behavior kind entirely, so a "don't do" guardrail (caffeine cutoff)
+ * could become the hero "do this next" card over an undone workout.
+ *
+ * The model now mirrors human intuition via three tiers (lower tier =
+ * surfaced first):
+ *   0 — due or overdue (its time has come) — leverage dominates, then
+ *       most-overdue first. Overdue is NOT penalised.
+ *   1 — still upcoming today — soonest first, then leverage.
+ *   2 — anytime (flexible, never urgent) — leverage-ordered.
+ *
+ * Guardrail behaviors (kind "avoid" / "reminder") are filtered out by
+ * the caller before ranking — they belong in the timeline, but should
+ * never be promoted as the next *action*.
+ */
+export interface UpNextRank {
+  tier: 0 | 1 | 2;
+  lev: number;
+  /** scheduled minutes − now; 0 for anytime (unused at tier 2). */
+  diff: number;
+}
+
+export function upNextRank(
   it: TimelineItem,
-  settings: { wakeTime: string; bedtime: string }
-): number {
+  settings: { wakeTime: string; bedtime: string },
+  now: number = nowMinutes()
+): UpNextRank {
+  const lev = (it.leverage as number) ?? 1;
   const m = effectiveMinutes(it, settings);
-  if (m == null) return 9999; // anytime — lowest urgency
-  const diff = m - nowMinutes();
-  // overdue (negative) and near-future rank highest (smallest)
-  return diff < 0 ? -diff * 0.4 : diff;
+  if (m == null) return { tier: 2, lev, diff: 0 };
+  const diff = m - now;
+  return { tier: diff <= 0 ? 0 : 1, lev, diff };
+}
+
+/** Comparator for upNextRank — negative = a is surfaced before b. */
+export function compareUpNext(a: UpNextRank, b: UpNextRank): number {
+  if (a.tier !== b.tier) return a.tier - b.tier;
+  if (a.tier === 0) {
+    // due/overdue: highest leverage first, then most-overdue (diff asc).
+    if (a.lev !== b.lev) return b.lev - a.lev;
+    return a.diff - b.diff;
+  }
+  if (a.tier === 1) {
+    // upcoming: soonest first, then highest leverage.
+    if (a.diff !== b.diff) return a.diff - b.diff;
+    return b.lev - a.lev;
+  }
+  // anytime: highest leverage first.
+  return b.lev - a.lev;
+}
+
+/** Is this behavior a discrete action (vs a guardrail/reminder)? */
+export function isActionable(it: Pick<TimelineItem, "kind">): boolean {
+  return it.kind !== "avoid" && it.kind !== "reminder";
 }

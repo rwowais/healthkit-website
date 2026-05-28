@@ -28,6 +28,7 @@ import {
   clearSwap as clearSwapFn,
   toggleSupplement as toggleSupplementFn,
   bulkCheckSupplements as bulkCheckSupplementsFn,
+  setSupplementsSkipped as setSupplementsSkippedFn,
   addSupplement as addSupplementFn,
   updateSupplement as updateSupplementFn,
   removeSupplement as removeSupplementFn,
@@ -288,6 +289,12 @@ export function useAppState() {
     },
     []
   );
+  const setSupplementsSkipped = useCallback(
+    (date: string, ids: string[], skipped: boolean) => {
+      setState((prev) => setSupplementsSkippedFn(prev, date, ids, skipped));
+    },
+    []
+  );
   const addSupplement = useCallback((supp: Parameters<typeof addSupplementFn>[1]) => {
     setState((prev) => addSupplementFn(prev, supp));
   }, []);
@@ -380,6 +387,7 @@ export function useAppState() {
     // Supplements
     toggleSupplement,
     bulkCheckSupplements,
+    setSupplementsSkipped,
     addSupplement,
     updateSupplement,
     removeSupplement,
