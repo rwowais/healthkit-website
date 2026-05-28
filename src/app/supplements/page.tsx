@@ -22,6 +22,7 @@ import { useAppState } from "@/hooks/useAppState";
 import {
   curatedSupplementCatalog,
   supplementBlockProgress,
+  supplementsForBlock,
 } from "@/lib/supplements";
 import SupplementSheet from "@/components/SupplementSheet";
 import type { Supplement, TimeBlock } from "@/lib/types";
@@ -57,7 +58,16 @@ function SupplementsInner() {
   const tz = getTz(state.settings);
   const today = dateKeyInTz(tz);
 
-  // Group user's supplements by block for the stack view.
+  // Group user's supplements by block for the stack view. We use
+  // supplementsForBlock so the same safety-flag + daysActive
+  // filtering that Today's SupplementBlockCard applies is honored
+  // here. Without this filter, a user with `anticoagulants: true`
+  // would still see fish oil here even though Today hides it.
+  const dayIndex = (() => {
+    const d = new Date();
+    const j = d.getDay();
+    return j === 0 ? 6 : j - 1;
+  })();
   const byBlock = useMemo(() => {
     const m: Record<TimeBlock, Supplement[]> = {
       morning: [],
@@ -65,10 +75,16 @@ function SupplementsInner() {
       evening: [],
       anytime: [],
     };
-    for (const s of userSupplements) m[s.block].push(s);
-    for (const b of BLOCKS) m[b].sort((a, b) => a.name.localeCompare(b.name));
+    for (const b of BLOCKS) {
+      m[b] = supplementsForBlock(
+        userSupplements,
+        b,
+        dayIndex,
+        state.settings.safetyFlags ?? {}
+      );
+    }
     return m;
-  }, [userSupplements]);
+  }, [userSupplements, dayIndex, state.settings.safetyFlags]);
 
   return (
     <Shell>

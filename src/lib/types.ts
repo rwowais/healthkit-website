@@ -157,6 +157,16 @@ export interface UserSettings {
   vacationMode?: boolean;
   /** ISO; stamped when the user toggled vacation mode on. */
   vacationStartedAt?: string;
+  /**
+   * Historical vacation periods. Each entry is a date range
+   * (start..end inclusive, YYYY-MM-DD). When a vacation is active
+   * the most-recent period has `end: null`. When it ends, the toggle
+   * writes today's date as the end. Used by calculateStreak to walk
+   * through vacation days transparently so a user's streak survives
+   * a real break — the "your streak holds" promise in Profile copy
+   * was previously a lie because no caller passed the vacation set.
+   */
+  vacationPeriods?: Array<{ start: string; end: string | null }>;
 
   /**
    * ISO; stamped when the user accepted Terms + Privacy. Required for

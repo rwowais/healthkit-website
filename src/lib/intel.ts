@@ -456,10 +456,16 @@ export function suggestions(state: AppState): Suggestion[] {
     recent.length >= 6 &&
     recent.reduce((a, b) => a + b.score, 0) / recent.length >= 75
   ) {
+    // Suggestion progression-pack list. "burnout-recovery" was
+    // here but contradicted the use case — it installs a
+    // no-intense restraint that mutes the user's strength/zone2
+    // training, the exact opposite of what we want to suggest to
+    // a consistently-strong user. Replace with packs that build
+    // on momentum rather than restrict it.
     const next = activePacks().find(
       (p) =>
         !installed.has(p.id) &&
-        ["deep-focus", "blood-sugar", "burnout-recovery"].includes(p.id)
+        ["deep-focus", "blood-sugar", "heart-health"].includes(p.id)
     );
     if (next) {
       out.push({

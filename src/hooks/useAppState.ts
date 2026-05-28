@@ -29,6 +29,7 @@ import {
   addSupplement as addSupplementFn,
   updateSupplement as updateSupplementFn,
   removeSupplement as removeSupplementFn,
+  setVacationMode as setVacationModeFn,
   installPack as installPackFn,
   uninstallPack as uninstallPackFn,
   setBehaviorOverride as setBehaviorOverrideFn,
@@ -294,6 +295,9 @@ export function useAppState() {
   const removeSupplement = useCallback((id: string) => {
     setState((prev) => removeSupplementFn(prev, id));
   }, []);
+  const setVacationMode = useCallback((on: boolean) => {
+    setState((prev) => setVacationModeFn(prev, on));
+  }, []);
 
   const toggleBehavior = useCallback((date: string, key: string) => {
     setState((prev) => toggleBehaviorFn(prev, date, key));
@@ -365,6 +369,8 @@ export function useAppState() {
     addSupplement,
     updateSupplement,
     removeSupplement,
+    // Vacation
+    setVacationMode,
     // Protocol OS
     toggleBehavior,
     installPack,

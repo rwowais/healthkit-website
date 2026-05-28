@@ -346,25 +346,37 @@ function biomarkerConcern(state: AppState): {
 } {
   const bms = state.biomarkers ?? [];
   if (bms.length === 0) return { text: null, recovery: false };
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
-  const cut = `${cutoff.getFullYear()}-${String(
-    cutoff.getMonth() + 1
-  ).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
-  const latest = new Map<string, number>();
+  // 30-day cutoff in the user's tz — was previously device-clock,
+  // which could drift by up to a day for travelers.
+  const tz = getTz(state.settings);
+  const cut = addDaysToKey(dateKeyInTz(tz), -30);
+  const latest = new Map<string, { value: number; date: string }>();
   for (const b of [...bms].sort((a, c) => a.date.localeCompare(c.date)))
-    if (b.date >= cut) latest.set(b.metric, b.value);
-  for (const [metric, value] of latest) {
+    if (b.date >= cut) latest.set(b.metric, { value: b.value, date: b.date });
+  // Pick the most-recent metric that's outside its band — was
+  // previously insertion-order which surfaced the oldest metric on a
+  // user with multiple "Watch" readings.
+  const candidates: {
+    metric: string;
+    value: number;
+    date: string;
+    def: ReturnType<typeof biomarkerDef>;
+  }[] = [];
+  for (const [metric, entry] of latest) {
     const def = biomarkerDef(metric);
     if (!def || def.direction === "range") continue;
-    if (biomarkerBand(def, value).label === "Watch") {
-      return {
-        text: `Recent ${def.label.toLowerCase()} (${value} ${def.unit}) is outside its optimal range`,
-        recovery: BIO_RECOVERY.has(metric),
-      };
+    if (biomarkerBand(def, entry.value).label === "Watch") {
+      candidates.push({ metric, ...entry, def });
     }
   }
-  return { text: null, recovery: false };
+  if (candidates.length === 0) return { text: null, recovery: false };
+  // Sort by date desc — most-recent Watch wins.
+  candidates.sort((a, b) => b.date.localeCompare(a.date));
+  const pick = candidates[0];
+  return {
+    text: `Recent ${pick.def!.label.toLowerCase()} (${pick.value} ${pick.def!.unit}) is outside its optimal range`,
+    recovery: BIO_RECOVERY.has(pick.metric),
+  };
 }
 
 function logHasActivity(l: DailyLog): boolean {
@@ -379,11 +391,12 @@ function logHasActivity(l: DailyLog): boolean {
 export function getSignals(state: AppState): Signals {
   const logs = state.dailyLogs ?? [];
   const tz = getTz(state.settings);
-  const today = new Date();
-  const tKey = dateKey(today, tz);
-  const y = new Date();
-  y.setDate(y.getDate() - 1);
-  const yLog = logs.find((l) => l.date === dateKey(y, tz));
+  const tKey = dateKeyInTz(tz);
+  // Yesterday in the user's tz — addDaysToKey is DST-stable, unlike
+  // `new Date(); y.setDate(y.getDate() - 1)` which used device tz
+  // and could disagree with stored YYYY-MM-DD keys for travelers.
+  const yKey = addDaysToKey(tKey, -1);
+  const yLog = logs.find((l) => l.date === yKey);
   const tLog = logs.find((l) => l.date === tKey);
 
   const recent = [...logs]
@@ -394,17 +407,26 @@ export function getSignals(state: AppState): Signals {
     ? Math.round(recent.reduce((s, l) => s + l.score, 0) / recent.length)
     : null;
 
-  // gap since last active day (not counting today)
+  // gap since last active day (not counting today). Counts via
+  // calendar-day differences in the user's tz — not via Date math
+  // on the device clock — so a traveler doesn't see drift.
   const active = [...logs]
     .filter((l) => logHasActivity(l) && l.date !== tKey)
     .sort((a, b) => b.date.localeCompare(a.date));
   let gapDays = 0;
   if (active.length) {
-    const last = new Date(active[0].date + "T00:00:00");
-    gapDays = Math.max(
-      0,
-      Math.round((today.setHours(0, 0, 0, 0) - last.getTime()) / 86400000) - 1
-    );
+    const lastKey = active[0].date;
+    // Walk back from today one day at a time until we hit the last
+    // active day. Cheap (<<1ms even with a year-long gap) and
+    // tz-stable. Caps at 365 to avoid pathological loops.
+    let cursor = tKey;
+    for (let i = 0; i < 366; i++) {
+      cursor = addDaysToKey(cursor, -1);
+      if (cursor === lastKey) {
+        gapDays = i; // i = days since lastKey, NOT counting today
+        break;
+      }
+    }
   }
 
   // Prefer *today's* check-in the moment it exists — otherwise the whole
@@ -830,8 +852,20 @@ export function freshlyMastered(
   // noon-UTC anchoring, so DST and device-tz don't matter).
   const yesterdayKey = addDaysToKey(dayKey, -1);
   const yesterday = masteredKeys(state, yesterdayKey);
+  // Compare against the WEEK-PRIOR mastery set too. The weekly
+  // spot-check inside masteredKeys deterministically excludes a
+  // mastered key one day in 7 — so the naive `today \ yesterday`
+  // diff fires a fake "freshly mastered" the day after every spot-
+  // check (a week-long false positive cycle that re-celebrates the
+  // same behavior). Requiring the key to be ALSO missing 7 days ago
+  // gates the celebration to actual graduation, not a spot-check
+  // return.
+  const weekAgoKey = addDaysToKey(dayKey, -7);
+  const weekAgo = masteredKeys(state, weekAgoKey);
   const out = new Set<string>();
-  for (const k of today) if (!yesterday.has(k)) out.add(k);
+  for (const k of today) {
+    if (!yesterday.has(k) && !weekAgo.has(k)) out.add(k);
+  }
   return out;
 }
 

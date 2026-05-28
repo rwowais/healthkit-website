@@ -33,7 +33,7 @@
  *
  *  Push notifications: see the push event handler below.
  */
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v8";
 const SHELL_CACHE = `pz-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `pz-static-${CACHE_VERSION}`;
 const CURRENT_CACHES = [SHELL_CACHE, STATIC_CACHE];

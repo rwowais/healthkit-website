@@ -6,6 +6,7 @@ import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { derivedInsights } from "@/lib/insights";
 import { calculateStreak, weeklyActiveDays } from "@/lib/scoring";
+import { getVacationDates } from "@/lib/storage";
 import { biomarkerDef, biomarkerBand } from "@/lib/biomarkers";
 import {
   keystone,
@@ -55,8 +56,8 @@ export default function InsightsPage() {
   }, [access.premium, state]);
 
   const streak = useMemo(
-    () => calculateStreak(intelState.dailyLogs),
-    [intelState.dailyLogs]
+    () => calculateStreak(intelState.dailyLogs, getVacationDates(intelState)),
+    [intelState]
   );
   const week = useMemo(
     () => weeklyActiveDays(intelState.dailyLogs),

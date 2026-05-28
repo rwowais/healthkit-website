@@ -45,7 +45,7 @@ const INTEGRATIONS: { name: string; icon: IconName }[] = [
 ];
 
 export default function ProfilePage() {
-  const { state, loading, updateSettings } = useAppState();
+  const { state, loading, updateSettings, setVacationMode } = useAppState();
   const router = useRouter();
   const access = getAccess(state);
   const toast = useToast();
@@ -236,14 +236,7 @@ export default function ProfilePage() {
           <Eyebrow>Taking a break</Eyebrow>
           <Row label="Pause everything">
             <button
-              onClick={() =>
-                updateSettings({
-                  vacationMode: !s.vacationMode,
-                  vacationStartedAt: !s.vacationMode
-                    ? new Date().toISOString()
-                    : undefined,
-                })
-              }
+              onClick={() => setVacationMode(!s.vacationMode)}
               role="switch"
               aria-checked={!!s.vacationMode}
               aria-label="Pause everything"
@@ -721,12 +714,15 @@ export default function ProfilePage() {
                 // returning signed-in user lands on /today instead
                 // of the "what's your name" screen.
                 try {
+                  // Preserve the user's wake/bed/tz settings so a
+                  // signed-in reset doesn't silently overwrite
+                  // their schedule with stock defaults.
                   const seed = {
                     version: 3,
                     settings: {
                       name: s.name || "",
-                      bedtime: "23:00",
-                      wakeTime: "07:00",
+                      bedtime: s.bedtime || "23:00",
+                      wakeTime: s.wakeTime || "07:00",
                       timezone: s.timezone || "",
                       subscriptionStatus: "trial",
                       trialStartDate: new Date().toISOString(),

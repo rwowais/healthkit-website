@@ -23,6 +23,7 @@ import type {
 } from "./types";
 
 import { DEFAULT_INSTALLED, PACKS } from "./packs";
+import { activePacks } from "./knowledge";
 import {
   compileTimeline,
   shapeTimeline,
@@ -263,9 +264,12 @@ function normalize(s: AppState): AppState {
 
   // Prune behaviorOverrides that no longer belong to any installed pack —
   // uninstalling/deleting a pack must not leave orphaned overrides behind.
+  // Walk activePacks() (which honors a published CMS bundle) so the
+  // valid-key set matches what the engine actually compiles. Walking
+  // PACKS alone would prune overrides keyed by bundle-only atoms.
   const installedSet = new Set(installedPacks);
   const validKeys = new Set<string>();
-  for (const pack of [...PACKS, ...customPacks]) {
+  for (const pack of [...activePacks(), ...customPacks]) {
     if (!installedSet.has(pack.id)) continue;
     for (const b of pack.behaviors) validKeys.add(b.canonicalKey);
   }
@@ -316,13 +320,15 @@ function normalize(s: AppState): AppState {
   // pack-bound supplements automatically).
   const installedSupplementKeys = new Set<string>();
   const packForSupplementKey = new Map<string, string>();
-  for (const p of PACKS) {
+  // Use activePacks() so a CMS-published bundle (with possibly
+  // different canonical keys, edited titles, or extra atoms) is the
+  // authoritative source. Falling back to PACKS would miss bundle-
+  // only supplements and silently lose user overrides whose keys
+  // belong to bundle atoms.
+  const activeForSync = activePacks();
+  for (const p of activeForSync) {
     if (!installedSetSupp.has(p.id)) continue;
     for (const b of p.behaviors) {
-      // Use the broad detector so CMS-renamed titles + icon=pill
-      // entries that escaped the canonical-key registry still get
-      // extracted into state.supplements. Keys not in the strict
-      // registry are still tracked by their canonicalKey.
       if (isSupplementBehavior(b)) {
         installedSupplementKeys.add(b.canonicalKey);
         if (!packForSupplementKey.has(b.canonicalKey))
@@ -355,9 +361,11 @@ function normalize(s: AppState): AppState {
   for (const key of installedSupplementKeys) {
     if (priorSuppById.has(key)) continue;
     const packId = packForSupplementKey.get(key);
-    // Find the behavior def in the catalog (deduped across packs).
+    // Find the behavior def in the active catalog (built-in OR
+    // published CMS bundle), in that priority order. Walking PACKS
+    // alone would miss bundle-only supplements.
     let def: BehaviorDef | undefined;
-    for (const p of PACKS) {
+    for (const p of activeForSync) {
       def = p.behaviors.find((b) => b.canonicalKey === key);
       if (def) break;
     }
@@ -387,6 +395,20 @@ function normalize(s: AppState): AppState {
   const alreadyMigrated =
     (s.supplementsMigratedAt ?? 0) >= SUPPLEMENT_MIGRATION_VERSION;
   const rawLogs: DailyLog[] = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
+  // Build a broader set of "supplement keys" that includes
+  // CMS-renamed pills that escape the strict canonical-key registry.
+  // We walk every installed pack's behaviors and flag any behavior
+  // detected as a supplement by isSupplementBehavior (canonical key
+  // + derivedFrom + icon + title regex). This way a published bundle
+  // that ships `coq10` as `mag-supp` doesn't silently lose the
+  // user's completion history when we migrate.
+  const allSupplementKeysForMigration = new Set<string>(SUPPLEMENT_CANONICAL_KEYS);
+  for (const p of activeForSync) {
+    if (!installedSetSupp.has(p.id)) continue;
+    for (const b of p.behaviors) {
+      if (isSupplementBehavior(b)) allSupplementKeysForMigration.add(b.canonicalKey);
+    }
+  }
   const migratedLogs: DailyLog[] = alreadyMigrated
     ? rawLogs
     : rawLogs.map((l) => {
@@ -395,7 +417,7 @@ function normalize(s: AppState): AppState {
         const nextSuppDone: Record<string, boolean> = { ...existingSuppDone };
         for (const [key, done] of Object.entries(bc)) {
           if (!done) continue;
-          if (SUPPLEMENT_CANONICAL_KEYS.has(key)) {
+          if (allSupplementKeysForMigration.has(key)) {
             nextSuppDone[key] = true;
           }
         }
@@ -642,7 +664,86 @@ export function toggleBehavior(
   return {
     ...state,
     dailyLogs,
-    currentStreak: calculateStreak(dailyLogs),
+    // Pass vacation dates so the streak walks through them
+    // transparently — matches the "your streak holds" Profile copy.
+    currentStreak: calculateStreak(dailyLogs, getVacationDates(state)),
+  };
+}
+
+// ── Vacation periods ──────────────────────────────────────────────
+
+/**
+ * Compute the full set of date keys (YYYY-MM-DD) the user has been
+ * in vacation mode for. Walks settings.vacationPeriods, emitting
+ * every day in each range (start..end inclusive). For an active
+ * vacation (end === null), uses today (in the user's tz) as the
+ * end. Used by every caller of calculateStreak so vacation days
+ * are transparent in streak math.
+ *
+ * Returns a Set so consumers get O(1) membership checks during
+ * the streak walk.
+ */
+export function getVacationDates(state: AppState): Set<string> {
+  const out = new Set<string>();
+  const periods = state.settings?.vacationPeriods ?? [];
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  for (const p of periods) {
+    if (!p?.start) continue;
+    const end = p.end ?? today;
+    if (end < p.start) continue;
+    let cursor = p.start;
+    let safety = 0;
+    while (cursor <= end && safety < 10_000) {
+      out.add(cursor);
+      // Step day-by-day using a tz-stable add. Could be slow for a
+      // multi-year vacation but realistic ones are <30 days.
+      const [y, m, d] = cursor.split("-").map(Number);
+      const next = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+      next.setUTCDate(next.getUTCDate() + 1);
+      const yy = next.getUTCFullYear();
+      const mm = String(next.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(next.getUTCDate()).padStart(2, "0");
+      cursor = `${yy}-${mm}-${dd}`;
+      safety++;
+    }
+  }
+  return out;
+}
+
+/**
+ * Toggle vacation mode. On = pushes a new period with end=null;
+ * off = sets end on the most-recent open period. Mutates the
+ * settings + vacationStartedAt fields so existing surfaces that
+ * read those still work.
+ */
+export function setVacationMode(state: AppState, on: boolean): AppState {
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  const periods = [...(state.settings.vacationPeriods ?? [])];
+  if (on) {
+    // Reuse an open period if one already exists (idempotent).
+    const last = periods[periods.length - 1];
+    if (!last || last.end !== null) {
+      periods.push({ start: today, end: null });
+    }
+  } else {
+    // Close the most recent open period.
+    for (let i = periods.length - 1; i >= 0; i--) {
+      if (periods[i].end === null) {
+        periods[i] = { ...periods[i], end: today };
+        break;
+      }
+    }
+  }
+  return {
+    ...state,
+    settings: {
+      ...state.settings,
+      vacationMode: on,
+      vacationStartedAt: on ? state.settings.vacationStartedAt ?? new Date().toISOString() : undefined,
+      vacationPeriods: periods,
+    },
   };
 }
 
@@ -673,11 +774,23 @@ export function toggleSupplement(
       if (s.id !== id || !s.inventory) return s;
       const delta = wasDone === isDone ? 0 : isDone ? -1 : +1;
       if (delta === 0) return s;
+      // Phantom-restock guard: never let an un-check increment the
+      // count above what was decremented. If the count is already
+      // 0 (depleted), an un-check shouldn't manufacture phantom
+      // inventory. Only restore on un-check if the supplement was
+      // ALSO just decremented from this toggle's predecessor (i.e.
+      // count had headroom to grow back).
+      const nextCount = Math.max(0, s.inventory.count + delta);
+      // If we'd be restoring +1 but the current count is already at
+      // or above what it would have been pre-decrement, no-op.
+      // (Concretely: count=0 + delta=+1 → would become 1, but that
+      // 1 is phantom because we never decremented from 1. Skip.)
+      if (delta > 0 && s.inventory.count === 0) return s;
       return {
         ...s,
         inventory: {
           ...s.inventory,
-          count: Math.max(0, s.inventory.count + delta),
+          count: nextCount,
           updatedAt: new Date().toISOString(),
         },
       };
@@ -993,7 +1106,7 @@ export function saveDailyLog(state: AppState, log: DailyLog): AppState {
       ? state.dailyLogs.map((l, i) => (i === existingIndex ? updatedLog : l))
       : [...state.dailyLogs, updatedLog];
 
-  const currentStreak = calculateStreak(dailyLogs);
+  const currentStreak = calculateStreak(dailyLogs, getVacationDates(state));
   return { ...state, dailyLogs, currentStreak };
 }
 

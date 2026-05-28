@@ -2074,6 +2074,12 @@ export default function TodayPage() {
                             blockSupplements.map((s) => s.id)
                           )
                         }
+                        // Tap a row → route to /supplements with the
+                        // intent to edit. /supplements stack-view is
+                        // the proper editor; rather than inlining a
+                        // sheet here we hand off to the management
+                        // surface and let it open the SupplementSheet.
+                        onOpenDetail={() => router.push("/supplements")}
                       />
                     )}
 

@@ -295,7 +295,11 @@ describe("storage — biomarker future-date clamp", () => {
 
   it("deleteBiomarker removes by id", () => {
     let s = getDefaultState();
-    s = addBiomarker(s, { metric: "rhr", value: 55 });
+    s = addBiomarker(s, {
+      metric: "rhr",
+      value: 55,
+      date: new Date().toISOString().slice(0, 10),
+    });
     const id = s.biomarkers[0].id;
     s = deleteBiomarker(s, id);
     expect(s.biomarkers.length).toBe(0);

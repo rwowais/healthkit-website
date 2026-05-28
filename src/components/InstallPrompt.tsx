@@ -29,7 +29,16 @@ import { useIsInstalled } from "@/hooks/useIsInstalled";
  */
 const DISMISS_KEY = "pz-install-dismissed";
 const DISMISS_DAYS = 14;
-const SUPPRESS_PATHS = ["/privacy", "/terms", "/auth", "/auth/reset"];
+// Paths where the install prompt should never appear — onboarding
+// flows, legal pages, and auth sub-paths where the user has a
+// specific intent and the prompt would be a hostile interruption.
+const SUPPRESS_PATHS = [
+  "/privacy",
+  "/terms",
+  "/auth",
+  "/auth/reset",
+  "/onboarding",
+];
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
