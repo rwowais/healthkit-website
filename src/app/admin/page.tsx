@@ -121,7 +121,7 @@ import {
   type Suggestion,
 } from "@/lib/cms/suggestions";
 import type { AppState, DailyLog } from "@/lib/types";
-import { Eyebrow, Skeleton } from "@/components/ui";
+import { Eyebrow, Skeleton, ToastProvider, useToast } from "@/components/ui";
 import RuleEditor from "@/components/admin/RuleEditor";
 
 type Gate = "checking" | "denied" | "ok";
@@ -274,8 +274,31 @@ function Field({
   );
 }
 
+/**
+ * AdminHome wraps the actual admin surface in a local ToastProvider —
+ * the admin page lives outside Shell (which is where the user-facing
+ * routes get their provider), so we instantiate one here. All
+ * setMsg(...) calls in AdminHomeInner now flow through this toast
+ * (one-line non-blocking notification) instead of into inline
+ * paragraphs scattered across the page.
+ */
 export default function AdminHome() {
+  return (
+    <ToastProvider>
+      <AdminHomeInner />
+    </ToastProvider>
+  );
+}
+
+function AdminHomeInner() {
   const router = useRouter();
+  const toast = useToast();
+  // Backward-compatible shim: every existing setMsg(...) site fires a
+  // toast instead of mutating a local state variable. Keeps the diff
+  // tiny across ~42 callers.
+  const setMsg = (m: string | null) => {
+    if (m) toast.show(m);
+  };
   const [gate, setGate] = useState<Gate>("checking");
   const [tab, setTab] = useState<Tab>("home");
   const [contentMode, setContentMode] = useState<ContentMode>("author");
@@ -387,7 +410,6 @@ export default function AdminHome() {
   const [pubs, setPubs] = useState<Publication[]>([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const liveSum = useMemo(
     () => bundleChecksum(buildCatalogBundle(0)),
     []
@@ -1852,9 +1874,6 @@ export default function AdminHome() {
                   >
                     {busy ? "…" : "Add / update"}
                   </button>
-                  {msg && (
-                    <p className="t-caption">{msg}</p>
-                  )}
                 </div>
               </div>
             </div>
@@ -3117,11 +3136,6 @@ export default function AdminHome() {
                   >
                     {busy ? "…" : "Seed from built-in catalog"}
                   </button>
-                  {msg && (
-                    <p className="mt-2 text-[12px] text-[var(--text-3)]">
-                      {msg}
-                    </p>
-                  )}
                 </div>
               );
             if (!edP)
@@ -4512,11 +4526,6 @@ export default function AdminHome() {
                     Add behavior
                   </button>
                 </div>
-                {msg && (
-                  <p className="text-[12px] text-[var(--text-3)]">
-                    {msg}
-                  </p>
-                )}
                 <p className="t-caption">
                   Edits are drafts until you Publish a bundle — users
                   (and the Simulate tab) see nothing change until then.
@@ -4955,11 +4964,6 @@ export default function AdminHome() {
                       );
                     })}
                   </div>
-                  {msg && (
-                    <p className="mt-2 text-[12px] text-[var(--text-3)]">
-                      {msg}
-                    </p>
-                  )}
                   <p className="t-caption mt-3">
                     Approving writes a draft only. Nothing reaches users
                     until you Publish a bundle.
@@ -5224,11 +5228,6 @@ export default function AdminHome() {
               >
                 {busy ? "…" : "Publish current catalog"}
               </button>
-              {msg && (
-                <p className="mt-2 text-[12px] text-[var(--text-3)]">
-                  {msg}
-                </p>
-              )}
             </div>
 
             <div>
