@@ -15,12 +15,13 @@ drop policy if exists "own row" on public.protocolize_state;
 create policy "own row"
   on public.protocolize_state
   for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- Keep updated_at fresh on writes.
 create or replace function public.touch_protocolize_state()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = '' as $$
 begin
   new.updated_at = now();
   return new;
@@ -50,8 +51,8 @@ drop policy if exists "own logs" on public.protocolize_logs;
 create policy "own logs"
   on public.protocolize_logs
   for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 drop trigger if exists trg_touch_protocolize_logs on public.protocolize_logs;
 create trigger trg_touch_protocolize_logs
@@ -75,7 +76,7 @@ create table if not exists public.cms_admins (
 alter table public.cms_admins enable row level security;
 drop policy if exists "admins self-read" on public.cms_admins;
 create policy "admins self-read" on public.cms_admins
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 
 -- Wave C: let an admin list + manage the allowlist from the UI
 -- (otherwise admin onboarding requires the SQL editor). The
@@ -129,7 +130,8 @@ revoke all on function public.cms_resolve_email(text) from public;
 grant execute on function public.cms_resolve_email(text) to authenticated;
 
 create or replace function public.touch_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = '' as $$
 begin new.updated_at = now(); return new; end $$;
 
 -- Helper: apply an admin-only RLS policy + updated_at touch to a table.
@@ -196,6 +198,11 @@ create table if not exists public.cms_protocol_behaviors (
   position int not null default 0,
   primary key (protocol_id, behavior_id)
 );
+-- Covering index for the behavior_id FK. The composite PK covers the
+-- protocol_id side; the behavior_id side needs its own index so
+-- behavior-deletes / reverse lookups don't seq-scan.
+create index if not exists idx_cms_protocol_behaviors_behavior
+  on public.cms_protocol_behaviors (behavior_id);
 
 create table if not exists public.cms_adaptation_rules (
   id uuid primary key default gen_random_uuid(),
@@ -397,16 +404,18 @@ begin
   if auth.uid() is null then
     raise exception 'not authenticated';
   end if;
-  -- Best-effort cleanup of every owned row first. app_states uses
-  -- the user id as the primary key directly; the cms_admins table
-  -- has a user_id column.
-  delete from public.app_states where id = auth.uid();
+  -- Remove the cms_admins row, then the auth.users row itself.
+  -- Deleting the auth user cascades protocolize_state, protocolize_logs
+  -- and push_subscriptions (all FK `on delete cascade`), so they need no
+  -- explicit deletes. NOTE: the previous version deleted from
+  -- `public.app_states` — a table renamed to protocolize_state long ago
+  -- and no longer present — which raised undefined_table and aborted the
+  -- whole function, silently breaking account deletion under cloud sync.
   delete from public.cms_admins where user_id = auth.uid();
-  -- Finally remove the auth.users row itself.
   delete from auth.users where id = auth.uid();
 end;
 $$;
-revoke all on function public.delete_my_account() from public;
+revoke all on function public.delete_my_account() from public, anon;
 grant execute on function public.delete_my_account() to authenticated;
 
 -- ── Web Push subscriptions ────────────────────────────────────────
@@ -448,13 +457,48 @@ alter table public.push_subscriptions enable row level security;
 
 drop policy if exists "own subs select" on public.push_subscriptions;
 create policy "own subs select" on public.push_subscriptions
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 drop policy if exists "own subs insert" on public.push_subscriptions;
 create policy "own subs insert" on public.push_subscriptions
-  for insert with check (auth.uid() = user_id);
+  for insert with check ((select auth.uid()) = user_id);
 drop policy if exists "own subs update" on public.push_subscriptions;
 create policy "own subs update" on public.push_subscriptions
-  for update using (auth.uid() = user_id);
+  for update using ((select auth.uid()) = user_id);
 drop policy if exists "own subs delete" on public.push_subscriptions;
 create policy "own subs delete" on public.push_subscriptions
-  for delete using (auth.uid() = user_id);
+  for delete using ((select auth.uid()) = user_id);
+
+-- ── Defense-in-depth: auto-enable RLS on any new public table ──────
+-- A DDL event trigger that flips on row level security the moment any
+-- table is created in `public`, so a future table can never ship with
+-- RLS accidentally off. It's an event-trigger function (fires on DDL,
+-- not via the REST API) — execute is revoked from API roles so it
+-- can't be poked directly. Codified here to match what's already live.
+create or replace function public.rls_auto_enable()
+returns event_trigger language plpgsql security definer
+set search_path = pg_catalog as $$
+declare cmd record;
+begin
+  for cmd in
+    select * from pg_event_trigger_ddl_commands()
+    where command_tag in ('CREATE TABLE','CREATE TABLE AS','SELECT INTO')
+      and object_type in ('table','partitioned table')
+  loop
+    if cmd.schema_name = 'public' then
+      begin
+        execute format(
+          'alter table if exists %s enable row level security',
+          cmd.object_identity);
+        raise log 'rls_auto_enable: enabled RLS on %', cmd.object_identity;
+      exception when others then
+        raise log 'rls_auto_enable: failed on %', cmd.object_identity;
+      end;
+    end if;
+  end loop;
+end $$;
+revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+
+drop event trigger if exists ensure_rls;
+create event trigger ensure_rls on ddl_command_end
+  when tag in ('CREATE TABLE','CREATE TABLE AS','SELECT INTO')
+  execute function public.rls_auto_enable();

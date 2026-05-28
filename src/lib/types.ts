@@ -410,6 +410,14 @@ export interface BehaviorDef {
   block: TimeBlock;
   anchor: TimingAnchor;
   offsetMin: number;
+  /**
+   * User-chosen exact clock time "HH:MM" that overrides the anchor +
+   * offsetMin math (see effectiveMinutes). Custom behaviors authored
+   * with a specific time carry it here; curated atoms leave it unset and
+   * rely on anchor math. Mirrors BehaviorOverride.customTime so a
+   * behavior's intrinsic time survives compileTimeline's merge.
+   */
+  customTime?: string;
   dose?: string;
   rationale: string;
   evidence?: string;

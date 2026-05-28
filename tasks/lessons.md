@@ -21,6 +21,20 @@ rule that prevents it.
 
 ## Code hygiene
 
+- **`vitest` strips types — it does NOT type-check.** A clean `vitest run`
+  says nothing about `tsc`. **Rule:** after the *final* code edit of any
+  change, re-run `npx tsc --noEmit` (and `next build` for shippable work)
+  BEFORE committing — even if you already ran tsc earlier in the change.
+  (Burned once: added `b.customTime` in engine.ts after the last tsc run,
+  verified only with vitest, and committed a type error that would fail the
+  Vercel build — `customTime` lived on BehaviorOverride/TimelineItem but not
+  BehaviorDef.)
+- **A renamed table can leave dead references that only break at runtime
+  under a specific mode.** `app_states` → `protocolize_state` left both the
+  client (`auth.ts`) and the `delete_my_account` RPC pointing at a dropped
+  table; invisible in local-only mode, broke account deletion the moment
+  cloud sync was on. **Rule:** on a rename, grep ALL surfaces (client +
+  SQL functions + RLS) and prefer FK cascade over hand-written deletes.
 - **`next build` runs ESLint and fails on unused imports/vars.** **Rule:**
   after removing usage, remove the import in the same edit; tsc-clean is not
   build-clean.
