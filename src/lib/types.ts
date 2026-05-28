@@ -136,6 +136,16 @@ export interface UserSettings {
   trialExtendedAt?: string;
 
   /**
+   * Whether to hide the Supplements tab from the bottom nav. Default
+   * undefined = visible. Users who don't take supplements (or who
+   * track them elsewhere) can hide the tab from Profile. The
+   * `/supplements` route remains reachable via the Manage link
+   * inside the SupplementBlockCard on Today, so toggling this off
+   * never strands the user.
+   */
+  hideSupplementsTab?: boolean;
+
+  /**
    * Vacation mode — a single toggle that pauses every pack at once,
    * empties the timeline, and freezes the streak math. For trips,
    * sick days, or any "I need a break" stretch where the user doesn't

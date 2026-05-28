@@ -275,6 +275,38 @@ export default function ProfilePage() {
         {/* Preferences */}
         <Card>
           <Eyebrow>Preferences</Eyebrow>
+          <Row label="Show Supplements tab">
+            <button
+              onClick={() =>
+                updateSettings({
+                  hideSupplementsTab: !s.hideSupplementsTab,
+                })
+              }
+              role="switch"
+              aria-checked={!s.hideSupplementsTab}
+              aria-label="Show Supplements tab in the bottom nav"
+              className="tr-fast h-7 w-12 rounded-full p-1"
+              style={{
+                background: !s.hideSupplementsTab
+                  ? "var(--vitality)"
+                  : "var(--surface-3)",
+              }}
+            >
+              <div
+                className="tr-fast h-5 w-5 rounded-full bg-white"
+                style={{
+                  transform: !s.hideSupplementsTab
+                    ? "translateX(20px)"
+                    : "translateX(0)",
+                }}
+              />
+            </button>
+          </Row>
+          <p className="t-caption mt-1 mb-3 leading-relaxed">
+            Hide if you don&apos;t take supplements — you can still
+            reach the page via the Manage link inside your daily
+            supplement card.
+          </p>
           <Row label="Protocol reminders">
             <button
               onClick={toggleNotifications}

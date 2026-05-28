@@ -7,14 +7,31 @@ import { ToastProvider } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import Reminders from "@/components/Reminders";
 import SyncIndicator from "@/components/SyncIndicator";
+import { useAppState } from "@/hooks/useAppState";
 
 // Library + Protocols merged into a single hub. Discovery (browse + install
 // curated packs) and management (installed system) are one workflow, not
 // two — splitting them across tabs created a confusing "I added it, now
 // where do I find it?" loop.
-const NAV: { href: string; label: string; icon: IconName }[] = [
+const ALL_NAV: {
+  href: string;
+  label: string;
+  icon: IconName;
+  /**
+   * Optional tag a tab can carry so Shell can hide it based on the
+   * user's settings. "supplements" lets users opt out of the
+   * Supplements tab when they don't take any (Profile → toggle).
+   */
+  tag?: "supplements";
+}[] = [
   { href: "/today", label: "Today", icon: "home" },
   { href: "/protocols", label: "Protocols", icon: "layers" },
+  {
+    href: "/supplements",
+    label: "Supplements",
+    icon: "pill",
+    tag: "supplements",
+  },
   { href: "/insights", label: "Insights", icon: "bulb" },
   { href: "/profile", label: "Profile", icon: "user" },
 ];
@@ -22,8 +39,18 @@ const NAV: { href: string; label: string; icon: IconName }[] = [
 export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
+  const { state } = useAppState();
   const isActive = (href: string) =>
     pathname === href || pathname?.startsWith(href + "/");
+  // Filter tabs based on user settings. The supplements tab is
+  // visible by default; the user can hide it in Profile if they
+  // don't track any. `/supplements` is still reachable via the
+  // Manage link inside SupplementBlockCard, so hiding never strands.
+  const NAV = ALL_NAV.filter((n) => {
+    if (n.tag === "supplements" && state.settings?.hideSupplementsTab)
+      return false;
+    return true;
+  });
 
   return (
     <ToastProvider>
