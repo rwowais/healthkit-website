@@ -1,0 +1,551 @@
+"use client";
+
+/**
+ * /supplements — the supplement management surface.
+ *
+ * Three tabs:
+ *   1. Your stack — currently-taking list grouped by block. Tap to
+ *      edit. Custom-add + browse-catalog entry points.
+ *   2. Browse — the curated catalog. Add to stack with one tap.
+ *   3. Grid — 14-day adherence grid (M-S × supplement).
+ *
+ * The page is the long-tail surface; the Today flow is unchanged
+ * (SupplementBlockCard handles the daily check). This page is where
+ * the user manages WHICH supplements they take.
+ */
+import { Suspense, useMemo, useState } from "react";
+import Shell from "@/components/Shell";
+import { Card, Eyebrow, Button } from "@/components/ui";
+import { Icon } from "@/components/ui/icons";
+import * as haptic from "@/lib/haptics";
+import { useAppState } from "@/hooks/useAppState";
+import {
+  curatedSupplementCatalog,
+  supplementBlockProgress,
+} from "@/lib/supplements";
+import SupplementSheet from "@/components/SupplementSheet";
+import type { Supplement, TimeBlock } from "@/lib/types";
+import { getTz, addDaysToKey, dateKeyInTz } from "@/lib/tz";
+
+type ViewMode = "stack" | "browse" | "grid";
+
+const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
+const BLOCK_LABEL: Record<TimeBlock, string> = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
+  anytime: "Anytime",
+};
+
+function SupplementsInner() {
+  const {
+    state,
+    addSupplement,
+    updateSupplement,
+    removeSupplement,
+  } = useAppState();
+  const [view, setView] = useState<ViewMode>("stack");
+  const [editing, setEditing] = useState<Supplement | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const userSupplements = state.supplements ?? [];
+  const userIds = useMemo(
+    () => new Set(userSupplements.map((s) => s.id)),
+    [userSupplements]
+  );
+  const catalog = useMemo(curatedSupplementCatalog, []);
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+
+  // Group user's supplements by block for the stack view.
+  const byBlock = useMemo(() => {
+    const m: Record<TimeBlock, Supplement[]> = {
+      morning: [],
+      afternoon: [],
+      evening: [],
+      anytime: [],
+    };
+    for (const s of userSupplements) m[s.block].push(s);
+    for (const b of BLOCKS) m[b].sort((a, b) => a.name.localeCompare(b.name));
+    return m;
+  }, [userSupplements]);
+
+  return (
+    <Shell>
+      <div className="flex flex-col gap-6">
+        <div>
+          <Eyebrow>Supplements</Eyebrow>
+          <h1 className="t-title mt-2 text-[var(--text-1)]">Your stack</h1>
+          <p className="t-caption mt-2 leading-relaxed">
+            Bundle, edit, and track. Times are loose — supplements are
+            block-based (morning, evening), not minute-based.
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div
+          className="flex gap-1 rounded-[var(--r-pill)] p-1"
+          style={{ background: "var(--surface-2)" }}
+        >
+          {(
+            [
+              ["stack", "Your stack"],
+              ["browse", "Browse"],
+              ["grid", "Adherence"],
+            ] as Array<[ViewMode, string]>
+          ).map(([v, label]) => {
+            const on = view === v;
+            return (
+              <button
+                key={v}
+                onClick={() => {
+                  haptic.light();
+                  setView(v);
+                }}
+                className="flex-1 rounded-[var(--r-pill)] py-2 text-[12.5px] font-semibold tr-fast"
+                style={{
+                  background: on ? "var(--text-1)" : "transparent",
+                  color: on ? "#08090B" : "var(--text-3)",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {view === "stack" && (
+          <StackView
+            byBlock={byBlock}
+            onEdit={setEditing}
+            onAdd={() => setCreating(true)}
+            onBrowse={() => setView("browse")}
+            today={today}
+            completions={
+              state.dailyLogs.find((l) => l.date === today)
+                ?.supplementCompletions ?? {}
+            }
+            stateSupplements={userSupplements}
+            dayIndex={(() => {
+              const d = new Date();
+              const j = d.getDay();
+              return j === 0 ? 6 : j - 1;
+            })()}
+          />
+        )}
+
+        {view === "browse" && (
+          <BrowseView
+            catalog={catalog}
+            installedIds={userIds}
+            onInstall={(s) => {
+              haptic.medium();
+              addSupplement(s);
+            }}
+            onRemove={(id) => removeSupplement(id)}
+          />
+        )}
+
+        {view === "grid" && (
+          <GridView
+            supplements={userSupplements}
+            logs={state.dailyLogs}
+            tz={tz}
+          />
+        )}
+      </div>
+
+      {/* Edit existing */}
+      <SupplementSheet
+        supplement={editing}
+        onClose={() => setEditing(null)}
+        onSave={(patch) => {
+          if (editing) updateSupplement(editing.id, patch);
+        }}
+        onRemove={() => {
+          if (editing) removeSupplement(editing.id);
+        }}
+      />
+
+      {/* Create custom */}
+      <SupplementSheet
+        supplement={
+          creating
+            ? {
+                id: `supp:${Date.now().toString(36)}`,
+                name: "",
+                block: "morning",
+                source: "custom",
+              }
+            : null
+        }
+        onClose={() => setCreating(false)}
+        onSave={(patch) => {
+          const id = `supp:${Date.now().toString(36)}`;
+          const supp: Supplement = {
+            id,
+            name: patch.name ?? "Custom supplement",
+            dose: patch.dose,
+            block: patch.block ?? "morning",
+            timing: patch.timing,
+            brand: patch.brand,
+            notes: patch.notes,
+            daysActive: patch.daysActive,
+            inventory: patch.inventory,
+            source: "custom",
+          };
+          addSupplement(supp);
+        }}
+      />
+    </Shell>
+  );
+}
+
+// ── Stack view ────────────────────────────────────────────────────
+
+function StackView({
+  byBlock,
+  onEdit,
+  onAdd,
+  onBrowse,
+  today,
+  completions,
+  stateSupplements,
+  dayIndex,
+}: {
+  byBlock: Record<TimeBlock, Supplement[]>;
+  onEdit: (s: Supplement) => void;
+  onAdd: () => void;
+  onBrowse: () => void;
+  today: string;
+  completions: Record<string, boolean>;
+  stateSupplements: Supplement[];
+  dayIndex: number;
+}) {
+  const empty = stateSupplements.length === 0;
+  if (empty) {
+    return (
+      <Card>
+        <Eyebrow>No supplements yet</Eyebrow>
+        <p className="t-body mt-2 leading-relaxed text-[var(--text-2)]">
+          Browse the catalog to add curated supplements (Magnesium,
+          Vitamin D, NMN, etc.) or create a custom one for anything
+          you take that isn&apos;t in the catalog.
+        </p>
+        <div className="mt-4 flex gap-2.5">
+          <Button onClick={onBrowse} full>
+            Browse catalog
+          </Button>
+          <Button onClick={onAdd} variant="ghost" full>
+            Add custom
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+  return (
+    <div className="space-y-5">
+      {BLOCKS.map((b) => {
+        const list = byBlock[b];
+        if (list.length === 0) return null;
+        const prog = supplementBlockProgress(
+          stateSupplements,
+          b,
+          dayIndex,
+          completions
+        );
+        return (
+          <div key={b}>
+            <div className="mb-2 flex items-center justify-between">
+              <Eyebrow>{BLOCK_LABEL[b]}</Eyebrow>
+              {prog && (
+                <span className="text-[11px] font-semibold text-[var(--text-3)]">
+                  {prog.done}/{prog.total} today
+                </span>
+              )}
+            </div>
+            <Card>
+              <div className="-my-1.5 divide-y divide-[var(--hairline)]">
+                {list.map((s) => {
+                  const lowStock =
+                    s.inventory &&
+                    s.inventory.refillAt != null &&
+                    s.inventory.count <= s.inventory.refillAt;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => onEdit(s)}
+                      className="press tr-fast flex w-full items-center gap-3 py-3 text-left"
+                    >
+                      <span
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                        style={{
+                          background:
+                            "color-mix(in srgb, var(--warm) 14%, var(--surface-3))",
+                          color: "var(--warm)",
+                        }}
+                      >
+                        <Icon name="pill" size={15} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-medium text-[var(--text-1)]">
+                          {s.name}
+                        </p>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-[var(--text-3)]">
+                          {s.dose && <span>{s.dose}</span>}
+                          {s.dose && s.timing && <span>·</span>}
+                          {s.timing && (
+                            <span className="line-clamp-1">{s.timing}</span>
+                          )}
+                          {lowStock && (
+                            <>
+                              {(s.dose || s.timing) && <span>·</span>}
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                style={{
+                                  background:
+                                    "color-mix(in srgb, var(--alert) 18%, transparent)",
+                                  color: "var(--alert)",
+                                }}
+                              >
+                                {s.inventory!.count} left
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <Icon
+                        name="chevron"
+                        size={13}
+                        className="text-[var(--text-4)]"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+        );
+      })}
+      <div className="flex gap-2.5">
+        <Button onClick={onBrowse} full>
+          Browse catalog
+        </Button>
+        <Button onClick={onAdd} variant="ghost" full>
+          Add custom
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Browse view ───────────────────────────────────────────────────
+
+function BrowseView({
+  catalog,
+  installedIds,
+  onInstall,
+  onRemove,
+}: {
+  catalog: Supplement[];
+  installedIds: Set<string>;
+  onInstall: (s: Supplement) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return catalog;
+    return catalog.filter((s) => s.name.toLowerCase().includes(q));
+  }, [catalog, search]);
+  return (
+    <div className="space-y-4">
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search supplements"
+        className="w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[14px] text-[var(--text-1)] outline-none"
+      />
+      <Card>
+        <div className="-my-1.5 divide-y divide-[var(--hairline)]">
+          {filtered.length === 0 && (
+            <p className="py-3 text-center text-[13px] text-[var(--text-3)]">
+              Nothing matches that search.
+            </p>
+          )}
+          {filtered.map((s) => {
+            const installed = installedIds.has(s.id);
+            return (
+              <div
+                key={s.id}
+                className="flex items-center gap-3 py-3"
+              >
+                <span
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--warm) 14%, var(--surface-3))",
+                    color: "var(--warm)",
+                  }}
+                >
+                  <Icon name="pill" size={15} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-medium text-[var(--text-1)]">
+                    {s.name}
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] text-[var(--text-3)] line-clamp-1">
+                    {s.dose ?? "—"}{" "}
+                    {s.evidenceTier && (
+                      <span
+                        className="ml-1 rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        style={{ color: "var(--text-4)" }}
+                      >
+                        {s.evidenceTier}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (installed) onRemove(s.id);
+                    else onInstall(s);
+                  }}
+                  className="press tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
+                  style={{
+                    background: installed
+                      ? "var(--surface-3)"
+                      : "var(--text-1)",
+                    color: installed ? "var(--text-2)" : "#08090B",
+                  }}
+                >
+                  {installed ? "Remove" : "Add"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── Grid view (14-day adherence) ──────────────────────────────────
+
+function GridView({
+  supplements,
+  logs,
+  tz,
+}: {
+  supplements: Supplement[];
+  logs: { date: string; supplementCompletions?: Record<string, boolean> }[];
+  tz: string;
+}) {
+  const today = dateKeyInTz(tz);
+  const days = useMemo(() => {
+    const out: string[] = [];
+    for (let i = 13; i >= 0; i--) out.push(addDaysToKey(today, -i));
+    return out;
+  }, [today]);
+  const logByDate = useMemo(() => {
+    const m = new Map<string, Record<string, boolean>>();
+    for (const l of logs) m.set(l.date, l.supplementCompletions ?? {});
+    return m;
+  }, [logs]);
+  if (supplements.length === 0) {
+    return (
+      <Card>
+        <p className="t-body text-[var(--text-3)]">
+          No supplements to track yet.
+        </p>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <Eyebrow>Last 14 days</Eyebrow>
+      <p className="t-caption mt-1 mb-3 leading-relaxed">
+        Each row is one supplement. Each square is one day — filled
+        means you took it, empty means you didn&apos;t.
+      </p>
+      <div className="overflow-x-auto -mx-1 px-1">
+        <table className="w-full border-collapse text-[11px]">
+          <thead>
+            <tr>
+              <th className="text-left text-[10px] font-semibold text-[var(--text-4)] uppercase tracking-wide pr-2 pb-2">
+                Supplement
+              </th>
+              {days.map((d) => {
+                const day = d.slice(8);
+                return (
+                  <th
+                    key={d}
+                    className="px-0.5 pb-2 text-center text-[10px] font-medium text-[var(--text-4)]"
+                  >
+                    {day}
+                  </th>
+                );
+              })}
+              <th className="pl-2 pb-2 text-right text-[10px] font-semibold text-[var(--text-4)] uppercase tracking-wide">
+                Rate
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {supplements.map((s) => {
+              let done = 0;
+              const cells = days.map((d) => {
+                const log = logByDate.get(d);
+                const isDone = log?.[s.id] === true;
+                if (isDone) done++;
+                return { d, isDone };
+              });
+              const rate = Math.round((done / days.length) * 100);
+              return (
+                <tr key={s.id}>
+                  <td className="pr-2 py-1 text-[12.5px] text-[var(--text-1)] truncate max-w-[140px]">
+                    {s.name}
+                  </td>
+                  {cells.map(({ d, isDone }) => (
+                    <td
+                      key={d}
+                      className="text-center"
+                      title={`${d} — ${isDone ? "done" : "missed"}`}
+                    >
+                      <span
+                        className="inline-block h-3 w-3 rounded-[3px]"
+                        style={{
+                          background: isDone
+                            ? "var(--vitality)"
+                            : "var(--surface-3)",
+                          opacity: isDone ? 1 : 0.5,
+                        }}
+                      />
+                    </td>
+                  ))}
+                  <td className="pl-2 py-1 text-right text-[12px] font-semibold text-[var(--text-2)]">
+                    {rate}%
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+export default function SupplementsPage() {
+  return (
+    <Suspense
+      fallback={
+        <Shell>
+          <p className="t-eyebrow">Supplements</p>
+        </Shell>
+      }
+    >
+      <SupplementsInner />
+    </Suspense>
+  );
+}

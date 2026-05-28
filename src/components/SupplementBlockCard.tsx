@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import * as haptic from "@/lib/haptics";
 import type { Supplement, TimeBlock } from "@/lib/types";
@@ -107,6 +108,17 @@ export default function SupplementBlockCard({
           className="space-y-1 px-3 pb-3"
           style={{ borderTop: "1px solid var(--hairline)" }}
         >
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-4)]">
+              Stack
+            </span>
+            <Link
+              href="/supplements"
+              className="press tr-fast text-[11.5px] font-semibold text-[var(--readiness)]"
+            >
+              Manage →
+            </Link>
+          </div>
           {!allDone && (
             <button
               onClick={() => {
