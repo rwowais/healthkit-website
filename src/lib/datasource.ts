@@ -8,6 +8,12 @@
  */
 import type { AppState, DailyLog } from "./types";
 import { loadState, saveState, SAVE_ERROR_EVENT } from "./storage";
+import {
+  markSaveStarted,
+  markSaveSuccess,
+  markSaveError,
+  setRetryHandler,
+} from "./sync";
 import { STORAGE_KEY } from "./constants";
 import {
   getSupabase,
@@ -64,6 +70,16 @@ let conflictHandled = false;
 let conflictEvaluated = false;
 /** updated_at we last observed — used for optimistic concurrency. */
 let lastCloudUpdatedAt: string | null = null;
+/**
+ * Most recent state attempted-to-save-to-cloud. When a save fails
+ * (offline, transient 500, etc.) we leave the latest state here so
+ * the retry handler (wired through lib/sync.ts on network-returns)
+ * can re-attempt without needing the UI to fire another mutation.
+ * Cleared on successful save.
+ */
+let pendingCloudState: AppState | null = null;
+/** True once the retry handler has been registered (idempotent guard). */
+let retryHandlerRegistered = false;
 
 function reconKey(uid: string) {
   return `pz:recon:${uid}`;
@@ -436,6 +452,12 @@ class SupabaseDataSource implements DataSource {
 
   async save(state: AppState): Promise<void> {
     saveState(state); // offline-first cache
+    // Stash the most recent state in a module-level slot so the retry
+    // handler (registered below) can re-attempt the cloud upsert
+    // whenever the network comes back. Without this, an offline-edit
+    // burst would never be propagated to the cloud — the user would
+    // re-open the app on a new device and find their changes missing.
+    pendingCloudState = state;
     const notify = () => {
       if (typeof window !== "undefined")
         window.dispatchEvent(new CustomEvent(STATE_EVENT));
@@ -445,9 +467,13 @@ class SupabaseDataSource implements DataSource {
       notify();
       return;
     }
+    markSaveStarted();
     try {
       const userId = await getUserId();
-      if (!userId) return;
+      if (!userId) {
+        markSaveSuccess();
+        return;
+      }
 
       // Optimistic-concurrency guard: if another device wrote since we
       // last loaded, don't blindly clobber the whole document — pull the
@@ -490,9 +516,14 @@ class SupabaseDataSource implements DataSource {
       // Notify other tabs ONLY after the cloud copy is durable, so a
       // resync never reads a pre-write row.
       notify();
+      // Cloud copy matches local — clear the retry queue.
+      pendingCloudState = null;
+      markSaveSuccess();
     } catch {
       // Local cache still holds; tell the user the cloud copy is behind
-      // rather than letting the failure pass invisibly.
+      // rather than letting the failure pass invisibly. The sync state
+      // machine in lib/sync.ts auto-retries when network returns.
+      markSaveError();
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent(SAVE_ERROR_EVENT, { detail: "cloud" })
@@ -535,3 +566,20 @@ class SupabaseDataSource implements DataSource {
 export const activeDataSource: DataSource = supabaseEnabled
   ? new SupabaseDataSource()
   : new LocalDataSource();
+
+// Register the auto-retry handler exactly once. When network returns
+// (or the tab becomes visible while pending work exists), this fires
+// and re-attempts the most recent save. Idempotent — if there's
+// nothing pending OR the data source isn't cloud-backed, it's a no-op.
+if (!retryHandlerRegistered && supabaseEnabled) {
+  retryHandlerRegistered = true;
+  setRetryHandler(async () => {
+    if (!pendingCloudState) return;
+    const snapshot = pendingCloudState;
+    try {
+      await (activeDataSource as SupabaseDataSource).save(snapshot);
+    } catch {
+      /* save() already marks error + dispatches event; nothing more here */
+    }
+  });
+}

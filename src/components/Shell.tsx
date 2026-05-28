@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ToastProvider } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import Reminders from "@/components/Reminders";
+import SyncIndicator from "@/components/SyncIndicator";
 
 // Library + Protocols merged into a single hub. Discovery (browse + install
 // curated packs) and management (installed system) are one workflow, not
@@ -43,6 +44,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
                 Protocolize
               </span>
+              {/* Sync status pill — calm, peripheral, never alarming.
+                  Hidden when the cloud copy is current; surfaces only
+                  when we have something to tell the user. */}
+              <SyncIndicator />
             </Link>
             <nav className="hidden items-center gap-1 lg:flex">
               {NAV.map((n) => (
