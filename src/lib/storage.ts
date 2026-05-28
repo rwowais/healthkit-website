@@ -23,6 +23,11 @@ import type {
 } from "./types";
 
 import { DEFAULT_INSTALLED, PACKS } from "./packs";
+import {
+  getAccess,
+  getFreeBiomarkers,
+  getFreePacks,
+} from "./entitlements";
 import { activePacks } from "./knowledge";
 import {
   compileTimeline,
@@ -913,6 +918,21 @@ export function removeSupplement(state: AppState, id: string): AppState {
 
 export function installPack(state: AppState, id: string): AppState {
   if (state.installedPacks.includes(id)) return state;
+  // Free-tier cap: max getFreePacks() OFFICIAL packs. Custom packs
+  // don't count (they're user-authored, not a feature of the
+  // catalog), so this matches the gate the Library UI applies.
+  // Without this check, any non-UI code path (cloud sync, import,
+  // future API) could bypass the cap.
+  if (!getAccess(state).premium) {
+    const pack = PACKS.find((p) => p.id === id);
+    const isOfficial = pack?.source === "official";
+    if (isOfficial) {
+      const officialInstalled = state.installedPacks.filter((pid) =>
+        PACKS.some((p) => p.id === pid && p.source === "official")
+      ).length;
+      if (officialInstalled >= getFreePacks()) return state;
+    }
+  }
   return { ...state, installedPacks: [...state.installedPacks, id] };
 }
 
@@ -1015,6 +1035,22 @@ export function addBiomarker(
   state: AppState,
   entry: Omit<BiomarkerEntry, "id">
 ): AppState {
+  // Free-tier cap: getFreeBiomarkers() distinct metrics. Re-adding a
+  // reading for a metric already tracked is fine (it's just another
+  // data point on an existing metric); adding a NEW distinct metric
+  // above the cap is the case the UI blocks. Enforce it here too so
+  // non-UI code paths (cloud sync, import, future API) can't bypass.
+  if (!getAccess(state).premium) {
+    const distinctMetrics = new Set(
+      (state.biomarkers ?? []).map((b) => b.metric)
+    );
+    if (
+      !distinctMetrics.has(entry.metric) &&
+      distinctMetrics.size >= getFreeBiomarkers()
+    ) {
+      return state;
+    }
+  }
   // A future-dated reading would sort as "latest" forever and poison
   // every band/insight that reads the most recent value — clamp it.
   const today = getDateString(undefined, getTz(state.settings));

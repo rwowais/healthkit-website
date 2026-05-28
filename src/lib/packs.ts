@@ -156,6 +156,12 @@ const OMEGA3_AM = B({
   icon: "fish",
   leverage: 2,
   kind: "action",
+  // Higher doses (2-4 g/d EPA+DHA) can prolong bleeding time. The
+  // engine's safetyFlag pipeline (compileTimeline `hasFlag`, plus
+  // supplementsForBlock `contraindications`) reads this field to
+  // quietly suppress the atom for users on warfarin/DOAC/aspirin.
+  // Was missing — surfaced by the cautious-starter persona test.
+  contraindications: ["anticoagulants"],
 });
 
 // Shared atoms for behaviors that appear in multiple packs — defined

@@ -23,6 +23,7 @@ import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
 import { isSupplementBehavior } from "./supplements";
 import { resolveBehaviorByKey, easierDayFromSwap } from "./workouts";
+import { getAccess } from "./entitlements";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
@@ -409,6 +410,13 @@ export interface Signals {
    * intelligent, not just logged.
    */
   easierDayFromSwap: boolean;
+  /**
+   * Has the user ever logged a scored day? Distinct from trackedDays
+   * (which is a 7-day recent window). adapt() uses this to gate the
+   * rebuild branch — a 40-day returner DOES have history, even if
+   * their last 7 days are empty.
+   */
+  hasHistory: boolean;
 }
 
 /** Future wearable hook: return device readiness (0-100) or null. */
@@ -469,6 +477,41 @@ function logHasActivity(l: DailyLog): boolean {
   );
 }
 
+/**
+ * Compute the set of date keys the user was in vacation mode for.
+ * Duplicated here (also lives in storage.ts as getVacationDates)
+ * because storage imports from engine — adding the reverse would
+ * create a cycle. Walks settings.vacationPeriods, emitting every
+ * day in each range (start..end inclusive). For an active vacation
+ * (end === null), uses today (in the user's tz) as the end.
+ *
+ * Why getSignals needs this: the streak math (scoring.ts) already
+ * skips vacation days transparently; without the same treatment in
+ * signals, a user returning from a 2-week trip sees their day flip
+ * to "Welcome back / rebuild" mode AND a stale 0% adherence on the
+ * last 7 calendar days — even though the trip was a sanctioned
+ * break. Vacation transparency has to be honored end-to-end.
+ */
+function vacationDates(state: AppState): Set<string> {
+  const out = new Set<string>();
+  const periods = state.settings?.vacationPeriods ?? [];
+  if (periods.length === 0) return out;
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  for (const p of periods) {
+    if (!p?.start) continue;
+    const end = p.end ?? today;
+    let cursor = p.start;
+    // Cap at 365 iterations per range so a malformed period can't hang.
+    for (let i = 0; i < 366; i++) {
+      out.add(cursor);
+      if (cursor === end) break;
+      cursor = addDaysToKey(cursor, 1);
+    }
+  }
+  return out;
+}
+
 export function getSignals(state: AppState): Signals {
   const logs = state.dailyLogs ?? [];
   const tz = getTz(state.settings);
@@ -480,33 +523,51 @@ export function getSignals(state: AppState): Signals {
   const yLog = logs.find((l) => l.date === yKey);
   const tLog = logs.find((l) => l.date === tKey);
 
+  // adherence7 — 7-day windowed mean of scored days. Was previously
+  // ".slice(0, 7)" which took "the 7 most-recent scored logs of all
+  // time," meaning after a 40-day ghost the value was a 69%
+  // adherence from data 40 days stale. Now we filter by calendar
+  // window so adherence reflects *recent* engagement.
+  const sevenDaysAgo = addDaysToKey(tKey, -7);
   const recent = [...logs]
-    .filter((l) => l.score > 0 && l.date !== tKey)
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 7);
+    .filter(
+      (l) => l.score > 0 && l.date !== tKey && l.date >= sevenDaysAgo
+    )
+    .sort((a, b) => b.date.localeCompare(a.date));
   const adherence7 = recent.length
     ? Math.round(recent.reduce((s, l) => s + l.score, 0) / recent.length)
     : null;
+  // trackedDays — scored days WITHIN the 7-day window. Matches the
+  // "recent engagement" semantics (essentials mode gates on
+  // trackedDays >= 3). After a 40-day ghost this correctly reads 0,
+  // not "last 7 scored ever" which would inflate to 7 with 40-day-
+  // stale data.
+  const trackedDays = recent.length;
+  // hasHistory — has the user EVER had a scored log? Used by the
+  // rebuild branch to distinguish "user is genuinely returning"
+  // from "user just started and hasn't logged yet." Doesn't conflate
+  // with trackedDays (which is now a recent-window signal).
+  const hasHistory = logs.some((l) => l.score > 0);
 
-  // gap since last active day (not counting today). Counts via
-  // calendar-day differences in the user's tz — not via Date math
-  // on the device clock — so a traveler doesn't see drift.
+  // Gap since last active day (not counting today). Calendar-day
+  // math in the user's tz — DST-stable. Vacation days are TRANSPARENT
+  // (they don't count as gaps), mirroring the streak math in
+  // scoring.ts. A user returning from a 2-week trip should see
+  // gapDays === 0, not 14.
   const active = [...logs]
     .filter((l) => logHasActivity(l) && l.date !== tKey)
     .sort((a, b) => b.date.localeCompare(a.date));
   let gapDays = 0;
+  const vacays = vacationDates(state);
   if (active.length) {
     const lastKey = active[0].date;
-    // Walk back from today one day at a time until we hit the last
-    // active day. Cheap (<<1ms even with a year-long gap) and
-    // tz-stable. Caps at 365 to avoid pathological loops.
     let cursor = tKey;
     for (let i = 0; i < 366; i++) {
       cursor = addDaysToKey(cursor, -1);
-      if (cursor === lastKey) {
-        gapDays = i; // i = days since lastKey, NOT counting today
-        break;
-      }
+      if (cursor === lastKey) break;
+      // Skip vacation days — they're sanctioned breaks. Only
+      // increment for real "I forgot to open the app" gaps.
+      if (!vacays.has(cursor)) gapDays++;
     }
   }
 
@@ -544,7 +605,15 @@ export function getSignals(state: AppState): Signals {
     }
   }
 
-  const bio = biomarkerConcern(state);
+  // Biomarker-aware adaptation is a Premium feature per CLAUDE.md
+  // ("biomarker-aware adaptation, and unlimited history"). Gate the
+  // signal at the source so a free-tier / expired-trial user adding
+  // an HRV reading doesn't accidentally get a premium mode shift.
+  // Subjective recoveryProxy (sleep + energy) is still free and
+  // unaffected — only the bloodwork-derived signal is gated.
+  const bio = getAccess(state).premium
+    ? biomarkerConcern(state)
+    : { text: null, recovery: false };
 
   return {
     adherence7,
@@ -553,11 +622,12 @@ export function getSignals(state: AppState): Signals {
     energy,
     gapDays,
     eveningMissedYesterday,
-    trackedDays: recent.length,
+    trackedDays,
     bioConcern: bio.text,
     bioRecoveryFlag: bio.recovery,
     readiness,
     easierDayFromSwap: easierDayFromSwap(tLog),
+    hasHistory,
   };
 }
 
@@ -583,11 +653,21 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
   // who finished onboarding 2 days ago, never opened the app, and
   // returns on day 3 isn't returning — they're starting. The signal
   // for genuine prior engagement is `trackedDays > 0`.
-  if (s.gapDays >= 2 && s.trackedDays > 0) {
+  if (s.gapDays >= 2 && s.hasHistory) {
+    // Tier the tone by gap length — "a few days" reads oblivious for
+    // a 40-day return. Each tier keeps the same calm posture but
+    // matches the actual interval so the system feels like it
+    // notices.
+    const tone =
+      s.gapDays > 30
+        ? "It's been a while — welcome back. I've trimmed today to a couple of essentials; the rest will catch back up on its own as you re-engage."
+        : s.gapDays > 7
+        ? "It's been over a week — no problem. Today's pared back so restarting feels light. Build from here."
+        : "It's been a few days — no problem. I've trimmed today to just a few essentials so restarting feels effortless.";
     return {
       mode: "rebuild",
       headline: "Welcome back",
-      tone: `It's been a few days — no problem. I've trimmed today to just a few essentials so restarting feels effortless.`,
+      tone,
       reasons: [`You were away ${s.gapDays} days — easing back in`],
     };
   }
