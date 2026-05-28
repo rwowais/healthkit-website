@@ -626,3 +626,47 @@ describe("storage — workout swap (per-day)", () => {
     expect(s.dailyLogs.length).toBe(before);
   });
 });
+
+describe("engine — workout-aware adaptation", () => {
+  // Pin the workout-swap → "lighter day" mode-shift contract: when
+  // the user trades a high-intensity workout for a low-intensity one,
+  // adapt() should reflect that in the day's posture so downstream
+  // demotions (cold plunge, late caffeine) actually fire.
+  it("easierDayFromSwap is true when high→low intensity", async () => {
+    const { easierDayFromSwap } = await import("@/lib/workouts");
+    const today = new Date().toISOString().slice(0, 10);
+    const log = {
+      date: today,
+      swaps: { strength: "extended-walk" }, // high → low
+    } as Parameters<typeof easierDayFromSwap>[0];
+    expect(easierDayFromSwap(log)).toBe(true);
+  });
+
+  it("easierDayFromSwap is false when intensities are equal or rising", async () => {
+    const { easierDayFromSwap } = await import("@/lib/workouts");
+    const today = new Date().toISOString().slice(0, 10);
+    // walk → strength: intensity goes UP, not an "easier day"
+    expect(
+      easierDayFromSwap({
+        date: today,
+        swaps: { "extended-walk": "strength" },
+      } as Parameters<typeof easierDayFromSwap>[0])
+    ).toBe(false);
+    // No swaps at all
+    expect(
+      easierDayFromSwap({ date: today } as Parameters<typeof easierDayFromSwap>[0])
+    ).toBe(false);
+  });
+
+  it("baselineAdapt picks lighter mode on intensity-down swap", async () => {
+    const { adapt } = await import("@/lib/engine");
+    const todayDate = new Date().toISOString().slice(0, 10);
+    let s = getDefaultState();
+    s = swapBehavior(s, todayDate, "strength", "extended-walk");
+    const result = adapt(s);
+    expect(result.mode).toBe("lighter");
+    expect(result.reasons.some((r) => /easier workout/i.test(r))).toBe(
+      true
+    );
+  });
+});

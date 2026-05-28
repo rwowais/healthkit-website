@@ -369,6 +369,20 @@ export type BehaviorKind = "action" | "avoid" | "reminder";
  */
 export type BehaviorCategory = "workout";
 
+/**
+ * Physiological intensity of a behavior — used by the engine to
+ * detect "today is an easier day" when a user swaps a high-intensity
+ * workout for a low-intensity one. Optional and only meaningful for
+ * `category: "workout"` behaviors today, but the field is generic so
+ * future categories (e.g. cold exposure) can carry it too.
+ *
+ * Calibration:
+ *   - "high": strength, hiit, vo2max-intervals, tabata
+ *   - "moderate": zone2
+ *   - "low": walk, mobility, yoga, nsdr
+ */
+export type BehaviorIntensity = "high" | "moderate" | "low";
+
 /** An atomic behavior. canonicalKey is the dedupe/merge identity. */
 export interface BehaviorDef {
   canonicalKey: string;
@@ -385,6 +399,8 @@ export interface BehaviorDef {
   kind: BehaviorKind;
   /** Semantic category — optional, opt-in. See BehaviorCategory. */
   category?: BehaviorCategory;
+  /** Physiological intensity — see BehaviorIntensity. Workout-only today. */
+  intensity?: BehaviorIntensity;
   daysActive?: boolean[]; // optional per-behavior schedule
   /** Why this slot was recommended — calm, specific, one line. */
   timingReason?: string;

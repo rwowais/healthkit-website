@@ -95,3 +95,26 @@ export function resolveBehaviorByKey(key: string): BehaviorDef | null {
 export function getSwaps(log?: DailyLog): Record<string, string> {
   return log?.swaps ?? {};
 }
+
+/**
+ * Detect "today is an easier day" from the swap shape. Returns true
+ * when at least one swap goes from a higher-intensity workout to a
+ * lower-intensity one (high→{moderate,low} or moderate→low). Engine
+ * uses this to nudge adapt() toward "lighter" mode and to mute
+ * downstream high-stress items (late caffeine, cold plunge after
+ * lifts, etc.) — making the swap feel intelligent, not just logged.
+ */
+export function easierDayFromSwap(log: DailyLog | undefined): boolean {
+  const swaps = log?.swaps;
+  if (!swaps) return false;
+  const rank: Record<string, number> = { high: 3, moderate: 2, low: 1 };
+  for (const [fromKey, toKey] of Object.entries(swaps)) {
+    const from = resolveBehaviorByKey(fromKey);
+    const to = resolveBehaviorByKey(toKey);
+    if (!from || !to) continue;
+    const fi = from.intensity ? rank[from.intensity] : 0;
+    const ti = to.intensity ? rank[to.intensity] : 0;
+    if (fi > 0 && ti > 0 && fi > ti) return true;
+  }
+  return false;
+}

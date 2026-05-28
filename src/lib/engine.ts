@@ -22,7 +22,7 @@ import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
 import { isSupplementBehavior } from "./supplements";
-import { resolveBehaviorByKey } from "./workouts";
+import { resolveBehaviorByKey, easierDayFromSwap } from "./workouts";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
@@ -401,6 +401,14 @@ export interface Signals {
    * downstream changes — adapt() only reads recoveryProxy.
    */
   readiness: number | null;
+  /**
+   * True when the user swapped a higher-intensity workout for a lower-
+   * intensity one today (e.g. strength → walk, hiit → mobility).
+   * adapt() reads this to bump toward "lighter" mode so the rest of
+   * the day reflects the user's stated intent — a swap feels
+   * intelligent, not just logged.
+   */
+  easierDayFromSwap: boolean;
 }
 
 /** Future wearable hook: return device readiness (0-100) or null. */
@@ -549,6 +557,7 @@ export function getSignals(state: AppState): Signals {
     bioConcern: bio.text,
     bioRecoveryFlag: bio.recovery,
     readiness,
+    easierDayFromSwap: easierDayFromSwap(tLog),
   };
 }
 
@@ -609,6 +618,25 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
       headline: "Lighter day",
       tone: "Last night was rough. Lower the bar today — consistency beats intensity, and tonight's sleep is the priority.",
       reasons: ["You rated last night's sleep poor"],
+    };
+  }
+  // Workout-swap signal: user told us they dialed today's training
+  // intensity DOWN (e.g. swapped strength → walk). Honor that intent
+  // by mode-shifting to "lighter" so the rest of the day reflects
+  // the lighter posture — high-stress co-occurring items (cold
+  // plunge, late caffeine, intense intervals) get demoted by the
+  // existing lighter-mode shape pass.
+  //
+  // Skipped if a more-specific signal already chose recovery /
+  // essentials / lighter above; we never *upgrade* a recovery
+  // signal into lighter (which would feel like the system
+  // ignoring something heavier).
+  if (s.easierDayFromSwap) {
+    return {
+      mode: "lighter",
+      headline: "Lighter day",
+      tone: "You dialed today's training back — I've eased the rest of the day to match. Recovery is part of the program, not a setback.",
+      reasons: ["You swapped to an easier workout"],
     };
   }
   if (s.bioRecoveryFlag && s.bioConcern) {

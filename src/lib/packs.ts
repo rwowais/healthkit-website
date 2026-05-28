@@ -426,6 +426,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
         category: "workout",
+        intensity: "moderate",
       }),
       B({
         canonicalKey: "strength",
@@ -443,6 +444,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
         category: "workout",
+        intensity: "high",
         daysActive: [true, false, true, false, true, false, false],
       }),
       B({
@@ -959,6 +961,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
         category: "workout",
+        intensity: "moderate",
         daysActive: [true, false, true, false, true, false, false],
       }),
       B({
@@ -977,6 +980,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
         category: "workout",
+        intensity: "high",
         daysActive: [false, false, false, false, false, true, false],
       }),
       // Same canonical key as the Longevity Foundation strength row
@@ -998,6 +1002,7 @@ export const PACKS: ProtocolPack[] = [
         leverage: 3,
         kind: "action",
         category: "workout",
+        intensity: "high",
         daysActive: [false, true, false, true, false, false, true],
       }),
       OMEGA3_AM,
@@ -2453,6 +2458,7 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     leverage: 2,
     kind: "action",
     category: "workout",
+    intensity: "high",
     daysActive: [false, false, true, false, false, true, false],
   }),
   B({
@@ -2470,6 +2476,7 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     leverage: 2,
     kind: "action",
     category: "workout",
+    intensity: "low",
   }),
   B({
     canonicalKey: "standing-desk",
