@@ -24,6 +24,8 @@ import {
   addBiomarker as addBiomarkerFn,
   deleteBiomarker as deleteBiomarkerFn,
   toggleBehavior as toggleBehaviorFn,
+  swapBehavior as swapBehaviorFn,
+  clearSwap as clearSwapFn,
   toggleSupplement as toggleSupplementFn,
   bulkCheckSupplements as bulkCheckSupplementsFn,
   addSupplement as addSupplementFn,
@@ -302,6 +304,15 @@ export function useAppState() {
   const toggleBehavior = useCallback((date: string, key: string) => {
     setState((prev) => toggleBehaviorFn(prev, date, key));
   }, []);
+  const swapBehavior = useCallback(
+    (date: string, fromKey: string, toKey: string) => {
+      setState((prev) => swapBehaviorFn(prev, date, fromKey, toKey));
+    },
+    []
+  );
+  const clearSwap = useCallback((date: string, fromKey: string) => {
+    setState((prev) => clearSwapFn(prev, date, fromKey));
+  }, []);
   const installPack = useCallback((id: string) => {
     setState((prev) => installPackFn(prev, id));
   }, []);
@@ -373,6 +384,8 @@ export function useAppState() {
     setVacationMode,
     // Protocol OS
     toggleBehavior,
+    swapBehavior,
+    clearSwap,
     installPack,
     uninstallPack,
     setBehaviorOverride,

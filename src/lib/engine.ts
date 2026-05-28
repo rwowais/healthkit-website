@@ -22,6 +22,7 @@ import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
 import { isSupplementBehavior } from "./supplements";
+import { resolveBehaviorByKey } from "./workouts";
 
 export interface TimelineItem extends BehaviorDef {
   fromPacks: string[];
@@ -46,6 +47,18 @@ export interface TimelineItem extends BehaviorDef {
    * instead of silent disappearance.
    */
   muteReason?: string;
+  /**
+   * Per-day workout swap markers (populated by applySwaps).
+   * - `swappedTo`: this item was the user's PLANNED behavior; they
+   *   swapped it for `swappedTo`. The row should render replaced,
+   *   not as a normal todo. Engine renders it muted with a "swapped
+   *   for X" caption; Today UI may hide it entirely.
+   * - `swappedFrom`: this item is the REPLACEMENT. It was injected
+   *   into today's timeline because the user swapped from another
+   *   workout. UI labels it accordingly so the swap pairing reads.
+   */
+  swappedTo?: string;
+  swappedFrom?: string;
 }
 
 /**
@@ -308,6 +321,66 @@ export function compileTimeline(
       }
       return dt || b.leverage - a.leverage;
     });
+}
+
+/**
+ * Apply per-day workout swaps to a compiled timeline. Pure — takes
+ * the timeline + the day's log and returns a new timeline with:
+ *
+ *   - the swapped-FROM item annotated (swappedTo set, muted true,
+ *     muteReason populated). Today UI can choose to render it as a
+ *     "Swapped for Y" placeholder or hide it; the engine just marks.
+ *   - the swapped-TO behavior added if it's not already there
+ *     (looking it up across all packs and standalones so the
+ *     replacement renders even when its daysActive excludes today).
+ *     If it IS already in the timeline (e.g., both workouts were
+ *     scheduled today), we just annotate the existing item.
+ *
+ * Order: call this AFTER compileTimeline, BEFORE shapeTimeline. The
+ * adaptation pass should see the swap-adjusted set, since the
+ * user's intent ("I did yoga instead") is what matters for muting/
+ * reprioritization.
+ */
+export function applySwaps(
+  items: TimelineItem[],
+  log: { swaps?: Record<string, string> } | undefined
+): TimelineItem[] {
+  const swaps = log?.swaps;
+  if (!swaps || Object.keys(swaps).length === 0) return items;
+  // Index existing items by canonicalKey for O(1) lookups.
+  const byKey = new Map(items.map((it) => [it.canonicalKey, it]));
+  // 1. Annotate originals.
+  const next: TimelineItem[] = items.map((it) => {
+    const toKey = swaps[it.canonicalKey];
+    if (!toKey) return it;
+    return {
+      ...it,
+      swappedTo: toKey,
+      muted: true,
+      muteReason: `swapped for ${toKey}`,
+    };
+  });
+  // 2. Inject replacements that aren't already in the timeline.
+  for (const [fromKey, toKey] of Object.entries(swaps)) {
+    if (byKey.has(toKey)) {
+      // Replacement was already in today's timeline — annotate it.
+      const idx = next.findIndex((it) => it.canonicalKey === toKey);
+      if (idx >= 0) next[idx] = { ...next[idx], swappedFrom: fromKey };
+      continue;
+    }
+    const def = resolveBehaviorByKey(toKey);
+    if (!def) continue;
+    next.push({
+      ...def,
+      fromPacks: [],
+      muted: false,
+      recommendedBlock: def.block,
+      retimed: false,
+      trustTier: trustTier(def),
+      swappedFrom: fromKey,
+    });
+  }
+  return next;
 }
 
 // ── Signals (from the new behavior model + check-in) ──────────────

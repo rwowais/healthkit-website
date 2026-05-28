@@ -16,6 +16,7 @@ import { getLogForDate } from "@/lib/storage";
 import { getPendingConflict } from "@/lib/datasource";
 import {
   compileTimeline,
+  applySwaps,
   adapt,
   shapeTimeline,
   masteredKeys,
@@ -30,6 +31,10 @@ import {
   type TimelineItem,
   type LeverageTag,
 } from "@/lib/engine";
+import {
+  isWorkoutBehavior,
+  availableWorkoutAlternatives,
+} from "@/lib/workouts";
 import {
   currentBlock,
   effectiveMinutes,
@@ -152,6 +157,8 @@ export default function TodayPage() {
     state,
     loading,
     toggleBehavior,
+    swapBehavior,
+    clearSwap,
     toggleSupplement,
     bulkCheckSupplements,
     updateSleepLog,
@@ -259,6 +266,19 @@ export default function TodayPage() {
    * canonicalKey so only one is open at a time.
    */
   const [moveMenuKey, setMoveMenuKey] = useState<string | null>(null);
+  // Bulk-action bar destination picker — at iPhone-SE widths the
+  // inline "→ Morning / Afternoon / Evening / Anytime" pills
+  // wrapped to 3 rows next to Snooze + Clear. Collapsed into a
+  // single "Move to…" button that opens this picker.
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  /**
+   * Swap-workout sheet — when the user taps "Swap workout" on a
+   * scheduled workout row, this holds the canonicalKey of the
+   * original. The sheet lists installed workout alternatives;
+   * tapping one calls swapBehavior(date, original, replacement)
+   * and closes. null = sheet closed.
+   */
+  const [swapForKey, setSwapForKey] = useState<string | null>(null);
   // Close the move menu when the user taps anywhere else. We listen on
   // pointerdown (covers touch + mouse + pen) at the document level so
   // the menu can't get stuck open behind a scroll or another row tap.
@@ -442,11 +462,16 @@ export default function TodayPage() {
   const ks = useMemo(() => keystone(state), [state]);
   const timeline = useMemo(() => {
     const items = compileTimeline(state, selDayIdx);
-    return shapeTimeline(items, isToday ? adaptation.mode : "normal", {
+    // Apply per-day workout swaps BEFORE shapeTimeline so the
+    // adaptation pass sees the user's actual intent (e.g. don't
+    // mute the replacement during essentials mode just because the
+    // original was lev-2).
+    const swapped = applySwaps(items, log);
+    return shapeTimeline(swapped, isToday ? adaptation.mode : "normal", {
       keystoneKey: ks?.key,
       mastered: masteredKeys(state, selectedDate),
     });
-  }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate]);
+  }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate, log]);
 
   // Just-graduated behaviors today. We render their titles (from the
   // full pre-shape timeline) so the toast can name what tipped over —
@@ -2112,6 +2137,57 @@ export default function TodayPage() {
                                     {it.rationale}
                                   </p>
                                 )}
+                                {/* Swap-workout affordance — only on
+                                    workout-tagged behaviors, only for
+                                    today, only when not in edit mode
+                                    (the move handle owns that gesture).
+                                    Two states:
+                                    1. Default (no swap recorded) — show
+                                       "Swap workout" chip; tap opens
+                                       the alternatives sheet.
+                                    2. Replaced (item.swappedFrom set) —
+                                       show "Swapped from X — undo".
+                                    The swapped-FROM original is muted
+                                    by applySwaps with muteReason; the
+                                    Resting/Swapped caption above
+                                    surfaces it. */}
+                                {isToday &&
+                                  !editMode &&
+                                  isWorkoutBehavior(it) &&
+                                  !it.muted &&
+                                  !done &&
+                                  !it.swappedFrom && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSwapForKey(it.canonicalKey);
+                                      }}
+                                      className="press tr-fast mt-2 inline-flex items-center gap-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-2)]"
+                                      aria-label={`Swap ${it.title} for a different workout today`}
+                                    >
+                                      <Icon name="arrowRight" size={10} />
+                                      Swap workout
+                                    </button>
+                                  )}
+                                {isToday && !editMode && it.swappedFrom && (
+                                  <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--text-3)]">
+                                    <span>Swapped in for today</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (it.swappedFrom)
+                                          clearSwap(
+                                            selectedDate,
+                                            it.swappedFrom
+                                          );
+                                      }}
+                                      className="press underline-offset-2 hover:underline"
+                                      style={{ color: "var(--readiness)" }}
+                                    >
+                                      Undo
+                                    </button>
+                                  </div>
+                                )}
                                 {/* Visual link from avoid-card to the
                                     target behavior(s) it references —
                                     "→ Strength training" under the
@@ -2242,12 +2318,15 @@ export default function TodayPage() {
 
       {/* Bulk-action bar — appears only when a multi-select has any
           picks. Sticky to the bottom of the viewport so it can't be
-          scrolled out of reach. Three actions: Snooze (today only),
-          Move to block (re-times the selection together, cross-block
-          warning applies), and Clear. */}
+          scrolled out of reach. At iPhone SE widths the inline
+          "→ Morning / Afternoon / Evening / Anytime" pills wrapped
+          to 3 rows; now they live behind a single "Move to…" button
+          that opens a centered sheet. Three actions stay: Snooze
+          (today only), Move to… (re-time the selection together,
+          cross-block warning applies), and Clear. */}
       {editMode && selectedKeys.size > 0 && (
         <div
-          className="fixed inset-x-3 bottom-3 z-50 flex flex-wrap items-center gap-2 rounded-[var(--r-xl)] p-3"
+          className="fixed inset-x-3 bottom-3 z-50 flex items-center gap-2 rounded-[var(--r-xl)] p-3"
           style={{
             background:
               "color-mix(in srgb, var(--readiness) 16%, var(--surface-2))",
@@ -2256,10 +2335,9 @@ export default function TodayPage() {
             WebkitBackdropFilter: "blur(20px)",
           }}
         >
-          <span className="text-[12.5px] font-semibold text-[var(--text-1)]">
+          <span className="shrink-0 text-[12.5px] font-semibold text-[var(--text-1)]">
             {selectedKeys.size} selected
           </span>
-          <span className="t-caption">·</span>
           <button
             onClick={() => {
               setSnoozed((s) =>
@@ -2267,58 +2345,204 @@ export default function TodayPage() {
               );
               setSelectedKeys(new Set());
             }}
-            className="press tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+            className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
             style={{
               background: "var(--surface-3)",
               color: "var(--text-1)",
             }}
             title="Hide these for today only — they come back tomorrow."
           >
-            Snooze today
+            Snooze
           </button>
-          {(["morning", "afternoon", "evening", "anytime"] as TimeBlock[]).map(
-            (b) => (
-              <button
-                key={b}
-                onClick={() => {
-                  const moves: {
-                    key: string;
-                    title: string;
-                    recommendedBlock: TimeBlock;
-                    timingReason?: string;
-                  }[] = [];
-                  for (const k of selectedKeys) {
-                    const it = timeline.find((x) => x.canonicalKey === k);
-                    if (!it || it.block === b) continue;
-                    moves.push({
-                      key: k,
-                      title: it.title,
-                      recommendedBlock: it.recommendedBlock,
-                      timingReason: it.timingReason,
-                    });
-                  }
-                  requestBlockMove(moves, b);
-                  setSelectedKeys(new Set());
-                }}
-                className="press tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
-                style={{
-                  background: "var(--surface-3)",
-                  color: "var(--text-1)",
-                }}
-                title={`Move every selected behavior to ${blockLabel(b)}.`}
-              >
-                → {blockLabel(b)}
-              </button>
-            )
-          )}
+          <button
+            onClick={() => setBulkMoveOpen(true)}
+            className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+            style={{
+              background: "var(--text-1)",
+              color: "#08090B",
+            }}
+            title="Re-time every selected behavior to a different block."
+          >
+            Move to…
+          </button>
           <button
             onClick={() => setSelectedKeys(new Set())}
-            className="press ml-auto text-[11.5px] text-[var(--text-3)]"
+            className="press ml-auto shrink-0 text-[11.5px] text-[var(--text-3)]"
           >
             Clear
           </button>
         </div>
       )}
+
+      {/* Bulk move destination sheet — replaces the four inline block
+          pills that overflowed the bar on narrow screens. */}
+      {bulkMoveOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center"
+          onClick={() => setBulkMoveOpen(false)}
+          style={{
+            background: "color-mix(in srgb, #000 60%, transparent)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[420px] rounded-t-[var(--r-xl)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--hairline-strong)",
+              borderBottom: "none",
+            }}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--text-4)]" />
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+              Move {selectedKeys.size} to
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {(
+                ["morning", "afternoon", "evening", "anytime"] as TimeBlock[]
+              ).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => {
+                    const moves: {
+                      key: string;
+                      title: string;
+                      recommendedBlock: TimeBlock;
+                      timingReason?: string;
+                    }[] = [];
+                    for (const k of selectedKeys) {
+                      const it = timeline.find((x) => x.canonicalKey === k);
+                      if (!it || it.block === b) continue;
+                      moves.push({
+                        key: k,
+                        title: it.title,
+                        recommendedBlock: it.recommendedBlock,
+                        timingReason: it.timingReason,
+                      });
+                    }
+                    requestBlockMove(moves, b);
+                    setSelectedKeys(new Set());
+                    setBulkMoveOpen(false);
+                  }}
+                  className="press tr-fast rounded-[var(--r-md)] py-3 text-[13.5px] font-semibold"
+                  style={{
+                    background: "var(--surface-3)",
+                    color: "var(--text-1)",
+                  }}
+                >
+                  {blockLabel(b)}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setBulkMoveOpen(false)}
+              className="press tr-fast mt-3 w-full py-2 text-[12.5px] text-[var(--text-3)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Workout swap sheet — appears when the user taps "Swap
+          workout" on a scheduled workout row. Lists every workout
+          alternative they have access to (installed packs +
+          standalone library), excluding the original itself. Tapping
+          one swaps for today only and auto-marks complete (the user
+          is telling us they DID the alternative). */}
+      {swapForKey && (() => {
+        const original = timeline.find(
+          (x) => x.canonicalKey === swapForKey
+        );
+        const alternatives = availableWorkoutAlternatives(state).filter(
+          (b) => b.canonicalKey !== swapForKey
+        );
+        return (
+          <div
+            className="fixed inset-0 z-[60] flex items-end justify-center"
+            onClick={() => setSwapForKey(null)}
+            style={{
+              background: "color-mix(in srgb, #000 60%, transparent)",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[420px] rounded-t-[var(--r-xl)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+              style={{
+                background: "var(--surface-2)",
+                border: "1px solid var(--hairline-strong)",
+                borderBottom: "none",
+                maxHeight: "82vh",
+                overflowY: "auto",
+              }}
+            >
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--text-4)]" />
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                Swap for today
+              </p>
+              <h3 className="mt-1 text-[18px] font-bold text-[var(--text-1)]">
+                {original?.title ?? "Workout"} → ?
+              </h3>
+              <p className="t-caption mt-1 leading-relaxed">
+                Pick what you actually did. We&apos;ll mark it complete
+                for today; your original schedule is unchanged.
+              </p>
+              {alternatives.length === 0 ? (
+                <p className="mt-4 text-[13px] text-[var(--text-3)]">
+                  No other workouts available. Install another protocol
+                  pack from Library to unlock swaps.
+                </p>
+              ) : (
+                <div className="mt-4 space-y-1.5">
+                  {alternatives.map((alt) => (
+                    <button
+                      key={alt.canonicalKey}
+                      onClick={() => {
+                        swapBehavior(
+                          selectedDate,
+                          swapForKey,
+                          alt.canonicalKey
+                        );
+                        setSwapForKey(null);
+                        haptic.medium();
+                      }}
+                      className="press tr-fast flex w-full items-center gap-3 rounded-[var(--r-md)] p-3 text-left"
+                      style={{ background: "var(--surface-3)" }}
+                    >
+                      <span
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                        style={{
+                          background:
+                            "color-mix(in srgb, var(--readiness) 14%, var(--surface-3))",
+                          color: "var(--readiness)",
+                        }}
+                      >
+                        <Icon name={alt.icon as IconName} size={15} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[14px] font-semibold text-[var(--text-1)]">
+                          {alt.title}
+                        </span>
+                        {alt.dose && (
+                          <span className="mt-0.5 block text-[11.5px] text-[var(--text-3)]">
+                            {alt.dose}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setSwapForKey(null)}
+                className="press tr-fast mt-4 w-full py-2 text-[12.5px] text-[var(--text-3)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Cross-block move confirmation. Each contradicted behavior
           surfaces ITS OWN scientific rationale — melatonin says

@@ -473,13 +473,21 @@ export default function OnboardingPage() {
               <>
                 <Eyebrow color="var(--vitality)">Ready</Eyebrow>
                 <h1 className="t-title mt-3 text-[var(--text-1)]">
-                  Your system is ready
-                  {name.trim() ? `, ${name.trim()}` : ""}.
+                  {/* Name the starting pack in the headline — feels
+                      personalized (the questionnaire actually mattered)
+                      rather than a generic "Your system is ready". For
+                      multi-pack starters we keep the generic phrasing
+                      since one name would underrepresent the result. */}
+                  {packs.length === 1
+                    ? `Your starting system: ${packs[0].name}`
+                    : `Your system is ready${
+                        name.trim() ? `, ${name.trim()}` : ""
+                      }.`}
                 </h1>
                 <p className="t-body mt-3 leading-relaxed">
-                  {packs.length}{" "}
-                  {packs.length === 1 ? "protocol" : "protocols"}, merging
-                  into one calm day. It adapts as you go.
+                  {packs.length === 1
+                    ? "We started with one. Your Library has eight more — all one tap away when you're ready."
+                    : `${packs.length} protocols, merging into one calm day. It adapts as you go.`}
                 </p>
                 <div className="card mt-7 p-5">
                   {packs.map((p, i) => (

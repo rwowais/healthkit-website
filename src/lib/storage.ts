@@ -611,6 +611,91 @@ export function toggleBehavior(
   };
 }
 
+/**
+ * Record a per-day behavior swap (e.g. user planned strength, did
+ * yoga instead). The replacement (toKey) is auto-marked complete
+ * in the same op so the user doesn't have to tap twice — the whole
+ * point of swap is "I already did this." The original (fromKey) is
+ * left in the log but the engine will render it as muted/replaced.
+ *
+ * Both keys flow through behaviorCompletions for accurate scoring:
+ * the swap pair counts as one done item on the timeline (engine
+ * removes the original from the timeline view, leaving only the
+ * replacement). Mastery math ignores swapped items by design — a
+ * one-off replacement shouldn't accumulate a streak it didn't earn.
+ */
+export function swapBehavior(
+  state: AppState,
+  date: string,
+  fromKey: string,
+  toKey: string
+): AppState {
+  if (fromKey === toKey) return state;
+  const log = getOrCreateLog(state, date);
+  const swaps = { ...(log.swaps ?? {}), [fromKey]: toKey };
+  const bc = { ...(log.behaviorCompletions ?? {}) };
+  // Auto-complete the replacement — the user is telling us they DID
+  // do the alternative. If they undo via clearSwap we'll roll this
+  // back too.
+  bc[toKey] = true;
+  // The original is no longer something they did/skipped — it's
+  // replaced. Clear its completion bit so a previously-toggled
+  // strength doesn't ghost as "done" while showing as muted.
+  delete bc[fromKey];
+  const score = computeBehaviorScore(state, date, bc);
+  const updated: DailyLog = {
+    ...log,
+    swaps,
+    behaviorCompletions: bc,
+    score,
+  };
+  const idx = state.dailyLogs.findIndex((l) => l.date === date);
+  const dailyLogs =
+    idx >= 0
+      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
+      : [...state.dailyLogs, updated];
+  return {
+    ...state,
+    dailyLogs,
+    currentStreak: calculateStreak(dailyLogs, getVacationDates(state)),
+  };
+}
+
+/**
+ * Undo a per-day swap. Removes the swap mapping AND the
+ * auto-completed replacement (so the user isn't credited for a
+ * workout they undid). The original behavior returns to the
+ * timeline in its normal un-completed state.
+ */
+export function clearSwap(
+  state: AppState,
+  date: string,
+  fromKey: string
+): AppState {
+  const log = state.dailyLogs.find((l) => l.date === date);
+  if (!log || !log.swaps?.[fromKey]) return state;
+  const toKey = log.swaps[fromKey];
+  const swaps = { ...log.swaps };
+  delete swaps[fromKey];
+  const bc = { ...(log.behaviorCompletions ?? {}) };
+  delete bc[toKey];
+  const score = computeBehaviorScore(state, date, bc);
+  const updated: DailyLog = {
+    ...log,
+    swaps: Object.keys(swaps).length > 0 ? swaps : undefined,
+    behaviorCompletions: bc,
+    score,
+  };
+  const dailyLogs = state.dailyLogs.map((l) =>
+    l.date === date ? updated : l
+  );
+  return {
+    ...state,
+    dailyLogs,
+    currentStreak: calculateStreak(dailyLogs, getVacationDates(state)),
+  };
+}
+
 // ── Vacation periods ──────────────────────────────────────────────
 
 /**

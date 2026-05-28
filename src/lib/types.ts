@@ -315,6 +315,24 @@ export interface DailyLog {
 
   // Protocol-OS behavior tracking (canonicalKey -> done)
   behaviorCompletions?: Record<string, boolean>;
+
+  /**
+   * Per-day workout swap: when the user planned to do behavior X but
+   * actually did behavior Y (e.g., scheduled for strength, did yoga
+   * because of joint soreness), we record the swap here rather than
+   * lying about completion. Maps fromKey → toKey, scoped to this log.
+   *
+   * Engine reads this when compiling today's timeline:
+   * - the original key is muted with a "swapped for Y" note
+   * - the replacement is added to the timeline even if its daysActive
+   *   doesn't include today
+   * - completing the replacement also counts toward score
+   *
+   * Doesn't affect mastery (the user didn't actually do the original
+   * behavior, and the replacement is a one-off — neither should
+   * accumulate streak credit for the other).
+   */
+  swaps?: Record<string, string>;
 }
 
 // ── Insights ──────────────────────────────────────────────────────
@@ -338,6 +356,19 @@ export type SupplementMetaMap = Record<string, SupplementMeta>;
 export type TimeBlock = "morning" | "afternoon" | "evening" | "anytime";
 export type BehaviorKind = "action" | "avoid" | "reminder";
 
+/**
+ * Behavior category — semantic group, orthogonal to `kind`.
+ * `kind` says what the user does mechanically (act / avoid / be
+ * reminded). `category` says what kind of *thing* it is, so the
+ * engine can do category-aware UX without hard-coding canonical keys.
+ *
+ * "workout" enables the per-day workout-swap flow on Today: a user
+ * scheduled for strength can swap to yoga for the day without lying
+ * about completion. Add new categories sparingly — most behaviors
+ * shouldn't need one.
+ */
+export type BehaviorCategory = "workout";
+
 /** An atomic behavior. canonicalKey is the dedupe/merge identity. */
 export interface BehaviorDef {
   canonicalKey: string;
@@ -352,6 +383,8 @@ export interface BehaviorDef {
   icon: string; // IconName from icon system
   leverage: 1 | 2 | 3; // 3 = highest leverage
   kind: BehaviorKind;
+  /** Semantic category — optional, opt-in. See BehaviorCategory. */
+  category?: BehaviorCategory;
   daysActive?: boolean[]; // optional per-behavior schedule
   /** Why this slot was recommended — calm, specific, one line. */
   timingReason?: string;
