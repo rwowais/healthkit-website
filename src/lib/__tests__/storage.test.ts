@@ -207,18 +207,20 @@ describe("storage — supplements", () => {
     expect(found?.notes).toBe("doubled");
   });
 
-  it("removeSupplement removes + cleans up completion history", () => {
+  it("removeSupplement removes from stack but PRESERVES completion history", () => {
+    // Removing a supplement should not wipe its past data — adherence
+    // stats and Insights need that history to stay honest. Re-adding
+    // the same id later surfaces the past data again (intentional).
     let s = getDefaultState();
     s = addSupplement(s, supp);
     const today = new Date().toISOString().slice(0, 10);
     s = toggleSupplement(s, today, "test-supp");
-    // Sanity — completion exists
     const before = s.dailyLogs.find((l) => l.date === today);
     expect(before?.supplementCompletions?.["test-supp"]).toBe(true);
     s = removeSupplement(s, "test-supp");
     expect(s.supplements?.some((x) => x.id === "test-supp")).toBe(false);
     const after = s.dailyLogs.find((l) => l.date === today);
-    expect(after?.supplementCompletions?.["test-supp"]).toBeUndefined();
+    expect(after?.supplementCompletions?.["test-supp"]).toBe(true);
   });
 
   it("toggleSupplement is reversible + decrements inventory once", () => {
@@ -394,10 +396,11 @@ describe("storage — clearAllData", () => {
   });
 });
 
-describe("storage — supplement migration extracts curated supplements", () => {
-  it("auto-adds magnesium-pm to state.supplements when better-sleep is installed", () => {
-    // Build a state with better-sleep installed but no supplements
-    // yet — normalize should backfill.
+describe("storage — supplements stay user-owned (not pack-derived)", () => {
+  // Supplements are no longer auto-installed by protocol packs. The
+  // user picks them from the Supplements tab (Browse / Add custom).
+  // These tests pin the new contract.
+  it("does NOT auto-add pack supplements just because the pack is installed", () => {
     const json = JSON.stringify({
       ...getDefaultState(),
       version: 3,
@@ -405,14 +408,23 @@ describe("storage — supplement migration extracts curated supplements", () => 
       supplements: undefined,
     });
     const s = importState(json) as AppState;
-    expect(s.supplements?.some((x) => x.id === "magnesium-pm")).toBe(true);
+    expect(s.supplements?.some((x) => x.id === "magnesium-pm") ?? false).toBe(
+      false
+    );
   });
 
   it("doesn't double-create supplements when re-loaded", () => {
+    const customSupp: Supplement = {
+      id: "supp:custom-x",
+      name: "My supp",
+      block: "morning",
+      source: "custom",
+    };
     const json1 = JSON.stringify({
       ...getDefaultState(),
       version: 3,
       installedPacks: ["better-sleep"],
+      supplements: [customSupp],
     });
     const s1 = importState(json1) as AppState;
     const count1 = s1.supplements?.length ?? 0;
@@ -421,18 +433,24 @@ describe("storage — supplement migration extracts curated supplements", () => 
     expect(count2).toBe(count1);
   });
 
-  it("removes curated supplements when their source pack is uninstalled", () => {
+  it("preserves curated supplements even when the source pack is uninstalled", () => {
+    // User explicitly added Magnesium from Browse → it stays even if
+    // they later uninstall the sleep pack that first surfaced it.
+    const browsedSupp: Supplement = {
+      id: "magnesium-pm",
+      name: "Magnesium glycinate",
+      block: "evening",
+      source: "curated",
+      installedFromPack: "better-sleep",
+    };
     const json = JSON.stringify({
       ...getDefaultState(),
       version: 3,
-      installedPacks: ["better-sleep"],
+      installedPacks: [],
+      supplements: [browsedSupp],
     });
-    const s1 = importState(json) as AppState;
-    expect(s1.supplements?.some((x) => x.id === "magnesium-pm")).toBe(true);
-    // Now uninstall better-sleep and re-import.
-    const s2json = JSON.stringify({ ...s1, installedPacks: [] });
-    const s2 = importState(s2json) as AppState;
-    expect(s2.supplements?.some((x) => x.id === "magnesium-pm")).toBe(false);
+    const s = importState(json) as AppState;
+    expect(s.supplements?.some((x) => x.id === "magnesium-pm")).toBe(true);
   });
 
   it("custom supplements survive uninstall", () => {
@@ -449,7 +467,6 @@ describe("storage — supplement migration extracts curated supplements", () => 
       supplements: [customSupp],
     });
     const s1 = importState(json) as AppState;
-    // Uninstall + re-import — custom must still be present.
     const s2 = importState(
       JSON.stringify({ ...s1, installedPacks: [] })
     ) as AppState;

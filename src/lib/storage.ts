@@ -32,7 +32,6 @@ import {
 } from "./engine";
 import { keystone } from "./intel";
 import type {
-  BehaviorDef,
   BehaviorOverride,
   Insight,
   ProtocolPack,
@@ -302,90 +301,32 @@ function normalize(s: AppState): AppState {
     behaviorOverrides[k] = ov;
   }
 
-  // ── Supplement separation (one-time migration + sync) ─────────────
-  // First load after this schema lands: existing users have supplement
-  // behaviors mixed into installed packs and behaviorCompletions. We
-  // pull those into a separate `supplements` array + per-day
-  // supplementCompletions, then mark the migration done so it never
-  // runs again. On every subsequent load we also SYNC any newly-
-  // installed-pack supplements that haven't yet been added (so a
-  // user who installs Daily Essentials post-migration gets its
-  // supplements auto-populated). See lib/supplements.ts for the
-  // canonical-key set + helpers.
+  // ── Supplement separation ────────────────────────────────────────
+  // Architectural decision: supplements are NEVER auto-installed by a
+  // protocol pack. The user manages their stack manually via the
+  // Supplements tab (Browse / Add custom). This protects the user
+  // from us implicitly recommending specific compounds and keeps the
+  // stack as a deliberate, user-curated set rather than a side-effect
+  // of installing a behavioral pack. The pack still ships its
+  // supplement atoms (they just stay hidden from the timeline via
+  // engine.ts's isSupplementBehavior filter); they're available in
+  // the Browse catalog the user can pull from when they want.
+  //
+  // Below: one-time legacy migration of `behaviorCompletions[supp-key]`
+  // into `supplementCompletions[supp-key]` for users predating this
+  // schema. After that runs, state.supplements is user-owned and we
+  // make no further automatic edits to it here.
   const installedSetSupp = new Set(installedPacks);
-  // Build the set of curated supplement keys CURRENTLY available to
-  // this user (i.e., they belong to an installed pack or appear as
-  // a standalone — note: standalones aren't auto-added unless the
-  // user explicitly picks them via the library, so we only sync
-  // pack-bound supplements automatically).
-  const installedSupplementKeys = new Set<string>();
-  const packForSupplementKey = new Map<string, string>();
-  // Use activePacks() so a CMS-published bundle (with possibly
-  // different canonical keys, edited titles, or extra atoms) is the
-  // authoritative source. Falling back to PACKS would miss bundle-
-  // only supplements and silently lose user overrides whose keys
-  // belong to bundle atoms.
   const activeForSync = activePacks();
-  for (const p of activeForSync) {
-    if (!installedSetSupp.has(p.id)) continue;
-    for (const b of p.behaviors) {
-      if (isSupplementBehavior(b)) {
-        installedSupplementKeys.add(b.canonicalKey);
-        if (!packForSupplementKey.has(b.canonicalKey))
-          packForSupplementKey.set(b.canonicalKey, p.id);
-      }
-    }
-  }
-  // Preserve any existing supplements the user has (including their
-  // overrides, brand notes, inventory tracking).
+  // Preserve every supplement the user has chosen — curated or custom.
+  // Notably: we do NOT drop curated supplements whose origin pack is
+  // uninstalled. If the user explicitly picked Magnesium from Browse,
+  // it stays even if they later uninstall the sleep pack that first
+  // surfaced it. Their stack, their rules.
   const priorSupplements: Supplement[] = Array.isArray(s.supplements)
     ? s.supplements
     : [];
-  const priorSuppById = new Map(priorSupplements.map((x) => [x.id, x]));
-  const nextSupplements: Supplement[] = [];
-  // 1. Existing user customs / previously-migrated rows survive as-is.
-  for (const sp of priorSupplements) {
-    // Curated supplement from a pack the user has since uninstalled?
-    // Drop it — its presence is now stale. Customs always survive.
-    if (
-      sp.source === "curated" &&
-      sp.installedFromPack &&
-      !installedSetSupp.has(sp.installedFromPack)
-    ) {
-      continue;
-    }
-    nextSupplements.push(sp);
-  }
-  // 2. New pack-installed supplements that aren't yet in state get
-  //    auto-added with their curated defaults.
-  for (const key of installedSupplementKeys) {
-    if (priorSuppById.has(key)) continue;
-    const packId = packForSupplementKey.get(key);
-    // Find the behavior def in the active catalog (built-in OR
-    // published CMS bundle), in that priority order. Walking PACKS
-    // alone would miss bundle-only supplements.
-    let def: BehaviorDef | undefined;
-    for (const p of activeForSync) {
-      def = p.behaviors.find((b) => b.canonicalKey === key);
-      if (def) break;
-    }
-    if (!def) continue;
-    nextSupplements.push({
-      id: def.canonicalKey,
-      name: def.title,
-      dose: def.dose,
-      block: def.block,
-      timing: def.timingReason,
-      daysActive: def.daysActive,
-      derivedFrom: def.canonicalKey,
-      contraindications: def.contraindications,
-      evidence: def.evidence,
-      evidenceTier: def.evidenceTier,
-      rationale: def.rationale,
-      source: "curated",
-      installedFromPack: packId,
-    });
-  }
+  const nextSupplements: Supplement[] = [...priorSupplements];
 
   // Migrate completions: walk every daily log; for each
   // behaviorCompletions key that's a supplement, copy it into
@@ -870,20 +811,18 @@ export function updateSupplement(
   };
 }
 
-/** Remove a supplement by id. Removes its completion history too. */
+/**
+ * Remove a supplement by id. Preserves its completion history so
+ * adherence stats (rate %, Insights signals, Adherence grid) stay
+ * honest after the user pauses an item. Re-adding the same id will
+ * surface the past data again — that's intentional. If you genuinely
+ * want a clean slate, use the "reset data" flow in Profile.
+ */
 export function removeSupplement(state: AppState, id: string): AppState {
   const list = state.supplements ?? [];
   return {
     ...state,
     supplements: list.filter((s) => s.id !== id),
-    // Clean up completion data so deleting + re-adding doesn't
-    // resurrect old check states.
-    dailyLogs: state.dailyLogs.map((l) => {
-      if (!l.supplementCompletions || !l.supplementCompletions[id]) return l;
-      const sc = { ...l.supplementCompletions };
-      delete sc[id];
-      return { ...l, supplementCompletions: sc };
-    }),
   };
 }
 

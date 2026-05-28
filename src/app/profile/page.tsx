@@ -300,6 +300,39 @@ export default function ProfilePage() {
             reach the page via the Manage link inside your daily
             supplement card.
           </p>
+          <Row label="App icon badge">
+            <button
+              onClick={() =>
+                updateSettings({
+                  disableAppBadge: !s.disableAppBadge,
+                })
+              }
+              role="switch"
+              aria-checked={!s.disableAppBadge}
+              aria-label="Show remaining count on the home-screen app icon"
+              className="tr-fast h-7 w-12 rounded-full p-1"
+              style={{
+                background: !s.disableAppBadge
+                  ? "var(--vitality)"
+                  : "var(--surface-3)",
+              }}
+            >
+              <div
+                className="tr-fast h-5 w-5 rounded-full bg-white"
+                style={{
+                  transform: !s.disableAppBadge
+                    ? "translateX(20px)"
+                    : "translateX(0)",
+                }}
+              />
+            </button>
+          </Row>
+          <p className="t-caption mt-1 mb-3 leading-relaxed">
+            That number on your installed app icon is the count of
+            today&apos;s behaviors still to do — not unread
+            notifications. It clears when you finish the day. Turn off
+            if it&apos;s more pressure than help.
+          </p>
           <Row label="Protocol reminders">
             <button
               onClick={toggleNotifications}

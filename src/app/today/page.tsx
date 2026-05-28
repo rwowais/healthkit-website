@@ -251,6 +251,26 @@ export default function TodayPage() {
   const [dragOverBlock, setDragOverBlock] = useState<TimeBlock | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   /**
+   * Mobile move menu — HTML5 drag-and-drop is broken on touch devices
+   * (iOS Safari + Android Chrome don't fire dragstart from touch),
+   * so we also expose a tap-to-move flow: tap the handle, get a
+   * popover with the four time blocks, tap target → move. Works
+   * identically on desktop. The menu's keyed by the item's
+   * canonicalKey so only one is open at a time.
+   */
+  const [moveMenuKey, setMoveMenuKey] = useState<string | null>(null);
+  // Close the move menu when the user taps anywhere else. We listen on
+  // pointerdown (covers touch + mouse + pen) at the document level so
+  // the menu can't get stuck open behind a scroll or another row tap.
+  // The menu's own buttons stop propagation so this doesn't fire from
+  // inside it.
+  useEffect(() => {
+    if (!moveMenuKey) return;
+    const close = () => setMoveMenuKey(null);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [moveMenuKey]);
+  /**
    * A move that requires confirmation. Set when the user drags a
    * behavior to a block that doesn't match its recommendedBlock. Holds
    * everything we need to commit and a per-key rationale so each
@@ -469,13 +489,21 @@ export default function TodayPage() {
   // App icon badge: number of behaviors still to do today. Only set
   // for *today* (past/future scrubber views don't represent
   // actionable now-work). Cleared on day-complete so the user sees
-  // a clean icon as their reward, not a "0" sitting there. The
-  // helper is no-op on platforms that don't support the API.
+  // a clean icon as their reward, not a "0" sitting there. Honors
+  // settings.disableAppBadge — when the user opts out, we force-clear
+  // the badge on every render so a stale number from a previous
+  // session doesn't linger. The helper is no-op on platforms that
+  // don't support the API.
+  const badgeDisabled = state.settings.disableAppBadge === true;
   useEffect(() => {
+    if (badgeDisabled) {
+      setBadge(0);
+      return;
+    }
     if (!isToday) return;
     const remaining = Math.max(0, prog.total - prog.done);
     setBadge(remaining);
-  }, [isToday, prog.done, prog.total]);
+  }, [isToday, prog.done, prog.total, badgeDisabled]);
   const ksItem = useMemo(
     () =>
       ks ? timeline.find((i) => i.canonicalKey === ks.key) ?? null : null,
@@ -1469,6 +1497,7 @@ export default function TodayPage() {
                 if (editMode) setSelectedKeys(new Set());
                 setDragKey(null);
                 setDragOverBlock(null);
+                setMoveMenuKey(null);
               }}
               className="press tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11.5px] font-semibold"
               style={{
@@ -1718,32 +1747,122 @@ export default function TodayPage() {
                                 transition: "opacity 120ms ease",
                               }}
                             >
-                              {/* Drag handle — only in edit mode, only
+                              {/* Move handle — only in edit mode, only
                                   for today (past days are read-only).
-                                  Drag is initiated from the handle, not
-                                  the row, so the completion tap target
-                                  stays uncontaminated. */}
+                                  Dual UX: desktop users can still
+                                  drag (HTML5 dnd via `draggable`);
+                                  touch users tap to open a small
+                                  destination picker (mobile-friendly,
+                                  since dragstart never fires from a
+                                  touch event on iOS Safari and is
+                                  flaky on Android). Tap-path also
+                                  works on desktop — same affordance,
+                                  fewer keystrokes than dragging
+                                  across a tall screen. */}
                               {editMode && isToday && (
-                                <span
-                                  role="button"
-                                  tabIndex={-1}
-                                  aria-label={`Drag ${it.title} to a different time of day`}
-                                  title="Drag to move across times of day"
-                                  draggable
-                                  onDragStart={(e) => {
-                                    setDragKey(it.canonicalKey);
-                                    setDragOverBlock(block);
-                                    e.dataTransfer.effectAllowed = "move";
-                                  }}
-                                  onDragEnd={() => {
-                                    setDragKey(null);
-                                    setDragOverBlock(null);
-                                  }}
-                                  className="grid min-h-[44px] w-7 cursor-grab shrink-0 place-items-center text-[var(--text-3)] active:cursor-grabbing"
-                                >
-                                  <span className="font-mono text-[14px] leading-none">
-                                    ⋮⋮
-                                  </span>
+                                <span className="relative">
+                                  <button
+                                    type="button"
+                                    aria-label={`Move ${it.title} to a different time of day`}
+                                    aria-haspopup="menu"
+                                    aria-expanded={
+                                      moveMenuKey === it.canonicalKey
+                                    }
+                                    title="Tap to move (or drag from here on desktop)"
+                                    draggable
+                                    onDragStart={(e) => {
+                                      setMoveMenuKey(null);
+                                      setDragKey(it.canonicalKey);
+                                      setDragOverBlock(block);
+                                      e.dataTransfer.effectAllowed = "move";
+                                    }}
+                                    onDragEnd={() => {
+                                      setDragKey(null);
+                                      setDragOverBlock(null);
+                                    }}
+                                    onPointerDown={(e) => {
+                                      // Stop the document-level handler
+                                      // from closing the menu BEFORE
+                                      // our click toggles it open.
+                                      e.stopPropagation();
+                                    }}
+                                    onClick={() => {
+                                      setMoveMenuKey((k) =>
+                                        k === it.canonicalKey
+                                          ? null
+                                          : it.canonicalKey
+                                      );
+                                    }}
+                                    className="grid min-h-[44px] w-7 cursor-grab shrink-0 place-items-center text-[var(--text-3)] active:cursor-grabbing"
+                                  >
+                                    <span className="font-mono text-[14px] leading-none">
+                                      ⋮⋮
+                                    </span>
+                                  </button>
+                                  {moveMenuKey === it.canonicalKey && (
+                                    <div
+                                      role="menu"
+                                      onClick={(e) => e.stopPropagation()}
+                                      onPointerDown={(e) =>
+                                        e.stopPropagation()
+                                      }
+                                      className="absolute left-0 top-full z-40 mt-1 min-w-[150px] overflow-hidden rounded-[var(--r-md)] border shadow-xl"
+                                      style={{
+                                        background: "var(--surface-2)",
+                                        borderColor:
+                                          "var(--hairline-strong)",
+                                      }}
+                                    >
+                                      <p className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--text-4)]">
+                                        Move to
+                                      </p>
+                                      {(
+                                        [
+                                          "morning",
+                                          "afternoon",
+                                          "evening",
+                                          "anytime",
+                                        ] as TimeBlock[]
+                                      ).map((target) => (
+                                        <button
+                                          key={target}
+                                          role="menuitem"
+                                          disabled={target === block}
+                                          onClick={() => {
+                                            setMoveMenuKey(null);
+                                            if (target === block) return;
+                                            requestBlockMove(
+                                              [
+                                                {
+                                                  key: it.canonicalKey,
+                                                  title: it.title,
+                                                  recommendedBlock:
+                                                    it.recommendedBlock,
+                                                  timingReason:
+                                                    it.timingReason,
+                                                },
+                                              ],
+                                              target
+                                            );
+                                          }}
+                                          className="press tr-fast block w-full px-3 py-2 text-left text-[13px] text-[var(--text-1)] hover:bg-[var(--surface-3)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                          style={{
+                                            background:
+                                              target === block
+                                                ? "var(--surface-3)"
+                                                : undefined,
+                                          }}
+                                        >
+                                          {blockLabel(target)}
+                                          {target === block && (
+                                            <span className="ml-2 text-[10.5px] text-[var(--text-4)]">
+                                              current
+                                            </span>
+                                          )}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
                                 </span>
                               )}
                               {/* Multi-select checkbox — same surface as

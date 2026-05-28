@@ -169,6 +169,15 @@ export interface UserSettings {
   vacationPeriods?: Array<{ start: string; end: string | null }>;
 
   /**
+   * Opt out of the home-screen app icon badge. When true, the badge
+   * is cleared on every load and we never set it again — useful for
+   * users who interpret the number as a notification count and find
+   * it stressful, or whose OS doesn't show it cleanly. Default
+   * (undefined) = badge on for installed PWAs.
+   */
+  disableAppBadge?: boolean;
+
+  /**
    * ISO; stamped when the user accepted Terms + Privacy. Required for
    * EU/UK/CA legal compliance. We don't gate the app on this — we
    * collect it on first run after the legal pages ship, and surface
