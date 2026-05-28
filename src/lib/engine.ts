@@ -427,7 +427,9 @@ function deviceReadiness(_state: AppState): number | null {
 }
 
 // Recovery-relevant markers whose "Watch" band should soften the day.
-const BIO_RECOVERY = new Set(["hrv", "restingHR", "hsCRP"]);
+// hsCRP was dropped with the bloodwork panel — the live recovery signal
+// now rides entirely on HRV + resting HR (both wearable-friendly).
+const BIO_RECOVERY = new Set(["hrv", "restingHR"]);
 
 function biomarkerConcern(state: AppState): {
   text: string | null;
@@ -629,7 +631,7 @@ export function getSignals(state: AppState): Signals {
   // signal at the source so a free-tier / expired-trial user adding
   // an HRV reading doesn't accidentally get a premium mode shift.
   // Subjective recoveryProxy (sleep + energy) is still free and
-  // unaffected — only the bloodwork-derived signal is gated.
+  // unaffected — only the body-marker-derived signal is gated.
   const bio = getAccess(state).premium
     ? biomarkerConcern(state)
     : { text: null, recovery: false };

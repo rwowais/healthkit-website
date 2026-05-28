@@ -226,9 +226,10 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
       date: dayKey(80),
     });
     expect(new Set(st.biomarkers.map((b) => b.metric)).size).toBe(3);
-    // Now try to add LDL — at the free cap, should be blocked.
+    // Now try to add a 4th distinct marker — at the free cap, should be
+    // blocked.
     const before = st.biomarkers.length;
-    st = addBiomarker(st, { metric: "ldlC", value: 110, date: dayKey(90) });
+    st = addBiomarker(st, { metric: "vo2max", value: 46, date: dayKey(90) });
     const after = st.biomarkers.length;
     // EXPECTED behavior: cap enforced at the lib layer → after === before.
     // ACTUAL behavior: storage.ts addBiomarker has NO cap → after === before+1.
@@ -436,11 +437,11 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
           value: 62,
           date: dayKey(d),
         });
-      // Day 90 — LDL attempt; cap should block, but storage.ts doesn't.
+      // Day 90 — 4th-marker attempt; cap should block it.
       if (d === 90)
         st = addBiomarker(st, {
-          metric: "ldlC",
-          value: 110,
+          metric: "vo2max",
+          value: 46,
           date: dayKey(d),
         });
       st = saveDailyLog(st, simulateDay(st, d, adherenceForDay(d), 0.2));

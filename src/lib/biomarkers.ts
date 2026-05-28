@@ -1,9 +1,16 @@
 /**
- * biomarkers.ts — generic, evidence-informed biomarker catalog.
+ * biomarkers.ts — body-trend catalog.
  *
- * Ranges reflect commonly cited optimal vs. standard reference targets for
- * healthspan. Educational only — not medical advice, not branded to any
- * individual. Always interpret labs with a clinician.
+ * Body-level signals only: composition (weight, waist, body fat) and the
+ * cardio/autonomic markers a wearable can feed (resting HR, HRV, blood
+ * pressure, VO₂ max, grip strength). Self-tracking and educational —
+ * not medical advice.
+ *
+ * Lab/bloodwork panels (lipids, glucose, A1c, hs-CRP, etc.) were
+ * intentionally removed: they carry clinical-interpretation liability and
+ * don't drive the daily adaptation loop (recovery reads HRV + resting
+ * HR). The `category` field + "blood" union member are retained so the
+ * panel can be reintroduced later without a type change if ever desired.
  */
 
 export type BiomarkerCategory = "body" | "blood";
@@ -120,110 +127,6 @@ export const BIOMARKERS: BiomarkerDef[] = [
     optimal: 45,
     watch: 30,
     why: "Grip strength is a robust proxy for total-body strength and longevity.",
-  },
-
-  // ── Bloodwork ──
-  {
-    key: "apoB",
-    label: "ApoB",
-    unit: "mg/dL",
-    category: "blood",
-    direction: "lower",
-    optimal: 80,
-    watch: 100,
-    why: "ApoB counts atherogenic particles directly — a sharper cardiovascular risk marker than LDL-C alone.",
-  },
-  {
-    key: "ldlC",
-    label: "LDL-C",
-    unit: "mg/dL",
-    category: "blood",
-    direction: "lower",
-    optimal: 100,
-    watch: 130,
-    why: "Lower LDL cholesterol over a lifetime lowers atherosclerotic burden.",
-  },
-  {
-    key: "hdlC",
-    label: "HDL-C",
-    unit: "mg/dL",
-    category: "blood",
-    direction: "higher",
-    optimal: 55,
-    watch: 40,
-    why: "Context-dependent, but very low HDL often accompanies metabolic dysfunction.",
-  },
-  {
-    key: "triglycerides",
-    label: "Triglycerides",
-    unit: "mg/dL",
-    category: "blood",
-    direction: "lower",
-    optimal: 90,
-    watch: 150,
-    why: "Elevated triglycerides signal insulin resistance and metabolic strain.",
-  },
-  {
-    key: "fastingGlucose",
-    label: "Fasting Glucose",
-    unit: "mg/dL",
-    category: "blood",
-    direction: "lower",
-    optimal: 90,
-    watch: 100,
-    why: "Rising fasting glucose is an early signal on the path to insulin resistance.",
-  },
-  {
-    key: "fastingInsulin",
-    label: "Fasting Insulin",
-    unit: "µIU/mL",
-    category: "blood",
-    direction: "lower",
-    optimal: 5,
-    watch: 9,
-    why: "One of the earliest detectable markers of metabolic dysfunction — often years before glucose moves.",
-  },
-  {
-    key: "hba1c",
-    label: "HbA1c",
-    unit: "%",
-    category: "blood",
-    direction: "lower",
-    optimal: 5.3,
-    watch: 5.7,
-    why: "Reflects average glucose over ~3 months; lower is generally better within normal range.",
-    step: 0.1,
-  },
-  {
-    key: "hsCRP",
-    label: "hs-CRP",
-    unit: "mg/L",
-    category: "blood",
-    direction: "lower",
-    optimal: 1,
-    watch: 3,
-    why: "A sensitive marker of systemic inflammation linked to cardiovascular and metabolic risk.",
-    step: 0.1,
-  },
-  {
-    key: "lpa",
-    label: "Lp(a)",
-    unit: "nmol/L",
-    category: "blood",
-    direction: "lower",
-    optimal: 75,
-    watch: 125,
-    why: "Largely genetic; a high value meaningfully raises cardiovascular risk and is worth knowing once.",
-  },
-  {
-    key: "omega3Index",
-    label: "Omega-3 Index",
-    unit: "%",
-    category: "blood",
-    direction: "higher",
-    optimal: 8,
-    watch: 4,
-    why: "Higher omega-3 red-cell content is associated with lower cardiovascular and all-cause risk.",
   },
 ];
 

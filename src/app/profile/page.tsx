@@ -143,7 +143,7 @@ export default function ProfilePage() {
           )}
         </Card>
 
-        {/* Biomarkers entry */}
+        {/* Body trends entry */}
         <Link href="/biomarkers">
           <Card className="press flex items-center gap-4">
             <span
@@ -158,10 +158,11 @@ export default function ProfilePage() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[15px] font-semibold text-[var(--text-1)]">
-                Biomarkers
+                Body Trends
               </p>
               <p className="t-caption mt-0.5">
-                Body & bloodwork — {state.biomarkers.length} readings logged
+                Weight, HRV, resting HR &amp; more — {state.biomarkers.length}{" "}
+                readings logged
               </p>
             </div>
             <Icon
@@ -598,8 +599,8 @@ export default function ProfilePage() {
             </p>
             <p className="text-[13px] leading-relaxed text-[var(--text-2)]">
               Protocolize is an educational tool — not medical advice,
-              diagnosis, or treatment. Biomarker ranges are general
-              references; interpret all health data with a qualified
+              diagnosis, or treatment. The ranges shown are general
+              references; interpret any health data with a qualified
               clinician. If you&apos;re pregnant, under 18, on
               medication, or have any condition, please consult your
               doctor before changing your routine.

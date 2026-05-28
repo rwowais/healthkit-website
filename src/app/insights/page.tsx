@@ -447,10 +447,10 @@ export default function InsightsPage() {
                 line="Once you have a week of data, Premium shows your patterns the moment they form — live, biomarker-aware, with weekly review and identity reflection."
               />
             )}
-            {/* Cross-link to Biomarkers so users discover the bloodwork
-                surface from the same intelligence-y page. Biomarkers
-                has no nav-bar tab; without this card, returning users
-                have to dig through Profile to find it. */}
+            {/* Cross-link to Body Trends so users discover the body-marker
+                surface from the same intelligence-y page. It has no
+                nav-bar tab; without this card, returning users have to
+                dig through Profile to find it. */}
             <button
               onClick={() => router.push("/biomarkers")}
               className="press tr-fast panel flex w-full items-center gap-3 p-4 text-left"
@@ -467,10 +467,10 @@ export default function InsightsPage() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-semibold text-[var(--text-1)]">
-                  Body & bloodwork
+                  Body trends
                 </span>
                 <span className="mt-0.5 block text-[12px] text-[var(--text-3)]">
-                  Track weight, HRV, lipids, glucose — the inputs that
+                  Track weight, HRV, resting heart rate — the inputs that
                   make Insights smarter over time.
                 </span>
               </span>

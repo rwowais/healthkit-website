@@ -89,9 +89,9 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
       {
-        name: "Biomarkers",
-        short_name: "Biomarkers",
-        description: "Log or review bloodwork",
+        name: "Body Trends",
+        short_name: "Body",
+        description: "Log or review body trends",
         url: "/biomarkers?source=shortcut",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },

@@ -9,7 +9,6 @@ import {
   BIOMARKERS,
   biomarkerBand,
   targetText,
-  type BiomarkerCategory,
   type BiomarkerDef,
 } from "@/lib/biomarkers";
 import { Sparkline } from "@/components/ui/Charts";
@@ -86,13 +85,11 @@ export default function BiomarkersPage() {
     );
   }
 
-  const section = (cat: BiomarkerCategory, title: string) => {
-    const defs = BIOMARKERS.filter((b) => b.category === cat);
+  const markerList = () => {
     return (
       <section className="anim-rise">
-        <p className="t-eyebrow mb-3 px-1">{title}</p>
         <div className="well space-y-1.5 p-1.5">
-          {defs.map((def) => {
+          {BIOMARKERS.map((def) => {
             const hist = byMetric[def.key] ?? [];
             const last = hist[hist.length - 1];
             const bandInfo =
@@ -160,16 +157,16 @@ export default function BiomarkersPage() {
     <Shell>
       <div className="flex flex-col gap-7">
         <div className="anim-rise">
-          <Eyebrow color="var(--recovery)">Biomarkers</Eyebrow>
-          <h1 className="t-title mt-2 text-[var(--text-1)]">Health Markers</h1>
+          <Eyebrow color="var(--recovery)">Body</Eyebrow>
+          <h1 className="t-title mt-2 text-[var(--text-1)]">Body Trends</h1>
           <p className="t-caption mt-2 leading-relaxed">
-            Educational tracking only — not medical advice. Interpret labs with
-            a clinician.
+            The body signals that move with your training and recovery —
+            weight, HRV, resting heart rate, and more. For your own
+            tracking, not medical advice.
           </p>
         </div>
 
-        {section("body", "Body")}
-        {section("blood", "Bloodwork")}
+        {markerList()}
       </div>
 
       <Sheet

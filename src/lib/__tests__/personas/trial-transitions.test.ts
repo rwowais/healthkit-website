@@ -182,8 +182,8 @@ describe("persona: Quinn the quick converter", () => {
       { metric: "weight", value: 80 },
       { metric: "hrv", value: 60 },
       { metric: "restingHR", value: 58 },
-      { metric: "ldlC", value: 95 },
-      { metric: "fastingGlucose", value: 88 },
+      { metric: "vo2max", value: 46 },
+      { metric: "bodyFat", value: 22 },
     ];
     for (const b of bioOnTrial)
       st = addBiomarker(st, { ...b, date: dayKey(6) });
@@ -325,14 +325,14 @@ describe("persona: Erin the engaged but free", () => {
       { metric: "weight", value: 70 },
       { metric: "hrv", value: 30 }, // "Watch" band — would trigger biomarker-aware adapt for premium
       { metric: "restingHR", value: 65 },
-      { metric: "ldlC", value: 110 }, // 4th — should be blocked
+      { metric: "vo2max", value: 46 }, // 4th — should be blocked
     ];
     for (const b of toAdd) st = addBiomarker(st, { ...b, date: dayKey(30) });
     const distinctMetrics = new Set(
       (st.biomarkers ?? []).map((b) => b.metric),
     );
     expect(distinctMetrics.size, "free biomarker cap = 3").toBe(3);
-    expect(distinctMetrics.has("ldlC")).toBe(false);
+    expect(distinctMetrics.has("vo2max")).toBe(false);
     assertInvariants(st, "Erin day 30 (after biomarker add attempts)");
 
     // Critical: biomarker-aware adapt MUST NOT fire on a non-premium

@@ -287,7 +287,7 @@ function simulateMarcus(): {
 
     // Biomarker entry every 30 days (use real addBiomarker)
     if (i % 30 === 0) {
-      // 4 metrics per checkpoint — HRV, weight, LDL, fasting glucose
+      // 4 body markers per checkpoint — HRV, weight, VO2max, body fat
       // Values drift slightly day-by-day so trends are visible
       const k = Math.floor((400 - i) / 30); // 0,1,2,...
       state = addBiomarker(state, {
@@ -301,13 +301,13 @@ function simulateMarcus(): {
         date,
       });
       state = addBiomarker(state, {
-        metric: "ldlC",
-        value: 110 - k * 0.4,
+        metric: "vo2max",
+        value: 45 + k * 0.2,
         date,
       });
       state = addBiomarker(state, {
-        metric: "fastingGlucose",
-        value: 92 - k * 0.1,
+        metric: "bodyFat",
+        value: 20 - k * 0.05,
         date,
       });
     }

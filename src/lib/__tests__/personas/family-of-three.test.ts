@@ -391,21 +391,21 @@ interface PersonaSpec {
 }
 
 function dadBiomarkers(dayN: number, st: AppState): AppState {
-  // Monthly biomarker entries — 5 metrics (premium): HRV + weight + LDL +
-  // glucose + ApoB.
+  // Monthly body-marker entries — 5 metrics (premium): HRV + weight +
+  // VO2max + body fat + waist.
   if (dayN % 30 !== 0) return st;
   const date = dk(365 - dayN);
   const k = dayN / 30;
   let out = st;
   out = addBiomarker(out, { metric: "hrv", value: 55 + k * 0.5, date });
   out = addBiomarker(out, { metric: "weight", value: 78 - k * 0.1, date });
-  out = addBiomarker(out, { metric: "ldlC", value: 110 - k * 0.3, date });
+  out = addBiomarker(out, { metric: "vo2max", value: 45 + k * 0.2, date });
   out = addBiomarker(out, {
-    metric: "fastingGlucose",
-    value: 92 - k * 0.1,
+    metric: "bodyFat",
+    value: 20 - k * 0.05,
     date,
   });
-  out = addBiomarker(out, { metric: "apoB", value: 95 - k * 0.2, date });
+  out = addBiomarker(out, { metric: "waist", value: 88 - k * 0.2, date });
   return out;
 }
 
