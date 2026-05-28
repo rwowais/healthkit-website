@@ -91,10 +91,19 @@ function SupplementsInner() {
       <div className="flex flex-col gap-6">
         <div>
           <Eyebrow>Supplements</Eyebrow>
-          <h1 className="t-title mt-2 text-[var(--text-1)]">Your stack</h1>
+          <h1 className="t-title mt-2 text-[var(--text-1)]">
+            {view === "browse"
+              ? "Browse catalog"
+              : view === "grid"
+              ? "Adherence grid"
+              : "Your stack"}
+          </h1>
           <p className="t-caption mt-2 leading-relaxed">
-            Bundle, edit, and track. Times are loose — supplements are
-            block-based (morning, evening), not minute-based.
+            {view === "browse"
+              ? "Curated supplements with doses and timing. Tap Add to put one in your stack."
+              : view === "grid"
+              ? "Each row is a supplement; each square is a day. Filled = taken, empty = missed."
+              : "Bundle, edit, and track. Times are loose — supplements are block-based (morning, evening), not minute-based."}
           </p>
         </div>
 
@@ -307,28 +316,30 @@ function StackView({
                         <p className="text-[14px] font-medium text-[var(--text-1)]">
                           {s.name}
                         </p>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-[var(--text-3)]">
-                          {s.dose && <span>{s.dose}</span>}
-                          {s.dose && s.timing && <span>·</span>}
-                          {s.timing && (
-                            <span className="line-clamp-1">{s.timing}</span>
-                          )}
-                          {lowStock && (
-                            <>
-                              {(s.dose || s.timing) && <span>·</span>}
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                                style={{
-                                  background:
-                                    "color-mix(in srgb, var(--alert) 18%, transparent)",
-                                  color: "var(--alert)",
-                                }}
-                              >
-                                {s.inventory!.count} left
-                              </span>
-                            </>
-                          )}
-                        </div>
+                        {/* Dose and timing as a single line. Joining
+                            with " · " inline (instead of separate <span>
+                            children) keeps the separator attached to the
+                            preceding word when the line wraps on narrow
+                            screens — otherwise the dot ended up floating
+                            on its own line. line-clamp-1 caps height so
+                            long timing reasons get truncated cleanly. */}
+                        {(s.dose || s.timing) && (
+                          <p className="mt-0.5 line-clamp-1 text-[11.5px] text-[var(--text-3)]">
+                            {[s.dose, s.timing].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        {lowStock && (
+                          <span
+                            className="mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                            style={{
+                              background:
+                                "color-mix(in srgb, var(--alert) 18%, transparent)",
+                              color: "var(--alert)",
+                            }}
+                          >
+                            {s.inventory!.count} left
+                          </span>
+                        )}
                       </div>
                       <Icon
                         name="chevron"

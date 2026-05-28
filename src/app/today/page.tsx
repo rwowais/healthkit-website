@@ -1488,7 +1488,7 @@ export default function TodayPage() {
           <div className="flex items-center justify-between px-1">
             <span className="text-[12px] font-medium text-[var(--text-3)]">
               {editMode
-                ? "Drag to move across times of day"
+                ? "Tap a handle to move"
                 : "Today's flow"}
             </span>
             <button
@@ -1614,7 +1614,7 @@ export default function TodayPage() {
                     )}
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-3)]">
-                    {editMode
+                    {editMode && dragKey
                       ? `Drop here to move to ${blockLabel(block)}`
                       : fullyDone
                       ? "Complete"
@@ -1738,9 +1738,9 @@ export default function TodayPage() {
                             )}
 
                             <div
-                              className={`group relative flex items-stretch gap-3 ${
-                                lev1 ? "py-1" : "py-1.5"
-                              }`}
+                              className={`group relative flex items-stretch ${
+                                editMode ? "gap-1.5" : "gap-3"
+                              } ${lev1 ? "py-1" : "py-1.5"}`}
                               style={{
                                 opacity:
                                   dragKey === it.canonicalKey ? 0.4 : 1,
@@ -1793,7 +1793,7 @@ export default function TodayPage() {
                                           : it.canonicalKey
                                       );
                                     }}
-                                    className="grid min-h-[44px] w-7 cursor-grab shrink-0 place-items-center text-[var(--text-3)] active:cursor-grabbing"
+                                    className="grid min-h-[44px] w-6 cursor-grab shrink-0 place-items-center text-[var(--text-3)] active:cursor-grabbing"
                                   >
                                     <span className="font-mono text-[14px] leading-none">
                                       ⋮⋮
@@ -1870,7 +1870,7 @@ export default function TodayPage() {
                                   the user bulk-snooze or bulk-move a
                                   group without dragging each. */}
                               {editMode && isToday && (
-                                <span className="grid min-h-[44px] w-6 shrink-0 place-items-center">
+                                <span className="grid min-h-[44px] w-5 shrink-0 place-items-center">
                                   <input
                                     type="checkbox"
                                     aria-label={`Select ${it.title}`}
@@ -2162,14 +2162,20 @@ export default function TodayPage() {
                               </button>
 
                               {/* Details / edit — explicit, not the
-                                  accidental default tap target */}
-                              <button
-                                onClick={() => setDetail(it)}
-                                aria-label={`${it.title} details and options`}
-                                className="press grid min-h-[44px] w-9 shrink-0 place-items-center self-center text-[var(--text-4)] hover:text-[var(--text-2)]"
-                              >
-                                <Icon name="chevron" size={15} />
-                              </button>
+                                  accidental default tap target. Hidden
+                                  in edit mode so the title + tap-to-
+                                  move handle have enough horizontal
+                                  room on narrow screens; the user
+                                  reaches details by exiting edit. */}
+                              {!editMode && (
+                                <button
+                                  onClick={() => setDetail(it)}
+                                  aria-label={`${it.title} details and options`}
+                                  className="press grid min-h-[44px] w-9 shrink-0 place-items-center self-center text-[var(--text-4)] hover:text-[var(--text-2)]"
+                                >
+                                  <Icon name="chevron" size={15} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
