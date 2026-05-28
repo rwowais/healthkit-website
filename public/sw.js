@@ -3,11 +3,15 @@
  *
  * Caching strategy (chosen for "installable PWA that opens instantly"):
  *
- *  - App shell (HTML navigations, same-origin):
- *      stale-while-revalidate.
- *      Serve the cached version immediately, refresh the cache in the
- *      background. Net effect: launch feels instant even on flaky wifi,
- *      and new builds propagate on the next navigation.
+ *  - App shell (HTML navigations + RSC payloads, same-origin):
+ *      network-first.
+ *      Always fetch the live page when online, so a new deploy is seen
+ *      immediately; fall back to the cached shell (then /offline.html)
+ *      only when the network fails. Heavy assets stay cache-first
+ *      (below) so launch is still fast — we just never serve a stale
+ *      PAGE to an online user. (This replaced stale-while-revalidate,
+ *      which served the old page first, so a route not re-visited since
+ *      a deploy stayed stuck on the previous build.)
  *
  *  - Static assets (/_next/static/*, /icons/*, /splash/*, fonts):
  *      cache-first with long TTL.
@@ -33,7 +37,12 @@
  *
  *  Push notifications: see the push event handler below.
  */
-const CACHE_VERSION = "v9";
+// Bumped to v10 (network-first migration). In production this constant is
+// stamped with the per-deploy git SHA by scripts/stamp-sw.mjs, so every
+// deploy ships a distinct SW → old caches purge on activate → the
+// controllerchange reload in ServiceWorker.tsx fires → users land on the
+// new build automatically. Locally it stays "v10".
+const CACHE_VERSION = "v10";
 const SHELL_CACHE = `pz-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `pz-static-${CACHE_VERSION}`;
 const CURRENT_CACHES = [SHELL_CACHE, STATIC_CACHE];
@@ -116,9 +125,10 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Everything else (HTML navigations, manifest, dynamic chunks):
-  // stale-while-revalidate against the shell cache.
-  e.respondWith(staleWhileRevalidate(req, SHELL_CACHE));
+  // Everything else (HTML navigations, RSC payloads, manifest):
+  // network-first so an online user always gets the current deploy;
+  // the cached shell + /offline.html are the offline fallback.
+  e.respondWith(networkFirst(req, SHELL_CACHE));
 });
 
 async function cacheFirst(req, cacheName) {
@@ -136,27 +146,29 @@ async function cacheFirst(req, cacheName) {
   }
 }
 
-async function staleWhileRevalidate(req, cacheName) {
+async function networkFirst(req, cacheName) {
   const cache = await caches.open(cacheName);
-  const hit = await cache.match(req);
-  // Always kick off a background refresh — but only commit the new
-  // response to cache if it's actually OK (no 404/500 poisoning).
-  const refresh = fetch(req)
-    .then((res) => {
-      if (res.ok) cache.put(req, res.clone()).catch(() => {});
-      return res;
-    })
-    .catch(() => null);
-  if (hit) return hit; // serve cached immediately, refresh in background
-  const live = await refresh;
-  if (live) return live;
-  // Truly offline and never cached: serve the offline fallback for
-  // HTML navigations so the user sees something branded.
-  if (req.mode === "navigate" || req.headers.get("accept")?.includes("text/html")) {
-    const fallback = await cache.match("/offline.html");
-    if (fallback) return fallback;
+  try {
+    const res = await fetch(req);
+    // Cache successful GETs so the page is still available offline later.
+    // Only commit OK responses (no 404/500 poisoning of the shell cache).
+    if (res.ok) cache.put(req, res.clone()).catch(() => {});
+    return res;
+  } catch {
+    // Network failed (offline / flaky): serve the cached copy if we have
+    // one — instant launch is preserved offline.
+    const hit = await cache.match(req);
+    if (hit) return hit;
+    // Never cached either: branded offline page for navigations.
+    if (
+      req.mode === "navigate" ||
+      req.headers.get("accept")?.includes("text/html")
+    ) {
+      const fallback = await cache.match("/offline.html");
+      if (fallback) return fallback;
+    }
+    return new Response("Offline", { status: 504, statusText: "Offline" });
   }
-  return new Response("Offline", { status: 504, statusText: "Offline" });
 }
 
 // ── Push notifications ────────────────────────────────────────────
