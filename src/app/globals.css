@@ -53,6 +53,71 @@
   /* ── Easing ── */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Theme-varying effect tokens (overridden in the light block, so
+     every surface/effect reskins from one place). ── */
+  color-scheme: dark;
+  --glass-bg: rgba(12, 14, 17, 0.72);
+  --card-grad-2: rgba(16, 18, 22, 0.7);
+  --panel-grad-2: rgba(13, 15, 18, 0.6);
+  --well-grad-top: rgba(0, 0, 0, 0.18);
+  --well-grad-bot: rgba(0, 0, 0, 0.05);
+  --well-inset: rgba(255, 255, 255, 0.03);
+  --inset-hi: rgba(255, 255, 255, 0.04);
+  --chart-grid: rgba(255, 255, 255, 0.06);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   LIGHT THEME — applied when <html data-theme="light">. The inline
+   script in layout.tsx resolves the stored/system preference before
+   first paint (no flash). Dark stays the default (bare :root). Accents
+   are deepened so they stay legible on white (the originals are pale,
+   tuned to glow on black). Higher specificity than :root, so it wins
+   regardless of source order.
+   ════════════════════════════════════════════════════════════════ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg: #F6F7F9;
+  --bg-grad-top: #FFFFFF;
+  --surface-1: #FFFFFF;
+  --surface-2: #F1F3F6;
+  --surface-3: #E6E9EE;
+  --hairline: rgba(0, 0, 0, 0.07);
+  --hairline-strong: rgba(0, 0, 0, 0.12);
+
+  /* Text — near-black scale; text-1..3 meet WCAG AA on white + surfaces */
+  --text-1: #14161A;
+  --text-2: #45494F;
+  --text-3: #5F636B;
+  --text-4: #8A8F98;
+
+  /* Accents — deepened for legibility on light (≈4.5:1 as small text) */
+  --sleep: #5258C4;
+  --sleep-soft: rgba(82, 88, 196, 0.12);
+  --recovery: #0E7D71;
+  --recovery-soft: rgba(14, 125, 113, 0.12);
+  --readiness: #2C66D6;
+  --readiness-soft: rgba(44, 102, 214, 0.12);
+  --vitality: #1B8040;
+  --vitality-soft: rgba(27, 128, 64, 0.12);
+  --warm: #946417;
+  --warm-soft: rgba(148, 100, 23, 0.13);
+  --alert: #C2452D;
+
+  /* Effects */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --card-grad-2: rgba(248, 249, 251, 0.75);
+  --panel-grad-2: rgba(248, 249, 251, 0.6);
+  --well-grad-top: rgba(0, 0, 0, 0.05);
+  --well-grad-bot: rgba(0, 0, 0, 0.02);
+  --well-inset: rgba(255, 255, 255, 0.7);
+  --inset-hi: rgba(255, 255, 255, 0.7);
+  --chart-grid: rgba(0, 0, 0, 0.09);
+  --shadow-soft: 0 1px 2px rgba(20, 22, 28, 0.08),
+    0 8px 24px rgba(20, 22, 28, 0.1);
+  --shadow-row: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 
 @theme inline {
@@ -110,7 +175,7 @@ body {
 
 /* ── Surfaces ───────────────────────────────────────────────────── */
 .card {
-  background: linear-gradient(180deg, var(--surface-1) 0%, rgba(16,18,22,0.7) 100%);
+  background: linear-gradient(180deg, var(--surface-1) 0%, var(--card-grad-2) 100%);
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
 }
@@ -120,11 +185,11 @@ body {
   border-radius: var(--r-md);
 }
 .glass {
-  background: rgba(12, 14, 17, 0.72);
+  background: var(--glass-bg);
   backdrop-filter: saturate(160%) blur(24px);
   -webkit-backdrop-filter: saturate(160%) blur(24px);
 }
-.inset { box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+.inset { box-shadow: inset 0 1px 0 var(--inset-hi); }
 
 /* ── Transitions ────────────────────────────────────────────────── */
 .tr { transition: all 0.4s var(--ease); }
@@ -224,9 +289,9 @@ body {
 /* Recessed group — a well that holds rows, no border */
 .well {
   background:
-    linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.05) 100%);
+    linear-gradient(180deg, var(--well-grad-top) 0%, var(--well-grad-bot) 100%);
   border-radius: var(--r-lg);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  box-shadow: inset 0 1px 0 var(--well-inset);
 }
 
 /* Raised tappable row — separated by light, not lines */
@@ -246,7 +311,7 @@ body {
 
 /* Floating elevated panel */
 .panel {
-  background: linear-gradient(180deg, var(--surface-1) 0%, rgba(13,15,18,0.6) 100%);
+  background: linear-gradient(180deg, var(--surface-1) 0%, var(--panel-grad-2) 100%);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-soft);
 }

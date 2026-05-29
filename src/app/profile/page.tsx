@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
@@ -11,6 +11,7 @@ import { activeDataSource } from "@/lib/datasource";
 import { deleteAccount, supabaseEnabled } from "@/lib/auth";
 import { getUserId } from "@/lib/supabase";
 import { sendTestPush } from "@/lib/push";
+import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 import {
   Card,
   Eyebrow,
@@ -18,6 +19,7 @@ import {
   Skeleton,
   Sheet,
   Button,
+  Segmented,
   useToast,
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -54,6 +56,12 @@ export default function ProfilePage() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [theme, setTheme] = useState<ThemePref>("dark");
+  useEffect(() => {
+    // localStorage is unavailable during SSR, so the first client render
+    // matches the server ("dark"); sync to the real saved pref after mount.
+    setTheme(getThemePref());
+  }, []);
 
   if (loading) {
     return (
@@ -172,6 +180,29 @@ export default function ProfilePage() {
             />
           </Card>
         </Link>
+
+        {/* Appearance — theme preference (stored per-device, not synced). */}
+        <Card>
+          <Eyebrow>Appearance</Eyebrow>
+          <p className="t-caption mt-2">
+            Dark is the default. Light is easier in bright settings; System
+            follows your device.
+          </p>
+          <div className="mt-4">
+            <Segmented
+              options={[
+                { value: "system", label: "System" },
+                { value: "light", label: "Light" },
+                { value: "dark", label: "Dark" },
+              ]}
+              value={theme}
+              onChange={(v) => {
+                setTheme(v);
+                setThemePref(v);
+              }}
+            />
+          </div>
+        </Card>
 
         {/* Sleep schedule */}
         <Card>

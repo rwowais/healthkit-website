@@ -59,7 +59,7 @@ export function TrendArea({
           x2={W - pad}
           y1={top + g * (H - top - 24)}
           y2={top + g * (H - top - 24)}
-          stroke="rgba(255,255,255,0.04)"
+          stroke="var(--chart-grid)"
           strokeWidth="1"
         />
       ))}
@@ -114,7 +114,7 @@ export function BarWeek({
     if (v >= 80) return "var(--vitality)";
     if (v >= 55) return "var(--readiness)";
     if (v > 0) return "var(--warm)";
-    return "rgba(255,255,255,0.07)";
+    return "var(--chart-grid)";
   };
   return (
     <div className="flex items-end justify-between gap-2.5" style={{ height }}>
@@ -195,7 +195,7 @@ export function HeatStrip({
   values: { date: string; score: number }[];
 }) {
   const tone = (s: number) => {
-    if (s === 0) return "rgba(255,255,255,0.04)";
+    if (s === 0) return "var(--chart-grid)";
     if (s >= 80) return "var(--vitality)";
     if (s >= 55) return "var(--readiness)";
     if (s >= 30) return "var(--warm)";

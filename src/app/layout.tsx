@@ -8,6 +8,7 @@ import TimezoneSentry from "@/components/TimezoneSentry";
 import InstallPrompt from "@/components/InstallPrompt";
 import Analytics from "@/components/Analytics";
 import MotionProvider from "@/components/MotionProvider";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -155,9 +156,12 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      style={{ colorScheme: "dark" }}
+      suppressHydrationWarning
     >
       <body className="antialiased">
+        {/* Sets data-theme before first paint so there's no flash of the
+            wrong theme. Reads the same localStorage key as theme.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <ErrorBoundary>
           <MotionProvider>
             {children}

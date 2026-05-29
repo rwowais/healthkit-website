@@ -20,7 +20,7 @@ export function RingScore({
   size = 220,
   stroke = 14,
   color = "var(--readiness)",
-  trackColor = "rgba(255,255,255,0.05)",
+  trackColor = "var(--chart-grid)",
   label,
   sublabel,
   big = true,
@@ -116,7 +116,7 @@ export function MiniRing({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(255,255,255,0.05)"
+          stroke="var(--chart-grid)"
           strokeWidth={stroke}
         />
         <circle
@@ -172,7 +172,7 @@ export function ArcGauge({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(255,255,255,0.05)"
+          stroke="var(--chart-grid)"
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={`${arc} ${circ}`}
