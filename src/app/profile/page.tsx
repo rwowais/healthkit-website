@@ -56,7 +56,7 @@ export default function ProfilePage() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const [theme, setTheme] = useState<ThemePref>("dark");
+  const [theme, setTheme] = useState<ThemePref>("light");
   useEffect(() => {
     // localStorage is unavailable during SSR, so the first client render
     // matches the server ("dark"); sync to the real saved pref after mount.
@@ -185,7 +185,7 @@ export default function ProfilePage() {
         <Card>
           <Eyebrow>Appearance</Eyebrow>
           <p className="t-caption mt-2">
-            Dark is the default. Light is easier in bright settings; System
+            Light is the default. Dark is the deep, original look; System
             follows your device.
           </p>
           <div className="mt-4">
@@ -543,7 +543,7 @@ export default function ProfilePage() {
               </p>
               <button
                 onClick={() => router.push("/upgrade")}
-                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[#08090B]"
+                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[var(--bg)]"
               >
                 Keep Premium
               </button>
@@ -557,7 +557,7 @@ export default function ProfilePage() {
               </p>
               <button
                 onClick={() => router.push("/upgrade")}
-                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[#08090B]"
+                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[var(--bg)]"
               >
                 {access.trialExpired
                   ? "Restore full intelligence"
@@ -813,7 +813,7 @@ export default function ProfilePage() {
                 800
               );
             }}
-            className="!bg-[var(--alert)] !text-[#08090B]"
+            className="!bg-[var(--alert)] !text-[var(--bg)]"
           >
             Reset
           </Button>

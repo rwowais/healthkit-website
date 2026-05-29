@@ -161,7 +161,7 @@ export default function RuleEditor({
               className="rounded-[var(--r-pill)] px-2 py-0.5 font-semibold tr-fast"
               style={{
                 background: mode === "all" ? "var(--text-1)" : "transparent",
-                color: mode === "all" ? "#08090B" : "var(--text-3)",
+                color: mode === "all" ? "var(--bg)" : "var(--text-3)",
               }}
             >
               all of
@@ -171,7 +171,7 @@ export default function RuleEditor({
               className="rounded-[var(--r-pill)] px-2 py-0.5 font-semibold tr-fast"
               style={{
                 background: mode === "any" ? "var(--text-1)" : "transparent",
-                color: mode === "any" ? "#08090B" : "var(--text-3)",
+                color: mode === "any" ? "var(--bg)" : "var(--text-3)",
               }}
             >
               any of

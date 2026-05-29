@@ -209,7 +209,7 @@ export default function SupplementBlockCard({
                       border: `2px solid ${
                         isDone ? "var(--vitality)" : "var(--text-4)"
                       }`,
-                      color: "#08090B",
+                      color: "var(--bg)",
                     }}
                   >
                     {isDone && <Icon name="check" size={13} />}

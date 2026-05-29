@@ -140,7 +140,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#08090B",
+  themeColor: "#F6F7F9",
   width: "device-width",
   initialScale: 1,
   // No maximumScale — locking zoom fails WCAG 1.4.4 for low-vision users.

@@ -37,7 +37,7 @@ export default function LandingPage() {
                 "linear-gradient(145deg, var(--sleep), var(--readiness))",
             }}
           >
-            <span className="h-2 w-2 rounded-full bg-[#08090B]" />
+            <span className="h-2 w-2 rounded-full bg-[var(--bg)]" />
           </span>
           <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
             Protocolize
@@ -88,7 +88,7 @@ export default function LandingPage() {
           </p>
           <button
             onClick={() => router.push("/onboarding")}
-            className="press tr-fast mt-10 rounded-[var(--r-pill)] bg-[var(--text-1)] px-7 py-3.5 text-[15px] font-semibold text-[#08090B]"
+            className="press tr-fast mt-10 rounded-[var(--r-pill)] bg-[var(--text-1)] px-7 py-3.5 text-[15px] font-semibold text-[var(--bg)]"
           >
             Build my system
           </button>

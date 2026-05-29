@@ -146,7 +146,7 @@ function Check({ on, color }: { on: boolean; color: string }) {
           height="13"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#08090B"
+          stroke="var(--bg)"
           strokeWidth="3.4"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -714,7 +714,7 @@ export default function TodayPage() {
             </p>
             <Link
               href={onVacation ? "/profile#break" : "/protocols#discover"}
-              className="press tr-fast mt-6 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[14px] font-semibold text-[#08090B]"
+              className="press tr-fast mt-6 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[14px] font-semibold text-[var(--bg)]"
             >
               {onVacation ? "End break in Profile" : "Discover protocols"}
             </Link>
@@ -1482,7 +1482,7 @@ export default function TodayPage() {
                           });
                         setDismissed((d) => [...d, sug.id]);
                       }}
-                      className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2.5 text-[13px] font-semibold text-[#08090B]"
+                      className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2.5 text-[13px] font-semibold text-[var(--bg)]"
                     >
                       {sug.cta}
                     </button>
@@ -1522,7 +1522,7 @@ export default function TodayPage() {
               className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11.5px] font-semibold"
               style={{
                 background: editMode ? "var(--text-1)" : "var(--surface-3)",
-                color: editMode ? "#08090B" : "var(--text-2)",
+                color: editMode ? "var(--bg)" : "var(--text-2)",
               }}
               title={
                 editMode
@@ -1645,7 +1645,7 @@ export default function TodayPage() {
                         className="rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
                         style={{
                           background: accent,
-                          color: "#08090B",
+                          color: "var(--bg)",
                         }}
                       >
                         NOW
@@ -1984,7 +1984,7 @@ export default function TodayPage() {
                                       height={lev3 ? 14 : 11}
                                       viewBox="0 0 24 24"
                                       fill="none"
-                                      stroke="#08090B"
+                                      stroke="var(--bg)"
                                       strokeWidth="3.4"
                                       strokeLinecap="round"
                                       strokeLinejoin="round"
@@ -2427,7 +2427,7 @@ export default function TodayPage() {
             className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
             style={{
               background: "var(--text-1)",
-              color: "#08090B",
+              color: "var(--bg)",
             }}
             title="Re-time every selected behavior to a different block."
           >

@@ -120,7 +120,7 @@ export default function AuthPage() {
                 "linear-gradient(145deg, var(--sleep), var(--readiness))",
             }}
           >
-            <span className="h-2.5 w-2.5 rounded-full bg-[#08090B]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--bg)]" />
           </span>
           <h1 className="mt-7 text-[34px] font-bold leading-[1.1] tracking-tight text-[var(--text-1)]">
             {headline}
@@ -172,7 +172,7 @@ export default function AuthPage() {
                     <button
                       onClick={() => oauth("apple")}
                       disabled={!supabaseEnabled}
-                      className="press tr-fast flex w-full items-center justify-center gap-2 rounded-[var(--r-md)] bg-[var(--text-1)] py-3.5 text-[15px] font-semibold text-[#08090B] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="press tr-fast flex w-full items-center justify-center gap-2 rounded-[var(--r-md)] bg-[var(--text-1)] py-3.5 text-[15px] font-semibold text-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Icon name="sparkle" size={16} />
                       Continue with Apple
@@ -226,7 +226,7 @@ export default function AuthPage() {
                 <button
                   onClick={submit}
                   disabled={busy || !email.trim()}
-                  className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[#08090B] disabled:opacity-40"
+                  className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)] disabled:opacity-40"
                 >
                   {busy
                     ? "…"

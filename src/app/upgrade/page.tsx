@@ -184,7 +184,7 @@ export default function UpgradePage() {
                   const r = startCheckout(plan);
                   if (!r.ok) toast.show(r.reason ?? "Not available yet");
                 }}
-                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[#08090B]"
+                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)]"
               >
                 Start Premium
               </button>
@@ -204,7 +204,7 @@ export default function UpgradePage() {
               </div>
               <button
                 onClick={() => router.push("/today")}
-                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[#08090B]"
+                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)]"
               >
                 Continue with full access
               </button>

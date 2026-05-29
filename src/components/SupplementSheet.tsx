@@ -109,7 +109,7 @@ export default function SupplementSheet({
                   className="flex-1 rounded-[var(--r-pill)] py-2 text-[12px] font-semibold capitalize tr-fast"
                   style={{
                     background: on ? "var(--text-1)" : "transparent",
-                    color: on ? "#08090B" : "var(--text-3)",
+                    color: on ? "var(--bg)" : "var(--text-3)",
                   }}
                 >
                   {b}
@@ -143,7 +143,7 @@ export default function SupplementSheet({
                   className="press tr-fast h-11 flex-1 rounded-[var(--r-sm)] text-[13px] font-bold"
                   style={{
                     background: on ? "var(--warm)" : "var(--surface-2)",
-                    color: on ? "#08090B" : "var(--text-4)",
+                    color: on ? "var(--bg)" : "var(--text-4)",
                   }}
                 >
                   {d}

@@ -113,7 +113,7 @@ export default function BehaviorSheet({
                   className="flex-1 rounded-[var(--r-pill)] py-2 text-[12px] font-semibold capitalize tr-fast"
                   style={{
                     background: on ? color : "transparent",
-                    color: on ? "#08090B" : "var(--text-3)",
+                    color: on ? "var(--bg)" : "var(--text-3)",
                   }}
                 >
                   {b}
@@ -207,7 +207,7 @@ export default function BehaviorSheet({
                   className="press tr-fast h-11 flex-1 rounded-[var(--r-sm)] text-[13px] font-bold"
                   style={{
                     background: on ? color : "var(--surface-2)",
-                    color: on ? "#08090B" : "var(--text-4)",
+                    color: on ? "var(--bg)" : "var(--text-4)",
                   }}
                 >
                   {d}

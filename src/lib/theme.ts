@@ -13,11 +13,13 @@ export type ThemePref = "system" | "light" | "dark";
 export const THEME_KEY = "protocolize-theme";
 
 const THEME_COLORS = { light: "#F6F7F9", dark: "#08090B" } as const;
+// Dark remains fully supported and is one tap away in Profile → Appearance;
+// only the *default* (used when nothing is stored) changed to light.
 
 export function getThemePref(): ThemePref {
-  if (typeof localStorage === "undefined") return "dark";
+  if (typeof localStorage === "undefined") return "light";
   const v = localStorage.getItem(THEME_KEY);
-  return v === "light" || v === "system" || v === "dark" ? v : "dark";
+  return v === "light" || v === "system" || v === "dark" ? v : "light";
 }
 
 /** Resolve a preference to a concrete theme (system → OS setting). */
@@ -58,4 +60,4 @@ export function setThemePref(pref: ThemePref): void {
  */
 export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(
   THEME_KEY
-)};var p=localStorage.getItem(k)||"dark";var d=p==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):(p==="light"?"light":"dark");document.documentElement.setAttribute("data-theme",d);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",d==="light"?"#F6F7F9":"#08090B");}catch(e){}})();`;
+)};var p=localStorage.getItem(k)||"light";var d=p==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):(p==="light"?"light":"dark");document.documentElement.setAttribute("data-theme",d);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",d==="light"?"#F6F7F9":"#08090B");}catch(e){}})();`;

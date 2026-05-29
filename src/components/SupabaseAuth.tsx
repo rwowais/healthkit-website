@@ -70,7 +70,7 @@ export default function SupabaseAuth() {
           </p>
           <button
             onClick={() => router.push("/auth")}
-            className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[#08090B]"
+            className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[var(--bg)]"
           >
             Sign in or create an account
           </button>

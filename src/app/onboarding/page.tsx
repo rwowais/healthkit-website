@@ -86,7 +86,7 @@ function Choice({
                   background: on
                     ? "var(--readiness)"
                     : "var(--surface-3)",
-                  color: on ? "#08090B" : "var(--text-2)",
+                  color: on ? "var(--bg)" : "var(--text-2)",
                 }}
               >
                 <Icon name={c.icon} size={19} />
@@ -286,7 +286,7 @@ export default function OnboardingPage() {
                       "linear-gradient(145deg, var(--sleep), var(--readiness))",
                   }}
                 >
-                  <span className="h-3 w-3 rounded-full bg-[#08090B]" />
+                  <span className="h-3 w-3 rounded-full bg-[var(--bg)]" />
                 </span>
                 <h1 className="t-display text-[var(--text-1)]">
                   Let&apos;s build your system.

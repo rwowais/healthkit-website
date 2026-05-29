@@ -105,7 +105,7 @@ export function Button({
   const styles = disabled
     ? "border border-[var(--hairline)] !bg-transparent text-[var(--text-4)] px-6 py-3.5 cursor-not-allowed"
     : variant === "primary"
-    ? "bg-[var(--text-1)] text-[#0A0B0D] px-6 py-3.5"
+    ? "bg-[var(--text-1)] text-[var(--bg)] px-6 py-3.5"
     : variant === "soft"
     ? "bg-[var(--surface-3)] text-[var(--text-1)] px-6 py-3.5"
     : "border border-[var(--hairline-strong)] text-[var(--text-1)] px-6 py-3.5";

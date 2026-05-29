@@ -75,7 +75,7 @@ export default function ResetPage() {
             <button
               onClick={submit}
               disabled={busy || !password}
-              className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[#08090B] disabled:opacity-40"
+              className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)] disabled:opacity-40"
             >
               {busy ? "…" : "Update password"}
             </button>

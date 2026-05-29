@@ -67,7 +67,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                       "linear-gradient(145deg, var(--sleep), var(--readiness))",
                   }}
                 >
-                  <span className="h-2 w-2 rounded-full bg-[#08090B]" />
+                  <span className="h-2 w-2 rounded-full bg-[var(--bg)]" />
                 </span>
                 <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
                   Protocolize

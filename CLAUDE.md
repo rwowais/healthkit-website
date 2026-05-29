@@ -189,9 +189,9 @@ Full token set + reusable components live in `src/app/globals.css` and
 `.t-eyebrow`, `.anim-rise`, etc.) and primitives (`Card`, `Button`, `RingScore`,
 `TrendArea`, `Segmented`, `Sheet`, `useToast`) — do not hardcode colors.
 
-**Theming (dark default + opt-in light).** Profile → Appearance offers
-System / Light / Dark (dark is the default and the brand's signature
-look). It's driven entirely by CSS variables: the dark palette is `:root`
+**Theming (light default + dark option).** Profile → Appearance offers
+System / Light / Dark (light is the default as of the founder's call; dark
+is the original premium look and fully supported). It's driven entirely by CSS variables: the dark palette is `:root`
 in `globals.css`, and `:root[data-theme="light"]` redefines the same
 tokens (surfaces, text, accents — deepened for legibility on white — and
 the effect tokens `--glass-bg`, `--card-grad-2`, `--panel-grad-2`,

@@ -35,7 +35,7 @@ export default function Error({
       <div className="mt-5 flex items-center gap-3">
         <button
           onClick={() => reset()}
-          className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[13px] font-semibold text-[#08090B]"
+          className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[13px] font-semibold text-[var(--bg)]"
         >
           Try again
         </button>

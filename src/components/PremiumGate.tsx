@@ -44,7 +44,7 @@ export function UpgradeCTA({
           </p>
           <button
             onClick={() => router.push("/upgrade")}
-            className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2.5 text-[13px] font-semibold text-[#08090B]"
+            className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2.5 text-[13px] font-semibold text-[var(--bg)]"
           >
             See Premium
           </button>
@@ -78,7 +78,7 @@ export function PremiumPeek({
         </p>
         <button
           onClick={() => router.push("/upgrade")}
-          className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2.5 text-[13px] font-semibold text-[#08090B]"
+          className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2.5 text-[13px] font-semibold text-[var(--bg)]"
         >
           Unlock with Premium
         </button>

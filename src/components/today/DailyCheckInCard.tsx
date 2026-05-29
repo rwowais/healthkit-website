@@ -52,7 +52,7 @@ export default function DailyCheckInCard({
             className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
             style={{
               background: sleepQ === o.q ? "var(--sleep)" : "var(--surface-2)",
-              color: sleepQ === o.q ? "#08090B" : "var(--text-3)",
+              color: sleepQ === o.q ? "var(--bg)" : "var(--text-3)",
             }}
           >
             {o.l}
@@ -75,7 +75,7 @@ export default function DailyCheckInCard({
             style={{
               background:
                 energy === o.e ? "var(--readiness)" : "var(--surface-2)",
-              color: energy === o.e ? "#08090B" : "var(--text-3)",
+              color: energy === o.e ? "var(--bg)" : "var(--text-3)",
             }}
           >
             {o.l}

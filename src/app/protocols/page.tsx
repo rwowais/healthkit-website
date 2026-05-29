@@ -384,7 +384,7 @@ export default function ProtocolsPage() {
               className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2 text-[12.5px] font-semibold"
               style={{
                 background: viewMode === m.id ? "var(--text-1)" : "transparent",
-                color: viewMode === m.id ? "#08090B" : "var(--text-3)",
+                color: viewMode === m.id ? "var(--bg)" : "var(--text-3)",
               }}
             >
               {m.label}
@@ -903,7 +903,7 @@ export default function ProtocolsPage() {
                         addMode === m
                           ? "var(--text-1)"
                           : "transparent",
-                      color: addMode === m ? "#08090B" : "var(--text-3)",
+                      color: addMode === m ? "var(--bg)" : "var(--text-3)",
                     }}
                   >
                     {m === "library" ? "From library" : "Custom"}
@@ -1030,7 +1030,7 @@ export default function ProtocolsPage() {
                             ? "var(--readiness)"
                             : "transparent",
                         color:
-                          bDraft.block === bl ? "#08090B" : "var(--text-3)",
+                          bDraft.block === bl ? "var(--bg)" : "var(--text-3)",
                       }}
                     >
                       {bl}

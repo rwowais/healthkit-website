@@ -209,7 +209,7 @@ function Hint({
         className={`press grid ${dim} cursor-help place-items-center rounded-full font-bold`}
         style={{
           background: open ? "var(--readiness)" : "var(--surface-3)",
-          color: open ? "#08090B" : "var(--text-3)",
+          color: open ? "var(--bg)" : "var(--text-3)",
         }}
       >
         ?
@@ -999,7 +999,7 @@ function AdminHomeInner() {
             style={{
               background:
                 tab === t.id ? "var(--text-1)" : "var(--surface-2)",
-              color: tab === t.id ? "#08090B" : "var(--text-3)",
+              color: tab === t.id ? "var(--bg)" : "var(--text-3)",
             }}
           >
             {t.label}
@@ -1198,7 +1198,7 @@ function AdminHomeInner() {
                       ? "var(--text-1)"
                       : "var(--surface-2)",
                   color:
-                    engineSub === s.id ? "#08090B" : "var(--text-3)",
+                    engineSub === s.id ? "var(--bg)" : "var(--text-3)",
                 }}
               >
                 {s.label}
@@ -1355,7 +1355,7 @@ function AdminHomeInner() {
                           );
                           if (result.ok) refreshRules();
                         }}
-                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1 text-[11.5px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1 text-[11.5px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         Save
                       </button>
@@ -1441,7 +1441,7 @@ function AdminHomeInner() {
                         refreshRules();
                       }
                     }}
-                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                   >
                     Add rule (draft)
                   </button>
@@ -1878,7 +1878,7 @@ function AdminHomeInner() {
                         refreshCfg();
                       }
                     }}
-                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                   >
                     {busy ? "…" : "Add / update"}
                   </button>
@@ -1991,7 +1991,7 @@ function AdminHomeInner() {
                           );
                           if (r.ok) refreshTemplates();
                         }}
-                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[11.5px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[11.5px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         Save
                       </button>
@@ -2123,7 +2123,7 @@ function AdminHomeInner() {
                             refreshTemplates();
                           }
                         }}
-                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         Add template (draft)
                       </button>
@@ -2205,7 +2205,7 @@ function AdminHomeInner() {
                           );
                           if (r.ok) refreshTemplates();
                         }}
-                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[11.5px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[11.5px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         Save
                       </button>
@@ -2274,7 +2274,7 @@ function AdminHomeInner() {
                         refreshTemplates();
                       }
                     }}
-                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                   >
                     Add template
                   </button>
@@ -2365,7 +2365,7 @@ function AdminHomeInner() {
                     refreshAdmins();
                   }
                 }}
-                className="press tr-fast mt-2 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                className="press tr-fast mt-2 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
               >
                 {busy ? "…" : "Grant admin"}
               </button>
@@ -2522,7 +2522,7 @@ function AdminHomeInner() {
                               issue.severity === "error"
                                 ? "var(--alert)"
                                 : "var(--warm)",
-                            color: "#08090B",
+                            color: "var(--bg)",
                           }}
                         >
                           {issue.severity}
@@ -2618,7 +2618,7 @@ function AdminHomeInner() {
                             ? "var(--text-1)"
                             : "transparent",
                         color:
-                          intelTierFilter === t ? "#08090B" : "var(--text-3)",
+                          intelTierFilter === t ? "var(--bg)" : "var(--text-3)",
                       }}
                     >
                       {t === "untiered" ? "no tier" : t}
@@ -2960,7 +2960,7 @@ function AdminHomeInner() {
                           ? "var(--text-1)"
                           : "var(--surface-3)",
                       color:
-                        simSrc === o.id ? "#08090B" : "var(--text-3)",
+                        simSrc === o.id ? "var(--bg)" : "var(--text-3)",
                     }}
                   >
                     {o.label}
@@ -2995,7 +2995,7 @@ function AdminHomeInner() {
                         background: on
                           ? "var(--readiness)"
                           : "var(--surface-3)",
-                        color: on ? "#08090B" : "var(--text-3)",
+                        color: on ? "var(--bg)" : "var(--text-3)",
                       }}
                     >
                       {p.name}
@@ -3044,7 +3044,7 @@ function AdminHomeInner() {
                                 ? "var(--text-1)"
                                 : "var(--surface-3)",
                             color:
-                              g.val === o ? "#08090B" : "var(--text-3)",
+                              g.val === o ? "var(--bg)" : "var(--text-3)",
                           }}
                         >
                           {o}
@@ -3116,7 +3116,7 @@ function AdminHomeInner() {
                       ? "var(--text-1)"
                       : "var(--surface-2)",
                   color:
-                    contentMode === s.id ? "#08090B" : "var(--text-3)",
+                    contentMode === s.id ? "var(--bg)" : "var(--text-3)",
                 }}
               >
                 {s.label}
@@ -3146,7 +3146,7 @@ function AdminHomeInner() {
                       setMsg(r.ok ? "Seeded." : r.reason ?? "Failed");
                       if (r.ok) loadCms();
                     }}
-                    className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[13px] font-semibold text-[#08090B] disabled:opacity-40"
+                    className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[13px] font-semibold text-[var(--bg)] disabled:opacity-40"
                   >
                     {busy ? "…" : "Seed from built-in catalog"}
                   </button>
@@ -3201,7 +3201,7 @@ function AdminHomeInner() {
                             );
                           }
                         }}
-                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         {aiIdeaBusy
                           ? "Drafting…"
@@ -3292,7 +3292,7 @@ function AdminHomeInner() {
                                               : "var(--surface-3)",
                                           color:
                                             i === 0
-                                              ? "#08090B"
+                                              ? "var(--bg)"
                                               : "var(--text-3)",
                                         }}
                                       >
@@ -3321,7 +3321,7 @@ function AdminHomeInner() {
                     {!newProtoOpen ? (
                       <button
                         onClick={() => setNewProtoOpen(true)}
-                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B]"
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[var(--bg)]"
                       >
                         + New protocol
                       </button>
@@ -3378,7 +3378,7 @@ function AdminHomeInner() {
                                 loadCms();
                               }
                             }}
-                            className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                            className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                           >
                             {busy ? "Creating…" : "Create"}
                           </button>
@@ -3486,7 +3486,7 @@ function AdminHomeInner() {
                       );
                       if (r.ok) loadCms();
                     }}
-                    className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                    className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                   >
                     Save protocol
                   </button>
@@ -3526,7 +3526,7 @@ function AdminHomeInner() {
                             setAiMsg(r.reason ?? "AI drafting failed.");
                           }
                         }}
-                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         {aiBusy ? "Drafting…" : "Generate with AI"}
                       </button>
@@ -3857,7 +3857,7 @@ function AdminHomeInner() {
                               console.error("[ai] save failed", r);
                             }
                           }}
-                          className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                          className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                         >
                           {busy ? "Saving…" : "Save as draft"}
                         </button>
@@ -4035,7 +4035,7 @@ function AdminHomeInner() {
                               setMsg(r.reason ?? "Failed");
                             }
                           }}
-                          className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--text-1)] px-3 py-1.5 text-[11px] font-semibold text-[#08090B] disabled:opacity-40"
+                          className="press shrink-0 rounded-[var(--r-pill)] bg-[var(--text-1)] px-3 py-1.5 text-[11px] font-semibold text-[var(--bg)] disabled:opacity-40"
                         >
                           {savedIds[b.id] ? "Verified ✓" : "Mark verified"}
                         </button>
@@ -4276,7 +4276,7 @@ function AdminHomeInner() {
                           setMsg(r.reason ?? "Save failed.");
                         }
                       }}
-                      className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                      className="press tr-fast mt-3 rounded-[var(--r-pill)] bg-[var(--text-1)] px-5 py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                     >
                       {savedIds[b.id]
                         ? "Saved ✓"
@@ -4469,7 +4469,7 @@ function AdminHomeInner() {
                                 );
                               }
                             }}
-                            className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                            className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                           >
                             {savedIds[b.id]
                               ? "Saved ✓"
@@ -4535,7 +4535,7 @@ function AdminHomeInner() {
                         reopen();
                       }
                     }}
-                    className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                    className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                   >
                     Add behavior
                   </button>
@@ -4594,7 +4594,7 @@ function AdminHomeInner() {
                               `Saved ${dirtyList.length - failed.length}/${dirtyList.length}. Failed: ${failed.join(" · ")}`
                             );
                         }}
-                        className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         Save all
                       </button>
@@ -4660,7 +4660,7 @@ function AdminHomeInner() {
                                   : "var(--surface-3)",
                               color:
                                 dEntityType === t
-                                  ? "#08090B"
+                                  ? "var(--bg)"
                                   : "var(--text-3)",
                             }}
                           >
@@ -4781,7 +4781,7 @@ function AdminHomeInner() {
                             loadSugs("pending");
                           }
                         }}
-                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                        className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-2.5 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                       >
                         Submit suggestion
                       </button>
@@ -4806,7 +4806,7 @@ function AdminHomeInner() {
                                   : "var(--surface-3)",
                               color:
                                 sugStatus === s
-                                  ? "#08090B"
+                                  ? "var(--bg)"
                                   : "var(--text-3)",
                             }}
                           >
@@ -4954,7 +4954,7 @@ function AdminHomeInner() {
                                     ? "All fields rejected — nothing to apply. Reject the whole suggestion instead."
                                     : `Apply only the ${accepted.length} accepted field${accepted.length === 1 ? "" : "s"} as a draft.`
                                 }
-                                className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[#08090B] disabled:opacity-40"
+                                className="press rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-1.5 text-[12px] font-semibold text-[var(--bg)] disabled:opacity-40"
                               >
                                 {accepted.length === proposedKeys.length
                                   ? "Approve all → draft"
@@ -5238,7 +5238,7 @@ function AdminHomeInner() {
                     setMsg(r.reason);
                   }
                 }}
-                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[13px] font-semibold text-[#08090B] disabled:opacity-40"
+                className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[13px] font-semibold text-[var(--bg)] disabled:opacity-40"
               >
                 {busy ? "…" : "Publish current catalog"}
               </button>

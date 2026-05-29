@@ -19,7 +19,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/today"
-        className="press tr-fast mt-5 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[13px] font-semibold text-[#08090B]"
+        className="press tr-fast mt-5 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[13px] font-semibold text-[var(--bg)]"
       >
         Go to Today
       </Link>

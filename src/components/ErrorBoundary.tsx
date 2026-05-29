@@ -85,7 +85,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           <div className="flex flex-col gap-2.5">
             <button
               onClick={this.reload}
-              className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[#08090B]"
+              className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[var(--bg)]"
             >
               Reload
             </button>

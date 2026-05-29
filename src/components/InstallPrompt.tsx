@@ -322,7 +322,7 @@ export default function InstallPrompt() {
           </button>
           <button
             onClick={onInstall}
-            className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12.5px] font-semibold text-[#08090B]"
+            className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-2 text-[12.5px] font-semibold text-[var(--bg)]"
           >
             Install
           </button>

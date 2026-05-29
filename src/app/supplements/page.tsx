@@ -130,7 +130,7 @@ function SupplementsInner() {
                 className="flex-1 rounded-[var(--r-pill)] py-2 text-[12.5px] font-semibold tr-fast"
                 style={{
                   background: on ? "var(--text-1)" : "transparent",
-                  color: on ? "#08090B" : "var(--text-3)",
+                  color: on ? "var(--bg)" : "var(--text-3)",
                 }}
               >
                 {label}
@@ -457,7 +457,7 @@ function BrowseView({
                     background: installed
                       ? "var(--surface-3)"
                       : "var(--text-1)",
-                    color: installed ? "var(--text-2)" : "#08090B",
+                    color: installed ? "var(--text-2)" : "var(--bg)",
                   }}
                 >
                   {installed ? "Remove" : "Add"}
