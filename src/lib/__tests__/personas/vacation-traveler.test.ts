@@ -12,7 +12,7 @@
  *   - getVacationDates emits every day in each period (start..end inclusive).
  *   - Edge cases: 1-day vacation, overlapping periods.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   compileTimeline,
   adapt,
@@ -25,6 +25,14 @@ import {
 } from "@/lib/storage";
 import { calculateStreak } from "@/lib/scoring";
 import type { AppState, DailyLog } from "@/lib/types";
+
+// Pin "now" to a stable noon-UTC instant so dk() (which derives its
+// dates from `new Date()`) and the tz-aware engine ("today" via
+// dateKeyInTz) always agree on the calendar day. Without pinning, these
+// tests flip at the UTC/local midnight boundary — green in the morning,
+// red in the evening once local time crosses into the next UTC day.
+// Noon UTC keeps UTC and every non-extreme tz on the same date.
+const FIXED_NOW = new Date(Date.UTC(2026, 5, 15, 12, 0, 0));
 
 // ── helpers ──────────────────────────────────────────────────────
 
@@ -200,7 +208,15 @@ function buildLogs(state: AppState): DailyLog[] {
 // ── tests ─────────────────────────────────────────────────────────
 
 describe("vacation-traveler (Theo) — 365-day stress test", () => {
+  beforeEach(() => {
+    // Pin the clock BEFORE any test body runs dk(), so date generation
+    // and the engine's tz-aware "today" stay in lockstep.
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
   afterEach(() => {
+    // Restore real timers after every test so nothing leaks to other
+    // test files.
     vi.useRealTimers();
   });
 
@@ -293,13 +309,16 @@ describe("vacation-traveler (Theo) — 365-day stress test", () => {
       mode: string;
     }> = {};
     for (const rp of returnPoints) {
-      // Each return-point view sets the system clock to that resume
-      // day so streak/signals/adapt resolve "today" correctly.
+      // Compute resumeKey against the FIXED journey anchor — the same
+      // clock the logs/periods were built under in beforeEach. Without
+      // this reset, dk() would drift each iteration (it'd read the
+      // PREVIOUS iteration's resume-day clock), landing cutoffKey years
+      // off and emptying trimmedLogs → streak 0.
+      vi.setSystemTime(FIXED_NOW);
       const resumeKey = dk(journeyOffsetBack(rp.resumeJourneyDay));
-      // Anchor the simulated "now" at noon UTC on the resume day so
-      // dateKeyInTz / new Date() agree on the calendar day.
+      // Then move the clock to that resume day (noon UTC) so the trimmed
+      // view's streak/signals/adapt resolve "today" correctly.
       const [y, m, d] = resumeKey.split("-").map(Number);
-      vi.useFakeTimers();
       vi.setSystemTime(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)));
 
       const cutoffKey = resumeKey;
@@ -320,8 +339,11 @@ describe("vacation-traveler (Theo) — 365-day stress test", () => {
       const signals = getSignals(view);
       const a = adapt(view);
       snapshots[rp.name] = { streak, gapDays: signals.gapDays, mode: a.mode };
-      vi.useRealTimers();
     }
+    // The loop moved the clock to each historical resume day; restore
+    // the pinned "now" so the end-of-year assertions below resolve
+    // against the same day the logs/periods were built for.
+    vi.setSystemTime(FIXED_NOW);
 
     // Print snapshot for the report
     // eslint-disable-next-line no-console
