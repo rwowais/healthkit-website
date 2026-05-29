@@ -89,7 +89,17 @@ export default function BiomarkersPage() {
     return (
       <section className="anim-rise">
         <div className="well space-y-1.5 p-1.5">
-          {BIOMARKERS.map((def) => {
+          {/* Tracked metrics first (those with at least one reading), then
+              the rest in catalog order — so a user who logs weight + HRV
+              sees them up top instead of scrolling past untracked panels.
+              V8's sort is stable, so within-group order is preserved. */}
+          {[...BIOMARKERS]
+            .sort(
+              (a, b) =>
+                ((byMetric[b.key]?.length ?? 0) > 0 ? 1 : 0) -
+                ((byMetric[a.key]?.length ?? 0) > 0 ? 1 : 0)
+            )
+            .map((def) => {
             const hist = byMetric[def.key] ?? [];
             const last = hist[hist.length - 1];
             const bandInfo =
