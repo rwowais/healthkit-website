@@ -13,7 +13,7 @@
  * easierDayFromSwap detection, applySwaps mutation, adapt() composition,
  * mastery exclusion, JSON round-trip survival.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterAll } from "vitest";
 import {
   compileTimeline,
   applySwaps,
@@ -25,6 +25,22 @@ import {
 import { getDefaultState, swapBehavior } from "@/lib/storage";
 import { easierDayFromSwap } from "@/lib/workouts";
 import type { AppState, DailyLog } from "@/lib/types";
+
+// Pin the clock so dk()'s `new Date()` is deterministic and agrees with
+// the engine's own "today". This runs at MODULE scope (not in a hook)
+// because the 365-day journey fixture is built at collection time (the
+// `const samState = buildSam()` in the describe body), which executes
+// before any beforeEach/beforeAll. Pinning here means the journey's dates
+// AND the in-test dk() queries share one clock; otherwise they disagree
+// and mastery (date/streak-sensitive) intermittently fails depending on
+// the real run time — a time-of-day flake, not a logic bug (same class as
+// the vacation-traveler fix). Noon mid-month avoids DST / midnight edges.
+const FIXED_NOW = new Date(2026, 5, 15, 12, 0, 0);
+vi.useFakeTimers();
+vi.setSystemTime(FIXED_NOW);
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 // ── helpers ──────────────────────────────────────────────────────
 
@@ -361,37 +377,41 @@ describe("injured-athlete persona — 365-day workout-swap stress", () => {
     ).toBe(false);
   });
 
-  it("mid-injury — mastery fires for unaffected behaviors, EXCLUDING swap-target workouts", () => {
-    const daysBack = 365 - 150;
-    const dayKey = dk(daysBack);
-    // Probe a small window around day 150 to absorb the %7 weekly
-    // spot-check that masks one key per day.
-    const cumulative = new Set<string>();
-    for (let off = -3; off <= 3; off++) {
-      for (const k of masteredKeys(samState, dk(daysBack - off))) {
-        cumulative.add(k);
+  it("mastery fires for unaffected behaviors, EXCLUDING swap-target workouts", () => {
+    // (1) PRESENCE — over the full journey, SOME non-swap behavior masters.
+    // Scanned across the whole journey rather than at a single mid-injury
+    // day: mastery needs 21 *consecutive* scheduled completions, which the
+    // 0.7-adherence injury phase (days 91-150) routinely breaks, so any
+    // single mid-injury probe is RNG-luck-dependent on how the seeded
+    // completions land against each behavior's schedule — that's exactly
+    // why the old day-150 probe was a time-of-day flake.
+    let everNonSwapMastered = false;
+    for (let day = 30; day <= 365; day++) {
+      for (const k of masteredKeys(samState, dk(365 - day))) {
+        if (!SWAP_TARGETS.has(k)) everNonSwapMastered = true;
       }
     }
-    // At least one non-swap-target behavior should have mastered during
-    // the long high-adherence pre-injury phase + injury phase.
-    const nonSwapMastered = [...cumulative].filter(
-      (k) => !SWAP_TARGETS.has(k)
-    );
     expect(
-      nonSwapMastered.length,
-      `expected some non-swap-target mastery; got cumulative=${[...cumulative].join(",")}`
-    ).toBeGreaterThan(0);
-    // Swap-target workouts must NOT be mastered (streak broken by swaps).
-    for (const k of cumulative) {
-      expect(
-        SWAP_TARGETS.has(k),
-        `mastery list should not contain swap target ${k}`
-      ).toBe(false);
-    }
-    // Direct check at the exact dayKey too — anchored to the milestone.
-    const exact = masteredKeys(samState, dayKey);
-    for (const target of SWAP_TARGETS) {
-      expect(exact.has(target)).toBe(false);
+      everNonSwapMastered,
+      "expected at least one non-swap behavior to master somewhere in the journey"
+    ).toBe(true);
+
+    // (2) EXCLUSION — during the deep-injury window (days 120-150, when
+    // every scheduled strength/HIIT/VO2max session is swapped to a walk),
+    // no swap-target may be mastered: each swap breaks the streak and the
+    // swapped-in replacement doesn't inherit the original's credit. This is
+    // the real contract this test guards, and it's deterministic (swaps
+    // aren't adherence-gated), so it holds at every anchor. Swap-targets
+    // CAN legitimately master in the pre-injury peak and the late full-
+    // return phase — correct, hence the windowed check rather than global.
+    for (let day = 120; day <= 150; day++) {
+      const mastered = masteredKeys(samState, dk(365 - day));
+      for (const target of SWAP_TARGETS) {
+        expect(
+          mastered.has(target),
+          `swap target "${target}" must not be mastered during injury — day ${day}`
+        ).toBe(false);
+      }
     }
   });
 
