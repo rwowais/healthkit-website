@@ -243,7 +243,7 @@ export default function ProfilePage() {
               role="switch"
               aria-checked={!!s.vacationMode}
               aria-label="Pause everything"
-              className="tr-fast h-7 w-12 rounded-full p-1"
+              className="tap-44 tr-fast h-7 w-12 rounded-full p-1"
               style={{
                 background: s.vacationMode
                   ? "var(--warm)"
@@ -281,7 +281,7 @@ export default function ProfilePage() {
               role="switch"
               aria-checked={!s.hideSupplementsTab}
               aria-label="Show Supplements tab in the bottom nav"
-              className="tr-fast h-7 w-12 rounded-full p-1"
+              className="tap-44 tr-fast h-7 w-12 rounded-full p-1"
               style={{
                 background: !s.hideSupplementsTab
                   ? "var(--vitality)"
@@ -313,7 +313,7 @@ export default function ProfilePage() {
               role="switch"
               aria-checked={!s.disableAppBadge}
               aria-label="Show remaining count on the home-screen app icon"
-              className="tr-fast h-7 w-12 rounded-full p-1"
+              className="tap-44 tr-fast h-7 w-12 rounded-full p-1"
               style={{
                 background: !s.disableAppBadge
                   ? "var(--vitality)"
@@ -342,7 +342,7 @@ export default function ProfilePage() {
               role="switch"
               aria-checked={s.notificationsEnabled}
               aria-label="Protocol reminders"
-              className="tr-fast h-7 w-12 rounded-full p-1"
+              className="tap-44 tr-fast h-7 w-12 rounded-full p-1"
               style={{
                 background: s.notificationsEnabled
                   ? "var(--vitality)"
@@ -472,7 +472,7 @@ export default function ProfilePage() {
                   role="switch"
                   aria-checked={on}
                   aria-label={f.label}
-                  className="tr-fast h-7 w-12 rounded-full p-1 shrink-0"
+                  className="tap-44 tr-fast h-7 w-12 rounded-full p-1 shrink-0"
                   style={{
                     background: on ? "var(--vitality)" : "var(--surface-3)",
                   }}

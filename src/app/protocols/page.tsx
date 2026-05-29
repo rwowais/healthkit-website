@@ -356,7 +356,7 @@ export default function ProtocolsPage() {
               access.premium ? setCreating(true) : router.push("/upgrade")
             }
             aria-label="Create protocol"
-            className="press grid h-10 w-10 place-items-center rounded-full"
+            className="press grid h-11 w-11 place-items-center rounded-full"
             style={{ background: "var(--surface-2)", color: "var(--text-1)" }}
           >
             <Icon name="plus" size={18} />
@@ -873,7 +873,7 @@ export default function ProtocolsPage() {
                   <button
                     onClick={() => removeDraftBehavior(i)}
                     aria-label={`Remove ${b.title}`}
-                    className="press grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--alert)]"
+                    className="press grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-full text-[var(--text-4)] hover:text-[var(--alert)]"
                   >
                     <Icon name="ban" size={14} />
                   </button>
@@ -897,7 +897,7 @@ export default function ProtocolsPage() {
                   <button
                     key={m}
                     onClick={() => setAddMode(m)}
-                    className="press tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11px] font-semibold capitalize"
+                    className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11px] font-semibold capitalize"
                     style={{
                       background:
                         addMode === m

@@ -452,7 +452,7 @@ function BrowseView({
                     if (installed) onRemove(s.id);
                     else onInstall(s);
                   }}
-                  className="press tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
+                  className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
                   style={{
                     background: installed
                       ? "var(--surface-3)"

@@ -198,7 +198,7 @@ export default function SupplementBlockCard({
                       : `Mark ${s.name} taken`
                   }
                   aria-pressed={isDone}
-                  className="press grid min-h-[40px] w-10 shrink-0 place-items-center"
+                  className="press grid min-h-[44px] min-w-[44px] shrink-0 place-items-center"
                 >
                   <span
                     className="grid h-7 w-7 place-items-center rounded-full tr-fast"

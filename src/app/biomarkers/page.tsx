@@ -271,7 +271,7 @@ export default function BiomarkersPage() {
                               <button
                                 onClick={() => deleteBiomarker(h.id)}
                                 aria-label="Delete"
-                                className="press text-[var(--text-4)] hover:text-[var(--alert)]"
+                                className="press grid min-h-[44px] min-w-[44px] place-items-center text-[var(--text-4)] hover:text-[var(--alert)]"
                               >
                                 <Icon name="ban" size={14} />
                               </button>

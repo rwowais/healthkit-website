@@ -816,7 +816,7 @@ export default function TodayPage() {
             {!isToday && (
               <button
                 onClick={() => setOffset(0)}
-                className="press text-[12px] font-semibold text-[var(--readiness)]"
+                className="press tap-44 text-[12px] font-semibold text-[var(--readiness)]"
               >
                 Back to today
               </button>
@@ -1137,7 +1137,7 @@ export default function TodayPage() {
                 </p>
                 <button
                   onClick={ackTrialExtension}
-                  className="press tr-fast mt-3 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
+                  className="press tap-44 tr-fast mt-3 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
                   style={{
                     background: "var(--surface-2)",
                     color: "var(--text-2)",
@@ -1515,7 +1515,7 @@ export default function TodayPage() {
                 setDragOverBlock(null);
                 setMoveMenuKey(null);
               }}
-              className="press tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11.5px] font-semibold"
+              className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3 py-1 text-[11.5px] font-semibold"
               style={{
                 background: editMode ? "var(--text-1)" : "var(--surface-3)",
                 color: editMode ? "#08090B" : "var(--text-2)",
@@ -2188,7 +2188,7 @@ export default function TodayPage() {
                                         e.stopPropagation();
                                         setSwapForKey(it.canonicalKey);
                                       }}
-                                      className="press tr-fast mt-2 inline-flex items-center gap-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-2)]"
+                                      className="press tap-44 tr-fast mt-2 inline-flex items-center gap-1 rounded-[var(--r-pill)] bg-[var(--surface-3)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-2)]"
                                       aria-label={`Swap ${it.title} for a different workout today`}
                                     >
                                       <Icon name="arrowRight" size={10} />

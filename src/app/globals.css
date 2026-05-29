@@ -130,6 +130,25 @@ body {
 .tr { transition: all 0.4s var(--ease); }
 .tr-fast { transition: all 0.22s var(--ease-soft); }
 .press { transition: transform 0.18s var(--ease-soft); }
+
+/* Expand a control's touch target to >=44px (WCAG 2.5.5) without changing
+   its visual size — an invisible centered overlay. Width tracks the
+   element (min 44px) so it never spills sideways into neighbours; it only
+   adds vertical reach, into the non-interactive space above/below. Use on
+   small text buttons, icon toggles, and switches that must stay visually
+   compact. (Icon-only buttons that can grow should instead just size up to
+   min-h-[44px] min-w-[44px].) */
+.tap-44 { position: relative; }
+.tap-44::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 44px;
+  width: 100%;
+  min-width: 44px;
+  transform: translate(-50%, -50%);
+}
 .press:active { transform: scale(0.97); }
 
 /* ── Scrollbars ─────────────────────────────────────────────────── */

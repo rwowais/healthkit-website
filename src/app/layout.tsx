@@ -7,6 +7,7 @@ import StorageSafetyNet from "@/components/StorageSafetyNet";
 import TimezoneSentry from "@/components/TimezoneSentry";
 import InstallPrompt from "@/components/InstallPrompt";
 import Analytics from "@/components/Analytics";
+import MotionProvider from "@/components/MotionProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -158,13 +159,15 @@ export default function RootLayout({
     >
       <body className="antialiased">
         <ErrorBoundary>
-          {children}
-          <SyncConflictPrompt />
-          <ServiceWorker />
-          <StorageSafetyNet />
-          <TimezoneSentry />
-          <InstallPrompt />
-          <Analytics />
+          <MotionProvider>
+            {children}
+            <SyncConflictPrompt />
+            <ServiceWorker />
+            <StorageSafetyNet />
+            <TimezoneSentry />
+            <InstallPrompt />
+            <Analytics />
+          </MotionProvider>
         </ErrorBoundary>
       </body>
     </html>
