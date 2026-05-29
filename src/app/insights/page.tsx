@@ -54,11 +54,21 @@ export default function InsightsPage() {
     return {
       ...state,
       dailyLogs: (state.dailyLogs ?? []).filter((l) => l.date <= cutoff),
+      // Delay biomarker alerts on the same 3-day lag as everything else,
+      // so the "you're seeing a delayed view" banner stays truthful and a
+      // free user doesn't get the live "biomarker-aware" signal the
+      // paywall sells as Premium.
+      biomarkers: (state.biomarkers ?? []).filter((b) => b.date <= cutoff),
     };
   }, [access.premium, state]);
 
   const streak = useMemo(
-    () => calculateStreak(intelState.dailyLogs, getVacationDates(intelState)),
+    () =>
+      calculateStreak(
+        intelState.dailyLogs,
+        getVacationDates(intelState),
+        intelState.settings
+      ),
     [intelState]
   );
   const week = useMemo(
@@ -89,7 +99,7 @@ export default function InsightsPage() {
 
     // Biomarker attention (calm, not alarming)
     const latestByMetric = new Map<string, number>();
-    for (const b of [...state.biomarkers].sort((a, c) =>
+    for (const b of [...intelState.biomarkers].sort((a, c) =>
       a.date.localeCompare(c.date)
     ))
       latestByMetric.set(b.metric, b.value);
@@ -108,7 +118,7 @@ export default function InsightsPage() {
     }
 
     return out;
-  }, [intelState.dailyLogs, state.biomarkers, streak, week]);
+  }, [intelState.dailyLogs, intelState.biomarkers, streak, week]);
 
   const review = useMemo(
     () => weeklyReview(intelState),

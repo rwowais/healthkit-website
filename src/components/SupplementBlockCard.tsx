@@ -241,8 +241,8 @@ export default function SupplementBlockCard({
                           className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
                           style={{
                             background:
-                              "color-mix(in srgb, var(--alert) 18%, transparent)",
-                            color: "var(--alert)",
+                              "color-mix(in srgb, var(--warm) 18%, transparent)",
+                            color: "var(--warm)",
                           }}
                           aria-label="Low stock"
                         >

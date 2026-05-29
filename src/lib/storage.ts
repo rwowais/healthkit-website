@@ -31,6 +31,7 @@ import {
 import { resolveBehaviorByKey } from "./workouts";
 import { activePacks } from "./knowledge";
 import {
+  applySwaps,
   compileTimeline,
   shapeTimeline,
   adapt,
@@ -574,7 +575,16 @@ export function computeBehaviorScore(
 ): number {
   const tz = getTz(state.settings);
   const isToday = date === getDateString(undefined, tz);
-  const compiled = compileTimeline(state, isoDayIndex(state, date));
+  // Apply the day's workout swaps BEFORE shaping, so the scored active
+  // set matches exactly what Today shows (a swap mutes the original and
+  // counts the replacement). Without this, the stored score — which
+  // feeds streak, weeklyReview, adapt and insights — disagreed with the
+  // on-screen "Day complete" for any swapped day.
+  const dayLog = state.dailyLogs.find((l) => l.date === date);
+  const compiled = applySwaps(
+    compileTimeline(state, isoDayIndex(state, date)),
+    dayLog
+  );
   const shaped = shapeTimeline(
     compiled,
     isToday ? adapt(state).mode : "normal",
@@ -613,7 +623,11 @@ export function toggleBehavior(
     dailyLogs,
     // Pass vacation dates so the streak walks through them
     // transparently — matches the "your streak holds" Profile copy.
-    currentStreak: calculateStreak(dailyLogs, getVacationDates(state)),
+    currentStreak: calculateStreak(
+      dailyLogs,
+      getVacationDates(state),
+      state.settings
+    ),
   };
 }
 
@@ -679,7 +693,11 @@ export function swapBehavior(
   return {
     ...state,
     dailyLogs,
-    currentStreak: calculateStreak(dailyLogs, getVacationDates(state)),
+    currentStreak: calculateStreak(
+      dailyLogs,
+      getVacationDates(state),
+      state.settings
+    ),
   };
 }
 
@@ -728,7 +746,11 @@ export function clearSwap(
   return {
     ...state,
     dailyLogs,
-    currentStreak: calculateStreak(dailyLogs, getVacationDates(state)),
+    currentStreak: calculateStreak(
+      dailyLogs,
+      getVacationDates(state),
+      state.settings
+    ),
   };
 }
 
@@ -1226,7 +1248,11 @@ export function saveDailyLog(state: AppState, log: DailyLog): AppState {
       ? state.dailyLogs.map((l, i) => (i === existingIndex ? updatedLog : l))
       : [...state.dailyLogs, updatedLog];
 
-  const currentStreak = calculateStreak(dailyLogs, getVacationDates(state));
+  const currentStreak = calculateStreak(
+    dailyLogs,
+    getVacationDates(state),
+    state.settings
+  );
   return { ...state, dailyLogs, currentStreak };
 }
 

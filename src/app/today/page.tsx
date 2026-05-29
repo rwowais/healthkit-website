@@ -197,6 +197,17 @@ export default function TodayPage() {
     refresh();
   });
 
+  // Re-render once a minute so all clock-derived UI — relative times,
+  // the "NOW" divider, past-item detection, Up Next ordering — stays
+  // live while the page sits open. useVisibilityRefresh only fires on
+  // tab refocus, so without this the "live, time-aware timeline" froze
+  // at the last render's clock for anyone leaving Today open.
+  const [, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setMinuteTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Onboarding guard — a returning user lands here after auth, but a
   // genuinely new account (cloud-loaded, no onboarding) gets sent to
   // build their system first. Fire once so a focus/visibility resync

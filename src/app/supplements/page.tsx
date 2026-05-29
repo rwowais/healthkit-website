@@ -21,7 +21,6 @@ import * as haptic from "@/lib/haptics";
 import { useAppState } from "@/hooks/useAppState";
 import {
   curatedSupplementCatalog,
-  supplementBlockProgress,
   supplementsForBlock,
 } from "@/lib/supplements";
 import SupplementSheet from "@/components/SupplementSheet";
@@ -153,11 +152,6 @@ function SupplementsInner() {
                 ?.supplementCompletions ?? {}
             }
             stateSupplements={userSupplements}
-            dayIndex={(() => {
-              const d = new Date();
-              const j = d.getDay();
-              return j === 0 ? 6 : j - 1;
-            })()}
           />
         )}
 
@@ -239,7 +233,6 @@ function StackView({
   today,
   completions,
   stateSupplements,
-  dayIndex,
 }: {
   byBlock: Record<TimeBlock, Supplement[]>;
   onEdit: (s: Supplement) => void;
@@ -251,7 +244,6 @@ function StackView({
   today: string;
   completions: Record<string, boolean>;
   stateSupplements: Supplement[];
-  dayIndex: number;
 }) {
   const empty = stateSupplements.length === 0;
   if (empty) {
@@ -291,12 +283,13 @@ function StackView({
       {BLOCKS.map((b) => {
         const list = byBlock[b];
         if (list.length === 0) return null;
-        const prog = supplementBlockProgress(
-          stateSupplements,
-          b,
-          dayIndex,
-          completions
-        );
+        // Count against the SAME flag-filtered list that's rendered, so
+        // the header total can never exceed the visible rows. (A
+        // contraindicated supplement is dropped from byBlock but the old
+        // progress helper still counted it — header read e.g. 3/5 over a
+        // 4-row card.)
+        const done = list.filter((s) => completions?.[s.id] === true).length;
+        const prog = { done, total: list.length };
         return (
           <div key={b}>
             <div className="mb-2 flex items-center justify-between">
@@ -443,8 +436,11 @@ function BrowseView({
                     {s.dose ?? "—"}{" "}
                     {s.evidenceTier && (
                       <span
-                        className="ml-1 rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                        style={{ color: "var(--text-4)" }}
+                        className="ml-1 rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        style={{
+                          background: "var(--surface-3)",
+                          color: "var(--text-3)",
+                        }}
                       >
                         {s.evidenceTier}
                       </span>

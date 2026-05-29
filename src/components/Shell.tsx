@@ -58,24 +58,27 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen">
         <header className="glass sticky top-0 z-50 border-b border-[var(--hairline)]">
           <div className="mx-auto flex h-16 max-w-[600px] items-center justify-between px-6">
-            <Link href="/today" className="flex items-center gap-2.5">
-              <span
-                className="grid h-7 w-7 place-items-center rounded-[9px]"
-                style={{
-                  background:
-                    "linear-gradient(145deg, var(--sleep), var(--readiness))",
-                }}
-              >
-                <span className="h-2 w-2 rounded-full bg-[#08090B]" />
-              </span>
-              <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
-                Protocolize
-              </span>
+            <div className="flex items-center gap-2.5">
+              <Link href="/today" className="flex items-center gap-2.5">
+                <span
+                  className="grid h-7 w-7 place-items-center rounded-[9px]"
+                  style={{
+                    background:
+                      "linear-gradient(145deg, var(--sleep), var(--readiness))",
+                  }}
+                >
+                  <span className="h-2 w-2 rounded-full bg-[#08090B]" />
+                </span>
+                <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
+                  Protocolize
+                </span>
+              </Link>
               {/* Sync status pill — calm, peripheral, never alarming.
-                  Hidden when the cloud copy is current; surfaces only
-                  when we have something to tell the user. */}
+                  A sibling of the logo link (not nested inside it): an
+                  aria-live status region inside an <a> folds into the
+                  link's accessible name and re-announces as part of it. */}
               <SyncIndicator />
-            </Link>
+            </div>
             <nav className="hidden items-center gap-1 lg:flex">
               {NAV.map((n) => (
                 <Link

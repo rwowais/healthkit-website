@@ -391,8 +391,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ show }}>
       {children}
       {msg && (
-        <div className="anim-toast glass fixed bottom-28 left-1/2 z-[200] rounded-[var(--r-pill)] border border-[var(--hairline-strong)] px-5 py-3">
-          <p className="text-[13px] font-medium text-[var(--text-1)]">{msg}</p>
+        // Outer wrapper owns the centering (static -translate-x-1/2) so it
+        // survives prefers-reduced-motion, which neutralizes .anim-toast's
+        // transform — previously centering lived in the keyframe, so
+        // reduced-motion users got the toast shoved off the right edge.
+        // role=status + aria-live announces it to screen readers (the
+        // toast is the only channel for storage-full / save-error msgs).
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed bottom-28 left-1/2 z-[200] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2"
+        >
+          <div className="anim-toast glass rounded-[var(--r-pill)] border border-[var(--hairline-strong)] px-5 py-3">
+            <p className="text-[13px] font-medium text-[var(--text-1)]">{msg}</p>
+          </div>
         </div>
       )}
     </ToastContext.Provider>
