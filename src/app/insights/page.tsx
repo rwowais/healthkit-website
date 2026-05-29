@@ -350,11 +350,26 @@ export default function InsightsPage() {
                       of everything else. If you protect one behavior, make
                       it this one.
                     </p>
+                    {/* If the keystone behavior is *also* the outcome-proven
+                        one, fold the proof into this card instead of showing
+                        a second near-identical card with the same title. */}
+                    {works && works.key === ks.key && (
+                      <p className="mt-3 text-[13px] leading-relaxed text-[var(--text-3)]">
+                        It&rsquo;s also proven in your own check-ins — your{" "}
+                        {works.dimension === "energy"
+                          ? "energy"
+                          : works.dimension === "sleep"
+                          ? "sleep"
+                          : "energy and sleep"}{" "}
+                        runs {works.delta} point{works.delta === 1 ? "" : "s"}{" "}
+                        higher on these days.
+                      </p>
+                    )}
                   </div>
                 </motion.div>
               )}
 
-              {works && (
+              {works && (!ks || works.key !== ks.key) && (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}

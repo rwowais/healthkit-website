@@ -195,7 +195,13 @@ export default function OnboardingPage() {
       if (starter !== "longevity-foundation")
         extras.add("longevity-foundation");
       if (focus.includes("supplements")) extras.add("daily-essentials");
-      if (focus.includes("body") || goal === "body")
+      // Avoid stacking two metabolic packs: "blood-sugar" is already the
+      // body-goal starter and covers the same ground, so only layer in
+      // metabolic-health when it isn't already the chosen starter. (The
+      // old `focus.includes("body")` was dead — "body" is a goal, never a
+      // focus value — and let a body-goal user get blood-sugar *and*
+      // metabolic-health at once.)
+      if (goal === "body" && starter !== "blood-sugar")
         extras.add("metabolic-health");
       [...extras].slice(0, 2).forEach((id) => ids.push(id));
     }

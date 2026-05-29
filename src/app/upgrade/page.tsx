@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess } from "@/lib/entitlements";
-import { startCheckout, PRICING, type Plan } from "@/lib/billing";
+import { startCheckout, PRICING, billingConfigured, type Plan } from "@/lib/billing";
 import { Eyebrow, Skeleton, useToast } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 
@@ -177,21 +177,39 @@ export default function UpgradePage() {
         </div>
 
         <div className="space-y-2.5">
-          <button
-            onClick={() => {
-              const r = startCheckout(plan);
-              if (!r.ok) toast.show(r.reason ?? "Not available yet");
-            }}
-            className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[#08090B]"
-          >
-            Start Premium
-          </button>
-          <button
-            onClick={() => router.push("/today")}
-            className="press tr-fast w-full py-2 text-center text-[13px] font-medium text-[var(--text-3)]"
-          >
-            Continue on the free plan
-          </button>
+          {billingConfigured ? (
+            <>
+              <button
+                onClick={() => {
+                  const r = startCheckout(plan);
+                  if (!r.ok) toast.show(r.reason ?? "Not available yet");
+                }}
+                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[#08090B]"
+              >
+                Start Premium
+              </button>
+              <button
+                onClick={() => router.push("/today")}
+                className="press tr-fast w-full py-2 text-center text-[13px] font-medium text-[var(--text-3)]"
+              >
+                Continue on the free plan
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Payments not wired yet — don't show a button that just
+                  pops a toast. State the truth and make "continue" primary. */}
+              <div className="w-full rounded-[var(--r-pill)] border border-[var(--hairline-strong)] bg-[var(--surface-2)] py-4 text-center text-[14px] font-semibold text-[var(--text-2)]">
+                Premium is coming soon — you have full access today
+              </div>
+              <button
+                onClick={() => router.push("/today")}
+                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[#08090B]"
+              >
+                Continue with full access
+              </button>
+            </>
+          )}
           <p className="px-2 text-center text-[11px] leading-relaxed text-[var(--text-4)]">
             Cancel anytime. Your data is always yours — export whenever you
             like. Educational tool, not medical advice.
