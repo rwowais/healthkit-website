@@ -189,6 +189,19 @@ Full token set + reusable components live in `src/app/globals.css` and
 `.t-eyebrow`, `.anim-rise`, etc.) and primitives (`Card`, `Button`, `RingScore`,
 `TrendArea`, `Segmented`, `Sheet`, `useToast`) — do not hardcode colors.
 
+**Theming (dark default + opt-in light).** Profile → Appearance offers
+System / Light / Dark (dark is the default and the brand's signature
+look). It's driven entirely by CSS variables: the dark palette is `:root`
+in `globals.css`, and `:root[data-theme="light"]` redefines the same
+tokens (surfaces, text, accents — deepened for legibility on white — and
+the effect tokens `--glass-bg`, `--card-grad-2`, `--panel-grad-2`,
+`--well-*`, `--inset-hi`, `--chart-grid`). ALWAYS style via tokens
+(`var(--surface-1)`, `text-[var(--text-1)]`, `.card`, `.glass`, …) — a
+hardcoded hex/rgba won't follow the theme and will break light mode. Theme
+is device-local (`src/lib/theme.ts`, key `protocolize-theme`) with a
+no-flash inline script in `layout.tsx`. **New UI must look right in BOTH
+themes.**
+
 ### Core tokens (CSS vars)
 
 | Token | Value | Usage |
