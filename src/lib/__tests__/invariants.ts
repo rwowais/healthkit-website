@@ -40,6 +40,7 @@ import {
   getFreePacks,
 } from "@/lib/entitlements";
 import { getVacationDates } from "@/lib/storage";
+import { dateKeyInTz, getTz } from "@/lib/tz";
 import { isSupplementBehavior } from "@/lib/supplements";
 import { resolveBehaviorByKey } from "@/lib/workouts";
 import { PACKS } from "@/lib/packs";
@@ -73,10 +74,15 @@ const inv_vacation_transparency: Invariant = {
     // should leave gapDays at 0 immediately after the vacation ends
     // (assuming no real gap on top of the trip).
     const vacays = getVacationDates(state);
-    // Sanity: vacation dates set is non-empty
-    if (vacays.size === 0) {
+    // A period entirely in the FUTURE (starts after today) legitimately
+    // contributes zero vacation days so far — that's correct, not
+    // malformed. Only flag when a period that has ALREADY begun produced
+    // no dates.
+    const today = dateKeyInTz(getTz(state.settings));
+    const anyStarted = periods.some((p) => p?.start && p.start <= today);
+    if (anyStarted && vacays.size === 0) {
       errors.push(
-        `vacationPeriods has ${periods.length} entry/entries but getVacationDates returned 0 days — period shape may be malformed`
+        `vacationPeriods has a started entry but getVacationDates returned 0 days — period shape may be malformed`
       );
     }
     // If gapDays > 0, every day in the gap should be a NON-vacation

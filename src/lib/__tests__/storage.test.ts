@@ -10,7 +10,7 @@
  * This file exercises every export with at-rest fixtures so failures
  * point at specific operations, not vague engine breakage.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   getDefaultState,
   importState,
@@ -43,6 +43,14 @@ beforeEach(() => {
   try {
     localStorage.clear();
   } catch {}
+  // Pin "today" to a stable instant where UTC and local share the same
+  // calendar date, so date-derived assertions (e.g. the workout-swap
+  // adapt test, which writes a swap on today's date and expects adapt()
+  // to read it) don't flip at the UTC/local midnight boundary.
+  vi.setSystemTime(new Date(Date.UTC(2026, 5, 15, 12, 0, 0)));
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("storage — defaults + import/export round-trip", () => {
