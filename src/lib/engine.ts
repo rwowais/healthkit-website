@@ -701,7 +701,7 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
     return {
       mode: "recovery",
       headline: "Recovery mode",
-      tone: "Your recovery is low. I've eased today toward restoration and moved demanding work aside — this is the smart play, not a setback.",
+      tone: "Your recovery is low, so today leans lighter — the demanding work is set aside. Keep anything that still feels right; this is the smart play, not a setback.",
       reasons: [
         s.sleepQuality != null && s.sleepQuality <= 2
           ? "Sleep quality was low"
@@ -741,7 +741,7 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
     return {
       mode: "lighter",
       headline: "Lighter day",
-      tone: "You dialed today's training back — I've eased the rest of the day to match. Recovery is part of the program, not a setback.",
+      tone: "You dialed today's training back, so the rest of the day leans lighter to match. Recovery is part of the program, not a setback.",
       reasons: ["You swapped to an easier workout"],
     };
   }

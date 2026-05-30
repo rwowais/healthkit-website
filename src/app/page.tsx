@@ -129,7 +129,28 @@ export default function LandingPage() {
             </motion.div>
           ))}
         </div>
-        <p className="mt-16 text-center text-[12px] leading-relaxed text-[var(--text-4)]">
+        {/* Why you can trust this — the honest, evidence-first stance that
+            wins a skeptical longevity audience. Phrased to stay durable as
+            the product grows (no "never affiliate / never collect" pledges;
+            transparency over absolutes). */}
+        <div className="mx-auto mt-16 max-w-xl rounded-[var(--r-lg)] bg-[var(--surface-2)] p-6 text-left">
+          <p className="t-eyebrow">Why you can trust this</p>
+          <ul className="mt-3 space-y-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">
+            <li>
+              Every recommendation is{" "}
+              <span className="font-semibold text-[var(--text-1)]">
+                evidence-rated
+              </span>{" "}
+              — we tell you what&rsquo;s well-proven versus still promising.
+            </li>
+            <li>
+              No hype, no fear-marketing. If we ever point you to a product,
+              you&rsquo;ll see exactly why — and the evidence behind it.
+            </li>
+            <li>Your data is yours — export it anytime.</li>
+          </ul>
+        </div>
+        <p className="mt-10 text-center text-[12px] leading-relaxed text-[var(--text-4)]">
           Protocolize is an educational tool, not medical advice. Consult a
           clinician before changing your health routine.
         </p>
