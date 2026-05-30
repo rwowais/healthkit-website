@@ -47,6 +47,15 @@ const STEPS = 8;
 const inputCls =
   "w-full rounded-[var(--r-md)] bg-[var(--surface-2)] px-4 py-4 text-[17px] text-[var(--text-1)] outline-none focus:ring-1 focus:ring-[var(--readiness)] tr-fast";
 
+/** "22:30" -> "10:30 PM" for friendly schedule display. */
+function fmt12(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h)) return hhmm;
+  const ap = h >= 12 ? "PM" : "AM";
+  const hr = h % 12 || 12;
+  return `${hr}:${String(m ?? 0).padStart(2, "0")} ${ap}`;
+}
+
 /** Hoisted so it isn't remounted every parent render (focus/state loss). */
 function Choice({
   chips,
@@ -209,6 +218,31 @@ export default function OnboardingPage() {
       .map((id) => packById(id))
       .filter((p): p is NonNullable<typeof p> => !!p);
   }, [goal, sleepBaseline, focus, overwhelm, experience]);
+
+  // "Your day, assembled" proof — makes the MERGE visible even for a single
+  // starter pack. The differentiator (scattered tips → one structured,
+  // de-duplicated day) is otherwise invisible until a 2nd pack is installed,
+  // which most users never do. Counts distinct behaviors across the chosen
+  // pack(s), how they fold into morning/afternoon/evening, and how many
+  // cross-pack duplicates were removed.
+  const dayPlan = useMemo(() => {
+    const seen = new Set<string>();
+    const byBlock: Record<string, number> = {
+      morning: 0,
+      afternoon: 0,
+      evening: 0,
+      anytime: 0,
+    };
+    let raw = 0;
+    for (const p of packs)
+      for (const b of p.behaviors) {
+        raw++;
+        if (seen.has(b.canonicalKey)) continue;
+        seen.add(b.canonicalKey);
+        byBlock[b.block] = (byBlock[b.block] ?? 0) + 1;
+      }
+    return { count: seen.size, folded: raw - seen.size, byBlock };
+  }, [packs]);
 
   // Defense-in-depth: an already-onboarded, signed-in user must never be
   // trapped in the questionnaire (the login-loop symptom). If the synced
@@ -497,7 +531,54 @@ export default function OnboardingPage() {
                       } more — all one tap away when you're ready.`
                     : `${packs.length} protocols, merging into one calm day. It adapts as you go.`}
                 </p>
-                <div className="card mt-7 p-5">
+                {/* Make the merge tangible: the real assembled day, not just
+                    pack names. This is the differentiator most users never
+                    see otherwise. */}
+                <div className="mt-6 rounded-[var(--r-lg)] bg-[var(--surface-2)] p-5">
+                  <p className="t-eyebrow">Your day, assembled</p>
+                  <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--text-2)]">
+                    <span className="font-bold text-[var(--text-1)]">
+                      {dayPlan.count} behavior{dayPlan.count === 1 ? "" : "s"}
+                    </span>{" "}
+                    woven into one timeline, placed around your{" "}
+                    <span className="font-semibold text-[var(--text-1)]">
+                      {fmt12(wakeTime)}–{fmt12(bedtime)}
+                    </span>{" "}
+                    day
+                    {dayPlan.folded > 0 ? (
+                      <>
+                        {" "}
+                        — with{" "}
+                        <span className="font-semibold text-[var(--text-1)]">
+                          {dayPlan.folded} overlap
+                          {dayPlan.folded === 1 ? "" : "s"} folded
+                        </span>{" "}
+                        so you never do the same thing twice
+                      </>
+                    ) : null}
+                    .
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(
+                      [
+                        ["Morning", dayPlan.byBlock.morning],
+                        ["Afternoon", dayPlan.byBlock.afternoon],
+                        ["Evening", dayPlan.byBlock.evening],
+                        ["Anytime", dayPlan.byBlock.anytime],
+                      ] as [string, number][]
+                    )
+                      .filter(([, n]) => n > 0)
+                      .map(([label, n]) => (
+                        <span
+                          key={label}
+                          className="rounded-[var(--r-pill)] bg-[var(--surface-3)] px-3 py-1 text-[12px] font-medium text-[var(--text-2)]"
+                        >
+                          {label} · {n}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+                <div className="card mt-5 p-5">
                   {packs.map((p, i) => (
                     <div
                       key={p.id}
