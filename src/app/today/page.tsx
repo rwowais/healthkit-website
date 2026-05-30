@@ -264,6 +264,24 @@ export default function TodayPage() {
       /* non-fatal */
     }
   }, [dismissed]);
+  // Per-day dismissal of the check-in "read" — so the card morphs into its
+  // advisory read after both taps, then recedes once acknowledged (mirrors
+  // the snooze pattern; resets each day).
+  const [checkInAcked, setCheckInAcked] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem(`pz:cia:${todayKey}`) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(`pz:cia:${todayKey}`, checkInAcked ? "1" : "0");
+    } catch {
+      /* non-fatal */
+    }
+  }, [checkInAcked, todayKey]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
   // Edit-mode for the timeline. Off by default so the primary "tap to
   // complete" affordance stays uncontaminated; flipping it on reveals
@@ -473,7 +491,6 @@ export default function TodayPage() {
 
   const sleepQ = log.sleepLog?.sleepQuality ?? null;
   const energy = log.energyLevel ?? null;
-  const checkedIn = sleepQ != null && energy != null;
 
   const adaptation = useMemo(() => adapt(state), [state]);
   const sig = useMemo(() => getSignals(state), [state]);
@@ -1227,12 +1244,14 @@ export default function TodayPage() {
         )}
 
         {/* Daily check-in — feeds the adaptive engine */}
-        {isToday && !checkedIn && !firstDaySoft && (
+        {isToday && !firstDaySoft && !checkInAcked && (
           <DailyCheckInCard
             sleepQ={sleepQ}
             energy={energy}
+            mode={adaptation.mode}
             onSleep={(q) => updateSleepLog(selectedDate, { sleepQuality: q })}
             onEnergy={(e) => updateRatings(selectedDate, { energy: e })}
+            onAck={() => setCheckInAcked(true)}
           />
         )}
 
