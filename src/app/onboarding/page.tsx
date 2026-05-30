@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { loadState } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
 import { getUserId } from "@/lib/supabase";
-import { packById } from "@/lib/packs";
+import { PACKS, packById } from "@/lib/packs";
 import { Button, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 
@@ -492,7 +492,9 @@ export default function OnboardingPage() {
                 </h1>
                 <p className="t-body mt-3 leading-relaxed">
                   {packs.length === 1
-                    ? "We started with one. Your Library has eight more — all one tap away when you're ready."
+                    ? `We started with one. Your Library has ${
+                        PACKS.length - 1
+                      } more — all one tap away when you're ready.`
                     : `${packs.length} protocols, merging into one calm day. It adapts as you go.`}
                 </p>
                 <div className="card mt-7 p-5">

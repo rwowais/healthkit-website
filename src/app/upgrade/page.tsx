@@ -24,7 +24,7 @@ const VALUE: { icon: IconName; t: string; s: string }[] = [
   {
     icon: "pulse",
     t: "Biomarker-aware adaptation",
-    s: "Full panel with reference ranges; your day flexes around recovery signals.",
+    s: "Your day flexes around your own recovery signals — the HRV, resting-heart-rate and weight trends you log in Body Trends.",
   },
   {
     icon: "flame",
