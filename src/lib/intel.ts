@@ -132,6 +132,7 @@ export interface Keystone {
   key: string;
   title: string;
   delta: number; // pts more of *other* behaviors kept on days done
+  days: number; // sample size (qualifying logged days) behind the read
 }
 
 /**
@@ -172,7 +173,9 @@ export function keystone(state: AppState): Keystone | null {
   // of d>=0.77 + >=8/group made it a dead feature).
   const dThreshold = 0.35 + 0.05 * Math.log2(Math.max(items.length, 2));
 
-  let best: (Keystone & { d: number }) | null = null;
+  let best:
+    | { key: string; title: string; delta: number; d: number }
+    | null = null;
   for (const it of items) {
     // Trust-tier gate: the keystone is the system's strongest claim
     // about a behavior's importance. A user's free-text custom
@@ -217,7 +220,9 @@ export function keystone(state: AppState): Keystone | null {
       best = { key: k, title: it.title, delta, d };
     }
   }
-  return best ? { key: best.key, title: best.title, delta: best.delta } : null;
+  return best
+    ? { key: best.key, title: best.title, delta: best.delta, days: logs.length }
+    : null;
 }
 
 // ── Outcome reflection — "what works for YOU" ─────────────────────
@@ -233,6 +238,7 @@ export interface OutcomeInsight {
   title: string;
   dimension: "energy" | "sleep" | "overall";
   delta: number; // points higher (0–100 felt scale) on days done
+  days: number; // sample size (qualifying logged days) behind the read
 }
 
 /** A day's felt index (0–100) from the check-in, or null if not logged. */
@@ -286,7 +292,15 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
   // Multiple-comparison guard scales with behaviors tested.
   const dThreshold = 0.4 + 0.05 * Math.log2(Math.max(items.length, 2));
 
-  let best: (OutcomeInsight & { d: number }) | null = null;
+  let best:
+    | {
+        key: string;
+        title: string;
+        dimension: "energy" | "sleep" | "overall";
+        delta: number;
+        d: number;
+      }
+    | null = null;
   for (const it of items) {
     // Trust-tier gate: the "Proven by your data" insight is a
     // first-person claim — the system is telling the user "your own
@@ -338,6 +352,7 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
         title: best.title,
         dimension: best.dimension,
         delta: best.delta,
+        days: logs.length,
       }
     : null;
 }

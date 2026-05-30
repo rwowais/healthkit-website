@@ -126,6 +126,17 @@ export default function InsightsPage() {
   );
   const ks = useMemo(() => keystone(intelState), [intelState]);
   const works = useMemo(() => whatWorks(intelState), [intelState]);
+  // Days of real activity logged so far — drives the cold-start
+  // "insights forming — ~N to go" countdown (keystone/whatWorks gate at 10).
+  const loggedDays = useMemo(
+    () =>
+      intelState.dailyLogs.filter(
+        (l) =>
+          l.score > 0 ||
+          Object.values(l.behaviorCompletions ?? {}).some(Boolean)
+      ).length,
+    [intelState.dailyLogs]
+  );
   const model = useMemo(() => personalModel(intelState), [intelState]);
   const identity = useMemo(
     () => identityReflection(intelState),
@@ -365,6 +376,9 @@ export default function InsightsPage() {
                         higher on these days.
                       </p>
                     )}
+                    <p className="mt-3 text-[12px] font-medium text-[var(--text-4)]">
+                      Measured across {ks.days} of your check-ins.
+                    </p>
                   </div>
                 </motion.div>
               )}
@@ -410,6 +424,9 @@ export default function InsightsPage() {
                       </span>{" "}
                       — measured from your own check-ins, not a generic
                       claim.
+                    </p>
+                    <p className="mt-3 text-[12px] font-medium text-[var(--text-4)]">
+                      Measured across {works.days} of your check-ins.
                     </p>
                   </div>
                 </motion.div>
@@ -459,7 +476,17 @@ export default function InsightsPage() {
               <EmptyState
                 icon={<Icon name="bulb" size={24} />}
                 title="Patterns are forming"
-                body="Track consistently for about a week and your first personalized correlations will appear here."
+                body={
+                  loggedDays >= 10
+                    ? "You've logged enough — no pattern is strong enough to call honestly yet. I'll surface one the moment it is."
+                    : loggedDays >= 1
+                    ? `You're ${loggedDays} check-in${
+                        loggedDays === 1 ? "" : "s"
+                      } in — about ${
+                        10 - loggedDays
+                      } more and your first personalized read can appear. I only call a pattern when it's real.`
+                    : "Check in for about a week and your first personalized read appears here — I only call a pattern when it's real."
+                }
               />
             </div>
             {/* Premium preview for free users on the empty page — they
