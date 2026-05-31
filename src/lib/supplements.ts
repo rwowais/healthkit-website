@@ -173,7 +173,16 @@ export function isSupplementBehavior(b: {
   if (b.derivedFrom && SUPPLEMENT_CANONICAL_KEYS.has(b.derivedFrom))
     return true;
   if (b.icon === "pill") return true;
-  if (b.title) {
+  // Title-pattern detection is a FALLBACK for CURATED supplements whose
+  // canonical key was renamed or lost (e.g. a CMS-edited bundle). It must NOT
+  // eat a behavior the USER authored: a custom/forked atom named like a
+  // supplement ("Magnesium before bed") is their explicit behavior — without
+  // this guard the title regex reclassified it as a supplement and
+  // compileTimeline dropped it from the timeline entirely (it never appeared
+  // anywhere). A user-DERIVED supplement is still caught above via the
+  // derivedFrom / pill-icon layers; only the loose title heuristic is gated.
+  const userAuthored = b.canonicalKey.startsWith("custom:") || !!b.derivedFrom;
+  if (!userAuthored && b.title) {
     for (const pat of SUPPLEMENT_TITLE_PATTERNS) {
       if (pat.test(b.title)) return true;
     }

@@ -428,6 +428,46 @@ describe("blockIntelligence — calm per-block notes", () => {
   });
 });
 
+describe("custom behavior named like a supplement is NOT dropped from the timeline", () => {
+  it("a custom 'Magnesium before bed' behavior still compiles into Today", () => {
+    // Regression: the supplement title-regex matched the custom behavior's
+    // title → isSupplementBehavior true → compileTimeline skipped it → it
+    // vanished from the app entirely. A user custom: atom is a behavior.
+    const base = getDefaultState();
+    const key = customCanonicalKey("my-pack", "Magnesium before bed");
+    const pack = {
+      id: "my-pack",
+      name: "My Custom",
+      tagline: "",
+      goal: "",
+      accent: "--warm",
+      icon: "sparkle",
+      source: "custom",
+      behaviors: [
+        {
+          canonicalKey: key,
+          title: "Magnesium before bed",
+          block: "evening",
+          anchor: "bed",
+          offsetMin: -30,
+          dose: "200 mg",
+          rationale: "Custom behavior.",
+          icon: "sparkle",
+          leverage: 2,
+          kind: "action",
+        },
+      ],
+    } as unknown as ProtocolPack;
+    const state: AppState = {
+      ...base,
+      customPacks: [pack],
+      installedPacks: ["my-pack"],
+    };
+    const tl = compileTimeline(state, 0);
+    expect(tl.some((i) => i.canonicalKey === key)).toBe(true);
+  });
+});
+
 describe("atom-library (2B) — listBehaviorAtoms + customCanonicalKey", () => {
   it("exposes every unique curated atom with its origin packs", () => {
     const atoms = listBehaviorAtoms();

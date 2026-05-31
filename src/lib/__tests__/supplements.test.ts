@@ -128,6 +128,60 @@ describe("isSupplementBehavior — four-layer detection", () => {
   });
 });
 
+describe("isSupplementBehavior — never eats a user-authored behavior", () => {
+  it("a user CUSTOM behavior titled like a supplement is NOT a supplement", () => {
+    // The bug: "Magnesium before bed" created as a custom BEHAVIOR matched the
+    // title regex → classified as a supplement → silently dropped from the
+    // timeline. A custom: atom is the user's explicit behavior.
+    expect(
+      isSupplementBehavior({
+        canonicalKey: "custom:draft:magnesium-before-bed-ab12",
+        title: "Magnesium before bed",
+        icon: "sparkle",
+      })
+    ).toBe(false);
+    expect(
+      isSupplementBehavior({
+        canonicalKey: "custom:p1:take-my-zinc-cd34",
+        title: "Take my zinc",
+        icon: "sparkle",
+      })
+    ).toBe(false);
+  });
+
+  it("a fork DERIVED from a non-supplement is not title-matched", () => {
+    // Forked a curated behavior and renamed it supplement-y → still a behavior.
+    expect(
+      isSupplementBehavior({
+        canonicalKey: "fork:p1:morning-sunlight",
+        derivedFrom: "morning-sunlight",
+        title: "Magnesium sunlight (renamed)",
+        icon: "sun",
+      })
+    ).toBe(false);
+  });
+
+  it("but a user atom DERIVED from a curated supplement IS still a supplement", () => {
+    expect(
+      isSupplementBehavior({
+        canonicalKey: "custom:p1:my-mag-ef56",
+        derivedFrom: "magnesium-pm",
+        title: "My magnesium",
+      })
+    ).toBe(true); // caught by the derivedFrom layer, before the title guard
+  });
+
+  it("a curated/CMS atom titled like a supplement is STILL caught (fallback intact)", () => {
+    expect(
+      isSupplementBehavior({
+        canonicalKey: "renamed-by-cms",
+        title: "Low-dose melatonin",
+        icon: "moon",
+      })
+    ).toBe(true);
+  });
+});
+
 describe("supplementsForBlock — filtering + sort + safety", () => {
   const sample = (over: Partial<Supplement> = {}): Supplement => ({
     id: over.id ?? "x",
