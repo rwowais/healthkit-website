@@ -4,14 +4,21 @@
  * Time anchoring, current-block awareness, per-behavior streaks,
  * keystone-habit detection, and proactive (calm) suggestions.
  */
-import type { AppState, DailyLog, TimeBlock, TrustTier } from "./types";
-import { compileTimeline, type TimelineItem } from "./engine";
-import { packById } from "./packs";
+import type {
+  AppState,
+  BehaviorDef,
+  DailyLog,
+  TimeBlock,
+  TrustTier,
+} from "./types";
+import { compileTimeline, effectiveKey, type TimelineItem } from "./engine";
+import { packById, listBehaviorAtoms } from "./packs";
 import { activePacks } from "./knowledge";
 import { effectiveMinutes, nowMinutes, parseHM } from "./time";
 import { getInsightTemplate, renderTemplate } from "./knowledge";
 import { getTz, dateKeyInTz, addDaysToKey, dayIndexOfKeyInTz } from "./tz";
 import { evidenceRank } from "./governance";
+import { isSupplementBehavior } from "./supplements";
 
 export {
   resolveMinutes,
@@ -885,4 +892,75 @@ export function compareUpNext(a: UpNextRank, b: UpNextRank): number {
 /** Is this behavior a discrete action (vs a guardrail/reminder)? */
 export function isActionable(it: Pick<TimelineItem, "kind">): boolean {
   return it.kind !== "avoid" && it.kind !== "reminder";
+}
+
+/**
+ * "Your next habit" — recommend the single highest-leverage CURATED behavior
+ * the user isn't doing yet. The growth counterpart to suggestions() (which
+ * handles friction: retime / pause). Governed + advisory:
+ *   - CURATED atoms only (listBehaviorAtoms = official packs + standalones) —
+ *     never surfaces a user's custom atom as "recommended";
+ *   - excludes anything already in the user's system (by effectiveKey, so a
+ *     fork counts as having the original) + their supplements;
+ *   - skips supplements (this is a behavior) and guardrails / reminders;
+ *   - honors safety flags — never recommends a contraindicated atom;
+ *   - ranks by leverage, then evidence (established first), then title for
+ *     determinism;
+ *   - fires only for genuinely high-leverage atoms (leverage >= 2) — it
+ *     nudges, it never nags. Returns null when there's nothing worth adding.
+ */
+export interface NextBehaviorRec {
+  key: string;
+  title: string;
+  rationale: string;
+  leverage: number;
+  evidenceTier?: BehaviorDef["evidenceTier"];
+  category?: BehaviorDef["category"];
+  fromPacks: string[];
+}
+
+export function nextBestAddition(state: AppState): NextBehaviorRec | null {
+  const installed = new Set(state.installedPacks ?? []);
+  // "Have" = every behavior in an installed pack (official or custom), keyed
+  // by effectiveKey, plus the user's supplements. A paused pack still counts
+  // as "have" so we never recommend something the user chose to shelve.
+  const have = new Set<string>();
+  for (const pack of [...activePacks(), ...(state.customPacks ?? [])]) {
+    if (!installed.has(pack.id)) continue;
+    for (const b of pack.behaviors) have.add(effectiveKey(b));
+  }
+  for (const s of state.supplements ?? []) have.add(s.id);
+
+  const userFlags = state.settings?.safetyFlags ?? {};
+  const contraindicated = (b: BehaviorDef): boolean =>
+    (b.contraindications ?? []).some((f) => userFlags[f] === true);
+
+  const candidates = listBehaviorAtoms().filter(
+    (a) =>
+      !have.has(effectiveKey(a)) &&
+      !isSupplementBehavior(a) && // "your next habit" is a behavior, not a pill
+      isActionable(a) && // not a guardrail / reminder
+      !contraindicated(a) &&
+      (a.leverage ?? 1) >= 2 // meaningful levers only — never lev-1 filler
+  );
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => {
+    const lev = (b.leverage ?? 1) - (a.leverage ?? 1);
+    if (lev !== 0) return lev;
+    const ev = evidenceRank(a.evidenceTier) - evidenceRank(b.evidenceTier);
+    if (ev !== 0) return ev;
+    return a.title.localeCompare(b.title);
+  });
+
+  const top = candidates[0];
+  return {
+    key: top.canonicalKey,
+    title: top.title,
+    rationale: top.rationale ?? "",
+    leverage: top.leverage ?? 1,
+    evidenceTier: top.evidenceTier,
+    category: top.category,
+    fromPacks: top.fromOfficialPacks ?? [],
+  };
 }

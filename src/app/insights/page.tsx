@@ -14,6 +14,7 @@ import {
   behaviorStats,
   weeklyReview,
   whatWorks,
+  nextBestAddition,
 } from "@/lib/intel";
 import { getAccess } from "@/lib/entitlements";
 import { UpgradeCTA } from "@/components/PremiumGate";
@@ -126,6 +127,10 @@ export default function InsightsPage() {
   );
   const ks = useMemo(() => keystone(intelState), [intelState]);
   const works = useMemo(() => whatWorks(intelState), [intelState]);
+  // "Your next habit" — a calm, governed recommendation of the highest-
+  // leverage curated behavior the user isn't doing yet. Uses full `state`
+  // (not the delayed peek): it's a catalog recommendation, not time-series.
+  const rec = useMemo(() => nextBestAddition(state), [state]);
   // Days of real activity logged so far — drives the cold-start
   // "insights forming — ~N to go" countdown (keystone/whatWorks gate at 10).
   const loggedDays = useMemo(
@@ -316,6 +321,47 @@ export default function InsightsPage() {
               </div>
             </div>
           </motion.div>
+        )}
+
+        {/* "Your next habit" — the growth counterpart to the friction
+            suggestions: the highest-leverage curated behavior the user
+            isn't doing yet. Advisory, never pushy; taps through to the
+            Library to add it. */}
+        {rec && (
+          <button
+            onClick={() => router.push("/library")}
+            className="press tr-fast panel relative w-full overflow-hidden p-6 text-left"
+          >
+            <span
+              className="ambient"
+              style={{
+                background:
+                  "radial-gradient(130% 90% at 100% 0%, color-mix(in srgb, var(--vitality) 20%, transparent), transparent 60%)",
+              }}
+            />
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <Icon
+                  name="bulb"
+                  size={14}
+                  className="text-[var(--vitality)]"
+                />
+                <Eyebrow color="var(--vitality)">Your next habit</Eyebrow>
+              </div>
+              <p className="mt-3 text-[19px] font-bold leading-snug text-[var(--text-1)]">
+                {rec.title}
+              </p>
+              {rec.rationale && (
+                <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
+                  {rec.rationale}
+                </p>
+              )}
+              <div className="mt-4 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--vitality)]">
+                Add it from the Library
+                <Icon name="chevron" size={13} />
+              </div>
+            </div>
+          </button>
         )}
 
         {/* What matters most — consolidated. Keystone and "Proven for you"
