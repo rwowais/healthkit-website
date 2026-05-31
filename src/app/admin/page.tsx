@@ -124,6 +124,7 @@ import {
 import type { AppState, DailyLog } from "@/lib/types";
 import { Eyebrow, Skeleton, ToastProvider, useToast } from "@/components/ui";
 import RuleEditor from "@/components/admin/RuleEditor";
+import InteractionsEditor from "@/components/admin/InteractionsEditor";
 
 type Gate = "checking" | "denied" | "ok";
 type Tab =
@@ -135,7 +136,7 @@ type Tab =
   | "intelligence"
   | "howitworks";
 type ContentMode = "author" | "review";
-type EngineSub = "rules" | "config" | "intelligence" | "access";
+type EngineSub = "rules" | "interactions" | "config" | "intelligence" | "access";
 
 const TABS: { id: Tab; label: string; hint: string }[] = [
   {
@@ -1178,6 +1179,11 @@ function AdminHomeInner() {
                   hint: "Adaptation triggers, behavior rule sets (recovery, restraint, training, circadian).",
                 },
                 {
+                  id: "interactions",
+                  label: "Interactions",
+                  hint: "Author behavior-to-behavior relationships (conflict / timing / ordering / synergy) + verify their sources.",
+                },
+                {
                   id: "config",
                   label: "Config",
                   hint: "Live constants gating trial behavior, free-tier caps, and intelligence thresholds.",
@@ -1212,6 +1218,10 @@ function AdminHomeInner() {
               </button>
             ))}
           </div>
+        )}
+
+        {tab === "engine" && engineSub === "interactions" && (
+          <InteractionsEditor />
         )}
 
         {tab === "engine" && engineSub === "rules" && (
