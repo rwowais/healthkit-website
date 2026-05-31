@@ -26,6 +26,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Eyebrow } from "@/components/ui";
+import { Icon, type IconName } from "@/components/ui/icons";
 import * as haptic from "@/lib/haptics";
 
 interface DailyReflectionProps {
@@ -35,10 +36,15 @@ interface DailyReflectionProps {
   onNote: (note: string) => void;
 }
 
-const MOODS: { label: string; value: number; emoji: string }[] = [
-  { label: "Rough", value: 2, emoji: "🌫" },
-  { label: "Okay", value: 3, emoji: "🌤" },
-  { label: "Good", value: 5, emoji: "🌅" },
+const MOODS: {
+  label: string;
+  value: number;
+  icon: IconName;
+  color: string;
+}[] = [
+  { label: "Rough", value: 2, icon: "moon", color: "var(--text-3)" },
+  { label: "Okay", value: 3, icon: "balance", color: "var(--readiness)" },
+  { label: "Good", value: 5, icon: "sun", color: "var(--vitality)" },
 ];
 
 export default function DailyReflection({
@@ -82,7 +88,12 @@ export default function DailyReflection({
               color: "var(--text-1)",
             }}
           >
-            <span className="block text-[18px] leading-none">{m.emoji}</span>
+            <span
+              className="flex justify-center"
+              style={{ color: m.color }}
+            >
+              <Icon name={m.icon} size={22} />
+            </span>
             <span className="mt-1.5 block">{m.label}</span>
           </button>
         ))}

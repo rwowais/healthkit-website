@@ -705,6 +705,19 @@ export default function TodayPage() {
     prog.done > 0;
 
   const upNext = useMemo(() => {
+    // Don't promote a behavior as the "next action" once its window is well
+    // past — e.g. morning sunlight at 8pm is no longer doable even though
+    // it's technically "overdue". Drop timed behaviors whose block is 2+
+    // blocks behind the current block (a morning item when it's evening).
+    // They stay in the timeline; they just stop being the Up Next hero.
+    const blockOrder: Record<string, number> = {
+      morning: 0,
+      afternoon: 1,
+      evening: 2,
+    };
+    const cbIdx = blockOrder[cb] ?? 0;
+    const windowGone = (b: string) =>
+      b in blockOrder && blockOrder[b] <= cbIdx - 2;
     const candidates = timeline.filter(
       (i) =>
         !i.muted &&
@@ -713,13 +726,14 @@ export default function TodayPage() {
         // Guardrail / "avoid" / reminder behaviors (e.g. caffeine cutoff)
         // are constraints you hold, not actions you tap to do next — they
         // stay in the timeline but never become the Up Next hero.
-        isActionable(i)
+        isActionable(i) &&
+        !windowGone(i.block)
     );
     if (candidates.length === 0) return null;
     return [...candidates].sort((a, b) =>
       compareUpNext(upNextRank(a, settings), upNextRank(b, settings))
     )[0];
-  }, [timeline, log, settings, snoozed]);
+  }, [timeline, log, settings, snoozed, cb]);
 
   const activeSuggestions = useMemo<Suggestion[]>(
     () => suggestions(state).filter((s) => !dismissed.includes(s.id)),
