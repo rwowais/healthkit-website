@@ -19,7 +19,7 @@ import type {
 } from "./types";
 import { activePacks, activeAdaptationRules, activeInteractions } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
-import { effectiveMinutes } from "./time";
+import { effectiveMinutes, blockForMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
 import { isSupplementBehavior } from "./supplements";
@@ -305,6 +305,19 @@ export function compileTimeline(
   }
 
   const settings = state.settings;
+  // Clock-based day blocks: file each behavior under the section that
+  // matches the actual clock time it resolves to (blockForMinutes —
+  // Morning <12pm, Afternoon 12–5pm, Evening 5pm+), so the section header
+  // can never contradict the time shown (an 11:30am behavior sits under
+  // Morning, not Afternoon). Two cases keep the stored block: an untimed
+  // "anytime" behavior, and one the user has explicitly moved to a block
+  // (block !== recommendedBlock) — their manual choice wins.
+  for (const it of merged.values()) {
+    if (it.block === "anytime") continue;
+    if (it.block !== it.recommendedBlock) continue;
+    const m = effectiveMinutes(it, settings);
+    if (m != null) it.block = blockForMinutes(m);
+  }
   const clock = (it: TimelineItem) => {
     const m = effectiveMinutes(it, settings);
     return m == null ? Number.MAX_SAFE_INTEGER : m;

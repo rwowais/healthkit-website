@@ -53,41 +53,46 @@ export function nowMinutes(): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+/**
+ * Clock-based day block for a minutes-since-midnight value (0..1439).
+ * The day is split by the CLOCK, not by wake time:
+ *   Morning    5:00am – 11:59am
+ *   Afternoon  12:00pm – 4:59pm
+ *   Evening    5:00pm onward, incl. the late-night wind-down before 5am
+ * so a behavior always sits under the section that matches the time it's
+ * shown at (an 11:30am item is "morning", a 12:30pm item is "afternoon").
+ * Never returns "anytime" — callers handle untimed items separately.
+ */
+export function blockForMinutes(min: number): TimeBlock {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  if (m >= 300 && m < 720) return "morning"; // 5:00am – 11:59am
+  if (m >= 720 && m < 1020) return "afternoon"; // 12:00pm – 4:59pm
+  return "evening"; // 5:00pm – 4:59am
+}
+
+/**
+ * The user's current day block — CLOCK-BASED (see blockForMinutes). This
+ * is the live "NOW" block on Today, and it deliberately uses the SAME
+ * clock split as the section a behavior is filed under, so the section
+ * header and the NOW highlight can never disagree (an 11:30am item and
+ * the NOW marker are both "morning").
+ *
+ * The post-bedtime "rest / the day is done" state is a SEPARATE concern,
+ * handled by isOvernight(); when that's true the Today surface shows the
+ * rest state and ignores this value for the NOW highlight.
+ *
+ * `settings` is accepted for call-site stability (every caller already
+ * passes it) and possible future schedule-aware tweaks; the clock split
+ * itself needs only the time. `now` is minutes since local midnight — a
+ * caller in another timezone (Today passes nowMinutesInTz) supplies a
+ * tz-aware value so the block matches the user's actual local time.
+ */
 export function currentBlock(
   settings: { wakeTime: string; bedtime: string },
   now: number = nowMinutes()
 ): TimeBlock {
-  // Compute the user's current block by mapping "now" into a
-  // wake-aligned frame: minutes elapsed since their most recent
-  // wake (0..1439). This gives a single linear coordinate for
-  // every time of day, including overnight.
-  //
-  // Why the rewrite: the old logic mapped pre-wake times to
-  // (now + 1440) and ran them past every break, so anything before
-  // wake fell into "evening." For a 4:30 AM session, that meant
-  // the app showed yesterday's evening block as "NOW" when the
-  // user was clearly starting a new day. Fix splits the overnight
-  // window 60/40 — first 60% is winding-down ("evening"), last
-  // 40% is pre-dawn ("morning") so a 4:30 AM user sees morning.
-  // `now` is minutes since local midnight; a caller in a different
-  // timezone (Today passes nowMinutesInTz) supplies a tz-aware value so
-  // the block matches the user's actual local time, not the device clock.
-  const wake = parseHM(settings.wakeTime);
-  let bed = parseHM(settings.bedtime);
-  if (bed <= wake) bed += 1440;
-  const dayLength = bed - wake;
-  let sinceWake = now - wake;
-  if (sinceWake < 0) sinceWake += 1440;
-
-  const morningEnd = 300; // first 5h after wake
-  const eveningStart = dayLength - 180; // last 3h before bed
-  if (sinceWake < morningEnd) return "morning";
-  if (sinceWake < eveningStart) return "afternoon";
-  if (sinceWake < dayLength) return "evening";
-  // Overnight: 60/40 split between bed and next wake.
-  const nightLength = 1440 - dayLength;
-  const sinceBed = sinceWake - dayLength;
-  return sinceBed > nightLength * 0.6 ? "morning" : "evening";
+  void settings;
+  return blockForMinutes(now);
 }
 
 /**

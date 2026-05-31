@@ -34,12 +34,12 @@ const S = { wakeTime: "07:00", bedtime: "23:00" };
 
 describe("#7 currentBlock — injectable tz-aware now", () => {
   it("maps an explicit `now` (minutes since local midnight) to the block", () => {
-    expect(currentBlock(S, 8 * 60)).toBe("morning"); // sinceWake 60
-    expect(currentBlock(S, 13 * 60)).toBe("afternoon"); // sinceWake 360
-    expect(currentBlock(S, 21 * 60 + 30)).toBe("evening"); // sinceWake 870
-    // Overnight 60/40 split (nightLength 480 → 288-min boundary past bed):
-    expect(currentBlock(S, 1 * 60)).toBe("evening"); // 1:00 → 120 past bed (winding down)
-    expect(currentBlock(S, 5 * 60 + 30)).toBe("morning"); // 5:30 → 390 past bed (pre-dawn)
+    // Clock-based: Morning 5:00–11:59, Afternoon 12:00–16:59, else Evening.
+    expect(currentBlock(S, 8 * 60)).toBe("morning"); // 8:00am
+    expect(currentBlock(S, 13 * 60)).toBe("afternoon"); // 1:00pm
+    expect(currentBlock(S, 21 * 60 + 30)).toBe("evening"); // 9:30pm
+    expect(currentBlock(S, 1 * 60)).toBe("evening"); // 1:00am — late-night tail
+    expect(currentBlock(S, 5 * 60 + 30)).toBe("morning"); // 5:30am
   });
 
   it("is backward-compatible called WITHOUT a now (defaults to device nowMinutes)", () => {
