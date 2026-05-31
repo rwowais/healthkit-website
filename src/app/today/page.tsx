@@ -49,9 +49,11 @@ import {
   compareUpNext,
   isActionable,
   keystone,
+  weeklyReview,
   nowMinutes,
   type Suggestion,
 } from "@/lib/intel";
+import { identityReflection } from "@/lib/reflect";
 import BehaviorSheet from "@/components/BehaviorSheet";
 import { Skeleton, Eyebrow, Sheet, Button } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -526,6 +528,54 @@ export default function TodayPage() {
     }
     return out;
   }, [isToday, state, selectedDate, selDayIdx, masteryAcked]);
+
+  // ── Weekly review + monthly identity, surfaced on Today ──
+  // These retention assets otherwise live only on the Insights tab the
+  // calm weekly user rarely visits. Surface them as calm POINTER cards
+  // (a freshness nudge that deep-links to the full, already-gated view on
+  // Insights) — shown one at a time, yielding to the higher-priority
+  // trial / mastery moments, so Today never stacks into a dashboard.
+  const review = useMemo(() => weeklyReview(state), [state]);
+  const identity = useMemo(() => identityReflection(state), [state]);
+  const weekStamp = String(
+    Math.floor(new Date(todayKey + "T00:00:00").getTime() / (86400000 * 7))
+  );
+  const monthKey = todayKey.slice(0, 7);
+  const [weekReviewAcked, setWeekReviewAcked] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("pz:wr-ack");
+    } catch {
+      return null;
+    }
+  });
+  const [identityAcked, setIdentityAcked] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("pz:id-ack");
+    } catch {
+      return null;
+    }
+  });
+  const reflectionsOk =
+    isToday && !showTrialExtension && freshlyMasteredToShow.length === 0;
+  const showIdentity = reflectionsOk && !!identity && identityAcked !== monthKey;
+  const showWeekly =
+    reflectionsOk && !showIdentity && !!review && weekReviewAcked !== weekStamp;
+  const ackWeekReview = () => {
+    try {
+      localStorage.setItem("pz:wr-ack", weekStamp);
+    } catch {
+      /* non-fatal */
+    }
+    setWeekReviewAcked(weekStamp);
+  };
+  const ackIdentity = () => {
+    try {
+      localStorage.setItem("pz:id-ack", monthKey);
+    } catch {
+      /* non-fatal */
+    }
+    setIdentityAcked(monthKey);
+  };
 
   const ackMastery = (keys: string[]) => {
     const next = new Set(masteryAcked);
@@ -1253,6 +1303,62 @@ export default function TodayPage() {
             onEnergy={(e) => updateRatings(selectedDate, { energy: e })}
             onAck={() => setCheckInAcked(true)}
           />
+        )}
+
+        {/* Monthly identity reflection — calm pointer to the full (gated)
+            view on Insights; one at a time, dismissible per month. */}
+        {showIdentity && identity && (
+          <div className="card p-5">
+            <Eyebrow color="var(--warm)">Who you&rsquo;re becoming</Eyebrow>
+            <p className="mt-2 text-[15px] font-semibold leading-snug text-[var(--text-1)]">
+              {identity.headline}
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-3)]">
+              A new monthly reflection is ready.
+            </p>
+            <div className="mt-3 flex items-center gap-5">
+              <button
+                onClick={() => router.push("/insights")}
+                className="press tap-44 tr-fast inline-flex items-center text-[13px] font-semibold text-[var(--warm)]"
+              >
+                Read it →
+              </button>
+              <button
+                onClick={ackIdentity}
+                className="press tap-44 tr-fast inline-flex items-center text-[13px] font-medium text-[var(--text-4)]"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Weekly review — surfaced once per week so the calm weekly user
+            encounters it instead of hunting for it on the Insights tab. */}
+        {showWeekly && review && (
+          <div className="card p-5">
+            <Eyebrow color="var(--readiness)">Your week</Eyebrow>
+            <p className="mt-2 text-[15px] font-semibold leading-snug text-[var(--text-1)]">
+              {review.headline}
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-3)]">
+              Your weekly review is ready — see how this week compared to last.
+            </p>
+            <div className="mt-3 flex items-center gap-5">
+              <button
+                onClick={() => router.push("/insights")}
+                className="press tap-44 tr-fast inline-flex items-center text-[13px] font-semibold text-[var(--readiness)]"
+              >
+                See your week →
+              </button>
+              <button
+                onClick={ackWeekReview}
+                className="press tap-44 tr-fast inline-flex items-center text-[13px] font-medium text-[var(--text-4)]"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
         )}
 
         {/* First-day soft entry — tomorrow's first focus, not today's
