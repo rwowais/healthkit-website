@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import HowItThinks from "./HowItThinks";
 import { isAdmin } from "@/lib/admin";
 import { activePacks, activeBundleVersion } from "@/lib/knowledge";
 import {
@@ -131,7 +132,8 @@ type Tab =
   | "engine"
   | "simulate"
   | "publish"
-  | "intelligence";
+  | "intelligence"
+  | "howitworks";
 type ContentMode = "author" | "review";
 type EngineSub = "rules" | "config" | "intelligence" | "access";
 
@@ -165,6 +167,11 @@ const TABS: { id: Tab; label: string; hint: string }[] = [
     id: "publish",
     label: "Publish",
     hint: "Diff-before-publish + immutable history with rollback.",
+  },
+  {
+    id: "howitworks",
+    label: "How it thinks",
+    hint: "Read-only: the adaptation, interaction, evidence + ranking logic in plain language.",
   },
 ];
 
@@ -4986,6 +4993,8 @@ function AdminHomeInner() {
               </div>
             );
           })()}
+
+        {tab === "howitworks" && <HowItThinks />}
 
         {tab === "publish" && (
           <div className="space-y-4">

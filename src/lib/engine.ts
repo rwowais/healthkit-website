@@ -675,6 +675,16 @@ export interface Adaptation {
   reasons: string[];
 }
 
+/**
+ * Adaptive-mode thresholds — the recovery / adherence cutoffs baselineAdapt
+ * uses to pick the day's mode. Exported as named constants to (a) kill the
+ * magic numbers and (b) let the admin "How it thinks" panel display the REAL
+ * values instead of a hand-copied duplicate that could silently drift.
+ */
+export const RECOVERY_EASE_BELOW = 45; // recoveryProxy below this → recovery mode
+export const PRIMED_AT_OR_ABOVE = 78; // recoveryProxy at/above this → primed
+export const LOW_ADHERENCE_BELOW = 35; // 7-day adherence below this (with ≥3 tracked days) → essentials
+
 function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
   // "Welcome back" requires there to BE a back to welcome to. A user
   // who finished onboarding 2 days ago, never opened the app, and
@@ -698,7 +708,7 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
       reasons: [`You were away ${s.gapDays} days — easing back in`],
     };
   }
-  if (s.recoveryProxy != null && s.recoveryProxy < 45) {
+  if (s.recoveryProxy != null && s.recoveryProxy < RECOVERY_EASE_BELOW) {
     return {
       mode: "recovery",
       headline: "Recovery mode",
@@ -711,7 +721,11 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
       ],
     };
   }
-  if (s.adherence7 != null && s.adherence7 < 35 && s.trackedDays >= 3) {
+  if (
+    s.adherence7 != null &&
+    s.adherence7 < LOW_ADHERENCE_BELOW &&
+    s.trackedDays >= 3
+  ) {
     return {
       mode: "essentials",
       headline: "Essentials only",
@@ -754,7 +768,7 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
       reasons: [s.bioConcern],
     };
   }
-  if (s.recoveryProxy != null && s.recoveryProxy >= 78) {
+  if (s.recoveryProxy != null && s.recoveryProxy >= PRIMED_AT_OR_ABOVE) {
     return {
       mode: "primed",
       headline: "Primed",
