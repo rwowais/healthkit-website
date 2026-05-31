@@ -120,4 +120,43 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
     };
     expect(zone2(state)!.block).toBe("evening");
   });
+
+  it("honors a move INTO the recommended block (no snap-back)", () => {
+    // Regression: Zone 2 clock-derives to Morning for a 6:30 riser; dragging
+    // it to its recommended Afternoon used to snap straight back because the
+    // guard keyed on block!==recommendedBlock. Now an explicit pin sticks.
+    const base = getDefaultState();
+    const state: AppState = {
+      ...base,
+      installedPacks: ["longevity-foundation"],
+      settings: { ...base.settings, wakeTime: "06:30", bedtime: "22:30" },
+      behaviorOverrides: { ...base.behaviorOverrides, zone2: { block: "afternoon" } },
+    };
+    const z = zone2(state);
+    expect(z!.block).toBe("afternoon"); // pinned, not re-derived to morning
+    expect(z!.blockPinned).toBe(true);
+  });
+
+  it("a customTime (no block pin) follows the clock and sorts by wake-relative time", () => {
+    const base = getDefaultState();
+    const state: AppState = {
+      ...base,
+      installedPacks: ["longevity-foundation"],
+      settings: { ...base.settings, wakeTime: "07:00", bedtime: "22:30" },
+      // Zone 2 retimed to 1:00am — a custom TIME, not a block pin.
+      behaviorOverrides: { ...base.behaviorOverrides, zone2: { customTime: "01:00" } },
+    };
+    const tl = compileTimeline(state, 0);
+    const z = tl.find((i) => i.canonicalKey === "zone2");
+    // Block follows the custom clock time (1am = evening wind-down tail),
+    // NOT pinned to its catalog block.
+    expect(z!.block).toBe("evening");
+    expect(z!.blockPinned).toBe(false);
+    // Wake-relative sort: a 1am item is the LAST thing in the evening block,
+    // not the first (raw-clock sort would wrongly float 60min to the top).
+    const evening = tl.filter((i) => i.block === "evening");
+    expect(evening.length).toBeGreaterThan(1);
+    expect(evening[evening.length - 1].canonicalKey).toBe("zone2");
+    expect(evening[0].canonicalKey).not.toBe("zone2");
+  });
 });

@@ -19,7 +19,7 @@ import type {
 } from "./types";
 import { activePacks, activeAdaptationRules, activeInteractions } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
-import { effectiveMinutes, blockForMinutes } from "./time";
+import { effectiveMinutes, blockForMinutes, parseHM } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
 import { isSupplementBehavior } from "./supplements";
@@ -35,6 +35,11 @@ export interface TimelineItem extends BehaviorDef {
   recommendedBlock: TimeBlock;
   /** True when the user moved it off the recommended block/time. */
   retimed: boolean;
+  /** True when the user EXPLICITLY pinned a block (drag/move), even if it
+   *  equals the recommended block. The clock-derive pass honors this and
+   *  won't re-file the item by its clock time. A customTime alone does NOT
+   *  pin the block — the block then follows the custom clock time. */
+  blockPinned: boolean;
   /**
    * Governance class — computed at compile time. Downstream consumers
    * (keystone, suggestions, mastery, leverageTag) can branch on this
@@ -205,6 +210,7 @@ export function compileTimeline(
           customTime: ov?.customTime ?? b.customTime,
           recommendedBlock: b.block,
           retimed,
+          blockPinned: !!ov?.block,
           fromPacks: [pack.name],
           muted: false,
           // Trust tier — derived from the originating behavior's
@@ -294,6 +300,7 @@ export function compileTimeline(
           if (ov.block && !existing.retimed) {
             existing.block = ov.block;
             existing.retimed = true;
+            existing.blockPinned = true;
           }
           if (ov.customTime && !existing.customTime) {
             existing.customTime = ov.customTime;
@@ -310,17 +317,26 @@ export function compileTimeline(
   // Morning <12pm, Afternoon 12–5pm, Evening 5pm+), so the section header
   // can never contradict the time shown (an 11:30am behavior sits under
   // Morning, not Afternoon). Two cases keep the stored block: an untimed
-  // "anytime" behavior, and one the user has explicitly moved to a block
-  // (block !== recommendedBlock) — their manual choice wins.
+  // "anytime" behavior, and one the user has explicitly PINNED to a block
+  // (blockPinned — a drag/move) — their choice wins even when it equals the
+  // recommended block. A customTime alone is NOT a pin: the block follows
+  // the custom clock time.
   for (const it of merged.values()) {
     if (it.block === "anytime") continue;
-    if (it.block !== it.recommendedBlock) continue;
+    if (it.blockPinned) continue;
     const m = effectiveMinutes(it, settings);
     if (m != null) it.block = blockForMinutes(m, settings);
   }
+  const wakeMin = parseHM(settings.wakeTime);
   const clock = (it: TimelineItem) => {
     const m = effectiveMinutes(it, settings);
-    return m == null ? Number.MAX_SAFE_INTEGER : m;
+    // Minutes since wake (wrapped to 0..1439) so within-block ordering
+    // follows the sequence the user actually reaches items — a post-midnight
+    // time (e.g. 1:00am) sorts AFTER the same block's evening items, not
+    // before. For normal daytime schedules this preserves clock order.
+    return m == null
+      ? Number.MAX_SAFE_INTEGER
+      : (((m - wakeMin) % 1440) + 1440) % 1440;
   };
   return [...merged.values()]
     .filter((it) => !it.daysActive || it.daysActive[dayIndex])
@@ -396,6 +412,7 @@ export function applySwaps(
       muted: false,
       recommendedBlock: def.block,
       retimed: false,
+      blockPinned: false,
       trustTier: trustTier(def),
       swappedFrom: fromKey,
     });
@@ -1568,6 +1585,17 @@ export function blockIntelligence(
   const allDayItems = allItems.filter(
     (i) => !i.muted && isActiveToday(i)
   );
+  // Fire training/stacking notes in the EARLIEST block that actually
+  // contains the relevant items today (was hardcoded to "afternoon", which
+  // silently dropped the note for early risers whose training is clock-
+  // derived into morning). Single-fire: only the earliest matching block
+  // returns the note.
+  const earliestBlockOf = (items: TimelineItem[]): TimeBlock | null =>
+    items.reduce<TimeBlock | null>(
+      (acc, it) =>
+        acc == null || BLOCK_ORDER[it.block] < BLOCK_ORDER[acc] ? it.block : acc,
+      null
+    );
 
   // 1. Same-day training stacking — most user-relevant note.
   // Two HARD training stimuli on the same day = explicit framing so
@@ -1578,7 +1606,7 @@ export function blockIntelligence(
   const hardToday = trainingToday.filter((i) =>
     HARD_TRAINING_KEY_SET.has(effectiveKey(i))
   );
-  if (hardToday.length >= 2 && block === "afternoon") {
+  if (hardToday.length >= 2 && block === earliestBlockOf(hardToday)) {
     const names = hardToday
       .map((i) => i.title)
       .slice(0, 2)
@@ -1591,10 +1619,13 @@ export function blockIntelligence(
   // Zone 2 + strength same day: NOT a contradiction (Attia-style
   // protocols schedule both), but worth flagging so the user sequences
   // them (strength first, Zone 2 after — or different times of day).
+  const z2s = trainingToday.filter(
+    (i) => effectiveKey(i) === "zone2" || effectiveKey(i) === "strength"
+  );
   if (
-    block === "afternoon" &&
     trainingToday.some((i) => effectiveKey(i) === "zone2") &&
-    trainingToday.some((i) => effectiveKey(i) === "strength")
+    trainingToday.some((i) => effectiveKey(i) === "strength") &&
+    block === earliestBlockOf(z2s)
   ) {
     return {
       kind: "training",

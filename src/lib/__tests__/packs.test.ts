@@ -382,10 +382,13 @@ describe("blockIntelligence — calm per-block notes", () => {
     st = {
       ...st,
       installedPacks: ["longevity-foundation"],
+      // Pin wake so Zone 2 (wake+5h = 12:00) and strength (wake+6h = 13:00)
+      // both clock-derive into the afternoon block, where the note fires.
+      settings: { ...st.settings, wakeTime: "07:00", bedtime: "22:30" },
     };
     const tl = compileTimeline(st, 0);
     // Monday (dayIndex 0): Longevity Foundation's strength runs
-    // Mon/Wed/Fri, zone2 daily. Both should be in afternoon today.
+    // Mon/Wed/Fri, zone2 daily. Both clock-derive to afternoon today.
     const note = blockIntelligence(tl, "afternoon", 0);
     expect(note).toBeTruthy();
     expect(note!.kind).toBe("training");
