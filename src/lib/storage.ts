@@ -380,6 +380,10 @@ function normalize(s: AppState): AppState {
     dailyLogs: migratedLogs,
     biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
     insights: Array.isArray(s.insights) ? s.insights : [],
+    // NOTE: the persisted streak is kept verbatim here (recomputing it in
+    // normalize() perturbs cloud-sync state comparison). Display surfaces
+    // recompute a fresh value at render (Today + Insights) so a returning
+    // user never SEES a stale streak.
     currentStreak: s.currentStreak ?? 0,
     installedPacks,
     pausedPacks,

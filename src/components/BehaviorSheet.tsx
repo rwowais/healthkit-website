@@ -41,7 +41,10 @@ export default function BehaviorSheet({
   if (!item) return null;
 
   const ov = override ?? {};
-  const effBlock = ov.block ?? item.recommendedBlock;
+  // Highlight the block the behavior is ACTUALLY filed under (item.block —
+  // clock-derived, or an explicit pin), not the static catalog block, so the
+  // lit "When" pill matches the section the behavior shows under on Today.
+  const effBlock = item.block;
   const retimed =
     (!!ov.block && ov.block !== item.recommendedBlock) || !!ov.customTime;
   const days = ov.daysActive ?? item.daysActive ?? new Array(7).fill(true);
@@ -162,7 +165,7 @@ export default function BehaviorSheet({
               className="mt-3 flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-3)]"
             >
               <Icon name="info" size={12} />
-              Why {blockLabel(item.recommendedBlock).toLowerCase()}?
+              Why {blockLabel(item.block).toLowerCase()}?
               <Icon
                 name="chevron"
                 size={12}

@@ -16,7 +16,8 @@ import WorkoutSwapSheet from "@/components/today/WorkoutSwapSheet";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
-import { getLogForDate } from "@/lib/storage";
+import { getLogForDate, getVacationDates } from "@/lib/storage";
+import { calculateStreak } from "@/lib/scoring";
 import { getPendingConflict } from "@/lib/datasource";
 import {
   compileTimeline,
@@ -203,16 +204,9 @@ export default function TodayPage() {
     refresh();
   });
 
-  // Re-render once a minute so all clock-derived UI — relative times,
-  // the "NOW" divider, past-item detection, Up Next ordering — stays
-  // live while the page sits open. useVisibilityRefresh only fires on
-  // tab refocus, so without this the "live, time-aware timeline" froze
-  // at the last render's clock for anyone leaving Today open.
-  const [, setMinuteTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setMinuteTick((n) => n + 1), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  // The live per-minute "now" signal (`nowMin`) is defined just below, once
+  // `tz` is known; it drives all clock-derived state and the re-renders that
+  // keep Today live while the page sits open.
 
   // Onboarding guard — a returning user lands here after auth, but a
   // genuinely new account (cloud-loaded, no onboarding) gets sent to
@@ -240,9 +234,26 @@ export default function TodayPage() {
   // device zone equals the saved zone (the usual case) this is identical to
   // the old device-based values.
   const tz = useMemo(() => getTz(settings), [settings]);
-  const cb = useMemo(
-    () => currentBlock(settings, nowMinutesInTz(tz)),
-    [settings, tz]
+  // Live "now" (minutes since local midnight in the saved tz), refreshed every
+  // minute so the time-derived state below — current block, overnight rest, Up
+  // Next, relative times — advances on its own while the page sits open
+  // (crossing bedtime flips Today into the rest state with no tap). Replaces a
+  // throwaway minute-tick whose re-render couldn't refresh these useMemos
+  // because their deps excluded any time signal.
+  const [nowMin, setNowMin] = useState(() => nowMinutesInTz(tz));
+  useEffect(() => {
+    setNowMin(nowMinutesInTz(tz)); // resync immediately when the tz changes
+    const id = setInterval(() => setNowMin(nowMinutesInTz(tz)), 60_000);
+    return () => clearInterval(id);
+  }, [tz]);
+  const cb = useMemo(() => currentBlock(settings, nowMin), [settings, nowMin]);
+  // Streak shown on Today is recomputed from the logs at render (same as
+  // Insights), NOT read from the persisted state.currentStreak — so a user
+  // returning after a long gap is never greeted with a stale flame that
+  // collapses on their first tap. The persisted value updates on next mutation.
+  const liveStreak = useMemo(
+    () => calculateStreak(state.dailyLogs, getVacationDates(state), settings),
+    [state, settings]
   );
 
   // Persist snooze/dismiss so a refresh doesn't resurrect everything the
@@ -488,8 +499,8 @@ export default function TodayPage() {
   // state, NOT the resurrected evening block. Drives the header greeting,
   // suppresses the Up Next hero, and gates the partial-close copy.
   const overnight = useMemo(
-    () => isToday && isOvernight(settings, nowMinutesInTz(tz)),
-    [isToday, settings, tz]
+    () => isToday && isOvernight(settings, nowMin),
+    [isToday, settings, nowMin]
   );
   const selDayIdx = useMemo(
     () => dayIndexOfKeyInTz(tz, selectedDate),
@@ -680,25 +691,20 @@ export default function TodayPage() {
     if (!isToday) return false;
     const trial = state.settings.trialStartDate;
     if (!trial) return false;
-    // Compare LOCAL calendar dates, not ISO substrings — a 5pm PT signup
-    // ISO-formats to the next UTC day, which would mis-mark Wednesday's
-    // first-real-day session as "you're joining mid-day."
-    const d = new Date();
-    const localToday = `${d.getFullYear()}-${String(
-      d.getMonth() + 1
-    ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const t = new Date(trial);
-    const localTrial = `${t.getFullYear()}-${String(
-      t.getMonth() + 1
-    ).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+    // Saved-tz calendar day (same frame as selectedDate/isToday/now), so the
+    // day-1 "joining mid-day" gate matches the rest of Today even when the
+    // device zone differs from the saved zone. dateKeyInTz uses Intl in the
+    // saved zone, so it still avoids the 5pm-PT UTC-substring pitfall.
+    const localToday = dateKeyInTz(tz);
+    const localTrial = dateKeyInTz(tz, new Date(trial));
     if (localTrial !== localToday) return false;
     if (prog.done > 0) return false; // engaged → resume normal
-    const now = nowMinutesInTz(tz);
+    const now = nowMin;
     return timeline.some((it) => {
       const m = effectiveMinutes(it, settings);
       return m != null && m < now;
     });
-  }, [isToday, state.settings.trialStartDate, prog.done, timeline, settings, tz]);
+  }, [isToday, state.settings.trialStartDate, prog.done, timeline, settings, tz, nowMin]);
 
   /** The most-leveraged morning behavior — what tomorrow "kicks off with". */
   const tomorrowFirstFocus = useMemo(() => {
@@ -744,11 +750,17 @@ export default function TodayPage() {
     const cbIdx = blockOrder[cb] ?? 0;
     const windowGone = (b: string) =>
       b in blockOrder && blockOrder[b] <= cbIdx - 2;
-    const now = nowMinutesInTz(tz);
+    const now = nowMin;
     const STALE_MIN = 90; // overdue by more than this → its window has passed
+    // Wake-relative so a bed-anchored item that resolves past midnight (e.g. a
+    // 1:00am wind-down) isn't read as ~23h overdue while the user is still in
+    // the prior evening — rebase both onto [wake, wake+1440).
+    const [wh, wm] = (settings.wakeTime || "7:00").split(":").map(Number);
+    const wakeM = (wh || 0) * 60 + (wm || 0);
+    const rel = (x: number) => (x < wakeM ? x + 1440 : x);
     const tooStale = (i: TimelineItem) => {
       const m = effectiveMinutes(i, settings);
-      return m != null && now - m > STALE_MIN;
+      return m != null && rel(now) - rel(m) > STALE_MIN;
     };
     const candidates = timeline.filter(
       (i) =>
@@ -766,18 +778,26 @@ export default function TodayPage() {
     return [...candidates].sort((a, b) =>
       compareUpNext(upNextRank(a, settings, now), upNextRank(b, settings, now))
     )[0];
-  }, [timeline, log, settings, snoozed, cb, overnight, tz]);
+  }, [timeline, log, settings, snoozed, cb, overnight, nowMin]);
 
   const activeSuggestions = useMemo<Suggestion[]>(
     () => suggestions(state).filter((s) => !dismissed.includes(s.id)),
     [state, dismissed]
   );
 
-  const displayDate = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  // Saved-tz day, derived from selectedDate (the same key the scrubber +
+  // timeline use), so the eyebrow can't show a different calendar day than the
+  // rest of Today after travel. Parsing YYYY-MM-DD at local midnight renders
+  // that exact calendar date (tz-stable).
+  const displayDate = useMemo(
+    () =>
+      new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+    [selectedDate]
+  );
 
   if (loading) {
     return (
@@ -935,7 +955,7 @@ export default function TodayPage() {
                 Back to today
               </button>
             )}
-            {isToday && state.currentStreak >= 2 && (
+            {isToday && liveStreak >= 2 && (
               <span
                 className="ml-auto flex items-center gap-1 rounded-[var(--r-pill)] px-2.5 py-1 text-[12px] font-bold"
                 style={{
@@ -945,7 +965,7 @@ export default function TodayPage() {
                 }}
               >
                 <Icon name="flame" size={12} />
-                {state.currentStreak}
+                {liveStreak}
               </span>
             )}
           </div>
@@ -1618,8 +1638,8 @@ export default function TodayPage() {
               </p>
               <div className="relative mt-4 flex items-center justify-between">
                 <span className="text-[11px] font-medium text-[var(--text-4)]">
-                  {state.currentStreak >= 2 && prog.done === 0
-                    ? `Keep your ${state.currentStreak}-day streak alive`
+                  {liveStreak >= 2 && prog.done === 0
+                    ? `Keep your ${liveStreak}-day streak alive`
                     : prog.done > 0
                     ? `${prog.done} done — keep the thread going`
                     : "First one sets the tone"}
@@ -1749,7 +1769,6 @@ export default function TodayPage() {
         <div className="flex flex-col gap-7">
           {BLOCKS.map((block, bIdx) => {
             const items = timeline.filter((i) => i.block === block);
-            if (items.length === 0) return null;
             const visibleItems = items.filter((i) => !i.muted);
             const optionalItems = items.filter((i) => i.muted);
             const optKey = `opt:${block}`;
@@ -1765,6 +1784,12 @@ export default function TodayPage() {
               selDayIdx,
               state.settings.safetyFlags ?? {}
             );
+            // Render the section if it has EITHER behaviors or supplements. A
+            // supplement-only block (e.g. an "anytime" stack) must still show
+            // its SupplementBlockCard — otherwise those supplements are
+            // invisible AND permanently block "day complete".
+            if (items.length === 0 && blockSupplements.length === 0)
+              return null;
             const baseItems =
               visibleItems.length > 0 ? visibleItems : items;
             const behaviorDone = baseItems.filter((i) =>

@@ -9,8 +9,8 @@ import {
   adapt,
   isDone,
 } from "@/lib/engine";
-import { resolveMinutes, nowMinutes } from "@/lib/time";
-import { getTz, dateKeyInTz, dayIndexInTz } from "@/lib/tz";
+import { resolveMinutes } from "@/lib/time";
+import { getTz, dateKeyInTz, dayIndexInTz, nowMinutesInTz } from "@/lib/tz";
 import {
   pushAvailable,
   subscribeToPush,
@@ -105,7 +105,10 @@ export default function Reminders() {
       compileTimeline(state, dayIdx),
       adapt(state).mode
     );
-    const now = nowMinutes();
+    // tz-aware: deltas use the same wall-clock basis as the target so an
+    // in-tab reminder fires at the right local time (and doesn't drift ~60min
+    // across a DST transition like nowMinutes()'s device-clock did).
+    const now = nowMinutesInTz(tz);
 
     const timers: number[] = [];
     let scheduled = 0;

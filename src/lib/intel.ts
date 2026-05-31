@@ -8,7 +8,7 @@ import type { AppState, DailyLog, TimeBlock, TrustTier } from "./types";
 import { compileTimeline, type TimelineItem } from "./engine";
 import { packById } from "./packs";
 import { activePacks } from "./knowledge";
-import { effectiveMinutes, nowMinutes } from "./time";
+import { effectiveMinutes, nowMinutes, parseHM } from "./time";
 import { getInsightTemplate, renderTemplate } from "./knowledge";
 import { getTz, dateKeyInTz, addDaysToKey, dayIndexOfKeyInTz } from "./tz";
 import { evidenceRank } from "./governance";
@@ -851,7 +851,13 @@ export function upNextRank(
   const ev = evidenceRank(it.evidenceTier);
   const m = effectiveMinutes(it, settings);
   if (m == null) return { tier: 2, lev, diff: 0, ev };
-  const diff = m - now;
+  // Wake-relative diff so a post-midnight time (e.g. a 1am wind-down) read
+  // while the user is still in the prior evening reads as "due in N min", not
+  // ~23h overdue. rel() rebases both onto [wake, wake+1440); it's the identity
+  // for normal daytime times (m,now >= wake), so existing ordering is unchanged.
+  const wake = parseHM(settings.wakeTime);
+  const rel = (x: number) => (x < wake ? x + 1440 : x);
+  const diff = rel(m) - rel(now);
   return { tier: diff <= 0 ? 0 : 1, lev, diff, ev };
 }
 
