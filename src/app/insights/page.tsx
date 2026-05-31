@@ -18,6 +18,8 @@ import {
 } from "@/lib/intel";
 import { getAccess } from "@/lib/entitlements";
 import { UpgradeCTA } from "@/components/PremiumGate";
+import ConsistencyCalendar from "@/components/ConsistencyCalendar";
+import { getTz } from "@/lib/tz";
 import { compileTimeline } from "@/lib/engine";
 import { personalModel, identityReflection } from "@/lib/reflect";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
@@ -321,6 +323,17 @@ export default function InsightsPage() {
               </div>
             </div>
           </motion.div>
+        )}
+
+        {/* Consistency calendar — the days you showed up, over time. Renders
+            from the (peek-delayed for free) intelState, once there's enough
+            history to be meaningful. */}
+        {loggedDays >= 3 && (
+          <ConsistencyCalendar
+            logs={intelState.dailyLogs}
+            tz={getTz(intelState.settings)}
+            weeks={12}
+          />
         )}
 
         {/* "Your next habit" — the growth counterpart to the friction
