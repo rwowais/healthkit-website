@@ -772,7 +772,12 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
   return {
     mode: "normal",
     headline: "Today",
-    tone: "A calm, complete day. Move through it block by block — momentum over perfection.",
+    // A steady day should still feel *assessed*, not generic — the
+    // research magnet for this audience is "it read me and decided."
+    // "Nothing needs easing" is honest whether or not they checked in
+    // (the engine looked for a reason to lighten and found none) and
+    // reads as a deliberate call rather than a stock greeting.
+    tone: "Nothing needs easing today — your day holds its full shape. Move through it block by block; momentum over perfection.",
     reasons: s.bioConcern ? [s.bioConcern] : [],
   };
 }

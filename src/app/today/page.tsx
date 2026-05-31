@@ -1143,37 +1143,52 @@ export default function TodayPage() {
             )}
             {adaptation.reasons.length > 0 && (
               <div className="mt-4">
-                <button
-                  onClick={() => setShowWhy((v) => !v)}
-                  className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-3)]"
-                >
-                  <Icon name="info" size={12} />
-                  Why today looks like this
-                  <Icon
-                    name="chevron"
-                    size={12}
-                    className={showWhy ? "rotate-90" : ""}
+                {/* Top reason shown inline — not hidden behind a tap.
+                    This audience wants the *why* behind the read visible
+                    (e.g. Attia publicly dissects why his recovery number
+                    is what it is). The expander holds any remaining ones. */}
+                <p className="flex items-start gap-2 text-[12.5px] leading-relaxed text-[var(--text-2)]">
+                  <span
+                    className="mt-[7px] h-1 w-1 shrink-0 rounded-full"
+                    style={{ background: accent }}
                   />
-                </button>
-                {showWhy && (
-                  <motion.ul
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    className="mt-2.5 space-y-1.5 overflow-hidden"
-                  >
-                    {adaptation.reasons.map((r) => (
-                      <li
-                        key={r}
-                        className="flex items-center gap-2 text-[12.5px] text-[var(--text-2)]"
+                  <span>{adaptation.reasons[0]}</span>
+                </p>
+                {adaptation.reasons.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setShowWhy((v) => !v)}
+                      className="mt-2.5 flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-3)]"
+                    >
+                      <Icon name="info" size={12} />
+                      More on today
+                      <Icon
+                        name="chevron"
+                        size={12}
+                        className={showWhy ? "rotate-90" : ""}
+                      />
+                    </button>
+                    {showWhy && (
+                      <motion.ul
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2.5 space-y-1.5 overflow-hidden"
                       >
-                        <span
-                          className="h-1 w-1 rounded-full"
-                          style={{ background: accent }}
-                        />
-                        {r}
-                      </li>
-                    ))}
-                  </motion.ul>
+                        {adaptation.reasons.slice(1).map((r) => (
+                          <li
+                            key={r}
+                            className="flex items-center gap-2 text-[12.5px] text-[var(--text-2)]"
+                          >
+                            <span
+                              className="h-1 w-1 rounded-full"
+                              style={{ background: accent }}
+                            />
+                            {r}
+                          </li>
+                        ))}
+                      </motion.ul>
+                    )}
+                  </>
                 )}
               </div>
             )}
