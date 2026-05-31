@@ -1507,6 +1507,46 @@ export interface BehaviorAtom extends BehaviorDef {
  */
 const STANDALONE_ATOMS: BehaviorDef[] = [
   B({
+    canonicalKey: "sleep-regularity",
+    timingReason:
+      "Anchored to bedtime — the goal is a CONSISTENT bed/wake time (even weekends); regularity matters as much as how long you sleep.",
+    title: "Consistent sleep–wake time",
+    block: "evening",
+    anchor: "bed",
+    offsetMin: 0,
+    dose: "Same time ±30 min nightly",
+    rationale:
+      "Keeping bed and wake times steady stabilizes your circadian rhythm — one of the strongest, most-overlooked levers for sleep quality, energy, and metabolic health.",
+    evidence:
+      "Sleep-timing regularity independently predicts health outcomes — in large cohorts an irregular schedule tracks with worse cardiometabolic markers and higher all-cause mortality risk, beyond total sleep duration.",
+    evidenceTier: "established",
+    recommendedBy: ["Clinical research"],
+    icon: "moon",
+    leverage: 3,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "weighted-vest-walk",
+    timingReason:
+      "Anytime that fits — a daytime walk that doubles as light cardio plus load-bearing for bone and muscle.",
+    title: "Weighted-vest walk",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 420,
+    dose: "20–40 min, 10–20% bodyweight",
+    rationale:
+      "Adding load to an easy walk raises the cardio plus bone/muscle stimulus without the recovery cost of hard training — an efficient longevity add-on.",
+    evidence:
+      "Weighted walking (rucking) increases energy expenditure and mechanical loading versus unloaded walking; the longevity-specific mortality evidence is still emerging, so treat the bone/muscle benefit as promising rather than proven.",
+    evidenceTier: "emerging",
+    category: "workout",
+    intensity: "moderate",
+    recommendedBy: ["Longevity research"],
+    icon: "dumbbell",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
     canonicalKey: "gratitude-journal",
     timingReason:
       "Evening — naming what went well primes the brain for rest and shifts the next-day baseline.",
