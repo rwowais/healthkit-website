@@ -1783,7 +1783,12 @@ export default function TodayPage() {
             const blockTotal = baseItems.length + blockSupplements.length;
             const cbIdx = BLOCKS.indexOf(cb);
             const isCurrent = !overnight && block === cb;
-            const isPast = bIdx < cbIdx;
+            // Block index vs current block is correct in the wake-anchored
+            // frame (earlier index = earlier in the user's day = past) — but
+            // NOT overnight, where cb is the prior "evening" tail yet the
+            // blocks below belong to the upcoming day. So nothing is "past"
+            // during the overnight rest state (fixes the midnight pre-dimming).
+            const isPast = !overnight && bIdx < cbIdx;
             const fullyDone = blockTotal > 0 && blockDone === blockTotal;
             const collapsed =
               isPast && fullyDone && !openBlocks[block];
