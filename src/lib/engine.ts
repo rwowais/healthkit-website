@@ -1603,6 +1603,27 @@ export function blockIntelligence(
     };
   }
 
+  // 2b. Authored soft interactions — a calm synergy / ordering / timing
+  // note for two behaviors BOTH active today, surfaced once in the block
+  // where one of them lives. Read from the published bundle
+  // (resolvedInteractions) so admins can add notes with no code change.
+  // A firm conflict is a mute (handled by applyConflictMutes), never a
+  // note, so it's skipped here.
+  {
+    const presentToday = new Set(allDayItems.map((i) => effectiveKey(i)));
+    const inThisBlock = new Set(today.map((i) => effectiveKey(i)));
+    for (const ix of resolvedInteractions()) {
+      if (ix.type === "conflict" && ix.severity === "firm") continue;
+      if (!ix.nudge || !ix.nudge.trim()) continue;
+      if (!presentToday.has(ix.aKey) || !presentToday.has(ix.bKey)) continue;
+      if (!inThisBlock.has(ix.aKey) && !inThisBlock.has(ix.bKey)) continue;
+      return {
+        kind: ix.type === "synergy" ? "combo" : "training",
+        text: ix.nudge.trim(),
+      };
+    }
+  }
+
   // 3. Overstuffed block — the catch-all. When more than 5 visible
   // behaviors land in one block (especially evening), point at the
   // essentials and let the rest land if they land.

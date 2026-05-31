@@ -29,6 +29,7 @@ import {
   applyConflictMutes,
   compileTimeline,
   shapeTimeline,
+  blockIntelligence,
   type TimelineItem,
 } from "@/lib/engine";
 import { getDefaultState } from "@/lib/storage";
@@ -209,6 +210,32 @@ const sunlightPack: ProtocolPack = {
   ],
 };
 
+// A curated evening behavior, paired with morning-sunlight to test that a
+// soft synergy surfaces as a block note.
+const windDownPack: ProtocolPack = {
+  id: "test-wind",
+  name: "Test Wind-down",
+  tagline: "t",
+  goal: "custom",
+  accent: "x",
+  icon: "moon",
+  source: "official",
+  durationLabel: "x",
+  behaviors: [
+    {
+      canonicalKey: "wind-down",
+      title: "Wind down",
+      block: "evening",
+      anchor: "bed",
+      offsetMin: -45,
+      rationale: "r",
+      icon: "moon",
+      leverage: 3,
+      kind: "action",
+    },
+  ],
+};
+
 function stateWith(installed: string[]): AppState {
   return { ...getDefaultState(), installedPacks: installed };
 }
@@ -315,5 +342,71 @@ describe("published bundle interactions reach the engine (end-to-end)", () => {
     const items = compileTimeline(st, 0, [sunlightPack, officialNoIntense]);
     const shaped = shapeTimeline(items, "normal", {});
     expect(isMuted(shaped, "morning-sunlight")).toBe(true);
+  });
+});
+
+// ── Phase 4: soft interactions surface as calm block notes ─────────────
+describe("Phase 4: soft interactions surface as calm block notes", () => {
+  afterEach(() => resetKnowledge());
+
+  it("a published soft synergy becomes a block note (rendered by Today)", () => {
+    const st = stateWith(["test-light", "test-wind"]);
+    const tl = compileTimeline(st, 0, [sunlightPack, windDownPack]);
+    // nothing published → the morning block has no note
+    expect(blockIntelligence(tl, "morning", 0)).toBeNull();
+    applyPublishedBundle({
+      ...builtinBundle(),
+      version: 1,
+      interactions: [
+        {
+          aKey: "morning-sunlight",
+          bKey: "wind-down",
+          type: "synergy",
+          severity: "soft",
+          nudge: "Morning light makes your target bedtime feel natural.",
+        },
+      ],
+    });
+    const note = blockIntelligence(tl, "morning", 0);
+    expect(note?.text).toContain("Morning light");
+    expect(note?.kind).toBe("combo");
+  });
+
+  it("a firm conflict is a mute, never a block note", () => {
+    const st = stateWith(["test-light", "test-burnout"]);
+    const tl = compileTimeline(st, 0, [sunlightPack, officialNoIntense]);
+    applyPublishedBundle({
+      ...builtinBundle(),
+      version: 1,
+      interactions: [
+        {
+          aKey: "no-intense",
+          bKey: "morning-sunlight",
+          type: "conflict",
+          severity: "firm",
+          nudge: "should not appear as a note",
+        },
+      ],
+    });
+    expect(blockIntelligence(tl, "morning", 0)).toBeNull();
+  });
+
+  it("no note unless BOTH behaviors are present today", () => {
+    const st = stateWith(["test-light"]);
+    const tl = compileTimeline(st, 0, [sunlightPack]); // wind-down absent
+    applyPublishedBundle({
+      ...builtinBundle(),
+      version: 1,
+      interactions: [
+        {
+          aKey: "morning-sunlight",
+          bKey: "wind-down",
+          type: "synergy",
+          severity: "soft",
+          nudge: "Morning light makes your target bedtime feel natural.",
+        },
+      ],
+    });
+    expect(blockIntelligence(tl, "morning", 0)).toBeNull();
   });
 });
