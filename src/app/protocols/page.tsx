@@ -10,6 +10,7 @@ import { useAppState } from "@/hooks/useAppState";
 import {
   packById,
   listBehaviorAtoms,
+  matchAtom,
   customCanonicalKey,
   type BehaviorAtom,
 } from "@/lib/packs";
@@ -115,6 +116,11 @@ export default function ProtocolsPage() {
   const [addMode, setAddMode] = useState<"library" | "custom">("library");
   const [atomQuery, setAtomQuery] = useState("");
   const atoms = useMemo(() => listBehaviorAtoms(), []);
+  // Phase 7: while someone free-types a custom behavior, surface a matching
+  // library atom so they can LINK it (derivedFrom) and inherit the whole
+  // intelligence layer — timing, evidence, interactions — instead of a thin
+  // custom the engine can't see. Conservative match; opt-in.
+  const suggestedAtom = useMemo(() => matchAtom(bDraft.title), [bDraft.title]);
   const filteredAtoms = useMemo(() => {
     const q = atomQuery.trim().toLowerCase();
     // Filter out atoms already in the draft so the picker never shows
@@ -1054,6 +1060,45 @@ export default function ProtocolsPage() {
                   placeholder="Behavior title"
                   className="w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3 py-2.5 text-[14px] text-[var(--text-1)] outline-none"
                 />
+                {suggestedAtom && (
+                  <div
+                    className="flex items-center gap-2 rounded-[var(--r-sm)] px-3 py-2"
+                    style={{
+                      background:
+                        "color-mix(in srgb, var(--readiness) 12%, var(--surface-3))",
+                      border: "1px solid var(--hairline)",
+                    }}
+                  >
+                    <span className="flex-1 text-[12px] leading-snug text-[var(--text-2)]">
+                      Looks like{" "}
+                      <strong className="text-[var(--text-1)]">
+                        {suggestedAtom.title}
+                      </strong>{" "}
+                      in our library — link it so it gets smart timing,
+                      evidence, and interactions.
+                    </span>
+                    <button
+                      onClick={() => {
+                        pickAtomToDraft(suggestedAtom);
+                        setBDraft({
+                          title: "",
+                          block: "morning",
+                          time: "",
+                          dose: "",
+                          rationale: "",
+                          timingReason: "",
+                        });
+                      }}
+                      className="press tr-fast shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold"
+                      style={{
+                        background: "var(--readiness)",
+                        color: "var(--bg)",
+                      }}
+                    >
+                      Link it
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-1 rounded-[10px] bg-[var(--surface-3)] p-1">
                   {BLOCKS.map((bl) => (
                     <button

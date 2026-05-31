@@ -2644,6 +2644,32 @@ export function listBehaviorAtoms(): BehaviorAtom[] {
 }
 
 /**
+ * Best-effort match of a free-typed custom title to a known library atom,
+ * so a user typing "cold plunge" can be OFFERED the curated "Cold plunge"
+ * (with its timing, evidence + interaction hooks via derivedFrom) instead
+ * of a thin custom that the intelligence layer can't see. CONSERVATIVE on
+ * purpose: exact normalized title, or the typed title fully CONTAINS a
+ * specific atom title (>= 5 chars, whole-phrase). Returns null below that
+ * bar so a suggestion never nags with a wrong guess. Opt-in — the caller
+ * only offers it; linking is always the user's explicit choice.
+ */
+export function matchAtom(title: string): BehaviorAtom | null {
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const t = norm(title);
+  if (t.length < 3) return null;
+  const atoms = listBehaviorAtoms();
+  const exact = atoms.find((a) => norm(a.title) === t);
+  if (exact) return exact;
+  const padded = ` ${t} `;
+  const contained = atoms
+    .map((a) => ({ a, at: norm(a.title) }))
+    .filter(({ at }) => at.length >= 5 && padded.includes(` ${at} `))
+    .sort((x, y) => y.at.length - x.at.length);
+  return contained.length ? contained[0].a : null;
+}
+
+/**
  * Generate a user-namespaced canonical key for a custom behavior. The
  * `custom:` prefix is what the engine looks for to skip the hardcoded
  * intelligence-layer key matches (RESTRAINT_KEYS, CIRCADIAN, etc.) —

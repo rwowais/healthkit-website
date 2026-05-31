@@ -34,6 +34,7 @@ import {
 } from "@/lib/engine";
 import { compareUpNext, type UpNextRank } from "@/lib/intel";
 import { isOvernight } from "@/lib/time";
+import { matchAtom } from "@/lib/packs";
 import { getDefaultState } from "@/lib/storage";
 import type { Interaction, AppState, ProtocolPack } from "@/lib/types";
 
@@ -461,5 +462,29 @@ describe("isOvernight — past bedtime is a rest state, not 'evening'", () => {
     expect(isOvernight(s, at(9, 0))).toBe(false);
     expect(isOvernight(s, at(13, 0))).toBe(false);
     expect(isOvernight(s, at(21, 0))).toBe(false); // 9 PM — real evening
+  });
+});
+
+// ── Phase 7: custom → atom matching ────────────────────────────────────
+describe("matchAtom — offer to link a free-typed custom to a library atom", () => {
+  it("matches an exact title (case / punctuation-insensitive)", () => {
+    expect(matchAtom("Weighted-vest walk")?.canonicalKey).toBe(
+      "weighted-vest-walk"
+    );
+    expect(matchAtom("consistent sleep-wake time")?.canonicalKey).toBe(
+      "sleep-regularity"
+    );
+  });
+
+  it("matches when the typed title contains a specific atom title", () => {
+    expect(matchAtom("my weighted-vest walk before work")?.canonicalKey).toBe(
+      "weighted-vest-walk"
+    );
+  });
+
+  it("returns null for novel / too-short input (never nags with a wrong guess)", () => {
+    expect(matchAtom("zzzqx nonsense behavior")).toBeNull();
+    expect(matchAtom("a")).toBeNull();
+    expect(matchAtom("")).toBeNull();
   });
 });
