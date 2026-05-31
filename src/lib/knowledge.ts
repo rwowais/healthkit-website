@@ -17,7 +17,7 @@
  * P1 establishes + proves this seam. Nothing consumes the override yet
  * (no publish path exists until P3) — the app stays byte-identical.
  */
-import type { ProtocolPack } from "./types";
+import type { ProtocolPack, Interaction } from "./types";
 import { PACKS } from "./packs";
 
 export const BUNDLE_SCHEMA = 1;
@@ -43,6 +43,10 @@ export interface KnowledgeBundle {
   /** Optional — CMS-authored adaptation rules. Older bundles omit this;
    *  adapt() then runs purely on the hardcoded baseline. */
   adaptationRules?: import("./cms/rules").AdaptationRule[];
+  /** Optional — CMS-authored behavior-to-behavior interactions. Older
+   *  bundles omit this; the engine then runs purely on the built-in
+   *  CONFLICT_PAIRS fallback. */
+  interactions?: Interaction[];
 }
 
 /** Stable, order-independent checksum for bundle integrity. */
@@ -51,6 +55,7 @@ export function bundleChecksum(b: {
   config: Record<string, unknown>;
   insightTemplates?: unknown;
   adaptationRules?: unknown;
+  interactions?: unknown;
 }): string {
   const canon = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(canon);
@@ -75,6 +80,12 @@ export function bundleChecksum(b: {
   }
   if (Array.isArray(b.adaptationRules) && b.adaptationRules.length > 0) {
     canonObj.r = b.adaptationRules;
+  }
+  // Same backward-compat rule: only fold interactions into the checksum
+  // when present AND non-empty, so every bundle published before this
+  // field existed still validates on read-back.
+  if (Array.isArray(b.interactions) && b.interactions.length > 0) {
+    canonObj.x = b.interactions;
   }
   const s = JSON.stringify(canon(canonObj));
   let h = 0;
@@ -176,6 +187,11 @@ export function activeInsightTemplates(): InsightTemplate[] {
 /** Current CMS adaptation rules from the active bundle (empty if none). */
 export function activeAdaptationRules(): import("./cms/rules").AdaptationRule[] {
   return published?.adaptationRules ?? [];
+}
+
+/** Current CMS-authored interactions from the active bundle (empty if none). */
+export function activeInteractions(): Interaction[] {
+  return published?.interactions ?? [];
 }
 
 /**

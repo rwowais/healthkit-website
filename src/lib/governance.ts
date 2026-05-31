@@ -498,6 +498,29 @@ export function evidenceFraming(
   return null;
 }
 
+/**
+ * Numeric rank for sorting behaviors most → least evidence-based (lower =
+ * stronger). Built on the EXISTING evidenceTier union — not a new scale:
+ *   established (0) > emerging (1) > foundational/absent (2) > exploratory (3).
+ * "Absent" = the atom makes no extraordinary claim (a walk, hydration); it
+ * sorts NEUTRALLY in the middle, never punished below experimental
+ * compounds. "exploratory" (thin human data) sorts last but is never
+ * hidden. Presentation + a final tie-break only — never mutes or
+ * down-weights a behavior.
+ */
+export function evidenceRank(tier?: BehaviorDef["evidenceTier"]): number {
+  switch (tier) {
+    case "established":
+      return 0;
+    case "emerging":
+      return 1;
+    case "exploratory":
+      return 3;
+    default:
+      return 2;
+  }
+}
+
 // ── Inventory + counts (for admin dashboard) ──────────────────────
 
 export interface CatalogInventory {

@@ -486,6 +486,54 @@ export interface BehaviorDef {
 }
 
 /**
+ * A typed relationship between two behaviors — the data-driven
+ * generalization of the hardcoded CONFLICT_PAIRS in engine.ts. Authored
+ * in the CMS (cms_interactions) and threaded through the published
+ * KnowledgeBundle; the built-in conflict pairs stay the always-present
+ * fallback, so the engine behaves identically with no published bundle.
+ *
+ *   conflict — doing both undermines a goal; severity "firm" mutes bKey
+ *              (today's restraint→target behavior), "soft" only notes it.
+ *   timing   — one should sit a certain distance from the other / sleep.
+ *   ordering — sequence within a shared block matters (lift before Zone 2).
+ *   synergy  — they reinforce each other (morning cold + evening sauna).
+ *
+ * aKey/bKey are canonicalKeys, matched at runtime via effectiveKey so
+ * atom-library-derived behaviors participate like their curated origin.
+ * Every record carries an evidence tier + source; a source is only
+ * trusted once a human stamps sourceVerifiedBy/At — nothing ships as a
+ * claim on an unchecked citation.
+ */
+export type InteractionType = "conflict" | "timing" | "ordering" | "synergy";
+export type InteractionSeverity = "soft" | "firm";
+
+export interface Interaction {
+  /** canonicalKey of the first behavior. */
+  aKey: string;
+  /** canonicalKey of the second behavior. */
+  bKey: string;
+  type: InteractionType;
+  /** "firm" mutes bKey (conflict only); "soft" surfaces a calm note. */
+  severity: InteractionSeverity;
+  /** Calm, one-line user-facing explanation. */
+  nudge: string;
+  /** For timing / ordering rules: desired separation in hours. */
+  gapHours?: number;
+  /** Optional structured window/bound, e.g. { windowMin: 360 }. */
+  bound?: Record<string, number>;
+  /** Optional gate, e.g. { goal: "muscle" } — only applies under condition. */
+  condition?: Record<string, string>;
+  /** "a_to_b" (default) or "mutual". */
+  direction?: "a_to_b" | "mutual";
+  evidenceTier?: BehaviorDef["evidenceTier"];
+  /** Source URL. MUST be human-verified before an interaction is published. */
+  source?: string;
+  /** Stamped when a human opens the source and confirms it supports the claim. */
+  sourceVerifiedBy?: string;
+  sourceVerifiedAt?: string;
+}
+
+/**
  * Trust tier — the *governance class* of a behavior. The system uses
  * this internally to decide what role a behavior plays in the
  * intelligence layer. Users never see these labels directly; the

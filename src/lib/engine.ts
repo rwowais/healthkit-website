@@ -12,11 +12,12 @@ import type {
   BehaviorDef,
   BehaviorOverride,
   DailyLog,
+  Interaction,
   ProtocolPack,
   TimeBlock,
   TrustTier,
 } from "./types";
-import { activePacks, activeAdaptationRules } from "./knowledge";
+import { activePacks, activeAdaptationRules, activeInteractions } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
 import { effectiveMinutes } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
@@ -992,6 +993,98 @@ export const CONFLICT_PAIRS: ReadonlyArray<{
 export const RESTRAINT_KEYS = new Set(CONFLICT_PAIRS.map((p) => p.restraint));
 export const TRAINING_KEYS = new Set(CONFLICT_PAIRS.map((p) => p.target));
 
+/**
+ * Built-in behavior interactions — the hardcoded CONFLICT_PAIRS expressed
+ * as firm-conflict Interaction records. DERIVED from CONFLICT_PAIRS so the
+ * two can never drift. This is the always-present fallback; any
+ * CMS-published interactions (activeInteractions()) layer on top.
+ */
+export const BUILTIN_INTERACTIONS: readonly Interaction[] = CONFLICT_PAIRS.map(
+  (p) => ({
+    aKey: p.restraint,
+    bKey: p.target,
+    type: "conflict" as const,
+    severity: "firm" as const,
+    nudge: "",
+  })
+);
+
+/**
+ * The active interaction set: built-in pairs unioned with any CMS-published
+ * interactions, deduped by aKey|bKey|type (a published record overrides a
+ * built-in of the same identity). With no published bundle this is exactly
+ * BUILTIN_INTERACTIONS, so the engine behaves identically to the hardcoded
+ * CONFLICT_PAIRS.
+ */
+export function resolvedInteractions(): Interaction[] {
+  const byKey = new Map<string, Interaction>();
+  for (const i of [...BUILTIN_INTERACTIONS, ...activeInteractions()]) {
+    byKey.set(`${i.aKey}|${i.bKey}|${i.type}`, i);
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Apply firm-conflict mutes to a timeline, data-driven from interactions.
+ * Pure + exported for testing. Generalizes the old hardcoded CONFLICT_PAIRS
+ * reconciliation, preserving its exact muteReason format:
+ *  - only firm "conflict" interactions mute (soft / timing / ordering /
+ *    synergy are calm notes, handled elsewhere),
+ *  - only a CURATED behavior may act as a restraint (the Phase-1 safety
+ *    whitelist — a user's custom/derived "no-intense" can't silence their
+ *    real curated training),
+ *  - each muted target names the responsible pack for provenance.
+ */
+export function applyConflictMutes(
+  items: TimelineItem[],
+  interactions: readonly Interaction[]
+): TimelineItem[] {
+  const firm = interactions.filter(
+    (i) => i.type === "conflict" && i.severity === "firm"
+  );
+  if (firm.length === 0) return items;
+  const restraintKeys = new Set(firm.map((i) => i.aKey));
+  const activeRestraints = new Set(
+    items
+      .filter(
+        (it) =>
+          restraintKeys.has(effectiveKey(it)) &&
+          !it.muted &&
+          it.trustTier === "curated"
+      )
+      .map((it) => effectiveKey(it))
+  );
+  if (activeRestraints.size === 0) return items;
+  const targetsToMute = new Map<string, string>(); // target key → restraint key
+  for (const i of firm) {
+    if (activeRestraints.has(i.aKey)) targetsToMute.set(i.bKey, i.aKey);
+  }
+  // Name the responsible pack so the sheet can surface a specific
+  // "Your Burnout Recovery protocol asks you to skip…" line.
+  const restraintPack = new Map<string, string>(); // restraint key → pack name
+  for (const it of items) {
+    const k = effectiveKey(it);
+    if (
+      restraintKeys.has(k) &&
+      !it.muted &&
+      it.trustTier === "curated" &&
+      it.fromPacks?.[0]
+    ) {
+      if (!restraintPack.has(k)) restraintPack.set(k, it.fromPacks[0]);
+    }
+  }
+  return items.map((it) => {
+    const restraint = targetsToMute.get(effectiveKey(it));
+    if (!restraint) return it;
+    const pack = restraintPack.get(restraint) ?? "";
+    return {
+      ...it,
+      muted: true,
+      muteReason: `conflict pair: "${restraint}"${pack ? ` | from: ${pack}` : ""}`,
+    };
+  });
+}
+
 /** A deterministic, stable rank: leverage desc, then block, then key. */
 function stableRank(a: TimelineItem, b: TimelineItem): number {
   return (
@@ -1351,50 +1444,12 @@ export function shapeTimeline(
   // together, which would mute strength training when the only active
   // restraint was "delay-first-meal" (no relation). The pair list keeps
   // mutes precise.
-  // effectiveKey: atom-library-derived custom restraints still trigger
-  // their target mutes; atom-library-derived custom targets still get
-  // muted by curated restraints. Pure-free-text customs (no derivedFrom)
-  // are correctly invisible to this pass.
-  const activeRestraints = new Set(
-    shaped
-      .filter(
-        (it) => RESTRAINT_KEYS.has(effectiveKey(it)) && !it.muted
-      )
-      .map((it) => effectiveKey(it))
-  );
-  if (activeRestraints.size > 0) {
-    const targetsToMute = new Map<string, string>(); // key → restraint key
-    for (const pair of CONFLICT_PAIRS) {
-      if (activeRestraints.has(pair.restraint))
-        targetsToMute.set(pair.target, pair.restraint);
-    }
-    // Index restraints by their source pack so we can name the
-    // protocol responsible when surfacing the mute reason. A user
-    // who installs Burnout Recovery and sees strength training
-    // "Resting today" deserves to know WHICH protocol asked for it
-    // — that's the entire point of provenance.
-    const restraintPack = new Map<string, string>(); // restraint key → pack name
-    for (const it of shaped) {
-      const k = effectiveKey(it);
-      if (RESTRAINT_KEYS.has(k) && !it.muted && it.fromPacks?.[0]) {
-        if (!restraintPack.has(k)) restraintPack.set(k, it.fromPacks[0]);
-      }
-    }
-    shaped = shaped.map((it) => {
-      const restraint = targetsToMute.get(effectiveKey(it));
-      if (!restraint) return it;
-      // Encode both the rule key and the source pack name so the
-      // sheet can surface a specific "Your Burnout Recovery
-      // protocol asks you to skip..." line. Pipe-delimited so the
-      // humanizer can parse without ambiguity.
-      const pack = restraintPack.get(restraint) ?? "";
-      return {
-        ...it,
-        muted: true,
-        muteReason: `conflict pair: "${restraint}"${pack ? ` | from: ${pack}` : ""}`,
-      };
-    });
-  }
+  // Always-on conflict reconciliation — now data-driven. The built-in
+  // CONFLICT_PAIRS (as firm-conflict interactions) unioned with any
+  // CMS-published interactions; with no published bundle this is
+  // byte-identical to the hardcoded pairs. The official-only restraint
+  // whitelist + provenance naming live inside applyConflictMutes.
+  shaped = applyConflictMutes(shaped, resolvedInteractions());
 
   // Graduate mastered behaviors to maintenance (collapsed) — never the
   // keystone, which is the one thing we always keep front-and-centre.
