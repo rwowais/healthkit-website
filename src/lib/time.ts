@@ -53,10 +53,10 @@ export function nowMinutes(): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-export function currentBlock(settings: {
-  wakeTime: string;
-  bedtime: string;
-}): TimeBlock {
+export function currentBlock(
+  settings: { wakeTime: string; bedtime: string },
+  now: number = nowMinutes()
+): TimeBlock {
   // Compute the user's current block by mapping "now" into a
   // wake-aligned frame: minutes elapsed since their most recent
   // wake (0..1439). This gives a single linear coordinate for
@@ -69,7 +69,9 @@ export function currentBlock(settings: {
   // user was clearly starting a new day. Fix splits the overnight
   // window 60/40 — first 60% is winding-down ("evening"), last
   // 40% is pre-dawn ("morning") so a 4:30 AM user sees morning.
-  const now = nowMinutes();
+  // `now` is minutes since local midnight; a caller in a different
+  // timezone (Today passes nowMinutesInTz) supplies a tz-aware value so
+  // the block matches the user's actual local time, not the device clock.
   const wake = parseHM(settings.wakeTime);
   let bed = parseHM(settings.bedtime);
   if (bed <= wake) bed += 1440;

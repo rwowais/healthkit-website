@@ -50,10 +50,16 @@ import {
   isActionable,
   keystone,
   weeklyReview,
-  nowMinutes,
   isOvernight,
   type Suggestion,
 } from "@/lib/intel";
+import {
+  getTz,
+  dateKeyInTz,
+  dayIndexOfKeyInTz,
+  addDaysToKey,
+  nowMinutesInTz,
+} from "@/lib/tz";
 import { identityReflection } from "@/lib/reflect";
 import BehaviorSheet from "@/components/BehaviorSheet";
 import { Skeleton, Eyebrow, Sheet, Button } from "@/components/ui";
@@ -114,12 +120,6 @@ function relTime(t: number | null, now: number): string {
   return `In ~${h}h`;
 }
 
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")}`;
-}
 function greeting(cb: string, overnight: boolean) {
   // Driven from the SAME wake-anchored source as the block header so the
   // two can never contradict (no "Good morning" over an "Evening — NOW"
@@ -233,12 +233,22 @@ export default function TodayPage() {
     }
   }, [loading, state.settings.completedOnboarding, router]);
 
-  const cb = useMemo(() => currentBlock(settings), [settings]);
+  // Timezone-consistent with the engine + storage: every date-key and
+  // "now" on Today is derived from getTz(settings) (the user's saved zone),
+  // NOT the device clock — so the day the UI reads/writes always matches
+  // the day the engine logs to, even after a flight near midnight. When the
+  // device zone equals the saved zone (the usual case) this is identical to
+  // the old device-based values.
+  const tz = useMemo(() => getTz(settings), [settings]);
+  const cb = useMemo(
+    () => currentBlock(settings, nowMinutesInTz(tz)),
+    [settings, tz]
+  );
 
   // Persist snooze/dismiss so a refresh doesn't resurrect everything the
   // user deliberately cleared (it felt broken, not adaptive). Snooze is
   // scoped to today; dismissed suggestions persist by id.
-  const todayKey = dateKey(new Date());
+  const todayKey = dateKeyInTz(tz);
   const readLS = (k: string): string[] => {
     if (typeof window === "undefined") return [];
     try {
@@ -469,23 +479,22 @@ export default function TodayPage() {
     setTrialExtAcked(t);
   };
   const [offset, setOffset] = useState(0);
-  const selectedDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - offset);
-    return dateKey(d);
-  }, [offset]);
+  const selectedDate = useMemo(
+    () => addDaysToKey(dateKeyInTz(tz), -offset),
+    [tz, offset]
+  );
   const isToday = offset === 0;
   // Past bedtime but before the pre-dawn run-up to wake: a calm "rest"
   // state, NOT the resurrected evening block. Drives the header greeting,
   // suppresses the Up Next hero, and gates the partial-close copy.
   const overnight = useMemo(
-    () => isToday && isOvernight(settings),
-    [isToday, settings]
+    () => isToday && isOvernight(settings, nowMinutesInTz(tz)),
+    [isToday, settings, tz]
   );
-  const selDayIdx = useMemo(() => {
-    const j = new Date(selectedDate + "T00:00:00").getDay();
-    return j === 0 ? 6 : j - 1;
-  }, [selectedDate]);
+  const selDayIdx = useMemo(
+    () => dayIndexOfKeyInTz(tz, selectedDate),
+    [tz, selectedDate]
+  );
   const dateLabel = useMemo(() => {
     if (offset === 0) return "Today";
     if (offset === 1) return "Yesterday";
@@ -684,12 +693,12 @@ export default function TodayPage() {
     ).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
     if (localTrial !== localToday) return false;
     if (prog.done > 0) return false; // engaged → resume normal
-    const now = nowMinutes();
+    const now = nowMinutesInTz(tz);
     return timeline.some((it) => {
       const m = effectiveMinutes(it, settings);
       return m != null && m < now;
     });
-  }, [isToday, state.settings.trialStartDate, prog.done, timeline, settings]);
+  }, [isToday, state.settings.trialStartDate, prog.done, timeline, settings, tz]);
 
   /** The most-leveraged morning behavior — what tomorrow "kicks off with". */
   const tomorrowFirstFocus = useMemo(() => {
@@ -735,7 +744,7 @@ export default function TodayPage() {
     const cbIdx = blockOrder[cb] ?? 0;
     const windowGone = (b: string) =>
       b in blockOrder && blockOrder[b] <= cbIdx - 2;
-    const now = nowMinutes();
+    const now = nowMinutesInTz(tz);
     const STALE_MIN = 90; // overdue by more than this → its window has passed
     const tooStale = (i: TimelineItem) => {
       const m = effectiveMinutes(i, settings);
@@ -755,9 +764,9 @@ export default function TodayPage() {
     );
     if (candidates.length === 0) return null;
     return [...candidates].sort((a, b) =>
-      compareUpNext(upNextRank(a, settings), upNextRank(b, settings))
+      compareUpNext(upNextRank(a, settings, now), upNextRank(b, settings, now))
     )[0];
-  }, [timeline, log, settings, snoozed, cb, overnight]);
+  }, [timeline, log, settings, snoozed, cb, overnight, tz]);
 
   const activeSuggestions = useMemo<Suggestion[]>(
     () => suggestions(state).filter((s) => !dismissed.includes(s.id)),
@@ -1516,7 +1525,7 @@ export default function TodayPage() {
               >
                 {relTime(
                   effectiveMinutes(upNext, settings),
-                  nowMinutes()
+                  nowMinutesInTz(tz)
                 ).toUpperCase()}
               </span>
             </div>
@@ -1602,7 +1611,7 @@ export default function TodayPage() {
                   minutesToStart:
                     effectiveMinutes(upNext, settings) != null
                       ? (effectiveMinutes(upNext, settings) as number) -
-                        nowMinutes()
+                        nowMinutesInTz(tz)
                       : null,
                   isKeystone: !!ks && upNext.canonicalKey === ks.key,
                 })}
@@ -1935,7 +1944,7 @@ export default function TodayPage() {
                       </>
                     )}
                     {(() => {
-                      const now = nowMinutes();
+                      const now = nowMinutesInTz(tz);
                       let nowShown = false;
                       return rendered.map((it) => {
                         const done = isDone(log, it.canonicalKey);
