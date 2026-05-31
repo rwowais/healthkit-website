@@ -964,3 +964,65 @@ export function nextBestAddition(state: AppState): NextBehaviorRec | null {
     fromPacks: top.fromOfficialPacks ?? [],
   };
 }
+
+/**
+ * Per-behavior adherence over a recent window — "what's sticking vs slipping".
+ * For each ACTION the user has (merged timeline, supplements excluded), the
+ * rate = days completed / days it was scheduled AND the user engaged at all
+ * (a day with no log is neither credit nor blame — they were simply away).
+ * Honest denominator: only days the behavior was active (daysActive) on a day
+ * the user logged something count toward "scheduled".
+ */
+export interface BehaviorAdherence {
+  key: string;
+  title: string;
+  done: number;
+  scheduled: number;
+  rate: number; // 0..1
+}
+
+export function behaviorAdherence(
+  state: AppState,
+  windowDays = 28
+): BehaviorAdherence[] {
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  const logByDate = new Map(
+    (state.dailyLogs ?? []).map((l) => [l.date, l])
+  );
+
+  // The user's behaviors as they actually appear on the timeline (merged by
+  // canonicalKey, supplements already excluded by compileTimeline). Union all
+  // 7 weekdays so an N×/week behavior is captured on its off-days too.
+  const items = new Map<string, { title: string; daysActive?: boolean[] }>();
+  for (let di = 0; di < 7; di++) {
+    for (const it of compileTimeline(state, di)) {
+      if (!isActionable(it)) continue; // guardrails/reminders aren't "kept"
+      if (!items.has(it.canonicalKey))
+        items.set(it.canonicalKey, {
+          title: it.title,
+          daysActive: it.daysActive,
+        });
+    }
+  }
+
+  const out: BehaviorAdherence[] = [];
+  for (const [key, info] of items) {
+    let done = 0;
+    let scheduled = 0;
+    for (let i = 0; i < windowDays; i++) {
+      const dk = addDaysToKey(today, -i);
+      const log = logByDate.get(dk);
+      if (!log) continue; // a day the user didn't engage — not counted
+      const active =
+        !info.daysActive || info.daysActive[dayIndexOfKeyInTz(tz, dk)];
+      if (!active) continue; // not scheduled that day
+      scheduled++;
+      if (log.behaviorCompletions?.[key]) done++;
+    }
+    if (scheduled >= 3)
+      out.push({ key, title: info.title, done, scheduled, rate: done / scheduled });
+  }
+  out.sort((a, b) => b.rate - a.rate);
+  return out;
+}

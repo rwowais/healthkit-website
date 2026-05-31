@@ -15,10 +15,14 @@ import {
   weeklyReview,
   whatWorks,
   nextBestAddition,
+  behaviorAdherence,
 } from "@/lib/intel";
 import { getAccess } from "@/lib/entitlements";
 import { UpgradeCTA } from "@/components/PremiumGate";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
+import MoodEnergyTrends from "@/components/MoodEnergyTrends";
+import BehaviorReportCard from "@/components/BehaviorReportCard";
+import JournalHistory from "@/components/JournalHistory";
 import { getTz } from "@/lib/tz";
 import { compileTimeline } from "@/lib/engine";
 import { personalModel, identityReflection } from "@/lib/reflect";
@@ -133,6 +137,7 @@ export default function InsightsPage() {
   // leverage curated behavior the user isn't doing yet. Uses full `state`
   // (not the delayed peek): it's a catalog recommendation, not time-series.
   const rec = useMemo(() => nextBestAddition(state), [state]);
+  const adherence = useMemo(() => behaviorAdherence(intelState), [intelState]);
   // Days of real activity logged so far — drives the cold-start
   // "insights forming — ~N to go" countdown (keystone/whatWorks gate at 10).
   const loggedDays = useMemo(
@@ -376,6 +381,12 @@ export default function InsightsPage() {
             </div>
           </button>
         )}
+
+        {/* Reflection set: how you've felt, what's sticking, your journal —
+            each self-gates on having enough data. */}
+        <MoodEnergyTrends logs={intelState.dailyLogs} />
+        <BehaviorReportCard rows={adherence} />
+        <JournalHistory logs={intelState.dailyLogs} />
 
         {/* What matters most — consolidated. Keystone and "Proven for you"
             used to live as twin cards that read as the same idea twice
