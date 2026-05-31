@@ -316,7 +316,7 @@ export function compileTimeline(
     if (it.block === "anytime") continue;
     if (it.block !== it.recommendedBlock) continue;
     const m = effectiveMinutes(it, settings);
-    if (m != null) it.block = blockForMinutes(m);
+    if (m != null) it.block = blockForMinutes(m, settings);
   }
   const clock = (it: TimelineItem) => {
     const m = effectiveMinutes(it, settings);

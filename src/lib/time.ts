@@ -54,45 +54,70 @@ export function nowMinutes(): number {
 }
 
 /**
- * Clock-based day block for a minutes-since-midnight value (0..1439).
- * The day is split by the CLOCK, not by wake time:
+ * The day block for a clock time (minutes since midnight 0..1439), given
+ * the user's wake/bed schedule.
+ *
+ * WAKING HOURS are split purely by the CLOCK — intuitive and wake-time
+ * independent:
  *   Morning    5:00am – 11:59am
  *   Afternoon  12:00pm – 4:59pm
- *   Evening    5:00pm onward, incl. the late-night wind-down before 5am
- * so a behavior always sits under the section that matches the time it's
- * shown at (an 11:30am item is "morning", a 12:30pm item is "afternoon").
+ *   Evening    5:00pm until bedtime (incl. a late night spent still awake)
+ * so a behavior sits under the section that matches the time it's shown at
+ * (11:30am → Morning, 12:30pm → Afternoon).
+ *
+ * The SLEEP window (past bedtime, before the next wake) is the only place
+ * the schedule matters: the clock alone can't tell a late-night wind-down
+ * from a pre-dawn run-up — only your bedtime/wake can. We split that window
+ * 60/40 (wind-down tail → evening, pre-dawn → morning), matching
+ * isOvernight(). In practice Today shows the "rest" state for those hours,
+ * so this label only surfaces for a behavior actually scheduled in the
+ * small hours — where it's now correct (a midnight wind-down reads as
+ * evening; 5am reads as morning) instead of contradictory.
+ *
  * Never returns "anytime" — callers handle untimed items separately.
  */
-export function blockForMinutes(min: number): TimeBlock {
+export function blockForMinutes(
+  min: number,
+  settings: { wakeTime: string; bedtime: string }
+): TimeBlock {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  const wake = parseHM(settings.wakeTime);
+  let bed = parseHM(settings.bedtime);
+  if (bed <= wake) bed += 1440;
+  // Place m on the same [wake, wake+1440) timeline to test awake vs asleep.
+  const t = m < wake ? m + 1440 : m;
+  if (t >= bed) {
+    // Sleep window — judge by proximity to bed vs the next wake.
+    const night = wake + 1440 - bed;
+    const sinceBed = t - bed;
+    return sinceBed > night * 0.6 ? "morning" : "evening";
+  }
+  // Awake — pure clock. 5pm→bed (incl. just-past-midnight while still up)
+  // is the evening wind-down.
   if (m >= 300 && m < 720) return "morning"; // 5:00am – 11:59am
   if (m >= 720 && m < 1020) return "afternoon"; // 12:00pm – 4:59pm
-  return "evening"; // 5:00pm – 4:59am
+  return "evening"; // 5:00pm – bedtime
 }
 
 /**
- * The user's current day block — CLOCK-BASED (see blockForMinutes). This
- * is the live "NOW" block on Today, and it deliberately uses the SAME
- * clock split as the section a behavior is filed under, so the section
- * header and the NOW highlight can never disagree (an 11:30am item and
- * the NOW marker are both "morning").
+ * The user's current day block (see blockForMinutes). This is the live
+ * "NOW" block on Today, and it uses the SAME rule as the section a behavior
+ * is filed under, so the header and the NOW highlight can never disagree
+ * (an 11:30am item and the NOW marker are both "morning").
  *
  * The post-bedtime "rest / the day is done" state is a SEPARATE concern,
  * handled by isOvernight(); when that's true the Today surface shows the
  * rest state and ignores this value for the NOW highlight.
  *
- * `settings` is accepted for call-site stability (every caller already
- * passes it) and possible future schedule-aware tweaks; the clock split
- * itself needs only the time. `now` is minutes since local midnight — a
- * caller in another timezone (Today passes nowMinutesInTz) supplies a
- * tz-aware value so the block matches the user's actual local time.
+ * `now` is minutes since local midnight — a caller in another timezone
+ * (Today passes nowMinutesInTz) supplies a tz-aware value so the block
+ * matches the user's actual local time, not the device clock.
  */
 export function currentBlock(
   settings: { wakeTime: string; bedtime: string },
   now: number = nowMinutes()
 ): TimeBlock {
-  void settings;
-  return blockForMinutes(now);
+  return blockForMinutes(now, settings);
 }
 
 /**

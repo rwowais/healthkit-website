@@ -1,11 +1,13 @@
 /**
  * Clock-based day blocks.
  *
- * The day is split by the CLOCK — Morning before noon, Afternoon noon–5pm,
- * Evening 5pm onward — NOT by wake time. A behavior is filed under the
- * section that matches the actual clock time it resolves to, and the live
- * "NOW" block uses the same split, so the section header and the time shown
- * under it can never contradict.
+ * Waking hours are split by the CLOCK — Morning before noon, Afternoon
+ * noon–5pm, Evening 5pm until bedtime — independent of wake time. The small
+ * hours (past bedtime, before the next wake) defer to the sleep schedule,
+ * since only that can tell a late-night wind-down from a pre-dawn run-up. A
+ * behavior is filed under the section matching its time, and the live "NOW"
+ * block uses the same rule, so the header and the time under it can't
+ * contradict.
  *
  * Regression target: "Zone 2 movement · 11:30 AM" was filed under an
  * "AFTERNOON" header for an early riser, because its block was a static
@@ -19,26 +21,45 @@ import { getDefaultState } from "@/lib/storage";
 import type { AppState } from "@/lib/types";
 
 const HM = (h: number, m = 0) => h * 60 + m;
+// Wide-awake schedule so daytime clock times are clearly in the awake window.
+const AWAKE = { wakeTime: "05:00", bedtime: "23:00" };
+const NORMAL = { wakeTime: "07:00", bedtime: "22:30" };
+const NIGHT_OWL = { wakeTime: "09:00", bedtime: "01:00" };
 
-describe("blockForMinutes — clock boundaries", () => {
-  it("splits the day by the clock", () => {
-    expect(blockForMinutes(HM(5, 0))).toBe("morning"); // 5:00am
-    expect(blockForMinutes(HM(11, 59))).toBe("morning"); // 11:59am
-    expect(blockForMinutes(HM(12, 0))).toBe("afternoon"); // 12:00pm
-    expect(blockForMinutes(HM(16, 59))).toBe("afternoon"); // 4:59pm
-    expect(blockForMinutes(HM(17, 0))).toBe("evening"); // 5:00pm
-    expect(blockForMinutes(HM(23, 0))).toBe("evening"); // 11:00pm
+describe("blockForMinutes — clock through the waking day", () => {
+  it("splits the waking day by the clock", () => {
+    expect(blockForMinutes(HM(5, 0), AWAKE)).toBe("morning"); // 5:00am
+    expect(blockForMinutes(HM(11, 59), AWAKE)).toBe("morning"); // 11:59am
+    expect(blockForMinutes(HM(12, 0), AWAKE)).toBe("afternoon"); // noon
+    expect(blockForMinutes(HM(16, 59), AWAKE)).toBe("afternoon"); // 4:59pm
+    expect(blockForMinutes(HM(17, 0), AWAKE)).toBe("evening"); // 5:00pm
+    expect(blockForMinutes(HM(22, 0), AWAKE)).toBe("evening"); // 10:00pm
   });
 
-  it("treats the late-night tail (before 5am) as evening wind-down", () => {
-    expect(blockForMinutes(HM(0, 30))).toBe("evening"); // 12:30am
-    expect(blockForMinutes(HM(4, 59))).toBe("evening"); // 4:59am
+  it("5am is morning (the start of the day), never evening", () => {
+    expect(blockForMinutes(HM(5, 0), NORMAL)).toBe("morning");
+    expect(blockForMinutes(HM(5, 0), AWAKE)).toBe("morning");
   });
 
   it("normalizes wrapped / out-of-range minutes", () => {
-    expect(blockForMinutes(HM(13))).toBe("afternoon");
-    expect(blockForMinutes(HM(13) + 1440)).toBe("afternoon"); // wraps a day
-    expect(blockForMinutes(-30)).toBe("evening"); // 11:30pm previous day
+    expect(blockForMinutes(HM(13), NORMAL)).toBe("afternoon");
+    expect(blockForMinutes(HM(13) + 1440, NORMAL)).toBe("afternoon"); // wraps
+  });
+});
+
+describe("blockForMinutes — the small hours defer to the sleep schedule", () => {
+  it("a wind-down BEFORE bedtime reads as evening, even past midnight", () => {
+    // Night owl, still up at 12:30am with a 1:00am bedtime — their evening.
+    expect(blockForMinutes(HM(0, 30), NIGHT_OWL)).toBe("evening");
+  });
+
+  it("the dead of night just after bed is the evening wind-down tail", () => {
+    expect(blockForMinutes(HM(2, 0), NORMAL)).toBe("evening"); // 2am, after 10:30pm bed
+  });
+
+  it("pre-dawn, approaching wake, reads as morning", () => {
+    expect(blockForMinutes(HM(6, 0), NORMAL)).toBe("morning"); // 6am, before 7am wake
+    expect(blockForMinutes(HM(8, 0), NIGHT_OWL)).toBe("morning"); // 8am, before 9am wake
   });
 });
 
