@@ -32,6 +32,7 @@ import {
   blockIntelligence,
   type TimelineItem,
 } from "@/lib/engine";
+import { compareUpNext, type UpNextRank } from "@/lib/intel";
 import { getDefaultState } from "@/lib/storage";
 import type { Interaction, AppState, ProtocolPack } from "@/lib/types";
 
@@ -408,5 +409,33 @@ describe("Phase 4: soft interactions surface as calm block notes", () => {
       ],
     });
     expect(blockIntelligence(tl, "morning", 0)).toBeNull();
+  });
+});
+
+// ── Phase 5: evidence rank is the strictly-last Up Next tiebreak ───────
+describe("Phase 5: evidence rank tiebreaks Up Next (never overrides)", () => {
+  const R = (tier: 0 | 1 | 2, lev: number, diff: number, ev: number): UpNextRank => ({
+    tier,
+    lev,
+    diff,
+    ev,
+  });
+
+  it("breaks an otherwise-exact tie toward stronger evidence", () => {
+    // identical tier/lev/diff → established (ev 0) sorts before exploratory (ev 3)
+    expect(compareUpNext(R(0, 3, 0, 0), R(0, 3, 0, 3))).toBeLessThan(0);
+    expect(compareUpNext(R(1, 2, 5, 0), R(1, 2, 5, 3))).toBeLessThan(0);
+    expect(compareUpNext(R(2, 2, 0, 0), R(2, 2, 0, 3))).toBeLessThan(0);
+  });
+
+  it("never overrides urgency or leverage", () => {
+    // higher leverage wins even with weaker evidence
+    expect(compareUpNext(R(0, 3, 0, 3), R(0, 2, 0, 0))).toBeLessThan(0);
+    // more-overdue wins even with weaker evidence (tier 0: diff before ev)
+    expect(compareUpNext(R(0, 3, -10, 3), R(0, 3, -5, 0))).toBeLessThan(0);
+    // sooner wins in tier 1 even with weaker evidence
+    expect(compareUpNext(R(1, 2, 5, 3), R(1, 2, 20, 0))).toBeLessThan(0);
+    // a lower tier always wins regardless of evidence
+    expect(compareUpNext(R(0, 1, 0, 3), R(1, 3, 0, 0))).toBeLessThan(0);
   });
 });

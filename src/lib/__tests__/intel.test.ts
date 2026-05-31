@@ -349,8 +349,9 @@ describe("Up Next ranking — compareUpNext / isActionable", () => {
   const r = (
     tier: 0 | 1 | 2,
     lev: number,
-    diff: number
-  ): UpNextRank => ({ tier, lev, diff });
+    diff: number,
+    ev = 2
+  ): UpNextRank => ({ tier, lev, diff, ev });
 
   const sortRanks = (xs: UpNextRank[]) => [...xs].sort(compareUpNext);
 

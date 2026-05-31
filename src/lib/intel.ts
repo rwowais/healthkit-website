@@ -11,6 +11,7 @@ import { activePacks } from "./knowledge";
 import { effectiveMinutes, nowMinutes } from "./time";
 import { getInsightTemplate, renderTemplate } from "./knowledge";
 import { getTz, dateKeyInTz, addDaysToKey, dayIndexOfKeyInTz } from "./tz";
+import { evidenceRank } from "./governance";
 
 export {
   resolveMinutes,
@@ -834,6 +835,10 @@ export interface UpNextRank {
   lev: number;
   /** scheduled minutes − now; 0 for anytime (unused at tier 2). */
   diff: number;
+  /** evidence rank (governance.evidenceRank; lower = stronger). The
+   *  STRICTLY-LAST tiebreak — only separates otherwise-identical
+   *  candidates, never reorders by urgency or leverage. */
+  ev: number;
 }
 
 export function upNextRank(
@@ -842,27 +847,32 @@ export function upNextRank(
   now: number = nowMinutes()
 ): UpNextRank {
   const lev = (it.leverage as number) ?? 1;
+  const ev = evidenceRank(it.evidenceTier);
   const m = effectiveMinutes(it, settings);
-  if (m == null) return { tier: 2, lev, diff: 0 };
+  if (m == null) return { tier: 2, lev, diff: 0, ev };
   const diff = m - now;
-  return { tier: diff <= 0 ? 0 : 1, lev, diff };
+  return { tier: diff <= 0 ? 0 : 1, lev, diff, ev };
 }
 
 /** Comparator for upNextRank — negative = a is surfaced before b. */
 export function compareUpNext(a: UpNextRank, b: UpNextRank): number {
   if (a.tier !== b.tier) return a.tier - b.tier;
   if (a.tier === 0) {
-    // due/overdue: highest leverage first, then most-overdue (diff asc).
+    // due/overdue: highest leverage first, then most-overdue (diff asc),
+    // then stronger evidence (strictly-last tiebreak).
     if (a.lev !== b.lev) return b.lev - a.lev;
-    return a.diff - b.diff;
+    if (a.diff !== b.diff) return a.diff - b.diff;
+    return a.ev - b.ev;
   }
   if (a.tier === 1) {
-    // upcoming: soonest first, then highest leverage.
+    // upcoming: soonest first, then highest leverage, then stronger evidence.
     if (a.diff !== b.diff) return a.diff - b.diff;
-    return b.lev - a.lev;
+    if (a.lev !== b.lev) return b.lev - a.lev;
+    return a.ev - b.ev;
   }
-  // anytime: highest leverage first.
-  return b.lev - a.lev;
+  // anytime: highest leverage first, then stronger evidence.
+  if (a.lev !== b.lev) return b.lev - a.lev;
+  return a.ev - b.ev;
 }
 
 /** Is this behavior a discrete action (vs a guardrail/reminder)? */

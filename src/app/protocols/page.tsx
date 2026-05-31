@@ -22,6 +22,7 @@ import {
   shapeTimeline,
   type TimelineItem,
 } from "@/lib/engine";
+import { evidenceRank } from "@/lib/governance";
 import BehaviorSheet from "@/components/BehaviorSheet";
 import {
   Eyebrow,
@@ -61,6 +62,9 @@ export default function ProtocolsPage() {
   // run, and what's available to add.
   const [viewMode, setViewMode] = useState<"yours" | "discover">("yours");
   const [discoverOpen, setDiscoverOpen] = useState<ProtocolPack | null>(null);
+  // Sort the discover-sheet behaviors by evidence strength (most-proven
+  // first) — the visible half of the founder's evidence-rank ask.
+  const [evSort, setEvSort] = useState(false);
   // Hash routing: /protocols#discover opens the catalog directly. Lets
   // the old /library route redirect here while landing on the right
   // segment, and lets onboarding deep-link "browse more protocols"
@@ -733,8 +737,24 @@ export default function ProtocolsPage() {
             <p className="mt-3 text-[14px] leading-relaxed text-[var(--text-2)]">
               {discoverOpen.tagline}
             </p>
-            <div className="mt-6 space-y-1.5">
-              {discoverOpen.behaviors.map((b) => (
+            <div className="mt-5 flex items-center justify-between">
+              <span className="t-eyebrow">Behaviors</span>
+              <button
+                onClick={() => setEvSort((v) => !v)}
+                className="press tr-fast text-[12px] font-medium text-[var(--text-3)] underline-offset-2 hover:underline"
+              >
+                Sort: {evSort ? "evidence strength" : "by block"}
+              </button>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {(evSort
+                ? [...discoverOpen.behaviors].sort(
+                    (a, b) =>
+                      evidenceRank(a.evidenceTier) -
+                      evidenceRank(b.evidenceTier)
+                  )
+                : discoverOpen.behaviors
+              ).map((b) => (
                 <div
                   key={b.canonicalKey}
                   className="flex items-center gap-3 rounded-[var(--r-md)] px-3.5 py-3"
@@ -757,7 +777,25 @@ export default function ProtocolsPage() {
                       {b.dose ?? b.rationale}
                     </p>
                   </div>
-                  <span className="t-caption capitalize">{b.block}</span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {b.evidenceTier && (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize"
+                        style={{
+                          background: "var(--surface-3)",
+                          color:
+                            b.evidenceTier === "established"
+                              ? "var(--vitality)"
+                              : b.evidenceTier === "emerging"
+                                ? "var(--readiness)"
+                                : "var(--warm)",
+                        }}
+                      >
+                        {b.evidenceTier}
+                      </span>
+                    )}
+                    <span className="t-caption capitalize">{b.block}</span>
+                  </div>
                 </div>
               ))}
             </div>
