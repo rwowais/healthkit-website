@@ -87,3 +87,29 @@ export function currentBlock(settings: {
   const sinceBed = sinceWake - dayLength;
   return sinceBed > nightLength * 0.6 ? "morning" : "evening";
 }
+
+/**
+ * True during the dead-of-night: the user is PAST their bedtime but not yet
+ * in the pre-dawn run-up to wake. currentBlock() still returns "evening"
+ * here (kept for back-compat), but the Today surface should treat this as a
+ * distinct "rest / the day is done" state — it must NOT resurrect the
+ * finished evening block as the live "NOW", and must NOT promote a daytime
+ * behavior as the Up Next action. Mirrors currentBlock's overnight branch:
+ * isOvernight ⟺ that branch lands on the "evening" (first 60%) side. The
+ * pre-dawn tail (early risers) stays "morning" and is NOT overnight.
+ */
+export function isOvernight(
+  settings: { wakeTime: string; bedtime: string },
+  now: number = nowMinutes()
+): boolean {
+  const wake = parseHM(settings.wakeTime);
+  let bed = parseHM(settings.bedtime);
+  if (bed <= wake) bed += 1440;
+  const dayLength = bed - wake;
+  let sinceWake = now - wake;
+  if (sinceWake < 0) sinceWake += 1440;
+  if (sinceWake < dayLength) return false; // still within the awake day
+  const nightLength = 1440 - dayLength;
+  const sinceBed = sinceWake - dayLength;
+  return sinceBed <= nightLength * 0.6;
+}

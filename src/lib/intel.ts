@@ -19,6 +19,7 @@ export {
   fmtClock,
   nowMinutes,
   currentBlock,
+  isOvernight,
 } from "./time";
 
 /**

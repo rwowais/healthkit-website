@@ -51,6 +51,7 @@ import {
   keystone,
   weeklyReview,
   nowMinutes,
+  isOvernight,
   type Suggestion,
 } from "@/lib/intel";
 import { identityReflection } from "@/lib/reflect";
@@ -119,10 +120,13 @@ function dateKey(d: Date) {
     "0"
   )}-${String(d.getDate()).padStart(2, "0")}`;
 }
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
+function greeting(cb: string, overnight: boolean) {
+  // Driven from the SAME wake-anchored source as the block header so the
+  // two can never contradict (no "Good morning" over an "Evening — NOW"
+  // header). Past bedtime, pre-wake → a calm "Good night".
+  if (overnight) return "Good night";
+  if (cb === "morning") return "Good morning";
+  if (cb === "afternoon") return "Good afternoon";
   return "Good evening";
 }
 
@@ -471,6 +475,13 @@ export default function TodayPage() {
     return dateKey(d);
   }, [offset]);
   const isToday = offset === 0;
+  // Past bedtime but before the pre-dawn run-up to wake: a calm "rest"
+  // state, NOT the resurrected evening block. Drives the header greeting,
+  // suppresses the Up Next hero, and gates the partial-close copy.
+  const overnight = useMemo(
+    () => isToday && isOvernight(settings),
+    [isToday, settings]
+  );
   const selDayIdx = useMemo(() => {
     const j = new Date(selectedDate + "T00:00:00").getDay();
     return j === 0 ? 6 : j - 1;
@@ -700,16 +711,22 @@ export default function TodayPage() {
   const partialClose =
     isToday &&
     !dayComplete &&
+    !overnight &&
     cb === "evening" &&
     prog.total > 0 &&
     prog.done > 0;
 
   const upNext = useMemo(() => {
+    // Past bedtime (overnight): the day is done — never promote an action.
+    // The calm rest card renders instead of an Up Next hero.
+    if (overnight) return null;
     // Don't promote a behavior as the "next action" once its window is well
-    // past — e.g. morning sunlight at 8pm is no longer doable even though
-    // it's technically "overdue". Drop timed behaviors whose block is 2+
-    // blocks behind the current block (a morning item when it's evening).
-    // They stay in the timeline; they just stop being the Up Next hero.
+    // past — e.g. morning sunlight at 8pm, or a noon workout still surfaced
+    // at 9pm. Two guards, both of which keep the item in the timeline and
+    // only stop it being the Up Next HERO:
+    //   (1) block-behind: drop a timed item 2+ blocks behind the current one;
+    //   (2) clock-stale: drop anything overdue by more than STALE_MIN, so a
+    //       9-hours-past workout can never be the "do this next" card.
     const blockOrder: Record<string, number> = {
       morning: 0,
       afternoon: 1,
@@ -718,6 +735,12 @@ export default function TodayPage() {
     const cbIdx = blockOrder[cb] ?? 0;
     const windowGone = (b: string) =>
       b in blockOrder && blockOrder[b] <= cbIdx - 2;
+    const now = nowMinutes();
+    const STALE_MIN = 90; // overdue by more than this → its window has passed
+    const tooStale = (i: TimelineItem) => {
+      const m = effectiveMinutes(i, settings);
+      return m != null && now - m > STALE_MIN;
+    };
     const candidates = timeline.filter(
       (i) =>
         !i.muted &&
@@ -727,13 +750,14 @@ export default function TodayPage() {
         // are constraints you hold, not actions you tap to do next — they
         // stay in the timeline but never become the Up Next hero.
         isActionable(i) &&
-        !windowGone(i.block)
+        !windowGone(i.block) &&
+        !tooStale(i)
     );
     if (candidates.length === 0) return null;
     return [...candidates].sort((a, b) =>
       compareUpNext(upNextRank(a, settings), upNextRank(b, settings))
     )[0];
-  }, [timeline, log, settings, snoozed, cb]);
+  }, [timeline, log, settings, snoozed, cb, overnight]);
 
   const activeSuggestions = useMemo<Suggestion[]>(
     () => suggestions(state).filter((s) => !dismissed.includes(s.id)),
@@ -769,7 +793,7 @@ export default function TodayPage() {
           <div>
             <Eyebrow>{displayDate}</Eyebrow>
             <h1 className="t-title mt-2 text-[var(--text-1)]">
-              {greeting()}
+              {greeting(cb, overnight)}
               {state.settings.name ? `, ${state.settings.name}` : ""}
             </h1>
           </div>
@@ -870,7 +894,7 @@ export default function TodayPage() {
         <div>
           <Eyebrow>{displayDate}</Eyebrow>
           <h1 className="t-title mt-2 text-[var(--text-1)]">
-            {greeting()}
+            {greeting(cb, overnight)}
             {state.settings.name ? `, ${state.settings.name}` : ""}
           </h1>
           <div className="mt-3 flex items-center gap-3">
@@ -1455,6 +1479,29 @@ export default function TodayPage() {
           </div>
         )}
 
+        {/* Overnight (past bedtime, pre-wake): a calm rest state instead of
+            promoting an action — the expired evening block is no longer "NOW"
+            and Up Next is suppressed (upNext is null here). */}
+        {!firstDaySoft && overnight && !dayComplete && (
+          <div
+            className="mb-4 rounded-[var(--r-xl)] p-5"
+            style={{
+              background:
+                "linear-gradient(155deg, color-mix(in srgb, var(--sleep) 10%, var(--surface-1)), var(--surface-1) 70%)",
+              border: "1px solid var(--hairline)",
+            }}
+          >
+            <Eyebrow color="var(--sleep)">Overnight</Eyebrow>
+            <p className="mt-2 text-[16px] font-bold leading-snug text-[var(--text-1)]">
+              It&rsquo;s past your bedtime — nothing&rsquo;s due now
+            </p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-3)]">
+              The kindest thing you can do for tomorrow is sleep. Your day
+              picks back up after you wake.
+            </p>
+          </div>
+        )}
+
         {/* Up next — the single intelligent focus */}
         {!firstDaySoft && isToday && !dayComplete && !partialClose && upNext && (
           <div>
@@ -1735,7 +1782,7 @@ export default function TodayPage() {
             const blockDone = behaviorDone + suppHandled;
             const blockTotal = baseItems.length + blockSupplements.length;
             const cbIdx = BLOCKS.indexOf(cb);
-            const isCurrent = block === cb;
+            const isCurrent = !overnight && block === cb;
             const isPast = bIdx < cbIdx;
             const fullyDone = blockTotal > 0 && blockDone === blockTotal;
             const collapsed =

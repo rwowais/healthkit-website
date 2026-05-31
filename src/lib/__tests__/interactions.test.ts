@@ -33,6 +33,7 @@ import {
   type TimelineItem,
 } from "@/lib/engine";
 import { compareUpNext, type UpNextRank } from "@/lib/intel";
+import { isOvernight } from "@/lib/time";
 import { getDefaultState } from "@/lib/storage";
 import type { Interaction, AppState, ProtocolPack } from "@/lib/types";
 
@@ -437,5 +438,28 @@ describe("Phase 5: evidence rank tiebreaks Up Next (never overrides)", () => {
     expect(compareUpNext(R(1, 2, 5, 3), R(1, 2, 20, 0))).toBeLessThan(0);
     // a lower tier always wins regardless of evidence
     expect(compareUpNext(R(0, 1, 0, 3), R(1, 3, 0, 0))).toBeLessThan(0);
+  });
+});
+
+// ── Day-boundary: the post-bedtime "rest" window (persona-sweep fix) ────
+describe("isOvernight — past bedtime is a rest state, not 'evening'", () => {
+  const s = { wakeTime: "07:00", bedtime: "22:30" };
+  const at = (h: number, m: number) => h * 60 + m;
+
+  it("is true just past bedtime through the dead of night", () => {
+    expect(isOvernight(s, at(0, 26))).toBe(true); // 12:26 AM — the reported bug
+    expect(isOvernight(s, at(23, 15))).toBe(true); // 11:15 PM (45 min past bed)
+    expect(isOvernight(s, at(3, 0))).toBe(true); // 3:00 AM
+  });
+
+  it("is false in the pre-dawn run-up to wake (early risers see morning)", () => {
+    expect(isOvernight(s, at(4, 0))).toBe(false); // pre-dawn morning tail
+    expect(isOvernight(s, at(6, 30))).toBe(false); // just before wake
+  });
+
+  it("is false during the awake day (incl. genuine evening)", () => {
+    expect(isOvernight(s, at(9, 0))).toBe(false);
+    expect(isOvernight(s, at(13, 0))).toBe(false);
+    expect(isOvernight(s, at(21, 0))).toBe(false); // 9 PM — real evening
   });
 });
