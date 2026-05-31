@@ -64,6 +64,7 @@ export async function previewNextBundle(): Promise<KnowledgeBundle> {
     config: cms.config,
     insightTemplates: cms.insightTemplates,
     adaptationRules: cms.adaptationRules,
+    interactions: cms.interactions,
   };
 }
 
@@ -454,6 +455,7 @@ export async function publishBundle(
         config: cms.config,
         insightTemplates: cms.insightTemplates,
         adaptationRules: cms.adaptationRules,
+        interactions: cms.interactions,
       }
     : buildCatalogBundle(version);
   const checksum = bundleChecksum(bundle);

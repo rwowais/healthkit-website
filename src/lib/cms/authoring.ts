@@ -8,7 +8,7 @@
  */
 import { getSupabase, getUserId } from "../supabase";
 import { activePacks } from "../knowledge";
-import type { ProtocolPack, BehaviorDef, TimeBlock } from "../types";
+import type { ProtocolPack, BehaviorDef, TimeBlock, Interaction } from "../types";
 
 type SB = NonNullable<ReturnType<typeof getSupabase>>;
 
@@ -765,6 +765,120 @@ export async function deleteAdaptationRule(
   }
 }
 
+// ── Behavior interactions (Phase 3: runtime adopts via the bundle) ──
+export interface InteractionRow {
+  id: string;
+  a_key: string;
+  b_key: string;
+  type: string;
+  severity: string;
+  gap_hours: number | null;
+  bound: unknown;
+  condition: unknown;
+  direction: string;
+  nudge: string;
+  evidence_tier: string | null;
+  source: string | null;
+  source_verified_by: string | null;
+  source_verified_at: string | null;
+  status: string;
+  version: number;
+}
+export async function listInteractions(): Promise<InteractionRow[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("cms_interactions")
+      .select(
+        "id, a_key, b_key, type, severity, gap_hours, bound, condition, direction, nudge, evidence_tier, source, source_verified_by, source_verified_at, status, version"
+      )
+      .order("a_key");
+    return (data ?? []) as InteractionRow[];
+  } catch {
+    return [];
+  }
+}
+export async function saveInteraction(
+  r: Partial<InteractionRow> & { a_key: string; b_key: string; type: string }
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  if (!r.a_key.trim() || !r.b_key.trim())
+    return { ok: false, reason: "Both behavior keys are required." };
+  try {
+    const row: Record<string, unknown> = {
+      a_key: r.a_key.trim(),
+      b_key: r.b_key.trim(),
+      type: r.type,
+      severity: r.severity ?? "soft",
+      gap_hours: r.gap_hours ?? null,
+      bound: r.bound ?? null,
+      condition: r.condition ?? null,
+      direction: r.direction ?? "a_to_b",
+      nudge: r.nudge ?? "",
+      evidence_tier: r.evidence_tier ?? null,
+      source: r.source ?? null,
+      status: r.status ?? "draft",
+      version: ((r.version as number | undefined) ?? 0) + 1,
+    };
+    const { error } = r.id
+      ? await sb.from("cms_interactions").update(row).eq("id", r.id)
+      : await sb.from("cms_interactions").insert(row);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Save failed.",
+    };
+  }
+}
+/**
+ * Stamp the human-verification fields on an interaction's source. Required
+ * before a scientific-claim interaction (evidence_tier set) can reach a
+ * published bundle — assembleBundleFromCMS holds back unstamped claims.
+ */
+export async function verifyInteractionSource(
+  id: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const uid = await getUserId();
+    const { error } = await sb
+      .from("cms_interactions")
+      .update({
+        source_verified_by: uid ?? null,
+        source_verified_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Verify failed.",
+    };
+  }
+}
+export async function deleteInteraction(
+  id: string
+): Promise<{ ok: boolean; reason?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, reason: "Cloud not configured." };
+  try {
+    const { error } = await sb.from("cms_interactions").delete().eq("id", id);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Delete failed.",
+    };
+  }
+}
+
 // ── Recommendation templates (runtime adoption pending) ────────────
 export interface RecTemplateRow {
   id: string;
@@ -1348,6 +1462,7 @@ export interface AssembledBundle {
     trigger: unknown;
     effect: unknown;
   }[];
+  interactions: Interaction[];
 }
 
 export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
@@ -1475,7 +1590,57 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
       /* rules are enrichment; assembly continues without them */
     }
 
-    return { protocols, config, insightTemplates, adaptationRules };
+    // Behavior-to-behavior interactions — only "published" rows, and a
+    // scientific-claim row (evidence_tier set) is held back until a human
+    // has stamped source_verified_at. Nothing ships as a claim on an
+    // unchecked citation (the analog of ai_unverified for behaviors).
+    const interactions: AssembledBundle["interactions"] = [];
+    try {
+      const { data: interactionRows } = await sb
+        .from("cms_interactions")
+        .select(
+          "a_key, b_key, type, severity, gap_hours, bound, condition, direction, nudge, evidence_tier, source, source_verified_at, status"
+        );
+      for (const row of (interactionRows ?? []) as Array<
+        Record<string, unknown>
+      >) {
+        if (row.status !== "published") continue;
+        if (row.evidence_tier && !row.source_verified_at) continue;
+        interactions.push({
+          aKey: String(row.a_key),
+          bKey: String(row.b_key),
+          type: row.type as Interaction["type"],
+          severity: (row.severity as Interaction["severity"]) ?? "soft",
+          nudge: typeof row.nudge === "string" ? row.nudge : "",
+          ...(row.gap_hours != null
+            ? { gapHours: Number(row.gap_hours) }
+            : {}),
+          ...(row.bound ? { bound: row.bound as Record<string, number> } : {}),
+          ...(row.condition
+            ? { condition: row.condition as Record<string, string> }
+            : {}),
+          ...(row.direction
+            ? { direction: row.direction as Interaction["direction"] }
+            : {}),
+          ...(row.evidence_tier
+            ? {
+                evidenceTier: row.evidence_tier as Interaction["evidenceTier"],
+              }
+            : {}),
+          ...(row.source ? { source: String(row.source) } : {}),
+        });
+      }
+    } catch {
+      /* interactions are enrichment; assembly continues without them */
+    }
+
+    return {
+      protocols,
+      config,
+      insightTemplates,
+      adaptationRules,
+      interactions,
+    };
   } catch {
     return null;
   }

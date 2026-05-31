@@ -143,7 +143,8 @@ begin
     'cms_adaptation_rules','cms_insight_templates','cms_explanations',
     'cms_evidence','cms_recommendation_templates',
     'cms_intelligence_config','cms_wearable_mappings',
-    'cms_revisions','cms_audit_log','cms_ai_suggestions'
+    'cms_revisions','cms_audit_log','cms_ai_suggestions',
+    'cms_interactions'
   ] loop
     -- created lazily below; policies (re)applied here after creation
     null;
@@ -210,6 +211,38 @@ create table if not exists public.cms_adaptation_rules (
   priority int not null default 100,
   trigger jsonb not null default '{}'::jsonb,
   effect jsonb not null default '{}'::jsonb,
+  status text not null default 'draft'
+    check (status in ('draft','published','archived')),
+  version int not null default 1,
+  updated_at timestamptz not null default now(),
+  updated_by uuid
+);
+
+-- Behavior-to-behavior interactions — the data-driven generalization of the
+-- hardcoded CONFLICT_PAIRS. Authored here, snapshotted into the published
+-- bundle; the runtime reads it from the bundle, never directly.
+create table if not exists public.cms_interactions (
+  id uuid primary key default gen_random_uuid(),
+  a_key text not null,
+  b_key text not null,
+  type text not null default 'conflict'
+    check (type in ('conflict','timing','ordering','synergy')),
+  severity text not null default 'soft'
+    check (severity in ('soft','firm')),
+  gap_hours numeric,
+  bound jsonb,
+  condition jsonb,
+  direction text not null default 'a_to_b'
+    check (direction in ('a_to_b','mutual')),
+  nudge text not null default '',
+  evidence_tier text
+    check (evidence_tier in ('established','emerging','exploratory')),
+  source text,
+  -- Scientific-claim interactions (evidence_tier set) are held back from
+  -- every published bundle until a human stamps these (assembleBundleFromCMS
+  -- enforces it) — the analog of cms_behaviors.ai_unverified.
+  source_verified_by uuid,
+  source_verified_at timestamptz,
   status text not null default 'draft'
     check (status in ('draft','published','archived')),
   version int not null default 1,
@@ -367,7 +400,8 @@ begin
     'cms_adaptation_rules','cms_insight_templates','cms_explanations',
     'cms_evidence','cms_recommendation_templates',
     'cms_intelligence_config','cms_wearable_mappings',
-    'cms_revisions','cms_audit_log','cms_ai_suggestions'
+    'cms_revisions','cms_audit_log','cms_ai_suggestions',
+    'cms_interactions'
   ] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "admin all" on public.%I', t);

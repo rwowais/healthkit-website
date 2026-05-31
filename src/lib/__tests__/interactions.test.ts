@@ -14,9 +14,14 @@
  * may act as a conflict restraint, so a user's own custom/derived "no
  * intense training" can never silently mute their real curated training.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { evidenceRank, knownCuratedKeys } from "@/lib/governance";
-import { bundleChecksum, builtinBundle } from "@/lib/knowledge";
+import {
+  bundleChecksum,
+  builtinBundle,
+  applyPublishedBundle,
+  resetKnowledge,
+} from "@/lib/knowledge";
 import {
   CONFLICT_PAIRS,
   BUILTIN_INTERACTIONS,
@@ -277,5 +282,38 @@ describe("data-driven conflict seam (interactions)", () => {
     expect(
       isMuted(applyConflictMutes(items, BUILTIN_INTERACTIONS), "strength")
     ).toBe(false);
+  });
+});
+
+// ── Phase 3: a published bundle's interactions reach the engine ────────
+describe("published bundle interactions reach the engine (end-to-end)", () => {
+  afterEach(() => resetKnowledge());
+
+  it("a published firm-conflict interaction takes effect with no code change", () => {
+    const applied = applyPublishedBundle({
+      ...builtinBundle(),
+      version: 1,
+      interactions: [
+        {
+          aKey: "no-intense",
+          bKey: "morning-sunlight",
+          type: "conflict",
+          severity: "firm",
+          nudge: "rest",
+        },
+      ],
+    });
+    expect(applied).toBe(true);
+    // The engine unions the built-in pairs with the published one…
+    expect(
+      resolvedInteractions().some(
+        (i) => i.aKey === "no-intense" && i.bKey === "morning-sunlight"
+      )
+    ).toBe(true);
+    // …and it fires through the real shape path — no code deploy needed.
+    const st = stateWith(["test-light", "test-burnout"]);
+    const items = compileTimeline(st, 0, [sunlightPack, officialNoIntense]);
+    const shaped = shapeTimeline(items, "normal", {});
+    expect(isMuted(shaped, "morning-sunlight")).toBe(true);
   });
 });
