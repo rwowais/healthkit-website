@@ -9,7 +9,7 @@ import {
   adapt,
   isDone,
 } from "@/lib/engine";
-import { resolveMinutes } from "@/lib/time";
+import { resolveMinutes, inQuietHours } from "@/lib/time";
 import { getTz, dateKeyInTz, dayIndexInTz, nowMinutesInTz } from "@/lib/tz";
 import {
   pushAvailable,
@@ -115,8 +115,12 @@ export default function Reminders() {
     for (const it of items) {
       if (scheduled >= 8) break;
       if (it.muted || isDone(log, it.canonicalKey)) continue;
+      // Per-behavior opt-out: the user silenced reminders for this one.
+      if (state.behaviorOverrides?.[it.canonicalKey]?.reminderOff) continue;
       const t = resolveMinutes(it, state.settings);
       if (t == null) continue;
+      // Quiet hours: never fire inside the user's do-not-disturb window.
+      if (inQuietHours(t, state.settings.quietHours)) continue;
       const deltaMin = t - now;
       if (deltaMin <= 0 || deltaMin > 12 * 60) continue;
       scheduled++;

@@ -220,6 +220,37 @@ export default function BehaviorSheet({
           </div>
         </div>
 
+        {/* Per-behavior reminder toggle */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <Eyebrow>Reminder</Eyebrow>
+            <p className="mt-1 text-[12px] text-[var(--text-3)]">
+              Notify me at this behavior&rsquo;s time.
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={!ov.reminderOff}
+            aria-label="Reminder"
+            onClick={() =>
+              patch({ reminderOff: ov.reminderOff ? undefined : true })
+            }
+            className="tap-44 tr-fast h-7 w-12 shrink-0 rounded-full p-1"
+            style={{
+              background: !ov.reminderOff ? color : "var(--surface-3)",
+            }}
+          >
+            <div
+              className="tr-fast h-5 w-5 rounded-full bg-white"
+              style={{
+                transform: !ov.reminderOff
+                  ? "translateX(20px)"
+                  : "translateX(0)",
+              }}
+            />
+          </button>
+        </div>
+
         {/* Personal note */}
         <div>
           <Eyebrow>Your note</Eyebrow>

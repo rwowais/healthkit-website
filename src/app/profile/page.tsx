@@ -397,6 +397,51 @@ export default function ProfilePage() {
             installing to the home screen first.
           </p>
           {s.notificationsEnabled && (
+            <div className="mt-3">
+              <Row label="Quiet hours">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="time"
+                    aria-label="Quiet hours start"
+                    value={s.quietHours?.start ?? ""}
+                    onChange={(e) =>
+                      updateSettings({
+                        quietHours: e.target.value
+                          ? {
+                              start: e.target.value,
+                              end: s.quietHours?.end || "07:00",
+                            }
+                          : undefined,
+                      })
+                    }
+                    className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3 py-2 text-[14px] text-[var(--text-1)] outline-none"
+                  />
+                  <span className="text-[12px] text-[var(--text-4)]">to</span>
+                  <input
+                    type="time"
+                    aria-label="Quiet hours end"
+                    value={s.quietHours?.end ?? ""}
+                    onChange={(e) =>
+                      updateSettings({
+                        quietHours: e.target.value
+                          ? {
+                              start: s.quietHours?.start || "22:00",
+                              end: e.target.value,
+                            }
+                          : undefined,
+                      })
+                    }
+                    className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3 py-2 text-[14px] text-[var(--text-1)] outline-none"
+                  />
+                </div>
+              </Row>
+              <p className="t-caption mt-1 leading-relaxed">
+                No reminders fire between these times — a wind-down window so
+                nothing buzzes overnight. Clear a field to turn it off.
+              </p>
+            </div>
+          )}
+          {s.notificationsEnabled && (
             <button
               onClick={async () => {
                 if (

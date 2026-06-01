@@ -98,6 +98,10 @@ export interface UserSettings {
   subscriptionStatus: "trial" | "active" | "expired" | "cancelled";
   trialStartDate: string;
   notificationsEnabled: boolean;
+  /** Optional do-not-disturb window for reminders, "HH:MM" 24h. A reminder
+   *  whose time falls inside [start, end) — wrapping past midnight, e.g.
+   *  22:00→07:00 — is never scheduled. */
+  quietHours?: { start: string; end: string };
   weekStartsOn: 0 | 1;
   completedOnboarding: boolean;
   primaryGoal?: string;
@@ -606,6 +610,9 @@ export interface BehaviorOverride {
   dose?: string;
   /** Personal note ("my why"). */
   note?: string;
+  /** When true, this behavior never schedules a reminder, even while global
+   *  notifications are on. */
+  reminderOff?: boolean;
 }
 
 // ── Biomarkers ────────────────────────────────────────────────────

@@ -48,6 +48,24 @@ export function fmtClock(min: number): string {
   return `${h12}:${String(m).padStart(2, "0")} ${ap}`;
 }
 
+/**
+ * Is a minutes-since-midnight time inside the user's quiet-hours window?
+ * The window {start,end} is "HH:MM" and may wrap past midnight (e.g.
+ * 22:00→07:00). Used to suppress reminders during do-not-disturb. An empty
+ * or degenerate (start === end) window means "no quiet hours".
+ */
+export function inQuietHours(
+  min: number,
+  quietHours?: { start: string; end: string }
+): boolean {
+  if (!quietHours || !quietHours.start || !quietHours.end) return false;
+  const s = parseHM(quietHours.start);
+  const e = parseHM(quietHours.end);
+  if (s === e) return false;
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return s < e ? m >= s && m < e : m >= s || m < e;
+}
+
 export function nowMinutes(): number {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();

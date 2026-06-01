@@ -15,7 +15,7 @@
  * wake). Now the block follows the clock time, so 11:30 → Morning.
  */
 import { describe, it, expect } from "vitest";
-import { blockForMinutes, currentBlock } from "@/lib/time";
+import { blockForMinutes, currentBlock, inQuietHours } from "@/lib/time";
 import { compileTimeline } from "@/lib/engine";
 import { getDefaultState } from "@/lib/storage";
 import type { AppState } from "@/lib/types";
@@ -158,5 +158,31 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
     expect(evening.length).toBeGreaterThan(1);
     expect(evening[evening.length - 1].canonicalKey).toBe("zone2");
     expect(evening[0].canonicalKey).not.toBe("zone2");
+  });
+});
+
+describe("inQuietHours — do-not-disturb window (with midnight wrap)", () => {
+  const HM2 = (h: number, m = 0) => h * 60 + m;
+
+  it("returns false when there's no window", () => {
+    expect(inQuietHours(HM2(3), undefined)).toBe(false);
+    expect(inQuietHours(HM2(3), { start: "22:00", end: "22:00" })).toBe(false);
+  });
+
+  it("a wrapping window (22:00→07:00) covers the night", () => {
+    const qh = { start: "22:00", end: "07:00" };
+    expect(inQuietHours(HM2(23), qh)).toBe(true); // 11pm
+    expect(inQuietHours(HM2(3), qh)).toBe(true); // 3am
+    expect(inQuietHours(HM2(6, 59), qh)).toBe(true); // 6:59am
+    expect(inQuietHours(HM2(7), qh)).toBe(false); // 7:00am — end exclusive
+    expect(inQuietHours(HM2(12), qh)).toBe(false); // noon
+    expect(inQuietHours(HM2(21, 59), qh)).toBe(false); // 9:59pm
+  });
+
+  it("a same-day window (13:00→14:00) covers only that span", () => {
+    const qh = { start: "13:00", end: "14:00" };
+    expect(inQuietHours(HM2(13, 30), qh)).toBe(true);
+    expect(inQuietHours(HM2(14), qh)).toBe(false); // end exclusive
+    expect(inQuietHours(HM2(9), qh)).toBe(false);
   });
 });
