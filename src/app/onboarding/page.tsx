@@ -152,6 +152,11 @@ function Nav({
 
 export default function OnboardingPage() {
   const router = useRouter();
+  // True when entered as a re-tune from Profile (/onboarding?redo=1). Read
+  // from the URL directly to avoid useSearchParams' Suspense requirement.
+  const isRedo = () =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("redo") === "1";
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("longevity");
@@ -252,11 +257,14 @@ export default function OnboardingPage() {
     if (guarded.current) return;
     guarded.current = true;
     activeDataSource.load().then((st) => {
-      if (st.settings.completedOnboarding) router.replace("/today");
+      // "Re-run setup" (/onboarding?redo=1) deliberately re-enters even for an
+      // already-onboarded user, so don't bounce them to /today.
+      if (!isRedo() && st.settings.completedOnboarding) router.replace("/today");
     });
   }, [router]);
 
   async function finish(withAccount: boolean) {
+    const redo = isRedo();
     const s = loadState();
     Object.assign(s.settings, {
       name: name.trim(),
@@ -270,19 +278,32 @@ export default function OnboardingPage() {
       wakeTime,
       completedOnboarding: true,
       disclaimerAcknowledged: true,
-      trialStartDate: new Date().toISOString(),
-      tier: "free" as const,
-      premiumTrialEndsAt: new Date(
-        Date.now() + 14 * 86400000
-      ).toISOString(),
+      // Re-tune NEVER resets the trial / tier / billing clock — only a
+      // first-time setup starts it.
+      ...(redo
+        ? {}
+        : {
+            trialStartDate: new Date().toISOString(),
+            tier: "free" as const,
+            premiumTrialEndsAt: new Date(
+              Date.now() + 14 * 86400000
+            ).toISOString(),
+          }),
     });
-    s.installedPacks = packs.map((p) => p.id);
+    // Fresh setup installs exactly the recommended packs; a re-tune ADDS them
+    // to whatever the user already has (never drops their custom/added packs).
+    s.installedPacks = redo
+      ? Array.from(
+          new Set([...(s.installedPacks ?? []), ...packs.map((p) => p.id)])
+        )
+      : packs.map((p) => p.id);
     await activeDataSource.save(s);
     // If they already have a session, never send them back to /auth —
     // that's the loop. Only unauthenticated users who chose "save &
-    // sync" go to /auth to create an account.
+    // sync" go to /auth to create an account. A re-tune always returns
+    // straight to Today.
     const uid = await getUserId();
-    router.push(!uid && withAccount ? "/auth" : "/today");
+    router.push(redo ? "/today" : !uid && withAccount ? "/auth" : "/today");
   }
 
   const goBack = () => setStep((s) => s - 1);

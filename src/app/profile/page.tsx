@@ -419,6 +419,20 @@ export default function ProfilePage() {
         {/* Preferences */}
         <Card>
           <Eyebrow>Preferences</Eyebrow>
+          <Row label="Re-run setup">
+            <button
+              onClick={() => router.push("/onboarding?redo=1")}
+              className="press tr-fast rounded-[var(--r-pill)] px-4 py-2 text-[13px] font-semibold"
+              style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+            >
+              Start
+            </button>
+          </Row>
+          <p className="t-caption -mt-1 mb-2 leading-relaxed">
+            Re-tune your protocol as life changes — it adds the recommended
+            packs and keeps your trial, data, and history intact.
+          </p>
+          <Divider />
           <Row label="Show Supplements tab">
             <button
               onClick={() =>
