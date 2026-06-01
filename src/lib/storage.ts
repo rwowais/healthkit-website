@@ -32,6 +32,8 @@ import { resolveBehaviorByKey } from "./workouts";
 import { activePacks } from "./knowledge";
 import {
   applySwaps,
+  injectOneOffs,
+  applySnoozes,
   compileTimeline,
   shapeTimeline,
   adapt,
@@ -597,7 +599,13 @@ export function computeBehaviorScore(
       mastered: masteredKeys(state, date),
     }
   );
-  const active = shaped.filter((i) => !i.muted);
+  // Match the EXACT list Today renders: inject one-offs and apply snoozes
+  // after shaping, so the stored score (which feeds streak/weeklyReview/
+  // adapt/insights) can't disagree with the on-screen "Day complete". A
+  // one-off the user completed now counts; a behavior snoozed to tomorrow
+  // leaves the denominator instead of dragging the score down.
+  const planned = applySnoozes(injectOneOffs(shaped, dayLog), dayLog);
+  const active = planned.filter((i) => !i.muted);
   if (active.length === 0) return 0;
   const done = active.filter((i) => behaviorCompletions[i.canonicalKey])
     .length;

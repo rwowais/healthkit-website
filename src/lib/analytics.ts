@@ -28,10 +28,14 @@ import { listBehaviorAtoms } from "./packs";
 
 // ── small shared helpers ──────────────────────────────────────────
 
-/** Behaviors + supplements checked off on a given day. */
+/** Behaviors + supplements checked off on a given day. Ad-hoc one-off keys
+ *  ("oneoff:…") are excluded — they're today-only extras and must not inflate
+ *  lifetime milestones or consistency stats. */
 export function completionsOnLog(log: DailyLog): number {
   return (
-    Object.values(log.behaviorCompletions ?? {}).filter(Boolean).length +
+    Object.entries(log.behaviorCompletions ?? {}).filter(
+      ([k, v]) => v && !k.startsWith("oneoff:")
+    ).length +
     Object.values(log.supplementCompletions ?? {}).filter(Boolean).length
   );
 }

@@ -459,6 +459,15 @@ export function injectOneOffs(
 ): TimelineItem[] {
   const oneOffs = log?.oneOffs;
   if (!oneOffs || oneOffs.length === 0) return items;
+  // Give a one-off a representative time for its block so it renders a sane
+  // clock time and sorts within the block (instead of resolving to wake time
+  // and floating to the top). "anytime" stays untimed.
+  const ONEOFF_TIME: Record<TimeBlock, string | undefined> = {
+    morning: "08:00",
+    afternoon: "13:00",
+    evening: "19:00",
+    anytime: undefined,
+  };
   const present = new Set(items.map((i) => i.canonicalKey));
   const next = [...items];
   for (const o of oneOffs) {
@@ -469,6 +478,7 @@ export function injectOneOffs(
       block: o.block,
       anchor: "wake",
       offsetMin: 0,
+      customTime: ONEOFF_TIME[o.block],
       dose: o.dose,
       rationale: "",
       icon: o.icon ?? "check",
@@ -502,7 +512,17 @@ export function applySnoozes(
     const mode = snoozes[it.canonicalKey];
     if (mode === "tomorrow") continue; // hidden today
     if (mode === "later" && it.block !== "evening") {
-      out.push({ ...it, block: "evening", retimed: true });
+      // Relocate to the evening with an evening-anchored time (~2h before bed)
+      // so it reads as a real evening slot, not the original morning clock
+      // time sitting at the top of the block.
+      out.push({
+        ...it,
+        block: "evening",
+        anchor: "bed",
+        offsetMin: -120,
+        customTime: undefined,
+        retimed: true,
+      });
       continue;
     }
     out.push(it);
