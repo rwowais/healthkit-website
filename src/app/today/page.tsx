@@ -17,6 +17,7 @@ import WeekAhead from "@/components/today/WeekAhead";
 import MorningBriefing from "@/components/today/MorningBriefing";
 import MilestoneMoment from "@/components/today/MilestoneMoment";
 import WeeklyGoal from "@/components/today/WeeklyGoal";
+import QuickAdd from "@/components/today/QuickAdd";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -26,6 +27,8 @@ import { getPendingConflict } from "@/lib/datasource";
 import {
   compileTimeline,
   applySwaps,
+  injectOneOffs,
+  applySnoozes,
   adapt,
   shapeTimeline,
   masteredKeys,
@@ -184,6 +187,7 @@ export default function TodayPage() {
     installPack,
     setBehaviorOverride,
     updateSettings,
+    setSnooze,
     refresh,
   } = useAppState();
   const router = useRouter();
@@ -541,10 +545,14 @@ export default function TodayPage() {
     // mute the replacement during essentials mode just because the
     // original was lev-2).
     const swapped = applySwaps(items, log);
-    return shapeTimeline(swapped, isToday ? adaptation.mode : "normal", {
+    const shaped = shapeTimeline(swapped, isToday ? adaptation.mode : "normal", {
       keystoneKey: ks?.key,
       mastered: masteredKeys(state, selectedDate),
     });
+    // Per-day plan, applied after shaping so one-offs are always visible and
+    // snoozes operate on the final list: inject today-only behaviors, then
+    // hide/relocate snoozed ones.
+    return applySnoozes(injectOneOffs(shaped, log), log);
   }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate, log]);
 
   // Just-graduated behaviors today. We render their titles (from the
@@ -2692,6 +2700,9 @@ export default function TodayPage() {
           })}
         </div>
 
+        {/* Quick-add a one-off for today only (not the protocol). */}
+        {isToday && <QuickAdd date={selectedDate} />}
+
         {/* Daily reflection — the engagement loop. Once the day is
             mostly done (60%+) OR the evening block has started, the
             user gets a calm one-tap mood + optional one-line note.
@@ -2938,6 +2949,15 @@ export default function TodayPage() {
             ? !state.behaviorOverrides?.[detail.canonicalKey]?.disabled
             : true
         }
+        onSnooze={
+          detail && isToday
+            ? (mode) => {
+                setSnooze(selectedDate, detail.canonicalKey, mode);
+                setDetail(null);
+              }
+            : undefined
+        }
+        snoozed={detail ? log.snoozes?.[detail.canonicalKey] : undefined}
       />
     </Shell>
   );

@@ -758,6 +758,60 @@ export function clearSwap(
   };
 }
 
+// ── Per-day plan: one-offs + snoozes ──────────────────────────────
+
+/** Add a behavior for TODAY only — not the installed protocol. */
+export function addOneOff(
+  state: AppState,
+  date: string,
+  def: NonNullable<DailyLog["oneOffs"]>[number]
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const oneOffs = [...(log.oneOffs ?? [])];
+  if (oneOffs.some((o) => o.key === def.key)) return state; // dedupe
+  oneOffs.push(def);
+  return saveDailyLog(state, { ...log, oneOffs });
+}
+
+/** Remove a one-off and clear any completion bit it carried. */
+export function removeOneOff(
+  state: AppState,
+  date: string,
+  key: string
+): AppState {
+  const log = getOrCreateLog(state, date);
+  if (!log.oneOffs?.length) return state;
+  const oneOffs = log.oneOffs.filter((o) => o.key !== key);
+  const bc = { ...(log.behaviorCompletions ?? {}) };
+  delete bc[key];
+  return saveDailyLog(state, {
+    ...log,
+    oneOffs: oneOffs.length ? oneOffs : undefined,
+    behaviorCompletions: bc,
+  });
+}
+
+/**
+ * Snooze a behavior for today: "later" pushes it to the evening block,
+ * "tomorrow" hides it from today (returns on its normal schedule). Pass
+ * null to un-snooze.
+ */
+export function setSnooze(
+  state: AppState,
+  date: string,
+  key: string,
+  mode: "later" | "tomorrow" | null
+): AppState {
+  const log = getOrCreateLog(state, date);
+  const snoozes = { ...(log.snoozes ?? {}) };
+  if (mode == null) delete snoozes[key];
+  else snoozes[key] = mode;
+  return saveDailyLog(state, {
+    ...log,
+    snoozes: Object.keys(snoozes).length ? snoozes : undefined,
+  });
+}
+
 // ── Vacation periods ──────────────────────────────────────────────
 
 /**

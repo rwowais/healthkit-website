@@ -69,6 +69,8 @@ export interface TimelineItem extends BehaviorDef {
   /** User-chosen manual order within its block (lower = earlier). Absent =
    *  follow the clock. Set via "move earlier/later" in the behavior editor. */
   sortIndex?: number;
+  /** Added for today only (DailyLog.oneOffs), not part of the protocol. */
+  oneOff?: boolean;
 }
 
 /**
@@ -433,6 +435,79 @@ export function applySwaps(
     });
   }
   return next;
+}
+
+/**
+ * Inject per-day one-off behaviors (DailyLog.oneOffs) into a timeline. Run
+ * AFTER shapeTimeline so a one-off is always visible (never demoted by the
+ * adaptation pass). Skips keys already present. They're completable like any
+ * behavior but carry no streak / protocol weight.
+ */
+export function injectOneOffs(
+  items: TimelineItem[],
+  log:
+    | {
+        oneOffs?: Array<{
+          key: string;
+          title: string;
+          block: TimeBlock;
+          icon?: string;
+          dose?: string;
+        }>;
+      }
+    | undefined
+): TimelineItem[] {
+  const oneOffs = log?.oneOffs;
+  if (!oneOffs || oneOffs.length === 0) return items;
+  const present = new Set(items.map((i) => i.canonicalKey));
+  const next = [...items];
+  for (const o of oneOffs) {
+    if (present.has(o.key)) continue;
+    next.push({
+      canonicalKey: o.key,
+      title: o.title,
+      block: o.block,
+      anchor: "wake",
+      offsetMin: 0,
+      dose: o.dose,
+      rationale: "",
+      icon: o.icon ?? "check",
+      leverage: 1,
+      kind: "action",
+      recommendedBlock: o.block,
+      retimed: false,
+      blockPinned: true,
+      trustTier: "custom",
+      fromPacks: [],
+      muted: false,
+      oneOff: true,
+    } as TimelineItem);
+  }
+  return next;
+}
+
+/**
+ * Apply per-day snoozes (DailyLog.snoozes): "tomorrow" hides the behavior
+ * from today; "later" moves it to the evening block. Run AFTER shapeTimeline
+ * so it operates on the final, user-facing list.
+ */
+export function applySnoozes(
+  items: TimelineItem[],
+  log: { snoozes?: Record<string, "later" | "tomorrow"> } | undefined
+): TimelineItem[] {
+  const snoozes = log?.snoozes;
+  if (!snoozes || Object.keys(snoozes).length === 0) return items;
+  const out: TimelineItem[] = [];
+  for (const it of items) {
+    const mode = snoozes[it.canonicalKey];
+    if (mode === "tomorrow") continue; // hidden today
+    if (mode === "later" && it.block !== "evening") {
+      out.push({ ...it, block: "evening", retimed: true });
+      continue;
+    }
+    out.push(it);
+  }
+  return out;
 }
 
 // ── Signals (from the new behavior model + check-in) ──────────────

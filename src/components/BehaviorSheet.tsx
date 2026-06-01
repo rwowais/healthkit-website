@@ -28,6 +28,8 @@ export default function BehaviorSheet({
   onChange,
   onToggleEnabled,
   isEnabled = true,
+  onSnooze,
+  snoozed,
 }: {
   item: TimelineItem | null;
   override: BehaviorOverride | undefined;
@@ -36,6 +38,8 @@ export default function BehaviorSheet({
   onChange: (next: BehaviorOverride) => void;
   onToggleEnabled?: () => void;
   isEnabled?: boolean;
+  onSnooze?: (mode: "later" | "tomorrow" | null) => void;
+  snoozed?: "later" | "tomorrow";
 }) {
   const [showWhy, setShowWhy] = useState(false);
   if (!item) return null;
@@ -169,6 +173,48 @@ export default function BehaviorSheet({
               </button>
             )}
           </div>
+
+          {/* Snooze for today — "later today" or "tomorrow" (per-day). */}
+          {onSnooze && (
+            <div className="mt-5">
+              <p className="t-eyebrow">Snooze today</p>
+              {snoozed ? (
+                <div
+                  className="mt-2 flex items-center justify-between rounded-[var(--r-md)] p-3"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  <span className="text-[13px] text-[var(--text-2)]">
+                    {snoozed === "tomorrow"
+                      ? "Hidden until tomorrow"
+                      : "Moved to this evening"}
+                  </span>
+                  <button
+                    onClick={() => onSnooze(null)}
+                    className="press text-[12px] font-semibold text-[var(--readiness)]"
+                  >
+                    Undo
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => onSnooze("later")}
+                    className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+                    style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+                  >
+                    Later today
+                  </button>
+                  <button
+                    onClick={() => onSnooze("tomorrow")}
+                    className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+                    style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+                  >
+                    Tomorrow
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Why this slot was recommended */}
           {retimed ? (

@@ -377,6 +377,27 @@ export interface DailyLog {
    * after the user undoes a 5pm "strength → walk" swap.
    */
   swapAutoCompleted?: Record<string, boolean>;
+
+  /**
+   * One-off behaviors added for this day only (e.g. "sauna" after an
+   * impromptu gym trip) without changing the installed protocol. Injected
+   * into Today's timeline and completable like any behavior; they don't
+   * accumulate streaks or affect the protocol.
+   */
+  oneOffs?: Array<{
+    key: string;
+    title: string;
+    block: TimeBlock;
+    icon?: string;
+    dose?: string;
+  }>;
+
+  /**
+   * Per-day snoozes (canonicalKey → mode): "later" pushes a behavior to the
+   * evening block today; "tomorrow" hides it from today entirely (it returns
+   * on its normal schedule). Scoped to this log.
+   */
+  snoozes?: Record<string, "later" | "tomorrow">;
 }
 
 // ── Insights ──────────────────────────────────────────────────────

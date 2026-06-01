@@ -26,6 +26,9 @@ import {
   toggleBehavior as toggleBehaviorFn,
   swapBehavior as swapBehaviorFn,
   clearSwap as clearSwapFn,
+  addOneOff as addOneOffFn,
+  removeOneOff as removeOneOffFn,
+  setSnooze as setSnoozeFn,
   toggleSupplement as toggleSupplementFn,
   bulkCheckSupplements as bulkCheckSupplementsFn,
   setSupplementsSkipped as setSupplementsSkippedFn,
@@ -323,6 +326,21 @@ export function useAppState() {
   const clearSwap = useCallback((date: string, fromKey: string) => {
     setState((prev) => clearSwapFn(prev, date, fromKey));
   }, []);
+  const addOneOff = useCallback(
+    (date: string, def: Parameters<typeof addOneOffFn>[2]) => {
+      setState((prev) => addOneOffFn(prev, date, def));
+    },
+    []
+  );
+  const removeOneOff = useCallback((date: string, key: string) => {
+    setState((prev) => removeOneOffFn(prev, date, key));
+  }, []);
+  const setSnooze = useCallback(
+    (date: string, key: string, mode: "later" | "tomorrow" | null) => {
+      setState((prev) => setSnoozeFn(prev, date, key, mode));
+    },
+    []
+  );
   const installPack = useCallback((id: string) => {
     setState((prev) => installPackFn(prev, id));
   }, []);
@@ -397,6 +415,9 @@ export function useAppState() {
     toggleBehavior,
     swapBehavior,
     clearSwap,
+    addOneOff,
+    removeOneOff,
+    setSnooze,
     installPack,
     uninstallPack,
     setBehaviorOverride,
