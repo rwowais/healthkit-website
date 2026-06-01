@@ -429,6 +429,18 @@ export interface DailyLog {
    * on its normal schedule). Scoped to this log.
    */
   snoozes?: Record<string, "later" | "tomorrow">;
+
+  /**
+   * ISO timestamp of the last time THIS day's log content was changed by a
+   * user action (set at every mutation; travels with the log through cloud
+   * sync). Lets cross-device merge resolve genuine conflicts by recency —
+   * e.g. a behavior un-checked on a newer device stays un-checked instead of
+   * being resurrected by a stale union. Optional + backward-compatible: older
+   * logs (and logs written before this shipped) have it undefined, and the
+   * merge falls back to the prior union/max semantics whenever either side
+   * lacks a stamp — so existing data behaves exactly as before.
+   */
+  updatedAt?: string;
 }
 
 // ── Insights ──────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { AppState, DailyLog, Interaction } from "@/lib/types";
-import { getDefaultState } from "@/lib/storage";
+import { getDefaultState, toggleBehavior } from "@/lib/storage";
 import { compileTimeline } from "@/lib/engine";
 import { suggestions, behaviorStats } from "@/lib/intel";
 import { mergeStates } from "@/lib/datasource";
@@ -250,6 +250,86 @@ describe("publish diff — interaction identity", () => {
     const d = diffBundles(withInteractions([]), next);
     expect(d.interactionsAdded).toHaveLength(2); // both survive the identity key
     expect(new Set(d.interactionsAdded.map((i) => i.key)).size).toBe(2);
+  });
+});
+
+// ── Sync recency: updatedAt resolves genuine conflicts (un-check) ──
+describe("sync merge — recency via updatedAt", () => {
+  const logAt = (
+    date: string,
+    completions: Record<string, boolean>,
+    updatedAt: string,
+    score = 50
+  ): DailyLog =>
+    ({ ...mkLog(date, completions, score), updatedAt }) as unknown as DailyLog;
+  const stateWith = (log: DailyLog): AppState => ({
+    ...getDefaultState(),
+    dailyLogs: [log],
+  });
+
+  it("keeps a behavior un-checked on the NEWER device (no resurrection)", () => {
+    // cloud (a) older = done; local (b) newer = un-done. Newer wins.
+    const cloud = stateWith(
+      logAt("2026-05-20", { meditate: true }, "2026-05-20T08:00:00.000Z", 50)
+    );
+    const local = stateWith(
+      logAt("2026-05-20", { meditate: false }, "2026-05-20T09:00:00.000Z", 0)
+    );
+    const day = mergeStates(local, cloud).dailyLogs.find(
+      (l) => l.date === "2026-05-20"
+    )!;
+    expect(day.behaviorCompletions?.meditate).toBe(false);
+    expect(day.score).toBe(0); // score follows the newer side, not Math.max
+  });
+
+  it("honors whichever side is newer, regardless of local/cloud position", () => {
+    const cloud = stateWith(
+      logAt("2026-05-20", { meditate: true }, "2026-05-20T10:00:00.000Z", 50)
+    );
+    const local = stateWith(
+      logAt("2026-05-20", { meditate: false }, "2026-05-20T09:00:00.000Z", 0)
+    );
+    const day = mergeStates(local, cloud).dailyLogs.find(
+      (l) => l.date === "2026-05-20"
+    )!;
+    expect(day.behaviorCompletions?.meditate).toBe(true); // cloud newer → wins
+  });
+
+  it("falls back to UNION when either side lacks a stamp (legacy unchanged)", () => {
+    const cloud = stateWith(mkLog("2026-05-20", { meditate: true }, 50)); // no updatedAt
+    const local = stateWith(mkLog("2026-05-20", { meditate: false }, 0));
+    const day = mergeStates(local, cloud).dailyLogs.find(
+      (l) => l.date === "2026-05-20"
+    )!;
+    // OR — never silently drop a completion when recency is unknown.
+    expect(day.behaviorCompletions?.meditate).toBe(true);
+  });
+
+  it("keeps keys present on only one side (no conflict)", () => {
+    const cloud = stateWith(
+      logAt("2026-05-20", { a: true }, "2026-05-20T08:00:00.000Z")
+    );
+    const local = stateWith(
+      logAt("2026-05-20", { b: true }, "2026-05-20T09:00:00.000Z")
+    );
+    const day = mergeStates(local, cloud).dailyLogs.find(
+      (l) => l.date === "2026-05-20"
+    )!;
+    expect(day.behaviorCompletions?.a).toBe(true);
+    expect(day.behaviorCompletions?.b).toBe(true);
+  });
+});
+
+describe("storage — mutations stamp updatedAt", () => {
+  it("toggleBehavior stamps the day's log so merge can use recency", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const next = toggleBehavior(st, dk(0), "zone2");
+    const log = next.dailyLogs.find((l) => l.date === dk(0))!;
+    expect(typeof log.updatedAt).toBe("string");
+    expect(log.behaviorCompletions?.zone2).toBe(true);
   });
 });
 

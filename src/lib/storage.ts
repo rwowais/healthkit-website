@@ -555,6 +555,21 @@ function getOrCreateLog(state: AppState, date: string): DailyLog {
   return createEmptyDailyLog(date, state.protocols);
 }
 
+/**
+ * The single write-back path for a mutated day-log. Stamps `updatedAt` (so
+ * cross-device merge can resolve conflicts by recency) and inserts-or-replaces
+ * the log by date. Every mutation that changes a day's content routes through
+ * here — keeping the stamp honest (it marks a real user change, never a
+ * sync/normalize round-trip).
+ */
+function putDayLog(logs: DailyLog[], updated: DailyLog): DailyLog[] {
+  const stamped: DailyLog = { ...updated, updatedAt: new Date().toISOString() };
+  const idx = logs.findIndex((l) => l.date === stamped.date);
+  return idx >= 0
+    ? logs.map((l, i) => (i === idx ? stamped : l))
+    : [...logs, stamped];
+}
+
 /** Public: read (or synthesize) the log for any date. */
 export function getLogForDate(state: AppState, date: string): DailyLog {
   return getOrCreateLog(state, date);
@@ -646,11 +661,7 @@ export function toggleBehavior(
     behaviorCompletionMinutes: bcm,
     score,
   };
-  const idx = state.dailyLogs.findIndex((l) => l.date === date);
-  const dailyLogs =
-    idx >= 0
-      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
-      : [...state.dailyLogs, updated];
+  const dailyLogs = putDayLog(state.dailyLogs, updated);
 
   return {
     ...state,
@@ -719,11 +730,7 @@ export function swapBehavior(
       [fromKey]: replacementWasAlreadyDone ? false : true,
     },
   };
-  const idx = state.dailyLogs.findIndex((l) => l.date === date);
-  const dailyLogs =
-    idx >= 0
-      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
-      : [...state.dailyLogs, updated];
+  const dailyLogs = putDayLog(state.dailyLogs, updated);
   return {
     ...state,
     dailyLogs,
@@ -995,11 +1002,7 @@ export function toggleSupplement(
     });
   }
   const updated: DailyLog = { ...log, supplementCompletions: sc };
-  const idx = state.dailyLogs.findIndex((l) => l.date === date);
-  const dailyLogs =
-    idx >= 0
-      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
-      : [...state.dailyLogs, updated];
+  const dailyLogs = putDayLog(state.dailyLogs, updated);
   return { ...state, dailyLogs, supplements };
 }
 
@@ -1037,11 +1040,7 @@ export function bulkCheckSupplements(
     });
   }
   const updated: DailyLog = { ...log, supplementCompletions: sc };
-  const idx = state.dailyLogs.findIndex((l) => l.date === date);
-  const dailyLogs =
-    idx >= 0
-      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
-      : [...state.dailyLogs, updated];
+  const dailyLogs = putDayLog(state.dailyLogs, updated);
   return { ...state, dailyLogs, supplements };
 }
 
@@ -1066,11 +1065,7 @@ export function setSupplementsSkipped(
     else next.delete(id);
   }
   const updated: DailyLog = { ...log, supplementSkips: [...next] };
-  const idx = state.dailyLogs.findIndex((l) => l.date === date);
-  const dailyLogs =
-    idx >= 0
-      ? state.dailyLogs.map((l, i) => (i === idx ? updated : l))
-      : [...state.dailyLogs, updated];
+  const dailyLogs = putDayLog(state.dailyLogs, updated);
   return { ...state, dailyLogs };
 }
 
@@ -1355,12 +1350,7 @@ function calculateSupplementScore(log: DailyLog): number {
 
 export function saveDailyLog(state: AppState, log: DailyLog): AppState {
   const updatedLog = recalculate(state, log);
-  const existingIndex = state.dailyLogs.findIndex((l) => l.date === log.date);
-
-  const dailyLogs =
-    existingIndex >= 0
-      ? state.dailyLogs.map((l, i) => (i === existingIndex ? updatedLog : l))
-      : [...state.dailyLogs, updatedLog];
+  const dailyLogs = putDayLog(state.dailyLogs, updatedLog);
 
   const currentStreak = calculateStreak(
     dailyLogs,

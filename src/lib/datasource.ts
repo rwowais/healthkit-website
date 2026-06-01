@@ -164,13 +164,28 @@ function mergeDailyLog(
   b: AppState["dailyLogs"][number]
 ): AppState["dailyLogs"][number] {
   const keys = (o?: Record<string, boolean>) => Object.keys(o ?? {});
-  const unionDone = (
+  // Recency for GENUINE conflicts (same key true on one side, false on the
+  // other): resolve by `updatedAt` only when BOTH logs carry a stamp; else
+  // fall back to union (the proven legacy behavior). This is what lets a
+  // behavior un-checked on a newer device stay un-checked instead of being
+  // resurrected — without changing how existing un-stamped logs merge.
+  const aT = a.updatedAt;
+  const bT = b.updatedAt;
+  const newer: "a" | "b" | null = aT && bT ? (bT >= aT ? "b" : "a") : null;
+  const mergeCompletions = (
     x?: Record<string, boolean>,
     y?: Record<string, boolean>
   ): Record<string, boolean> => {
     const out: Record<string, boolean> = {};
-    for (const k of new Set([...keys(x), ...keys(y)]))
-      out[k] = !!(x?.[k] || y?.[k]); // done on EITHER device → done
+    for (const k of new Set([...keys(x), ...keys(y)])) {
+      const xv = x?.[k];
+      const yv = y?.[k];
+      if (xv === undefined) out[k] = !!yv; // only on the y side
+      else if (yv === undefined) out[k] = !!xv; // only on the x side
+      else if (newer === null)
+        out[k] = !!(xv || yv); // no recency → union (legacy)
+      else out[k] = newer === "b" ? !!yv : !!xv; // conflict → newer wins
+    }
     return out;
   };
   // Merge two arrays of {itemId} entries BY id, so an entry the user recorded
@@ -240,12 +255,15 @@ function mergeDailyLog(
   return {
     ...b,
     date: a.date,
-    behaviorCompletions: unionDone(a.behaviorCompletions, b.behaviorCompletions),
+    behaviorCompletions: mergeCompletions(
+      a.behaviorCompletions,
+      b.behaviorCompletions
+    ),
     behaviorCompletionMinutes: {
       ...(a.behaviorCompletionMinutes ?? {}),
       ...(b.behaviorCompletionMinutes ?? {}),
     },
-    supplementCompletions: unionDone(
+    supplementCompletions: mergeCompletions(
       a.supplementCompletions,
       b.supplementCompletions
     ),
@@ -298,7 +316,15 @@ function mergeDailyLog(
       if (an && bn && an !== bn) return `${bn}\n${an}`;
       return bn || an || "";
     })(),
-    score: Math.max(a.score ?? 0, b.score ?? 0),
+    // Score follows the winning side's completions (so an un-check that lowers
+    // the score propagates); only Math.max when recency is unknown — and a
+    // later real mutation recomputes it from the merged completions anyway.
+    score:
+      newer === "a"
+        ? a.score ?? 0
+        : newer === "b"
+          ? b.score ?? 0
+          : Math.max(a.score ?? 0, b.score ?? 0),
     swaps: { ...(a.swaps ?? {}), ...(b.swaps ?? {}) },
     swapAutoCompleted: {
       ...(a.swapAutoCompleted ?? {}),
@@ -311,6 +337,9 @@ function mergeDailyLog(
         (o) => !(a.oneOffs ?? []).some((x) => x.key === o.key)
       ),
     ],
+    // Carry the freshest stamp forward so the merged log keeps a true recency
+    // for any subsequent merge.
+    updatedAt: aT && bT ? (bT >= aT ? bT : aT) : bT ?? aT,
   };
 }
 
