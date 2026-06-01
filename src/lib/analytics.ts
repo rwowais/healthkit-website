@@ -641,6 +641,90 @@ export function correlate(
   return { a, b, n, r, strength, direction };
 }
 
+// ── 7. Monthly report ─────────────────────────────────────────────
+
+export interface MonthlyReport {
+  monthLabel: string; // "May 2026"
+  monthShort: string; // "May"
+  activeDays: number;
+  daysElapsed: number;
+  pillars: { pillar: Pillar; label: string; avg: number }[];
+  topBehaviors: { title: string; count: number }[];
+  totalCompletions: number;
+}
+
+const MONTH_PILLAR_LABEL: Record<Pillar, string> = {
+  sleep: "Sleep",
+  exercise: "Movement",
+  nutrition: "Nutrition",
+  supplements: "Supplements",
+};
+
+/** A month-in-review summary for the current calendar month (saved tz). */
+export function monthlyReport(state: AppState): MonthlyReport {
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  const monthKey = today.slice(0, 7); // YYYY-MM
+  const logs = (state.dailyLogs ?? []).filter((l) =>
+    l.date.startsWith(monthKey)
+  );
+  const activeDays = logs.filter(hasAnyActivity).length;
+  const daysElapsed = Number(today.slice(8, 10));
+
+  const pillars: MonthlyReport["pillars"] = [];
+  for (const p of PILLAR_LIST) {
+    const vals = logs
+      .map((l) => pillarScore(l, p))
+      .filter((v): v is number => v != null);
+    if (vals.length)
+      pillars.push({
+        pillar: p,
+        label: MONTH_PILLAR_LABEL[p],
+        avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+      });
+  }
+
+  const counts = new Map<string, number>();
+  let totalCompletions = 0;
+  for (const l of logs) {
+    for (const [k, done] of Object.entries(l.behaviorCompletions ?? {})) {
+      if (!done) continue;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+      totalCompletions++;
+    }
+    totalCompletions += Object.values(l.supplementCompletions ?? {}).filter(
+      Boolean
+    ).length;
+  }
+  const { title } = behaviorMaps(state);
+  const topBehaviors = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([k, c]) => ({ title: title.get(k) ?? prettifyKey(k), count: c }));
+
+  const [y, m] = monthKey.split("-").map(Number);
+  const anchor = new Date(Date.UTC(y, m - 1, 1));
+  const monthLabel = anchor.toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const monthShort = anchor.toLocaleString("en-US", {
+    month: "long",
+    timeZone: "UTC",
+  });
+
+  return {
+    monthLabel,
+    monthShort,
+    activeDays,
+    daysElapsed,
+    pillars,
+    topBehaviors,
+    totalCompletions,
+  };
+}
+
 export const WEEKDAY_LABELS = [
   "Monday",
   "Tuesday",

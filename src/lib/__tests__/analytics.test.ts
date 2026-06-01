@@ -13,6 +13,7 @@ import {
   pillarSummaries,
   correlate,
   completionsOnLog,
+  monthlyReport,
 } from "@/lib/analytics";
 import { getDefaultState } from "@/lib/storage";
 import { dateKeyInTz, addDaysToKey } from "@/lib/tz";
@@ -239,5 +240,22 @@ describe("correlate", () => {
       log(back(i), { energyLevel: e })
     );
     expect(correlate(logs, "energy", "energy").r).toBeNull();
+  });
+});
+
+describe("monthlyReport", () => {
+  it("summarizes the current month's activity", () => {
+    const month = today().slice(0, 7);
+    const logs = ["01", "02", "03"].map((d) =>
+      log(`${month}-${d}`, {
+        behaviorCompletions: { meditate: true, hydrate: true },
+      })
+    );
+    const r = monthlyReport(stateWith(logs));
+    expect(r.activeDays).toBe(3);
+    expect(r.totalCompletions).toBe(6);
+    expect(r.topBehaviors.length).toBeGreaterThan(0);
+    expect(r.monthLabel.length).toBeGreaterThan(0);
+    expect(r.monthShort.length).toBeGreaterThan(0);
   });
 });

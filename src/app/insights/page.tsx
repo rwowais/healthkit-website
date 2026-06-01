@@ -25,6 +25,7 @@ import BehaviorReportCard from "@/components/BehaviorReportCard";
 import JournalHistory from "@/components/JournalHistory";
 import ShareProgressCard from "@/components/ShareProgressCard";
 import PersonalRecords from "@/components/PersonalRecords";
+import MonthlyReport from "@/components/MonthlyReport";
 import OnThisDayCard from "@/components/OnThisDayCard";
 import WhenConsistent from "@/components/WhenConsistent";
 import PillarDeepDives from "@/components/PillarDeepDives";
@@ -358,6 +359,9 @@ export default function InsightsPage() {
         {/* Your records — quiet bests to beat (peek-delayed for free, like the
             rest of the page). */}
         <PersonalRecords state={intelState} />
+
+        {/* Month-in-review — shareable summary of the current month. */}
+        <MonthlyReport state={intelState} />
 
         {/* "Your next habit" — the growth counterpart to the friction
             suggestions: the highest-leverage curated behavior the user
