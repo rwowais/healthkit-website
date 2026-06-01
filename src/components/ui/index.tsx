@@ -304,6 +304,18 @@ export function Sheet({
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const panel = panelRef.current;
     if (!panel) return;
+    // Never hijack a press that lands on an interactive control. Starting a
+    // drag here calls setPointerCapture on the PANEL, which swallows the
+    // control's click — the "tap does nothing until you scroll the sheet"
+    // bug (at scrollTop 0 every press used to start a drag). Drag only from
+    // the handle / inert panel chrome, exactly as the comment above intends.
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        'button, a, input, select, textarea, label, [role="button"], [role="slider"], [role="switch"], [role="tab"], [contenteditable="true"]'
+      )
+    )
+      return;
     // If the user is touching scrolled-down content, let them scroll.
     if (panel.scrollTop > 0) return;
     dragStartRef.current = { y: e.clientY, t: Date.now() };
