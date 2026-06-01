@@ -210,11 +210,18 @@ export function Sheet({
   onClose,
   title,
   children,
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  /**
+   * When false, the sheet is forced-choice: no swipe-to-dismiss (and the
+   * caller also makes backdrop/Escape inert via a no-op onClose). Prevents
+   * a swipe from sliding a non-closable modal off-screen and stranding it.
+   */
+  dismissible?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Stable onClose ref. Callers pass inline arrows
@@ -302,6 +309,9 @@ export function Sheet({
     // > 0, treat as scroll, not drag" — otherwise dragging interferes
     // with content scrolling.
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Forced-choice sheet: no drag-to-dismiss (would strand it off-screen
+    // since onClose is a no-op and it never unmounts).
+    if (!dismissible) return;
     const panel = panelRef.current;
     if (!panel) return;
     // Never hijack a press that lands on an interactive control. Starting a

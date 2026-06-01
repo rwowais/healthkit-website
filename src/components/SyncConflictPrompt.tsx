@@ -38,7 +38,12 @@ export default function SyncConflictPrompt() {
   };
 
   return (
-    <Sheet open={open} onClose={() => {}} title="Two sets of data found">
+    <Sheet
+      open={open}
+      onClose={() => {}}
+      dismissible={false}
+      title="Two sets of data found"
+    >
       <p className="t-body mb-5 leading-relaxed">
         This device has{" "}
         <span className="font-semibold text-[var(--text-1)]">

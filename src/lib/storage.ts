@@ -1001,7 +1001,15 @@ export function toggleSupplement(
       };
     });
   }
-  const updated: DailyLog = { ...log, supplementCompletions: sc };
+  // Taking a supplement implicitly un-skips it — otherwise "Skip the rest
+  // today" then individually taking one leaves it BOTH taken and skipped, so
+  // the block card shows "Skipped today" over a visibly checked row.
+  const skips = log.supplementSkips ?? [];
+  const updated: DailyLog = {
+    ...log,
+    supplementCompletions: sc,
+    supplementSkips: isDone ? skips.filter((x) => x !== id) : skips,
+  };
   const dailyLogs = putDayLog(state.dailyLogs, updated);
   return { ...state, dailyLogs, supplements };
 }
@@ -1039,7 +1047,13 @@ export function bulkCheckSupplements(
       };
     });
   }
-  const updated: DailyLog = { ...log, supplementCompletions: sc };
+  // Taking the stack implicitly un-skips anything previously "skip the rest".
+  const idSet = new Set(ids);
+  const updated: DailyLog = {
+    ...log,
+    supplementCompletions: sc,
+    supplementSkips: (log.supplementSkips ?? []).filter((x) => !idSet.has(x)),
+  };
   const dailyLogs = putDayLog(state.dailyLogs, updated);
   return { ...state, dailyLogs, supplements };
 }

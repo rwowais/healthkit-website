@@ -253,6 +253,10 @@ export default function OnboardingPage() {
   // trapped in the questionnaire (the login-loop symptom). If the synced
   // state says onboarding is done, leave immediately.
   const guarded = useRef(false);
+  // Re-entrancy guard for the terminal finish() — both end buttons call it and
+  // it awaits a load before writing; without this a fast double-tap (or tapping
+  // both) would start the trial clock twice and double-save.
+  const finishing = useRef(false);
   useEffect(() => {
     if (guarded.current) return;
     guarded.current = true;
@@ -264,6 +268,8 @@ export default function OnboardingPage() {
   }, [router]);
 
   async function finish(withAccount: boolean) {
+    if (finishing.current) return;
+    finishing.current = true;
     const redo = isRedo();
     // Load through the data source (cloud-reconciled + normalized), not the
     // raw local cache — otherwise a re-tune's pack-merge + full-document save

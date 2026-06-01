@@ -25,7 +25,12 @@ import {
 } from "@/lib/supplements";
 import SupplementSheet from "@/components/SupplementSheet";
 import type { Supplement, TimeBlock } from "@/lib/types";
-import { getTz, addDaysToKey, dateKeyInTz } from "@/lib/tz";
+import {
+  getTz,
+  addDaysToKey,
+  dateKeyInTz,
+  dayIndexOfKeyInTz,
+} from "@/lib/tz";
 import { blockLabel } from "@/lib/engine";
 
 type ViewMode = "stack" | "browse" | "grid";
@@ -58,11 +63,10 @@ function SupplementsInner() {
   // filtering that Today's SupplementBlockCard applies is honored
   // here. Without this filter, a user with `anticoagulants: true`
   // would still see fish oil here even though Today hides it.
-  const dayIndex = (() => {
-    const d = new Date();
-    const j = d.getDay();
-    return j === 0 ? 6 : j - 1;
-  })();
+  // Use the saved-tz weekday (matches Today's SupplementBlockCard + the
+  // engine), not the device clock — otherwise a device in a different zone
+  // can list a different day's set near midnight.
+  const dayIndex = dayIndexOfKeyInTz(tz, today);
   const byBlock = useMemo(() => {
     const m: Record<TimeBlock, Supplement[]> = {
       morning: [],

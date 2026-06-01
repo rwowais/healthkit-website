@@ -1806,8 +1806,9 @@ export default function TodayPage() {
                   }
                   className="press flex min-h-[44px] items-center rounded-full px-4 py-2.5 text-[12px] font-semibold text-[var(--text-3)]"
                   style={{ background: "var(--surface-2)" }}
+                  title="Stop suggesting this as your next step (it stays in your timeline below)"
                 >
-                  Later
+                  Not now
                 </button>
               </div>
             </motion.div>

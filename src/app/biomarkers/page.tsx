@@ -22,23 +22,21 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/icons";
 import type { BiomarkerEntry } from "@/lib/types";
-
-function todayKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import { getTz, dateKeyInTz } from "@/lib/tz";
 
 export default function BiomarkersPage() {
   const { state, loading, addBiomarker, deleteBiomarker } = useAppState();
   const router = useRouter();
   const access = getAccess(state);
   const toast = useToast();
+  // Saved-tz "today" (matches the store's clamp + the rest of the app), not
+  // the device clock — avoids a day-off picker/max near midnight in a
+  // different zone.
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
   const [open, setOpen] = useState<BiomarkerDef | null>(null);
   const [val, setVal] = useState("");
-  const [date, setDate] = useState(todayKey());
+  const [date, setDate] = useState(today);
 
   const byMetric = useMemo(() => {
     const m: Record<string, BiomarkerEntry[]> = {};
@@ -51,7 +49,10 @@ export default function BiomarkersPage() {
 
   const submit = () => {
     if (!open) return;
-    const n = parseFloat(val);
+    // Strict: reject empty and partially-numeric input ("12abc") rather than
+    // silently logging 12, the way parseFloat would.
+    const trimmed = val.trim();
+    const n = trimmed === "" ? NaN : Number(trimmed);
     if (Number.isNaN(n)) {
       toast.show("Enter a number");
       return;
@@ -112,7 +113,7 @@ export default function BiomarkersPage() {
                 onClick={() => {
                   setOpen(def);
                   setVal("");
-                  setDate(todayKey());
+                  setDate(today);
                 }}
                 className="row row-tap flex w-full items-center gap-3.5 px-4 py-3.5 text-left"
               >
@@ -236,7 +237,7 @@ export default function BiomarkersPage() {
                 <input
                   type="date"
                   value={date}
-                  max={todayKey()}
+                  max={today}
                   onChange={(e) => setDate(e.target.value)}
                   className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-3)] px-3.5 py-3 text-[14px] text-[var(--text-1)] outline-none"
                 />
