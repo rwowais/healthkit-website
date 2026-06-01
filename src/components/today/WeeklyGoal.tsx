@@ -15,8 +15,8 @@ import { Eyebrow } from "@/components/ui";
 export default function WeeklyGoal({ state }: { state: AppState }) {
   const goal = state.settings.weeklyGoal ?? 0;
   const done = useMemo(
-    () => weeklyActiveDays(state.dailyLogs ?? []),
-    [state.dailyLogs]
+    () => weeklyActiveDays(state.dailyLogs ?? [], state.settings),
+    [state.dailyLogs, state.settings]
   );
   if (!goal || goal < 1) return null;
 

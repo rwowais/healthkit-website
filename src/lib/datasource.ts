@@ -191,6 +191,21 @@ function mergeStates(local: AppState, cloud: AppState): AppState {
         cloud.settings.premiumTrialEndsAt,
         local.settings.premiumTrialEndsAt
       ),
+      // Append-only sets — union across devices so a rest day planned on one
+      // device isn't lost, and a milestone already celebrated on either
+      // device never re-fires after the merge.
+      restDays: [
+        ...new Set([
+          ...(cloud.settings.restDays ?? []),
+          ...(local.settings.restDays ?? []),
+        ]),
+      ],
+      celebratedMilestones: [
+        ...new Set([
+          ...(cloud.settings.celebratedMilestones ?? []),
+          ...(local.settings.celebratedMilestones ?? []),
+        ]),
+      ],
     },
     dailyLogs: [...byDate.values()].sort((a, b) =>
       a.date.localeCompare(b.date)

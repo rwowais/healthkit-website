@@ -265,7 +265,10 @@ export default function OnboardingPage() {
 
   async function finish(withAccount: boolean) {
     const redo = isRedo();
-    const s = loadState();
+    // Load through the data source (cloud-reconciled + normalized), not the
+    // raw local cache — otherwise a re-tune's pack-merge + full-document save
+    // could be built on a stale cache and overwrite newer cloud state.
+    const s = await activeDataSource.load();
     Object.assign(s.settings, {
       name: name.trim(),
       primaryGoal: goal,

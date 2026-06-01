@@ -22,11 +22,14 @@ function moodOf(level?: number | null) {
 }
 
 function prettyDate(key: string) {
-  return new Date(key + "T00:00:00").toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+  // Anchor at noon UTC and format in UTC so the weekday/day reflects the
+  // log's own calendar day, not the device tz (which would shift it by a day
+  // for a traveler or across a DST jump).
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1, 12)).toLocaleDateString(
+    "en-US",
+    { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }
+  );
 }
 
 export default function JournalHistory({ logs }: { logs: DailyLog[] }) {

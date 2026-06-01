@@ -208,6 +208,19 @@ describe("blockForMinutes — custom block boundaries", () => {
     expect(blockForMinutes(HM(12, 30), BAD)).toBe("afternoon"); // default noon
     expect(blockForMinutes(HM(17, 30), BAD)).toBe("evening"); // default 5pm
   });
+
+  it("rejects ascending-but-out-of-window boundaries (evening past bedtime)", () => {
+    // Evening boundary 23:00 sits AFTER a 21:00 bedtime → the evening block
+    // would be unreachable while awake. Must fall back to defaults, so 6pm
+    // reads evening (default 5pm), not afternoon (which the bad 23:00 set
+    // would have produced).
+    const OUT = {
+      wakeTime: "05:00",
+      bedtime: "21:00",
+      blockBoundaries: { morning: "06:00", afternoon: "12:00", evening: "23:00" },
+    };
+    expect(blockForMinutes(HM(18, 0), OUT)).toBe("evening");
+  });
 });
 
 describe("compileTimeline — manual reorder via sortIndex", () => {

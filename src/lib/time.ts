@@ -106,6 +106,8 @@ type BlockSettings = {
  *  05:00 / 12:00 / 17:00 and only honoring custom values when they're
  *  strictly ascending (a malformed set silently falls back to defaults). */
 export function resolveBlockBounds(settings: {
+  wakeTime?: string;
+  bedtime?: string;
   blockBoundaries?: { morning: string; afternoon: string; evening: string };
 }): { morning: number; afternoon: number; evening: number } {
   const d = { morning: 300, afternoon: 720, evening: 1020 };
@@ -114,8 +116,20 @@ export function resolveBlockBounds(settings: {
   const mo = parseHM(bb.morning);
   const af = parseHM(bb.afternoon);
   const ev = parseHM(bb.evening);
-  if (mo < af && af < ev) return { morning: mo, afternoon: af, evening: ev };
-  return d;
+  // Ascending + in-range (guards malformed/out-of-range values too).
+  if (!(mo >= 0 && mo < af && af < ev && ev < 1440)) return d;
+  // For a normal same-day awake window (wake before bed), the afternoon and
+  // evening starts must fall inside it so every block stays reachable while
+  // awake — otherwise an ascending-but-degenerate set (e.g. an evening
+  // boundary past bedtime, or all three before wake) would silently collapse
+  // the whole day into one block. Wrap schedules (bed past midnight) skip
+  // this extra check rather than risk a wrong rejection.
+  if (settings.wakeTime && settings.bedtime) {
+    const wake = parseHM(settings.wakeTime);
+    const bed = parseHM(settings.bedtime);
+    if (bed > wake && !(af > wake && ev < bed)) return d;
+  }
+  return { morning: mo, afternoon: af, evening: ev };
 }
 
 export function blockForMinutes(min: number, settings: BlockSettings): TimeBlock {

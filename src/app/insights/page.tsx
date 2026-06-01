@@ -413,7 +413,10 @@ export default function InsightsPage() {
         <WhenConsistent state={intelState} />
         <BehaviorReportCard rows={adherence} />
         <PillarDeepDives state={intelState} />
-        <CorrelationExplorer logs={state.dailyLogs} premium={access.premium} />
+        <CorrelationExplorer
+          logs={access.premium ? state.dailyLogs : intelState.dailyLogs}
+          premium={access.premium}
+        />
         <OnThisDayCard state={intelState} />
         <JournalHistory logs={intelState.dailyLogs} />
 

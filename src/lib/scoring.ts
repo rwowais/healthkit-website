@@ -168,16 +168,28 @@ export function calculateStreak(
   return streak;
 }
 
-/** Active days within the trailing 7-day window (for weekly goals). */
-export function weeklyActiveDays(logs: DailyLog[]): number {
+/** Active days within the trailing 7-day window (for weekly goals).
+ *  Pass `settings` to anchor the window in the user's saved tz (matches the
+ *  rest of Today/streak); without it, falls back to device-local. */
+export function weeklyActiveDays(
+  logs: DailyLog[],
+  settings?: UserSettings
+): number {
   const keys = new Set(
     logs.filter((l) => hasAnyActivity(l)).map((l) => l.date)
   );
   let n = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    if (keys.has(formatDateKey(d))) n++;
+  if (settings) {
+    const today = dateKeyInTz(getTz(settings));
+    for (let i = 0; i < 7; i++) {
+      if (keys.has(addDaysToKey(today, -i))) n++;
+    }
+  } else {
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      if (keys.has(formatDateKey(d))) n++;
+    }
   }
   return n;
 }
