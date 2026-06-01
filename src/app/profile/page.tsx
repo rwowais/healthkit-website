@@ -7,6 +7,7 @@ import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess } from "@/lib/entitlements";
 import { clearAllData, exportState, importState } from "@/lib/storage";
+import { getTz, dateKeyInTz } from "@/lib/tz";
 import { activeDataSource } from "@/lib/datasource";
 import { deleteAccount, supabaseEnabled } from "@/lib/auth";
 import { getUserId } from "@/lib/supabase";
@@ -283,6 +284,34 @@ export default function ProfilePage() {
           </p>
         </Card>
 
+        {/* Weekly goal — an active-days target; a calm ring on Today
+            tracks progress over the trailing 7 days. */}
+        <Card>
+          <Eyebrow>Weekly goal</Eyebrow>
+          <p className="t-caption mt-2">
+            A target number of active days each week. A calm ring on Today
+            tracks it — no pressure, just a gentle aim.
+          </p>
+          <div className="mt-4 flex gap-2">
+            {[0, 3, 4, 5, 6, 7].map((n) => {
+              const active = (s.weeklyGoal ?? 0) === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => updateSettings({ weeklyGoal: n || undefined })}
+                  className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2 text-[13px] font-semibold"
+                  style={{
+                    background: active ? "var(--text-1)" : "var(--surface-3)",
+                    color: active ? "var(--bg)" : "var(--text-2)",
+                  }}
+                >
+                  {n === 0 ? "Off" : n}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
         {/* Integrations */}
         <Card>
           <Eyebrow>Integrations</Eyebrow>
@@ -347,6 +376,43 @@ export default function ProfilePage() {
             Your timeline goes quiet, your streak holds, your data
             stays intact. Flip it off when you&apos;re ready to come
             back — everything resumes where you left off.
+          </p>
+          <Divider />
+          <Row label="Rest day today">
+            {(() => {
+              const tk = dateKeyInTz(getTz(s));
+              const rd = s.restDays ?? [];
+              const on = rd.includes(tk);
+              return (
+                <button
+                  onClick={() =>
+                    updateSettings({
+                      restDays: on
+                        ? rd.filter((d) => d !== tk)
+                        : [...rd, tk],
+                    })
+                  }
+                  role="switch"
+                  aria-checked={on}
+                  aria-label="Rest day today"
+                  className="tap-44 tr-fast h-7 w-12 rounded-full p-1"
+                  style={{
+                    background: on ? "var(--recovery)" : "var(--surface-3)",
+                  }}
+                >
+                  <div
+                    className="tr-fast h-5 w-5 rounded-full bg-white"
+                    style={{
+                      transform: on ? "translateX(20px)" : "translateX(0)",
+                    }}
+                  />
+                </button>
+              );
+            })()}
+          </Row>
+          <p className="t-caption mt-1 leading-relaxed">
+            A single day off — your streak holds and your timeline stays. For
+            one intentional rest day without pausing everything.
           </p>
         </Card>
 

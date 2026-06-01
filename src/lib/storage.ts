@@ -796,6 +796,11 @@ export function getVacationDates(state: AppState): Set<string> {
       safety++;
     }
   }
+  // Planned single rest days are transparent to the streak too — the user
+  // deliberately took the day off, so a miss that day shouldn't break it.
+  for (const day of state.settings?.restDays ?? []) {
+    if (day) out.add(day);
+  }
   return out;
 }
 

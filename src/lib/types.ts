@@ -108,6 +108,13 @@ export interface UserSettings {
    *  and evening begin so behaviors file under the right section. */
   blockBoundaries?: { morning: string; afternoon: string; evening: string };
   weekStartsOn: 0 | 1;
+  /** Target active days per week (1–7). Undefined/0 = no goal. Powers the
+   *  Today weekly progress ring. */
+  weeklyGoal?: number;
+  /** Planned single rest days (YYYY-MM-DD). Each is transparent to streak
+   *  math (like a vacation day) but explicit — a deliberate day off that
+   *  earns streak protection without pausing the whole system. */
+  restDays?: string[];
   completedOnboarding: boolean;
   primaryGoal?: string;
   disclaimerAcknowledged?: boolean;

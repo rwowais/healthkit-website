@@ -16,6 +16,7 @@ import WorkoutSwapSheet from "@/components/today/WorkoutSwapSheet";
 import WeekAhead from "@/components/today/WeekAhead";
 import MorningBriefing from "@/components/today/MorningBriefing";
 import MilestoneMoment from "@/components/today/MilestoneMoment";
+import WeeklyGoal from "@/components/today/WeeklyGoal";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -1032,6 +1033,32 @@ export default function TodayPage() {
             overnight={overnight}
             isToday={isToday}
           />
+        )}
+
+        {/* Weekly active-days goal ring (only when a goal is set). */}
+        {isToday && <WeeklyGoal state={state} />}
+
+        {/* Planned rest day — streak-protected, timeline still available. */}
+        {isToday && (state.settings.restDays ?? []).includes(selectedDate) && (
+          <div className="panel flex items-center gap-3 p-4">
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--recovery) 16%, var(--surface-3))",
+                color: "var(--recovery)",
+              }}
+            >
+              <Icon name="moon" size={17} />
+            </span>
+            <p className="text-[13px] leading-relaxed text-[var(--text-2)]">
+              <span className="font-semibold text-[var(--text-1)]">
+                Rest day.
+              </span>{" "}
+              Your streak is protected today — do as much or as little as you
+              like.
+            </p>
+          </div>
         )}
 
         {/* Day complete — calm reward */}
