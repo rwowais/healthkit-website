@@ -320,6 +320,65 @@ describe("sync merge — recency via updatedAt", () => {
   });
 });
 
+// ── Cloud-wins load path: merge preserves un-pushed local NON-log edits ──
+// The dirty-aware load path calls mergeStates(local, cloud) when local has
+// un-pushed edits. These prove the combiner keeps those edits (the data the
+// old raw cloud-overwrite silently discarded). (The load() wiring itself
+// needs a live Supabase session and is exercised on staging.)
+describe("sync merge — un-pushed local non-log slices survive", () => {
+  it("keeps a locally-installed pack the cloud doesn't have yet", () => {
+    const cloud: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const local: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation", "better-sleep"],
+    };
+    const merged = mergeStates(local, cloud);
+    expect(merged.installedPacks).toContain("better-sleep"); // local-only kept
+    expect(merged.installedPacks).toContain("longevity-foundation");
+  });
+
+  it("keeps a local settings scalar edit (local wins on conflict)", () => {
+    const cloud: AppState = {
+      ...getDefaultState(),
+      settings: { ...getDefaultState().settings, name: "CloudName" },
+    };
+    const local: AppState = {
+      ...getDefaultState(),
+      settings: { ...getDefaultState().settings, name: "LocalEdit" },
+    };
+    expect(mergeStates(local, cloud).settings.name).toBe("LocalEdit");
+  });
+
+  it("unions biomarkers + behaviorOverrides from both sides", () => {
+    const cloud: AppState = {
+      ...getDefaultState(),
+      biomarkers: [{ id: "bm-cloud" }] as unknown as AppState["biomarkers"],
+      behaviorOverrides: {
+        kCloud: { disabled: true },
+      } as unknown as AppState["behaviorOverrides"],
+    };
+    const local: AppState = {
+      ...getDefaultState(),
+      biomarkers: [{ id: "bm-local" }] as unknown as AppState["biomarkers"],
+      behaviorOverrides: {
+        kLocal: { disabled: true },
+      } as unknown as AppState["behaviorOverrides"],
+    };
+    const merged = mergeStates(local, cloud);
+    expect(merged.biomarkers.map((b) => b.id).sort()).toEqual([
+      "bm-cloud",
+      "bm-local",
+    ]);
+    expect(Object.keys(merged.behaviorOverrides).sort()).toEqual([
+      "kCloud",
+      "kLocal",
+    ]);
+  });
+});
+
 describe("storage — mutations stamp updatedAt", () => {
   it("toggleBehavior stamps the day's log so merge can use recency", () => {
     const st: AppState = {

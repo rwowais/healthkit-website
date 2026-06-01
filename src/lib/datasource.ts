@@ -104,6 +104,44 @@ function markReconciled(uid: string): void {
 }
 
 /**
+ * Persisted "local has edits not yet confirmed in the cloud STATE row" flag.
+ * Set when a save writes locally; cleared only once the cloud upsert succeeds.
+ * Survives reloads (unlike the in-memory `pendingCloudState`), so a load that
+ * happens after an offline edit + reopen knows local is ahead and MERGES
+ * local into cloud instead of letting cloud-wins silently discard the
+ * un-pushed edits to non-log slices (settings / packs / overrides / …).
+ * When clean (the normal case) load stays cloud-wins, so cross-device
+ * deletions still propagate.
+ */
+const PENDING_SYNC_KEY = "pz:pending-sync";
+function markPendingSync(): void {
+  try {
+    if (typeof window !== "undefined")
+      localStorage.setItem(PENDING_SYNC_KEY, "1");
+  } catch {
+    /* non-fatal */
+  }
+}
+function clearPendingSync(): void {
+  try {
+    if (typeof window !== "undefined")
+      localStorage.removeItem(PENDING_SYNC_KEY);
+  } catch {
+    /* non-fatal */
+  }
+}
+function hasPendingSync(): boolean {
+  try {
+    return (
+      typeof window !== "undefined" &&
+      localStorage.getItem(PENDING_SYNC_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * On any auth identity change (sign-out, or a *different* user signing
  * in on this device) the per-session sync singletons must reset, or the
  * conflict prompt can't re-evaluate for the new account and a stale
@@ -124,6 +162,12 @@ function bindAuthReset() {
       conflictEvaluated = false;
       pendingConflict = null;
       lastCloudUpdatedAt = null;
+      // NOTE: deliberately do NOT clear the pending-sync flag here. This fires
+      // on the initial null→uid transition for the SAME user on every page
+      // load — clearing it would defeat the persisted flag before load() can
+      // read it. A genuine different-user switch is already protected from
+      // cross-account merges by the first-sign-in conflict gate + per-uid
+      // reconciled marker below.
     }
   });
 }
@@ -659,11 +703,33 @@ class SupabaseDataSource implements DataSource {
         }
         // Established on this account/device — never prompt again here.
         markReconciled(userId);
+        const dirty = hasPendingSync();
         if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
+          if (dirty) {
+            // Local has un-pushed edits (an offline session not yet synced).
+            // MERGE local into cloud (local-preferring union — the same
+            // combiner the first-sign-in "merge" choice uses) so cloud-wins
+            // doesn't silently discard the un-pushed non-log slices (settings,
+            // installed packs, behavior overrides, biomarkers, goals…). Logs
+            // are reconciled separately below.
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify(mergeStates(local, cloud))
+            );
+          } else {
+            // Clean local (the normal case): cloud wins, so a deletion made on
+            // another device still propagates to this one.
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
+          }
         }
-        const norm = loadState(); // normalizes + migrates the cloud payload
-        return await this.reconcileLogs(sb, userId, norm);
+        const norm = loadState(); // normalizes + migrates the payload
+        const reconciled = await this.reconcileLogs(sb, userId, norm);
+        // If we merged un-pushed edits, push the result up so the cloud row
+        // catches up and the dirty flag clears. Best effort: on failure the
+        // flag stays set and the next load re-merges (idempotent) — the
+        // merged local copy is never lost in the meantime.
+        if (dirty) await this.save(reconciled);
+        return reconciled;
       }
 
       // First sign-in on this account: lift local data up, don't wipe.
@@ -678,6 +744,7 @@ class SupabaseDataSource implements DataSource {
       });
       lastCloudUpdatedAt =
         (await this.readStateUpdatedAt(sb, userId)) ?? nowIso;
+      clearPendingSync(); // local is now mirrored to the cloud row
       return await this.reconcileLogs(sb, userId, local);
     } catch {
       return loadState(); // offline / transient → local cache
@@ -686,6 +753,9 @@ class SupabaseDataSource implements DataSource {
 
   async save(state: AppState): Promise<void> {
     saveState(state); // offline-first cache
+    // Mark local ahead of cloud until a push confirms. Persisted so a reload
+    // before the push still knows to merge rather than be clobbered.
+    markPendingSync();
     // Stash the most recent state in a module-level slot so the retry
     // handler (registered below) can re-attempt the cloud upsert
     // whenever the network comes back. Without this, an offline-edit
@@ -705,6 +775,9 @@ class SupabaseDataSource implements DataSource {
     try {
       const userId = await getUserId();
       if (!userId) {
+        // Guest (no cloud row to be behind) — local is authoritative; the
+        // first-sign-in path lifts it up wholesale later. Nothing pending.
+        clearPendingSync();
         markSaveSuccess();
         return;
       }
@@ -750,8 +823,9 @@ class SupabaseDataSource implements DataSource {
       // Notify other tabs ONLY after the cloud copy is durable, so a
       // resync never reads a pre-write row.
       notify();
-      // Cloud copy matches local — clear the retry queue.
+      // Cloud copy matches local — clear the retry queue + the dirty flag.
       pendingCloudState = null;
+      clearPendingSync();
       markSaveSuccess();
     } catch {
       // Local cache still holds; tell the user the cloud copy is behind
@@ -780,6 +854,7 @@ class SupabaseDataSource implements DataSource {
         .eq("user_id", userId);
       if (error) throw error;
       lastCloudUpdatedAt = null;
+      clearPendingSync(); // cloud row gone; nothing local to push up
       // Also clear the per-day rows (best effort; ignore if absent).
       this.lastDays.clear();
       try {
