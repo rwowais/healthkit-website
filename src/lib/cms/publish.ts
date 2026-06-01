@@ -522,11 +522,14 @@ export function validateBundleGovernance(
   // (live runtime) — the BUNDLE being validated may not be live yet.
   const knownKeys = new Set<string>();
   for (const p of bundle.protocols ?? []) {
-    if (p.source !== "official") continue;
+    // Include EVERY protocol's keys (official + custom) so cross-references
+    // (derivedFrom/targets) resolve across a custom CMS protocol too.
     for (const b of p.behaviors) knownKeys.add(b.canonicalKey);
   }
   for (const p of bundle.protocols ?? []) {
-    if (p.source !== "official") continue;
+    // Validate every admin-authored protocol's behaviors regardless of
+    // source — a custom CMS protocol publishes to all users too, so it must
+    // pass validateAtom + the daysActive/rationale checks, not skip them.
     for (const b of p.behaviors) {
       const errs = validateAtom(b, knownKeys);
       for (const e of errs) {

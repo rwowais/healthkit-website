@@ -11,7 +11,12 @@ import type {
   TimeBlock,
   TrustTier,
 } from "./types";
-import { compileTimeline, effectiveKey, type TimelineItem } from "./engine";
+import {
+  compileTimeline,
+  effectiveKey,
+  vacationDates,
+  type TimelineItem,
+} from "./engine";
 import { packById, listBehaviorAtoms } from "./packs";
 import { activePacks } from "./knowledge";
 import { effectiveMinutes, nowMinutes, parseHM } from "./time";
@@ -116,15 +121,20 @@ export function behaviorStats(
   const tz = getTz(state.settings);
   const today = dateKeyInTz(tz);
   const logs = new Map(state.dailyLogs.map((l) => [l.date, l]));
+  // Vacation / planned-rest / spent-freeze days are transparent to the
+  // per-behavior streak, exactly like the global streak (calculateStreak) —
+  // otherwise a sanctioned break would reset a behavior's "N days running"
+  // while the global "your streak holds" promise says otherwise.
+  const vac = vacationDates(state);
   let streak = 0;
   for (let i = 0; i < 365; i++) {
     // Step back through calendar days using addDaysToKey so DST + tz
     // changes don't skip or duplicate a day in the streak walk.
     const dk = i === 0 ? today : addDaysToKey(today, -i);
-    const log = logs.get(dk);
-    const done = !!log?.behaviorCompletions?.[key];
+    const done = !!logs.get(dk)?.behaviorCompletions?.[key];
     if (done) streak++;
     else if (i === 0) continue; // today not done yet — don't break
+    else if (vac.has(dk)) continue; // sanctioned break — transparent
     else break;
   }
   let last7 = 0;
@@ -182,6 +192,13 @@ export function keystone(state: AppState): Keystone | null {
   // of d>=0.77 + >=8/group made it a dead feature).
   const dThreshold = 0.35 + 0.05 * Math.log2(Math.max(items.length, 2));
 
+  // Count "other behaviors done" ONLY over the currently-installed analytics
+  // universe — so the numerator (mD−mN) and the denominator (items.length−1)
+  // share one population. Without this, one-offs, swap replacements, and stale
+  // keys from uninstalled packs (still present in old logs) inflate the count
+  // and overstate the "N points more of everything else" delta.
+  const itemKeys = new Set(items.map((i) => i.canonicalKey));
+
   let best:
     | { key: string; title: string; delta: number; d: number }
     | null = null;
@@ -200,7 +217,8 @@ export function keystone(state: AppState): Keystone | null {
     for (const l of logs) {
       const bc = l.behaviorCompletions ?? {};
       let others = 0;
-      for (const key in bc) if (key !== k && bc[key]) others++;
+      for (const key in bc)
+        if (key !== k && bc[key] && itemKeys.has(key)) others++;
       (bc[k] ? otherDone : otherNot).push(others);
     }
     // A keystone is, by definition, done most days — so the "not done"
@@ -352,7 +370,19 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
     let dimension: OutcomeInsight["dimension"] = "overall";
     if (dE >= dS && dE >= 0.3) dimension = "energy";
     else if (dS > dE && dS >= 0.3) dimension = "sleep";
-    const delta = Math.max(1, Math.round(mean(done) - mean(not)));
+    // Compute the displayed delta from the SAME series the copy names, so
+    // "your energy runs N higher" reflects the energy gap — not the overall
+    // felt-index gap (which would mis-state a single-dimension claim).
+    const src =
+      dimension === "energy"
+        ? dimVals.energy
+        : dimension === "sleep"
+        ? dimVals.sleep
+        : { done, not };
+    const delta = Math.max(
+      1,
+      Math.round(mean(src.done) - mean(src.not))
+    );
     best = { key: k, title: it.title, dimension, delta, d };
   }
   return best

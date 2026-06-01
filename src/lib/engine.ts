@@ -703,7 +703,7 @@ function logHasActivity(l: DailyLog): boolean {
  * last 7 calendar days — even though the trip was a sanctioned
  * break. Vacation transparency has to be honored end-to-end.
  */
-function vacationDates(state: AppState): Set<string> {
+export function vacationDates(state: AppState): Set<string> {
   const out = new Set<string>();
   const tz = getTz(state.settings);
   const today = dateKeyInTz(tz);
@@ -1657,6 +1657,22 @@ export function shapeTimeline(
     shaped = guaranteePerBlock(shaped);
   } else {
     shaped = items;
+  }
+
+  // Keystone protection. suggestions() tells the user "if you protect one
+  // behavior, make it this one" — so the keystone must never render as
+  // "Optional today" from a LEVERAGE-based trim (lighter/essentials). rebuild
+  // already keeps it; normal never mutes. RECOVERY is the deliberate
+  // exception: it eases by physiological demand, so resting a demanding
+  // keystone on a low-recovery day is the correct, safe call — left muted.
+  // (Always-on conflict reconciliation below may still mute a genuine
+  // restraint→keystone conflict; that's intentional and safety-correct.)
+  if (opts.keystoneKey && mode !== "recovery") {
+    shaped = shaped.map((it) =>
+      it.canonicalKey === opts.keystoneKey && it.muted
+        ? { ...it, muted: false, muteReason: undefined }
+        : it
+    );
   }
 
   // Always-on conflict reconciliation. Each restraint mutes only its

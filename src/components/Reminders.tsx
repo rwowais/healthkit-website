@@ -72,12 +72,18 @@ export default function Reminders() {
     const times: string[] = [];
     for (const it of items) {
       if (it.muted) continue;
+      // Per-behavior opt-out — match the in-tab path so a silenced behavior
+      // isn't pushed from the server with the tab closed.
+      if (state.behaviorOverrides?.[it.canonicalKey]?.reminderOff) continue;
       const sched = effectiveMinutes(it, state.settings);
       if (sched == null) continue;
       // Smart timing: fire at the learned typical completion time when there's
       // enough history (else the scheduled time). Only retimes already-timed
       // behaviors — untimed "anytime" items stay reminder-free.
       const t = learnedReminderMinutes(state, it.canonicalKey) ?? sched;
+      // Quiet hours: never POST a time inside the user's do-not-disturb window
+      // (the cron would otherwise push it overnight).
+      if (inQuietHours(t, state.settings.quietHours)) continue;
       const h = Math.floor(t / 60) % 24;
       const m = t % 60;
       const hm = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;

@@ -379,7 +379,12 @@ function normalize(s: AppState): AppState {
     settings: { ...d.settings, ...s.settings },
     protocols: s.protocols ?? d.protocols,
     supplementMeta: s.supplementMeta ?? d.supplementMeta,
-    dailyLogs: migratedLogs,
+    // Canonical date order. Local writes APPEND new days (insertion order)
+    // while the cloud read path (reconcileLogs/mergeStates) sorts by date —
+    // so without sorting here, a Supabase load looked "changed" to the
+    // fixed-point guard and triggered redundant cross-instance save churn.
+    // Sorting makes a round-trip a true fixed point.
+    dailyLogs: [...migratedLogs].sort((a, b) => a.date.localeCompare(b.date)),
     biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
     insights: Array.isArray(s.insights) ? s.insights : [],
     // NOTE: the persisted streak is kept verbatim here (recomputing it in

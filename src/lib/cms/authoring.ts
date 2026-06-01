@@ -8,7 +8,58 @@
  */
 import { getSupabase, getUserId } from "../supabase";
 import { activePacks } from "../knowledge";
+import { PACKS, STANDALONE_ATOMS_REGISTRY } from "../packs";
 import type { ProtocolPack, BehaviorDef, TimeBlock, Interaction } from "../types";
+
+/**
+ * Built-in atom lookup by canonicalKey (lazy, computed once). The CMS
+ * `cms_behaviors` table only stores the editable presentation fields — it has
+ * no columns for safety/scheduling/identity metadata (contraindications,
+ * daysActive, evidenceTier, derivedFrom, targets, evidence, timingReason,
+ * recommendedBy, customTime, category, intensity). When a CMS behavior shares
+ * a canonicalKey with a built-in atom, those fields MUST be backfilled from
+ * the canonical catalog — otherwise a published bundle would silently strip
+ * safety contraindications (fish-oil/anticoagulants, NMN/pregnancy, etc.) for
+ * every user. These fields aren't CMS-editable, so the built-in is the
+ * authoritative source.
+ */
+let _builtinByKey: Map<string, BehaviorDef> | null = null;
+function builtinAtom(key: string): BehaviorDef | undefined {
+  if (!_builtinByKey) {
+    _builtinByKey = new Map();
+    for (const p of PACKS)
+      for (const b of p.behaviors)
+        if (!_builtinByKey.has(b.canonicalKey)) _builtinByKey.set(b.canonicalKey, b);
+    for (const a of STANDALONE_ATOMS_REGISTRY)
+      if (!_builtinByKey.has(a.canonicalKey)) _builtinByKey.set(a.canonicalKey, a);
+  }
+  return _builtinByKey.get(key);
+}
+
+/**
+ * Backfill the CMS-non-editable fields of an assembled behavior from the
+ * canonical built-in atom (matched by canonicalKey). Pure + exported so the
+ * "publish never strips safety data" guarantee is unit-testable. CMS-editable
+ * fields on `base` always win; only fields the CMS schema can't store are
+ * sourced from the built-in.
+ */
+export function backfillBuiltinFields(base: BehaviorDef): BehaviorDef {
+  const bi = builtinAtom(base.canonicalKey);
+  if (!bi) return base;
+  const out = { ...base };
+  if (bi.contraindications) out.contraindications = bi.contraindications;
+  if (bi.daysActive) out.daysActive = bi.daysActive;
+  if (bi.evidenceTier) out.evidenceTier = bi.evidenceTier;
+  if (bi.derivedFrom) out.derivedFrom = bi.derivedFrom;
+  if (bi.targets) out.targets = bi.targets;
+  if (bi.evidence && !out.evidence) out.evidence = bi.evidence;
+  if (bi.timingReason && !out.timingReason) out.timingReason = bi.timingReason;
+  if (bi.recommendedBy) out.recommendedBy = bi.recommendedBy;
+  if (bi.customTime) out.customTime = bi.customTime;
+  if (bi.category) out.category = bi.category;
+  if (bi.intensity) out.intensity = bi.intensity;
+  return out;
+}
 
 type SB = NonNullable<ReturnType<typeof getSupabase>>;
 
@@ -1487,21 +1538,23 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
     const protocols: ProtocolPack[] = protRows.map((p, i) => {
       const behaviors = behaviorsPerProtocol[i]
         .filter(isPublishableBehavior)
-        .map(
-          (b): BehaviorDef =>
-            ({
-              canonicalKey: b.canonical_key,
-              title: b.title,
-              block: b.block as TimeBlock,
-              anchor: (b.anchor ?? "wake") as BehaviorDef["anchor"],
-              offsetMin: b.offset_min ?? 0,
-              dose: b.dose ?? undefined,
-              leverage: (b.leverage ?? 2) as BehaviorDef["leverage"],
-              kind: (b.kind ?? "action") as BehaviorDef["kind"],
-              icon: (b.icon ?? "sparkle") as BehaviorDef["icon"],
-              rationale: b.rationale ?? "",
-            }) as BehaviorDef
-        );
+        .map((b): BehaviorDef => {
+          const base: BehaviorDef = {
+            canonicalKey: b.canonical_key,
+            title: b.title,
+            block: b.block as TimeBlock,
+            anchor: (b.anchor ?? "wake") as BehaviorDef["anchor"],
+            offsetMin: b.offset_min ?? 0,
+            dose: b.dose ?? undefined,
+            leverage: (b.leverage ?? 2) as BehaviorDef["leverage"],
+            kind: (b.kind ?? "action") as BehaviorDef["kind"],
+            icon: (b.icon ?? "sparkle") as BehaviorDef["icon"],
+            rationale: b.rationale ?? "",
+          } as BehaviorDef;
+          // Backfill the CMS-non-editable fields from the canonical built-in
+          // atom so publishing never strips safety/scheduling/identity data.
+          return backfillBuiltinFields(base);
+        });
       return {
         id: p.slug,
         name: p.name,
