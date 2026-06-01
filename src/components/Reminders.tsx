@@ -6,10 +6,12 @@ import { getLogForDate } from "@/lib/storage";
 import {
   compileTimeline,
   shapeTimeline,
+  injectOneOffs,
+  applySnoozes,
   adapt,
   isDone,
 } from "@/lib/engine";
-import { resolveMinutes, inQuietHours } from "@/lib/time";
+import { effectiveMinutes, inQuietHours } from "@/lib/time";
 import { getTz, dateKeyInTz, dayIndexInTz, nowMinutesInTz } from "@/lib/tz";
 import {
   pushAvailable,
@@ -53,14 +55,23 @@ export default function Reminders() {
     // server to ping at. Limit to the next 12 hours so we don't
     // schedule e.g. tomorrow morning's wake-anchor today.
     const dayIdx = dayIndexInTz(tz);
-    const items = shapeTimeline(
-      compileTimeline(state, dayIdx),
-      adapt(state).mode
+    // Mirror exactly what Today schedules: inject today's one-offs and apply
+    // snoozes, so a "tomorrow"-snoozed behavior doesn't ping today and a
+    // one-off added for today is included. Use effectiveMinutes so a user's
+    // exact customTime is honored (resolveMinutes only did anchor math).
+    const today = dateKeyInTz(tz);
+    const log = getLogForDate(state, today);
+    const items = applySnoozes(
+      injectOneOffs(
+        shapeTimeline(compileTimeline(state, dayIdx), adapt(state).mode),
+        log
+      ),
+      log
     );
     const times: string[] = [];
     for (const it of items) {
       if (it.muted) continue;
-      const t = resolveMinutes(it, state.settings);
+      const t = effectiveMinutes(it, state.settings);
       if (t == null) continue;
       const h = Math.floor(t / 60) % 24;
       const m = t % 60;
@@ -101,9 +112,12 @@ export default function Reminders() {
     const today = dateKeyInTz(tz);
     const dayIdx = dayIndexInTz(tz);
     const log = getLogForDate(state, today);
-    const items = shapeTimeline(
-      compileTimeline(state, dayIdx),
-      adapt(state).mode
+    const items = applySnoozes(
+      injectOneOffs(
+        shapeTimeline(compileTimeline(state, dayIdx), adapt(state).mode),
+        log
+      ),
+      log
     );
     // tz-aware: deltas use the same wall-clock basis as the target so an
     // in-tab reminder fires at the right local time (and doesn't drift ~60min
@@ -117,7 +131,7 @@ export default function Reminders() {
       if (it.muted || isDone(log, it.canonicalKey)) continue;
       // Per-behavior opt-out: the user silenced reminders for this one.
       if (state.behaviorOverrides?.[it.canonicalKey]?.reminderOff) continue;
-      const t = resolveMinutes(it, state.settings);
+      const t = effectiveMinutes(it, state.settings);
       if (t == null) continue;
       // Quiet hours: never fire inside the user's do-not-disturb window.
       if (inQuietHours(t, state.settings.quietHours)) continue;
