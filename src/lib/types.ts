@@ -633,6 +633,9 @@ export interface BehaviorOverride {
   /** When true, this behavior never schedules a reminder, even while global
    *  notifications are on. */
   reminderOff?: boolean;
+  /** Manual order within its block (lower = earlier). Absent = follow the
+   *  clock. Adjusted via "move earlier / later" in the behavior editor. */
+  sortIndex?: number;
 }
 
 // ── Biomarkers ────────────────────────────────────────────────────

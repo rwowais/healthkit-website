@@ -138,6 +138,38 @@ export default function BehaviorSheet({
             />
           </div>
 
+          {/* Manual order within the block — nudges sortIndex; default
+              ordering (clock) is unchanged until the user moves something. */}
+          <div className="mt-5">
+            <p className="t-eyebrow">
+              Order in {blockLabel(item.block).toLowerCase()}
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => patch({ sortIndex: (ov.sortIndex ?? 0) - 1 })}
+                className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+                style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+              >
+                ↑ Move earlier
+              </button>
+              <button
+                onClick={() => patch({ sortIndex: (ov.sortIndex ?? 0) + 1 })}
+                className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+                style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+              >
+                ↓ Move later
+              </button>
+            </div>
+            {!!ov.sortIndex && (
+              <button
+                onClick={() => patch({ sortIndex: undefined })}
+                className="press tr-fast mt-2 text-[12px] font-semibold text-[var(--readiness)]"
+              >
+                Reset to default order
+              </button>
+            )}
+          </div>
+
           {/* Why this slot was recommended */}
           {retimed ? (
             <div

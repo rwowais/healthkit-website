@@ -66,6 +66,9 @@ export interface TimelineItem extends BehaviorDef {
    */
   swappedTo?: string;
   swappedFrom?: string;
+  /** User-chosen manual order within its block (lower = earlier). Absent =
+   *  follow the clock. Set via "move earlier/later" in the behavior editor. */
+  sortIndex?: number;
 }
 
 /**
@@ -211,6 +214,7 @@ export function compileTimeline(
           recommendedBlock: b.block,
           retimed,
           blockPinned: !!ov?.block,
+          sortIndex: ov?.sortIndex,
           fromPacks: [pack.name],
           muted: false,
           // Trust tier — derived from the originating behavior's
@@ -306,6 +310,7 @@ export function compileTimeline(
             existing.customTime = ov.customTime;
             existing.retimed = true;
           }
+          if (ov.sortIndex != null) existing.sortIndex = ov.sortIndex;
         }
       }
     }
@@ -343,6 +348,11 @@ export function compileTimeline(
     .sort((a, b) => {
       const blockDiff = BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block];
       if (blockDiff !== 0) return blockDiff;
+      // Manual reorder: an explicit sortIndex (set via "move earlier/later")
+      // wins within a block. Both default to 0 → falls through to the clock
+      // sort below, so default ordering is unchanged.
+      const siDiff = (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+      if (siDiff !== 0) return siDiff;
       // Near-time tiebreaker: items within 5 minutes of each other
       // are treated as visually concurrent — break by leverage desc
       // so an Essential (lev 3) like Morning sunlight floats above

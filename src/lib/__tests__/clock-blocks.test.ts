@@ -209,3 +209,30 @@ describe("blockForMinutes — custom block boundaries", () => {
     expect(blockForMinutes(HM(17, 30), BAD)).toBe("evening"); // default 5pm
   });
 });
+
+describe("compileTimeline — manual reorder via sortIndex", () => {
+  it("a negative sortIndex floats a behavior to the top of its block", () => {
+    const base = getDefaultState();
+    const state: AppState = {
+      ...base,
+      installedPacks: ["longevity-foundation"],
+      settings: { ...base.settings, wakeTime: "07:00", bedtime: "22:30" },
+    };
+    const morning = compileTimeline(state, 0)
+      .filter((i) => i.block === "morning")
+      .map((i) => i.canonicalKey);
+    expect(morning.length).toBeGreaterThan(1);
+    const target = morning[morning.length - 1]; // last by clock
+    const moved: AppState = {
+      ...state,
+      behaviorOverrides: {
+        ...base.behaviorOverrides,
+        [target]: { sortIndex: -10 },
+      },
+    };
+    const reordered = compileTimeline(moved, 0)
+      .filter((i) => i.block === "morning")
+      .map((i) => i.canonicalKey);
+    expect(reordered[0]).toBe(target); // now first
+  });
+});
