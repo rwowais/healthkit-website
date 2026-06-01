@@ -36,7 +36,7 @@ import BenchmarksCard from "@/components/BenchmarksCard";
 import GoalsCard from "@/components/GoalsCard";
 import ExperimentsCard from "@/components/ExperimentsCard";
 import { getTz } from "@/lib/tz";
-import { compileTimeline } from "@/lib/engine";
+import { compileTimeline, getSignals } from "@/lib/engine";
 import { personalModel, identityReflection } from "@/lib/reflect";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -189,6 +189,15 @@ export default function InsightsPage() {
 
   const delayed = !access.premium && !nothing;
 
+  // Returning after a gap: the present-tense "what works for you" / keystone /
+  // records claims below are computed from data BEFORE the break, so under a
+  // "Welcome back" day they read as if the user is currently consistent.
+  // Surface a calm framing so they're understood as the pre-break rhythm.
+  const returning = useMemo(() => {
+    const s = getSignals(state);
+    return s.hasHistory && s.gapDays >= 2 && !nothing;
+  }, [state, nothing]);
+
   if (loading) {
     return (
       <Shell>
@@ -218,6 +227,20 @@ export default function InsightsPage() {
             title="You're seeing a delayed view"
             line="On the free plan, Insights update on a 3-day delay. Premium makes them live — your patterns the moment they form."
           />
+        )}
+
+        {returning && (
+          <div
+            className="rounded-[var(--r-md)] p-4"
+            style={{ background: "var(--surface-2)" }}
+          >
+            <Eyebrow color="var(--warm)">Picking up where you left off</Eyebrow>
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-2)]">
+              You&rsquo;ve been away for a bit — the reflections below are your
+              rhythm from <em>before</em> the break. They&rsquo;ll refresh as
+              you log again.
+            </p>
+          </div>
         )}
 
         {(

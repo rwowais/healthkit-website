@@ -17,7 +17,7 @@ import {
   BUNDLE_SCHEMA,
   type KnowledgeBundle,
 } from "../knowledge";
-import type { ProtocolPack } from "../types";
+import type { ProtocolPack, Interaction } from "../types";
 import { assembleBundleFromCMS } from "./authoring";
 import { validateAtom } from "../engine";
 
@@ -95,6 +95,13 @@ export interface TemplateChange {
 export interface RuleChange {
   name: string;
 }
+export interface InteractionChange {
+  /** Human label, e.g. "caffeine ✕ sleep (timing)". */
+  label: string;
+  aKey: string;
+  bKey: string;
+  type: string;
+}
 export interface BundleDiff {
   protocolsAdded: { id: string; name: string }[];
   protocolsRemoved: { id: string; name: string }[];
@@ -111,6 +118,9 @@ export interface BundleDiff {
   rulesAdded: RuleChange[];
   rulesRemoved: RuleChange[];
   rulesChanged: RuleChange[];
+  interactionsAdded: InteractionChange[];
+  interactionsRemoved: InteractionChange[];
+  interactionsChanged: InteractionChange[];
   unchanged: number;
   hasChanges: boolean;
 }
@@ -324,6 +334,53 @@ export function diffBundles(
       rulesChanged.push({ name: n });
   }
 
+  // Interactions — identity is the (aKey, bKey, type) triple; any other
+  // field changing (nudge, severity, gapHours, evidenceTier, source…) is a
+  // "changed". A severity flip (soft↔firm) or a new conflict silently
+  // muting a behavior MUST be reviewable before it ships.
+  const interKey = (i: Interaction) => `${i.aKey}|${i.bKey}|${i.type}`;
+  const interLabel = (i: Interaction) => {
+    const verb =
+      i.type === "conflict"
+        ? "✕"
+        : i.type === "synergy"
+          ? "+"
+          : i.type === "ordering"
+            ? "→"
+            : "·";
+    return `${i.aKey} ${verb} ${i.bKey} (${i.type})`;
+  };
+  const prevI = (prev?.interactions ?? []).reduce<
+    Record<string, { i: Interaction; sig: string }>
+  >((m, i) => {
+    m[interKey(i)] = { i, sig: JSON.stringify(i) };
+    return m;
+  }, {});
+  const nextI = (next.interactions ?? []).reduce<
+    Record<string, { i: Interaction; sig: string }>
+  >((m, i) => {
+    m[interKey(i)] = { i, sig: JSON.stringify(i) };
+    return m;
+  }, {});
+  const interactionsAdded: InteractionChange[] = [];
+  const interactionsRemoved: InteractionChange[] = [];
+  const interactionsChanged: InteractionChange[] = [];
+  const allIKeys = new Set([...Object.keys(prevI), ...Object.keys(nextI)]);
+  for (const k of allIKeys) {
+    const p = prevI[k];
+    const n = nextI[k];
+    const ref = (n ?? p).i;
+    const change: InteractionChange = {
+      label: interLabel(ref),
+      aKey: ref.aKey,
+      bKey: ref.bKey,
+      type: ref.type,
+    };
+    if (!p) interactionsAdded.push(change);
+    else if (!n) interactionsRemoved.push(change);
+    else if (p.sig !== n.sig) interactionsChanged.push(change);
+  }
+
   const hasChanges =
     protocolsAdded.length +
       protocolsRemoved.length +
@@ -339,7 +396,10 @@ export function diffBundles(
       templatesChanged.length +
       rulesAdded.length +
       rulesRemoved.length +
-      rulesChanged.length >
+      rulesChanged.length +
+      interactionsAdded.length +
+      interactionsRemoved.length +
+      interactionsChanged.length >
     0;
 
   return {
@@ -358,6 +418,9 @@ export function diffBundles(
     rulesAdded,
     rulesRemoved,
     rulesChanged,
+    interactionsAdded,
+    interactionsRemoved,
+    interactionsChanged,
     unchanged,
     hasChanges,
   };

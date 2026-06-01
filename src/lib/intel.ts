@@ -458,6 +458,21 @@ export function suggestions(state: AppState): Suggestion[] {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 7);
   if (state.dailyLogs.length >= 21 && activeDays.length >= 5) {
+    // Precompute pack tenure once. A behavior's PACK is "established"
+    // (clearly installed and lived-in, not freshly added) if any of its
+    // behaviors has ever been completed in the user's full history. Used
+    // below so we don't nag about a brand-new pack's slots before they've
+    // had a fair chance — without silencing the chronic-skip case.
+    const engagedKeysEver = new Set<string>();
+    for (const l of state.dailyLogs) {
+      const bc = l.behaviorCompletions;
+      if (!bc) continue;
+      for (const k in bc) if (bc[k]) engagedKeysEver.add(k);
+    }
+    const establishedPacks = new Set<string>();
+    for (const o of items)
+      if (engagedKeysEver.has(o.canonicalKey))
+        for (const p of o.fromPacks ?? []) establishedPacks.add(p);
     for (const it of items) {
       if (state.behaviorOverrides?.[it.canonicalKey]?.disabled) continue;
       // Never tell the user to pause their own keystone — that's a
@@ -470,10 +485,23 @@ export function suggestions(state: AppState): Suggestion[] {
       // picks) ARE eligible — they share canonical identity with a
       // curated atom we understand.
       if (it.trustTier === "custom") continue;
-      const everDone = activeDays.some(
+      const doneRecently = activeDays.some(
         (l) => l.behaviorCompletions?.[it.canonicalKey]
       );
-      if (!everDone) {
+      // Per-behavior tenure gate. Install date isn't tracked, so we infer
+      // tenure from engagement: a behavior is "established enough to judge"
+      // if it — or any sibling from the same pack — has ever been completed.
+      //   • a chronically-skipped slot inside an actively-used pack → eligible
+      //     (siblings have completions, so the pack clearly isn't new); but
+      //   • a freshly-installed pack on a long-lived account → suppressed
+      //     (no sibling has any completion yet, so the slot hasn't had a fair
+      //     chance regardless of total account age).
+      // This fixes the "21-day-old account nags a days-old behavior" bug
+      // without silencing D2's core chronic-skip case.
+      const packEstablished =
+        engagedKeysEver.has(it.canonicalKey) ||
+        !!it.fromPacks?.some((p) => establishedPacks.has(p));
+      if (packEstablished && !doneRecently) {
         const override = state.behaviorOverrides?.[it.canonicalKey];
         const effectiveBlock = override?.block ?? it.block;
         if (effectiveBlock !== "anytime") {

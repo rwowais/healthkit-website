@@ -5056,6 +5056,10 @@ function AdminHomeInner() {
                         diff.rulesChanged.length +
                         diff.rulesRemoved.length &&
                         `${diff.rulesAdded.length + diff.rulesChanged.length + diff.rulesRemoved.length} rules`,
+                      diff.interactionsAdded.length +
+                        diff.interactionsChanged.length +
+                        diff.interactionsRemoved.length &&
+                        `${diff.interactionsAdded.length + diff.interactionsChanged.length + diff.interactionsRemoved.length} interactions`,
                     ]
                       .filter(Boolean)
                       .join(" · ")}{" "}
@@ -5185,6 +5189,31 @@ function AdminHomeInner() {
                       className="text-[var(--alert)]"
                     >
                       − rule <b>{r.name}</b>
+                    </p>
+                  ))}
+                  {/* Interactions (conflicts / timing / synergy) */}
+                  {diff.interactionsAdded.map((i) => (
+                    <p
+                      key={`inter+${i.aKey}|${i.bKey}|${i.type}`}
+                      className="text-[var(--vitality)]"
+                    >
+                      + interaction <b>{i.label}</b>
+                    </p>
+                  ))}
+                  {diff.interactionsChanged.map((i) => (
+                    <p
+                      key={`inter~${i.aKey}|${i.bKey}|${i.type}`}
+                      className="text-[var(--warm)]"
+                    >
+                      ~ interaction <b>{i.label}</b>
+                    </p>
+                  ))}
+                  {diff.interactionsRemoved.map((i) => (
+                    <p
+                      key={`inter-${i.aKey}|${i.bKey}|${i.type}`}
+                      className="text-[var(--alert)]"
+                    >
+                      − interaction <b>{i.label}</b>
                     </p>
                   ))}
                   {diff.behaviorsAdded.length +

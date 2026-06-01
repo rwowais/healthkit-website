@@ -33,7 +33,10 @@ export const maxDuration = 60;
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const CRON_SECRET = process.env.PUSH_CRON_SECRET;
+// Accept the project secret (Supabase pg_cron path) OR Vercel's own CRON_SECRET
+// (Vercel Cron sends `Authorization: Bearer $CRON_SECRET` on a GET), so the
+// endpoint authenticates with whichever scheduler the owner wires.
+const CRON_SECRET = process.env.PUSH_CRON_SECRET || process.env.CRON_SECRET;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -155,4 +158,11 @@ export async function POST(req: Request) {
     gone: goneIds.length,
     considered: subs.length,
   });
+}
+
+// Vercel Cron invokes the path with a GET (and the `Authorization: Bearer
+// $CRON_SECRET` header). Delegate to the same auth + send logic so a Vercel
+// cron works without a separate code path. Supabase pg_cron uses POST.
+export async function GET(req: Request) {
+  return POST(req);
 }

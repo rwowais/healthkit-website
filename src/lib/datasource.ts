@@ -152,14 +152,101 @@ function slicesDiffer(a: AppState, b: AppState): boolean {
 }
 
 /** Non-destructive union of two states (keeps the most-progressed day). */
+/**
+ * Field-level merge of two logs for the SAME day (e.g. behaviors checked on
+ * the phone + a reflection written on the desktop, both offline). The old
+ * whole-object "higher completion count wins" pick discarded the loser's
+ * fields entirely; this unions/keeps the richer value per field so nothing a
+ * user recorded is lost. `b` is the more-recent-intent side (local).
+ */
+function mergeDailyLog(
+  a: AppState["dailyLogs"][number],
+  b: AppState["dailyLogs"][number]
+): AppState["dailyLogs"][number] {
+  const keys = (o?: Record<string, boolean>) => Object.keys(o ?? {});
+  const unionDone = (
+    x?: Record<string, boolean>,
+    y?: Record<string, boolean>
+  ): Record<string, boolean> => {
+    const out: Record<string, boolean> = {};
+    for (const k of new Set([...keys(x), ...keys(y)]))
+      out[k] = !!(x?.[k] || y?.[k]); // done on EITHER device → done
+    return out;
+  };
+  const completed = (arr?: { completed?: boolean }[]) =>
+    (arr ?? []).filter((e) => e.completed).length;
+  const richerByCompleted = <T extends { completed?: boolean }>(
+    x?: T[],
+    y?: T[]
+  ): T[] => (completed(y) >= completed(x) ? y ?? x ?? [] : x ?? []);
+  const answered = (sc?: AppState["dailyLogs"][number]["nutritionScorecard"]) =>
+    sc
+      ? [
+          sc.hitProteinTarget,
+          sc.ateFruitsVeggies,
+          sc.stayedHydrated,
+          sc.avoidedProcessedSugar,
+          sc.finishedEatingOnTime,
+          sc.minimizedAlcohol,
+        ].filter((v) => v != null).length + (sc.customItems?.length ?? 0)
+      : 0;
+  return {
+    ...b,
+    date: a.date,
+    behaviorCompletions: unionDone(a.behaviorCompletions, b.behaviorCompletions),
+    behaviorCompletionMinutes: {
+      ...(a.behaviorCompletionMinutes ?? {}),
+      ...(b.behaviorCompletionMinutes ?? {}),
+    },
+    supplementCompletions: unionDone(
+      a.supplementCompletions,
+      b.supplementCompletions
+    ),
+    supplementSkips: Array.from(
+      new Set([...(a.supplementSkips ?? []), ...(b.supplementSkips ?? [])])
+    ),
+    exerciseEntries: richerByCompleted(a.exerciseEntries, b.exerciseEntries),
+    sleepCompletions: richerByCompleted(a.sleepCompletions, b.sleepCompletions),
+    supplementEntries:
+      (b.supplementEntries?.length ?? 0) >= (a.supplementEntries?.length ?? 0)
+        ? b.supplementEntries
+        : a.supplementEntries,
+    nutritionScorecard:
+      answered(b.nutritionScorecard) >= answered(a.nutritionScorecard)
+        ? b.nutritionScorecard
+        : a.nutritionScorecard,
+    sleepLog: {
+      actualBedtime: b.sleepLog?.actualBedtime ?? a.sleepLog?.actualBedtime ?? null,
+      actualWakeTime: b.sleepLog?.actualWakeTime ?? a.sleepLog?.actualWakeTime ?? null,
+      sleepQuality: b.sleepLog?.sleepQuality ?? a.sleepLog?.sleepQuality ?? null,
+      sleepDurationMinutes:
+        b.sleepLog?.sleepDurationMinutes ?? a.sleepLog?.sleepDurationMinutes ?? null,
+    },
+    energyLevel: b.energyLevel ?? a.energyLevel ?? null,
+    moodLevel: b.moodLevel ?? a.moodLevel ?? null,
+    dayNote: (b.dayNote && b.dayNote.trim() ? b.dayNote : a.dayNote) || "",
+    score: Math.max(a.score ?? 0, b.score ?? 0),
+    swaps: { ...(a.swaps ?? {}), ...(b.swaps ?? {}) },
+    swapAutoCompleted: {
+      ...(a.swapAutoCompleted ?? {}),
+      ...(b.swapAutoCompleted ?? {}),
+    },
+    snoozes: { ...(a.snoozes ?? {}), ...(b.snoozes ?? {}) },
+    oneOffs: [
+      ...(a.oneOffs ?? []),
+      ...(b.oneOffs ?? []).filter(
+        (o) => !(a.oneOffs ?? []).some((x) => x.key === o.key)
+      ),
+    ],
+  };
+}
+
 export function mergeStates(local: AppState, cloud: AppState): AppState {
   const byDate = new Map<string, AppState["dailyLogs"][number]>();
-  const score = (l: AppState["dailyLogs"][number]) =>
-    Object.values(l.behaviorCompletions ?? {}).filter(Boolean).length * 1000 +
-    (l.score ?? 0);
+  // cloud first, then local — so the local (more-recent-intent) side is `b`.
   for (const l of [...(cloud.dailyLogs ?? []), ...(local.dailyLogs ?? [])]) {
     const prev = byDate.get(l.date);
-    if (!prev || score(l) >= score(prev)) byDate.set(l.date, l);
+    byDate.set(l.date, prev ? mergeDailyLog(prev, l) : l);
   }
   const bm = new Map<string, AppState["biomarkers"][number]>();
   for (const b of [...(cloud.biomarkers ?? []), ...(local.biomarkers ?? [])])

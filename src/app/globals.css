@@ -94,18 +94,20 @@
   --text-4: #6E727B; /* darkened from #8A8F98 (~2.8:1, failed AA) → ~4.5:1 on
                         light surfaces, while staying dimmer than --text-3 */
 
-  /* Accents — deepened for legibility on light (≈4.5:1 as small text) */
-  --sleep: #5258C4;
+  /* Accents — deepened so they clear WCAG AA (≥4.5:1) as small bold text even
+     on the darkest recessed surface (--surface-3, the .well/.row bg), not just
+     on white. (Dark theme keeps its pale-on-black accents in the :root block.) */
+  --sleep: #4A4FB8;
   --sleep-soft: rgba(82, 88, 196, 0.12);
-  --recovery: #0E7D71;
+  --recovery: #0B665C;
   --recovery-soft: rgba(14, 125, 113, 0.12);
-  --readiness: #2C66D6;
+  --readiness: #2A5BC4;
   --readiness-soft: rgba(44, 102, 214, 0.12);
-  --vitality: #1B8040;
+  --vitality: #166C34;
   --vitality-soft: rgba(27, 128, 64, 0.12);
-  --warm: #946417;
+  --warm: #80560F;
   --warm-soft: rgba(148, 100, 23, 0.13);
-  --alert: #C2452D;
+  --alert: #A73A24;
 
   /* Effects */
   --glass-bg: rgba(255, 255, 255, 0.72);
