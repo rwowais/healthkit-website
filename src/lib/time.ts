@@ -94,10 +94,31 @@ export function nowMinutes(): number {
  *
  * Never returns "anytime" — callers handle untimed items separately.
  */
-export function blockForMinutes(
-  min: number,
-  settings: { wakeTime: string; bedtime: string }
-): TimeBlock {
+/** Settings shape the block helpers read. `blockBoundaries` is optional —
+ *  absent (or invalid) falls back to the defaults 05:00 / 12:00 / 17:00. */
+type BlockSettings = {
+  wakeTime: string;
+  bedtime: string;
+  blockBoundaries?: { morning: string; afternoon: string; evening: string };
+};
+
+/** Resolve the three daytime block start-minutes, defaulting to
+ *  05:00 / 12:00 / 17:00 and only honoring custom values when they're
+ *  strictly ascending (a malformed set silently falls back to defaults). */
+export function resolveBlockBounds(settings: {
+  blockBoundaries?: { morning: string; afternoon: string; evening: string };
+}): { morning: number; afternoon: number; evening: number } {
+  const d = { morning: 300, afternoon: 720, evening: 1020 };
+  const bb = settings.blockBoundaries;
+  if (!bb) return d;
+  const mo = parseHM(bb.morning);
+  const af = parseHM(bb.afternoon);
+  const ev = parseHM(bb.evening);
+  if (mo < af && af < ev) return { morning: mo, afternoon: af, evening: ev };
+  return d;
+}
+
+export function blockForMinutes(min: number, settings: BlockSettings): TimeBlock {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
   const wake = parseHM(settings.wakeTime);
   let bed = parseHM(settings.bedtime);
@@ -110,11 +131,13 @@ export function blockForMinutes(
     const sinceBed = t - bed;
     return sinceBed > night * 0.6 ? "morning" : "evening";
   }
-  // Awake — pure clock. 5pm→bed (incl. just-past-midnight while still up)
-  // is the evening wind-down.
-  if (m >= 300 && m < 720) return "morning"; // 5:00am – 11:59am
-  if (m >= 720 && m < 1020) return "afternoon"; // 12:00pm – 4:59pm
-  return "evening"; // 5:00pm – bedtime
+  // Awake — pure clock, split by the (configurable) block boundaries.
+  // Anything before the morning boundary while awake is the evening
+  // wind-down / pre-dawn tail.
+  const b = resolveBlockBounds(settings);
+  if (m >= b.morning && m < b.afternoon) return "morning";
+  if (m >= b.afternoon && m < b.evening) return "afternoon";
+  return "evening";
 }
 
 /**
@@ -132,7 +155,7 @@ export function blockForMinutes(
  * matches the user's actual local time, not the device clock.
  */
 export function currentBlock(
-  settings: { wakeTime: string; bedtime: string },
+  settings: BlockSettings,
   now: number = nowMinutes()
 ): TimeBlock {
   return blockForMinutes(now, settings);

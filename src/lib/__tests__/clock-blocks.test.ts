@@ -186,3 +186,26 @@ describe("inQuietHours — do-not-disturb window (with midnight wrap)", () => {
     expect(inQuietHours(HM2(9), qh)).toBe(false);
   });
 });
+
+describe("blockForMinutes — custom block boundaries", () => {
+  const CUSTOM = {
+    wakeTime: "05:00",
+    bedtime: "23:00",
+    blockBoundaries: { morning: "06:00", afternoon: "13:00", evening: "18:00" },
+  };
+  it("honors ascending custom boundaries", () => {
+    expect(blockForMinutes(HM(12, 30), CUSTOM)).toBe("morning"); // before 1pm
+    expect(blockForMinutes(HM(13, 0), CUSTOM)).toBe("afternoon");
+    expect(blockForMinutes(HM(17, 30), CUSTOM)).toBe("afternoon"); // before 6pm
+    expect(blockForMinutes(HM(18, 0), CUSTOM)).toBe("evening");
+  });
+  it("falls back to the 5am/12pm/5pm defaults when not ascending", () => {
+    const BAD = {
+      wakeTime: "05:00",
+      bedtime: "23:00",
+      blockBoundaries: { morning: "13:00", afternoon: "12:00", evening: "18:00" },
+    };
+    expect(blockForMinutes(HM(12, 30), BAD)).toBe("afternoon"); // default noon
+    expect(blockForMinutes(HM(17, 30), BAD)).toBe("evening"); // default 5pm
+  });
+});

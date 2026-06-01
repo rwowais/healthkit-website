@@ -232,6 +232,57 @@ export default function ProfilePage() {
           </div>
         </Card>
 
+        {/* Day blocks — when morning / afternoon / evening begin. Lets a
+            shift worker or night owl file behaviors under the section that
+            matches their real day, instead of the fixed clock defaults. */}
+        <Card>
+          <Eyebrow>Day blocks</Eyebrow>
+          <p className="t-caption mt-2">
+            When your morning, afternoon, and evening begin. Behaviors file
+            under the section matching their time.
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {(
+              [
+                ["morning", "Morning", "05:00"],
+                ["afternoon", "Afternoon", "12:00"],
+                ["evening", "Evening", "17:00"],
+              ] as const
+            ).map(([key, label, def]) => (
+              <div key={key}>
+                <p className="t-caption mb-1.5">{label}</p>
+                <input
+                  type="time"
+                  value={s.blockBoundaries?.[key] ?? def}
+                  onChange={(e) => {
+                    const cur = s.blockBoundaries ?? {
+                      morning: "05:00",
+                      afternoon: "12:00",
+                      evening: "17:00",
+                    };
+                    updateSettings({
+                      blockBoundaries: { ...cur, [key]: e.target.value },
+                    });
+                  }}
+                  className={input}
+                />
+              </div>
+            ))}
+          </div>
+          {s.blockBoundaries && (
+            <button
+              onClick={() => updateSettings({ blockBoundaries: undefined })}
+              className="press tr-fast mt-3 text-[12px] font-semibold text-[var(--readiness)]"
+            >
+              Reset to default
+            </button>
+          )}
+          <p className="t-caption mt-2 text-[var(--text-4)]">
+            Times must go in order; otherwise the 5am / 12pm / 5pm defaults
+            apply.
+          </p>
+        </Card>
+
         {/* Integrations */}
         <Card>
           <Eyebrow>Integrations</Eyebrow>

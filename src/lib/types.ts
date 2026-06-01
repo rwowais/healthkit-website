@@ -102,6 +102,11 @@ export interface UserSettings {
    *  whose time falls inside [start, end) — wrapping past midnight, e.g.
    *  22:00→07:00 — is never scheduled. */
   quietHours?: { start: string; end: string };
+  /** Optional custom day-block start times ("HH:MM"). Defaults 05:00 /
+   *  12:00 / 17:00. Only honored when strictly ascending (else defaults).
+   *  Lets a shift worker / night owl define when their morning, afternoon,
+   *  and evening begin so behaviors file under the right section. */
+  blockBoundaries?: { morning: string; afternoon: string; evening: string };
   weekStartsOn: 0 | 1;
   completedOnboarding: boolean;
   primaryGoal?: string;
