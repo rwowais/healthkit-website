@@ -413,11 +413,13 @@ export default function TodayPage() {
       setBehaviorOverride(m.key, {
         ...cur,
         block: toBlock,
-        // Clearing customTime keeps the move predictable — a 7:30am
-        // morning custom time would otherwise still snap that exact
-        // clock when the user moves it to "evening", which is rarely
-        // what they want.
-        customTime: toBlock === "anytime" ? undefined : cur.customTime,
+        // Re-derive the time on a move: drop the old exact pin so the item
+        // shows a time INSIDE the new block (the engine fills the block's
+        // representative time) instead of keeping a stale clock from where it
+        // used to live — e.g. a 7:30am item moved to evening no longer reads
+        // "Evening · 7:30 AM". Moving also breaks any habit-stack anchor.
+        customTime: undefined,
+        stackAfter: undefined,
       });
     }
   };
@@ -2393,12 +2395,12 @@ export default function TodayPage() {
                                 </span>
                               </button>
 
-                              {/* Content — tapping the row completes it
-                                  (it's a checklist). Details/editing is a
-                                  deliberate secondary affordance, right.
-                                  In edit mode tapping the content toggles
-                                  selection so the entire row is hit-
-                                  target for picking, not just the tiny
+                              {/* Content — tapping the row body OPENS details
+                                  / options (the common intent); completing is
+                                  the radio node on the left, so a stray tap
+                                  never silently checks something off. In edit
+                                  mode the body toggles selection so the whole
+                                  row is the pick target, not just the tiny
                                   checkbox. */}
                               {/* Row body is a role=button div, NOT a
                                   <button> — it contains nested interactive
@@ -2426,18 +2428,14 @@ export default function TodayPage() {
                                     haptic.light();
                                     return;
                                   }
-                                  if (done) haptic.light();
-                                  else haptic.medium();
-                                  toggleBehavior(
-                                    selectedDate,
-                                    it.canonicalKey
-                                  );
+                                  // Tapping the row body OPENS details/options.
+                                  // Completion lives solely on the radio node to
+                                  // the left — so a stray tap never silently
+                                  // marks something done.
+                                  haptic.light();
+                                  setDetail(it);
                                 }}
-                                aria-label={
-                                  done
-                                    ? `${it.title} — done`
-                                    : `Mark ${it.title} done`
-                                }
+                                aria-label={`${it.title} — open details and options`}
                                 className={`min-w-0 flex-1 rounded-[var(--r-md)] text-left tr-fast ${
                                   lev3 && !done
                                     ? "px-4 py-3"

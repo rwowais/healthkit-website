@@ -253,6 +253,41 @@ describe("publish diff — interaction identity", () => {
   });
 });
 
+// ── Move-to-block re-derives the shown time (no stale clock) ──
+describe("move to a block re-derives the displayed time", () => {
+  const stWith = (ov: Record<string, unknown>): AppState =>
+    ({
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+      behaviorOverrides: ov,
+    }) as unknown as AppState;
+
+  it("a behavior moved to a different block shows a time INSIDE that block", () => {
+    // strength is an afternoon behavior baked at 12:30; moving it to evening
+    // must NOT keep 12:30 — it adopts the evening block's start (17:00).
+    const item = compileTimeline(stWith({ strength: { block: "evening" } }), 0).find(
+      (i) => i.canonicalKey === "strength"
+    )!;
+    expect(item.block).toBe("evening");
+    expect(item.customTime).toBe("17:00");
+  });
+
+  it("an explicit specific time still wins over the block default", () => {
+    const item = compileTimeline(
+      stWith({ strength: { block: "evening", customTime: "20:30" } }),
+      0
+    ).find((i) => i.canonicalKey === "strength")!;
+    expect(item.customTime).toBe("20:30");
+  });
+
+  it("leaves the baked time intact when NOT moved", () => {
+    const item = compileTimeline(stWith({}), 0).find(
+      (i) => i.canonicalKey === "strength"
+    )!;
+    expect(item.block).toBe("afternoon"); // unchanged
+  });
+});
+
 // ── Sync recency: updatedAt resolves genuine conflicts (un-check) ──
 describe("sync merge — recency via updatedAt", () => {
   const logAt = (

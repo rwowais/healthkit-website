@@ -132,6 +132,24 @@ export function resolveBlockBounds(settings: {
   return { morning: mo, afternoon: af, evening: ev };
 }
 
+/**
+ * A representative "HH:MM" clock time for a block — its start boundary. Used
+ * when a behavior is MOVED into a block (via the WHEN picker / Today move /
+ * drag) so it shows a time that actually sits in the new block, instead of
+ * keeping a stale clock time from where it used to live. Returns undefined for
+ * "anytime" (those carry no clock).
+ */
+export function blockStartClock(
+  block: TimeBlock,
+  settings: BlockSettings
+): string | undefined {
+  if (block === "anytime") return undefined;
+  const start = resolveBlockBounds(settings)[block];
+  const h = Math.floor(start / 60);
+  const m = start % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export function blockForMinutes(min: number, settings: BlockSettings): TimeBlock {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
   const wake = parseHM(settings.wakeTime);

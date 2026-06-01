@@ -144,9 +144,13 @@ export default function BehaviorSheet({
                 <button
                   key={b}
                   onClick={() =>
+                    // Pick a block → clear the exact-time pin (the item shows a
+                    // time inside the new block) and break any stack anchor, so
+                    // "Evening" can't keep showing an afternoon clock.
                     patch({
                       block: b === item.recommendedBlock ? undefined : b,
                       customTime: undefined,
+                      stackAfter: undefined,
                     })
                   }
                   className="flex-1 rounded-[var(--r-pill)] py-2 text-[12px] font-semibold capitalize tr-fast"
@@ -218,9 +222,18 @@ export default function BehaviorSheet({
               <select
                 aria-label="Stack this behavior after another habit"
                 value={ov.stackAfter ?? ""}
-                onChange={(e) =>
-                  patch({ stackAfter: e.target.value || undefined })
-                }
+                onChange={(e) => {
+                  const next = e.target.value || undefined;
+                  // Stacking hands timing to the anchor (engine files the
+                  // follower right after it, in its block, at its time). Clear
+                  // this item's own block/time pin so a stale clock can't
+                  // pre-empt the anchor. Clearing the anchor restores defaults.
+                  patch(
+                    next
+                      ? { stackAfter: next, block: undefined, customTime: undefined }
+                      : { stackAfter: undefined }
+                  );
+                }}
                 className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[14px] text-[var(--text-1)] outline-none"
               >
                 <option value="">No anchor — use its own time</option>

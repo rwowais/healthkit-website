@@ -19,7 +19,12 @@ import type {
 } from "./types";
 import { activePacks, activeAdaptationRules, activeInteractions } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
-import { effectiveMinutes, blockForMinutes, parseHM } from "./time";
+import {
+  effectiveMinutes,
+  blockForMinutes,
+  blockStartClock,
+  parseHM,
+} from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
 import { isSupplementBehavior } from "./supplements";
@@ -210,12 +215,17 @@ export function compileTimeline(
           daysActive: ov?.daysActive ?? b.daysActive,
           dose: ov?.dose ?? b.dose,
           block: ov?.block ?? b.block,
-          // Honor a user override first, then the behavior's OWN baked
-          // clock time. Previously this was `ov?.customTime` alone, which
-          // silently dropped a behavior's intrinsic customTime (e.g. a
-          // custom behavior authored with an exact time) — so it fell
-          // back to anchor math and mis-sorted on Today.
-          customTime: ov?.customTime ?? b.customTime,
+          // Time resolution, in priority order:
+          //  1. an explicit user pin (ov.customTime) always wins;
+          //  2. else, if the user MOVED this to a different block, the base
+          //     baked time is stale for the new block — show the new block's
+          //     representative time so it doesn't read "Evening · 12:30 PM";
+          //  3. else the behavior's own baked clock time (custom atoms etc.).
+          customTime:
+            ov?.customTime ??
+            (ov?.block && ov.block !== b.block
+              ? blockStartClock(ov.block, state.settings)
+              : b.customTime),
           recommendedBlock: b.block,
           retimed,
           blockPinned: !!ov?.block,
