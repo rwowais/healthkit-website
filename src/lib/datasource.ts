@@ -490,6 +490,23 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
   };
 }
 
+/**
+ * Decide which state a cloud-present load should persist + normalize:
+ *  - dirty (local has un-pushed edits): a local-preferring MERGE so those
+ *    edits survive cloud-wins;
+ *  - clean (the normal case): cloud verbatim (cloud-wins → cross-device
+ *    deletions propagate).
+ * Pure + exported so the load decision is unit-testable without a live
+ * Supabase session (the I/O plumbing around it is generic Supabase calls).
+ */
+export function chooseCloudLoad(
+  local: AppState,
+  cloud: AppState,
+  dirty: boolean
+): AppState {
+  return dirty ? mergeStates(local, cloud) : cloud;
+}
+
 /** Resolve a pending first-sign-in conflict; persists the chosen state. */
 export async function resolveConflict(
   choice: "local" | "cloud" | "merge"
@@ -705,22 +722,13 @@ class SupabaseDataSource implements DataSource {
         markReconciled(userId);
         const dirty = hasPendingSync();
         if (typeof window !== "undefined") {
-          if (dirty) {
-            // Local has un-pushed edits (an offline session not yet synced).
-            // MERGE local into cloud (local-preferring union — the same
-            // combiner the first-sign-in "merge" choice uses) so cloud-wins
-            // doesn't silently discard the un-pushed non-log slices (settings,
-            // installed packs, behavior overrides, biomarkers, goals…). Logs
-            // are reconciled separately below.
-            localStorage.setItem(
-              STORAGE_KEY,
-              JSON.stringify(mergeStates(local, cloud))
-            );
-          } else {
-            // Clean local (the normal case): cloud wins, so a deletion made on
-            // another device still propagates to this one.
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
-          }
+          // dirty → local-preferring merge (un-pushed non-log edits survive);
+          // clean → cloud-wins (cross-device deletions still propagate). See
+          // chooseCloudLoad (pure + unit-tested). Logs reconcile separately.
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(chooseCloudLoad(local, cloud, dirty))
+          );
         }
         const norm = loadState(); // normalizes + migrates the payload
         const reconciled = await this.reconcileLogs(sb, userId, norm);

@@ -10,7 +10,7 @@ import type { AppState, DailyLog, Interaction } from "@/lib/types";
 import { getDefaultState, toggleBehavior } from "@/lib/storage";
 import { compileTimeline } from "@/lib/engine";
 import { suggestions, behaviorStats } from "@/lib/intel";
-import { mergeStates } from "@/lib/datasource";
+import { mergeStates, chooseCloudLoad } from "@/lib/datasource";
 import { buildCatalogBundle, diffBundles } from "@/lib/cms/publish";
 import {
   getTz,
@@ -376,6 +376,38 @@ describe("sync merge — un-pushed local non-log slices survive", () => {
       "kCloud",
       "kLocal",
     ]);
+  });
+});
+
+// ── The cloud-present load DECISION (chooseCloudLoad) ──
+describe("chooseCloudLoad — dirty merges, clean takes cloud", () => {
+  it("clean local → returns the cloud state verbatim (cloud-wins)", () => {
+    const cloud: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const local: AppState = {
+      ...getDefaultState(),
+      // a local-only pack that a clean (already-synced) load must NOT keep —
+      // proving deletions/divergence from another device still propagate.
+      installedPacks: ["longevity-foundation", "stale-local"],
+    };
+    expect(chooseCloudLoad(local, cloud, false)).toBe(cloud); // exact cloud
+  });
+
+  it("dirty local → merges so un-pushed local edits survive", () => {
+    const cloud: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const local: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation", "better-sleep"],
+      settings: { ...getDefaultState().settings, name: "LocalEdit" },
+    };
+    const out = chooseCloudLoad(local, cloud, true);
+    expect(out.installedPacks).toContain("better-sleep"); // un-pushed survives
+    expect(out.settings.name).toBe("LocalEdit");
   });
 });
 
