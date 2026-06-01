@@ -115,6 +115,22 @@ export interface UserSettings {
    *  math (like a vacation day) but explicit — a deliberate day off that
    *  earns streak protection without pausing the whole system. */
   restDays?: string[];
+  /** Days (YYYY-MM-DD) the user spent a streak-freeze token to protect.
+   *  Transparent to streak math (unioned into getVacationDates) — a frozen
+   *  day bridges a gap without breaking or extending the streak. The bank is
+   *  a rolling monthly allowance (see freezeStatus in scoring). */
+  usedFreezeDates?: string[];
+  /** When true, per-behavior reminders fire at the user's *learned* typical
+   *  completion time (median of recent recorded completions, clamped to the
+   *  behavior's block) once there's enough signal, instead of the scheduled
+   *  clock time. Falls back to the scheduled time until ≥MIN samples exist. */
+  smartReminders?: boolean;
+  /** Outcome goals the user is tracking (biomarker target / streak / weekly
+   *  active days). Progress is derived, never stored — see goals.ts. */
+  outcomeGoals?: OutcomeGoal[];
+  /** Self-experiments: a structured before/during test of one change against
+   *  a chosen check-in metric. Readout is derived — see goals.ts. */
+  experiments?: Experiment[];
   completedOnboarding: boolean;
   primaryGoal?: string;
   disclaimerAcknowledged?: boolean;
@@ -347,6 +363,15 @@ export interface DailyLog {
 
   // Protocol-OS behavior tracking (canonicalKey -> done)
   behaviorCompletions?: Record<string, boolean>;
+
+  /**
+   * Clock time (minutes since local midnight) a behavior was first checked
+   * off, keyed by canonicalKey. Recorded opportunistically when a behavior is
+   * toggled complete; powers Smart reminder timing (learn the user's real
+   * rhythm). Absent for older logs and for completions toggled before this
+   * shipped — Smart timing simply has less to learn from until it fills in.
+   */
+  behaviorCompletionMinutes?: Record<string, number>;
 
   /**
    * Per-day workout swap: when the user planned to do behavior X but
@@ -657,6 +682,59 @@ export interface BehaviorOverride {
   /** Manual order within its block (lower = earlier). Absent = follow the
    *  clock. Adjusted via "move earlier / later" in the behavior editor. */
   sortIndex?: number;
+}
+
+// ── Outcome goals & self-experiments ──────────────────────────────
+
+/**
+ * An outcome goal the user is steering toward — a target, not a daily
+ * task. Three kinds, each mapping cleanly to data the app already has so
+ * progress is honest and derived (never stored):
+ *   "biomarker"    — reach a target value for a tracked body metric
+ *                    (e.g. "Resting HR ≤ 55"). Direction comes from the
+ *                    BiomarkerDef so "progress" means the right way.
+ *   "streak"       — reach a streak of N consecutive active days.
+ *   "weeklyActive" — sustain N active days within a rolling 7-day window.
+ */
+export interface OutcomeGoal {
+  id: string;
+  kind: "biomarker" | "streak" | "weeklyActive";
+  /** User-facing label, e.g. "Resting HR under 55". */
+  label: string;
+  /** Target number: bpm/kg/etc for biomarker; days for streak/weeklyActive. */
+  target: number;
+  /** Biomarker metric key (BiomarkerDef.key) — biomarker goals only. */
+  metric?: string;
+  /** The metric value when the goal was set — biomarker goals only. Anchors
+   *  the progress bar so "halfway there" means halfway from start→target. */
+  startValue?: number;
+  /** Optional target date (YYYY-MM-DD) — informational, never enforced. */
+  targetDate?: string;
+  createdAt: string; // ISO
+  /** Stamped the first day the goal is met (so the celebration is one-time). */
+  achievedAt?: string;
+}
+
+/**
+ * A self-experiment: test one change (a hypothesis) against a chosen
+ * check-in metric over a fixed window, measuring the metric's average
+ * during the experiment vs a baseline window just before it. Honest by
+ * construction — the readout (goals.ts) refuses a verdict until both
+ * windows have enough data, and never claims causation.
+ */
+export interface Experiment {
+  id: string;
+  /** What you're testing, e.g. "Magnesium before bed improves my sleep". */
+  hypothesis: string;
+  /** The check-in dimension measured before vs during. */
+  metric: "sleepQuality" | "energy" | "mood" | "sleepDuration";
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD (planned)
+  /** Days immediately before startDate used as the baseline window. */
+  baselineDays: number;
+  createdAt: string; // ISO
+  /** Stamped when the user concludes the experiment early/manually. */
+  concludedAt?: string;
 }
 
 // ── Biomarkers ────────────────────────────────────────────────────

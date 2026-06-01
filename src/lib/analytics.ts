@@ -20,11 +20,12 @@ import type {
   UserSettings,
 } from "./types";
 import { getTz, dateKeyInTz, addDaysToKey, dayIndexOfKeyInTz } from "./tz";
-import { calculateStreak, hasAnyActivity } from "./scoring";
+import { calculateStreak, hasAnyActivity, weeklyActiveDays } from "./scoring";
 import { pillarScore, sleepDurationMinutes, PILLAR_LIST } from "./metrics";
 import { getVacationDates } from "./storage";
 import { compileTimeline } from "./engine";
 import { listBehaviorAtoms } from "./packs";
+import { biomarkerDef } from "./biomarkers";
 
 // ── small shared helpers ──────────────────────────────────────────
 
@@ -739,3 +740,478 @@ export const WEEKDAY_LABELS = [
   "Sunday",
 ];
 export const WEEKDAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// ── 8. Trend forecasting ──────────────────────────────────────────
+//
+// A gentle "if this continues" projection for body metrics that have a
+// clear, statistically meaningful trend. Honest by construction: we only
+// surface a forecast when there are enough readings, over a long enough
+// span, with a strong enough fit (|r|). No fit, no forecast — never a
+// fabricated line. We deliberately do NOT forecast behavior scores
+// (too noisy day-to-day to project responsibly).
+
+/** Integer day number for a YYYY-MM-DD key (UTC epoch days). */
+function dayNum(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
+}
+
+/** Ordinary least-squares fit + Pearson r over (x,y) points. */
+function linfit(pts: { x: number; y: number }[]): {
+  slope: number;
+  intercept: number;
+  r: number;
+} | null {
+  const n = pts.length;
+  if (n < 2) return null;
+  const mx = pts.reduce((s, p) => s + p.x, 0) / n;
+  const my = pts.reduce((s, p) => s + p.y, 0) / n;
+  let sxx = 0;
+  let sxy = 0;
+  let syy = 0;
+  for (const p of pts) {
+    const dx = p.x - mx;
+    const dy = p.y - my;
+    sxx += dx * dx;
+    sxy += dx * dy;
+    syy += dy * dy;
+  }
+  if (sxx === 0) return null;
+  const slope = sxy / sxx;
+  const intercept = my - slope * mx;
+  const r = syy === 0 ? 0 : sxy / Math.sqrt(sxx * syy);
+  return { slope, intercept, r };
+}
+
+export interface BiomarkerForecast {
+  metric: string;
+  label: string;
+  unit: string;
+  /** Most recent reading. */
+  current: number;
+  /** Projected value `horizonDays` out, if the trend holds. */
+  projected: number;
+  horizonDays: number;
+  /** Signed change per week, in metric units. */
+  perWeek: number;
+  /** Relative to what's healthy for this metric. */
+  direction: "improving" | "worsening" | "drifting";
+  betterIs: "lower" | "higher" | "range";
+  n: number;
+  /** Fit strength |r|, 0–1. */
+  fit: number;
+  /** Calm one-liner. */
+  note: string;
+}
+
+/**
+ * Forecasts for tracked body metrics with a confident linear trend.
+ * Returns the strongest few (by fit), or [] when nothing qualifies.
+ */
+export function biomarkerForecasts(
+  state: AppState,
+  horizonDays = 30
+): BiomarkerForecast[] {
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  const lookFloor = addDaysToKey(today, -180);
+
+  // Group recent readings by metric (one value per day — last write wins).
+  const byMetric = new Map<string, Map<string, number>>();
+  for (const b of state.biomarkers ?? []) {
+    if (!b?.date || b.date < lookFloor || b.date > today) continue;
+    if (typeof b.value !== "number" || !isFinite(b.value)) continue;
+    if (!byMetric.has(b.metric)) byMetric.set(b.metric, new Map());
+    byMetric.get(b.metric)!.set(b.date, b.value);
+  }
+
+  const out: BiomarkerForecast[] = [];
+  for (const [metric, dayMap] of byMetric) {
+    const def = biomarkerDef(metric);
+    if (!def) continue;
+    const dates = [...dayMap.keys()].sort();
+    if (dates.length < 6) continue; // not enough signal
+    const spanDays = dayNum(dates[dates.length - 1]) - dayNum(dates[0]);
+    if (spanDays < 21) continue; // readings too clustered to project
+    const x0 = dayNum(dates[0]);
+    const pts = dates.map((d) => ({ x: dayNum(d) - x0, y: dayMap.get(d)! }));
+    const fit = linfit(pts);
+    if (!fit) continue;
+    const absR = Math.abs(fit.r);
+    if (absR < 0.5) continue; // weak/no trend → stay silent
+
+    const current = dayMap.get(dates[dates.length - 1])!;
+    const lastX = dayNum(dates[dates.length - 1]) - x0;
+    const rawProjected = fit.intercept + fit.slope * (lastX + horizonDays);
+    // Clamp the projection to a sane band around observed values so a steep
+    // short-term slope can't extrapolate to something physiologically absurd.
+    const ys = pts.map((p) => p.y);
+    const lo = Math.min(...ys);
+    const hi = Math.max(...ys);
+    const pad = Math.max((hi - lo) * 0.5, Math.abs(current) * 0.15, 1);
+    const projected = Math.max(lo - pad, Math.min(hi + pad, rawProjected));
+    const perWeek = fit.slope * 7;
+    // Ignore trends too small to matter (< ~0.3% of the value per week).
+    if (Math.abs(perWeek) < Math.max(Math.abs(current) * 0.003, 0.05)) continue;
+
+    const betterIs = def.direction;
+    let direction: BiomarkerForecast["direction"];
+    if (betterIs === "range") direction = "drifting";
+    else if (betterIs === "lower")
+      direction = fit.slope < 0 ? "improving" : "worsening";
+    else direction = fit.slope > 0 ? "improving" : "worsening";
+
+    const round = (v: number) =>
+      Math.round(v * (def.step && def.step < 1 ? 10 : 1)) /
+      (def.step && def.step < 1 ? 10 : 1);
+    const rate = `${Math.abs(perWeek) >= 1 ? Math.round(Math.abs(perWeek)) : Math.abs(perWeek).toFixed(1)} ${def.unit}/week`;
+    const trendWord = fit.slope > 0 ? "rising" : "falling";
+    let note: string;
+    if (direction === "drifting") {
+      note = `Trending ${trendWord} ~${rate}. About ${round(projected)} ${def.unit} in ${horizonDays} days if it holds.`;
+    } else if (direction === "improving") {
+      const reachesOptimal =
+        betterIs === "lower" ? projected <= def.optimal : projected >= def.optimal;
+      note = `Moving the right way — ~${rate}. ${
+        reachesOptimal
+          ? `On track to reach your optimal range (~${round(projected)} ${def.unit}) within ${horizonDays} days.`
+          : `~${round(projected)} ${def.unit} projected in ${horizonDays} days if it holds.`
+      }`;
+    } else {
+      note = `Drifting the wrong way — ~${rate}. Worth one protected fix this month; ~${round(projected)} ${def.unit} projected in ${horizonDays} days if nothing changes.`;
+    }
+
+    out.push({
+      metric,
+      label: def.label,
+      unit: def.unit,
+      current: round(current),
+      projected: round(projected),
+      horizonDays,
+      perWeek,
+      direction,
+      betterIs,
+      n: dates.length,
+      fit: absR,
+      note,
+    });
+  }
+
+  return out.sort((a, b) => b.fit - a.fit).slice(0, 3);
+}
+
+// ── 9. "What changed" — week-over-week digest ─────────────────────
+
+export interface WeekChange {
+  key: string;
+  label: string;
+  unit: string;
+  now: number;
+  prev: number;
+  delta: number;
+  /** Which direction of change is good for this metric. */
+  betterIs: "up" | "down";
+  dir: "up" | "down" | "flat";
+  good: boolean;
+}
+
+export interface WhatChanged {
+  hasData: boolean;
+  headline: string;
+  changes: WeekChange[];
+  /** The single most-worth-attention slip, phrased gently. null if none. */
+  attention: string | null;
+}
+
+function avg(nums: number[]): number | null {
+  const v = nums.filter((n) => n != null && isFinite(n));
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+
+/**
+ * Compares the trailing 7 days against the 7 before. Reports the metrics
+ * that moved, a calm headline, and the one slip most worth attention.
+ * Requires both windows to carry enough samples to be honest.
+ */
+export function whatChanged(state: AppState): WhatChanged {
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  const logs = state.dailyLogs ?? [];
+
+  const inWindow = (from: number, to: number) =>
+    logs.filter((l) => {
+      const lo = addDaysToKey(today, from);
+      const hi = addDaysToKey(today, to);
+      return l.date >= lo && l.date <= hi;
+    });
+  const nowLogs = inWindow(-6, 0);
+  const prevLogs = inWindow(-13, -7);
+
+  const nowActive = nowLogs.filter(hasAnyActivity);
+  const prevActive = prevLogs.filter(hasAnyActivity);
+  // Need a comparable amount of real data on both sides.
+  if (nowActive.length < 2 || prevActive.length < 2) {
+    return { hasData: false, headline: "", changes: [], attention: null };
+  }
+
+  const num = (v: number | null) => (v == null ? null : v);
+  type Spec = {
+    key: string;
+    label: string;
+    unit: string;
+    betterIs: "up" | "down";
+    val: (logs: DailyLog[]) => number | null;
+    round?: number;
+  };
+  const specs: Spec[] = [
+    {
+      key: "active",
+      label: "Active days",
+      unit: "/wk",
+      betterIs: "up",
+      val: (ls) => ls.filter(hasAnyActivity).length,
+    },
+    {
+      key: "energy",
+      label: "Energy",
+      unit: "/5",
+      betterIs: "up",
+      val: (ls) => num(avg(ls.map((l) => l.energyLevel).filter((v): v is number => v != null))),
+      round: 1,
+    },
+    {
+      key: "mood",
+      label: "Mood",
+      unit: "/5",
+      betterIs: "up",
+      val: (ls) => num(avg(ls.map((l) => l.moodLevel).filter((v): v is number => v != null))),
+      round: 1,
+    },
+    {
+      key: "sleep",
+      label: "Sleep",
+      unit: "h",
+      betterIs: "up",
+      val: (ls) => {
+        const a = avg(
+          ls.map((l) => sleepDurationMinutes(l)).filter((v): v is number => v != null)
+        );
+        return a == null ? null : a / 60;
+      },
+      round: 1,
+    },
+    {
+      key: "done",
+      label: "Behaviors / day",
+      unit: "",
+      betterIs: "up",
+      val: (ls) => {
+        const act = ls.filter(hasAnyActivity);
+        return act.length ? avg(act.map(completionsOnLog)) : null;
+      },
+      round: 1,
+    },
+  ];
+
+  const changes: WeekChange[] = [];
+  for (const s of specs) {
+    const now = s.val(nowLogs);
+    const prev = s.val(prevLogs);
+    if (now == null || prev == null) continue;
+    const rnd = (v: number) =>
+      s.round ? Math.round(v * 10 ** s.round) / 10 ** s.round : Math.round(v);
+    const rNow = rnd(now);
+    const rPrev = rnd(prev);
+    const delta = Math.round((rNow - rPrev) * 100) / 100;
+    const eps = s.round ? 0.1 : 0.5;
+    const dir = delta > eps ? "up" : delta < -eps ? "down" : "flat";
+    const good = dir === "flat" ? true : dir === s.betterIs;
+    changes.push({
+      key: s.key,
+      label: s.label,
+      unit: s.unit,
+      now: rNow,
+      prev: rPrev,
+      delta,
+      betterIs: s.betterIs,
+      dir,
+      good,
+    });
+  }
+
+  if (!changes.length)
+    return { hasData: false, headline: "", changes: [], attention: null };
+
+  // Sort by magnitude of (normalized) movement — biggest movers first.
+  const moved = [...changes].filter((c) => c.dir !== "flat");
+  moved.sort((a, b) => Math.abs(b.delta / (b.prev || 1)) - Math.abs(a.delta / (a.prev || 1)));
+
+  const ups = changes.filter((c) => c.dir !== "flat" && c.good).length;
+  const downs = changes.filter((c) => c.dir !== "flat" && !c.good).length;
+  let headline: string;
+  if (!moved.length) headline = "A steady week — much like the one before.";
+  else if (ups > downs) headline = "A stronger week than the last.";
+  else if (downs > ups) headline = "A lighter week than the last — that's okay.";
+  else headline = "A mixed week — some up, some down.";
+
+  const slip = moved.find((c) => !c.good) ?? null;
+  const attention = slip
+    ? `${slip.label} eased off this week (${slip.prev}${slip.unit} → ${slip.now}${slip.unit}). One small, protected nudge could bring it back.`
+    : null;
+
+  return { hasData: true, headline, changes, attention };
+}
+
+// ── 10. Anonymous benchmarks (built-in reference, not peer data) ──
+//
+// Honest framing: this compares the user's consistency to a FIXED,
+// built-in reference range for habit-tracking — NOT to other users' data
+// (we never collect or share that). It's computed entirely on-device. The
+// UI must say "a typical range" and footnote that it isn't peer data.
+
+/** Linear-interpolate a percentile from monotonic (value, percentile) anchors. */
+function pctFromAnchors(
+  anchors: [number, number][],
+  value: number
+): number {
+  if (value <= anchors[0][0]) return anchors[0][1];
+  const last = anchors[anchors.length - 1];
+  if (value >= last[0]) return last[1];
+  for (let i = 1; i < anchors.length; i++) {
+    const [x0, p0] = anchors[i - 1];
+    const [x1, p1] = anchors[i];
+    if (value <= x1) {
+      const t = (value - x0) / (x1 - x0);
+      return Math.round(p0 + t * (p1 - p0));
+    }
+  }
+  return last[1];
+}
+
+function bandFor(pct: number): "top" | "above" | "typical" | "building" {
+  if (pct >= 80) return "top";
+  if (pct >= 60) return "above";
+  if (pct >= 35) return "typical";
+  return "building";
+}
+
+export interface Benchmark {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  percentile: number;
+  band: "top" | "above" | "typical" | "building";
+  note: string;
+}
+
+export interface Benchmarks {
+  items: Benchmark[];
+  loggedDays: number;
+  /** Enough history to compare honestly. */
+  confident: boolean;
+}
+
+const BAND_NOTE: Record<Benchmark["band"], string> = {
+  top: "Top tier — you're more consistent than most people ever get.",
+  above: "Above the typical range. The habit is clearly holding.",
+  typical: "Right in the typical range. Steady, sustainable territory.",
+  building: "Still building. Every active day moves this up.",
+};
+
+/**
+ * Where the user falls within a built-in reference range for consistency.
+ * Reference curves are fixed (not peer data) — the UI labels them as such.
+ * Returns confident:false until there's ~2 weeks of history.
+ */
+export function benchmarks(state: AppState): Benchmarks {
+  const tz = getTz(state.settings);
+  const today = dateKeyInTz(tz);
+  const logs = state.dailyLogs ?? [];
+  const active = logs.filter(hasAnyActivity);
+  const loggedDays = active.length;
+
+  const items: Benchmark[] = [];
+
+  // 30-day consistency: share of the last 30 days that were active.
+  const floor30 = addDaysToKey(today, -29);
+  const active30 = active.filter((l) => l.date >= floor30 && l.date <= today).length;
+  const consistency = Math.round((active30 / 30) * 100);
+  items.push({
+    key: "consistency",
+    label: "30-day consistency",
+    value: consistency,
+    unit: "%",
+    percentile: pctFromAnchors(
+      [
+        [10, 8],
+        [30, 30],
+        [50, 50],
+        [70, 70],
+        [85, 85],
+        [95, 95],
+        [100, 99],
+      ],
+      consistency
+    ),
+    band: "typical",
+    note: "",
+  });
+
+  // Weekly active days (trailing 7).
+  const wk = weeklyActiveDays(logs, state.settings);
+  items.push({
+    key: "weekly",
+    label: "Active days this week",
+    value: wk,
+    unit: "/7",
+    percentile: pctFromAnchors(
+      [
+        [0, 5],
+        [2, 25],
+        [3, 45],
+        [4, 60],
+        [5, 75],
+        [6, 88],
+        [7, 97],
+      ],
+      wk
+    ),
+    band: "typical",
+    note: "",
+  });
+
+  // Behaviors completed per active day (last 30).
+  const recent = active.filter((l) => l.date >= floor30 && l.date <= today);
+  const perDay = recent.length
+    ? Math.round((recent.reduce((s, l) => s + completionsOnLog(l), 0) / recent.length) * 10) / 10
+    : 0;
+  if (perDay > 0) {
+    items.push({
+      key: "perday",
+      label: "Behaviors per day",
+      value: perDay,
+      unit: "",
+      percentile: pctFromAnchors(
+        [
+          [0.5, 10],
+          [1.5, 35],
+          [2.5, 55],
+          [4, 72],
+          [6, 86],
+          [9, 96],
+        ],
+        perDay
+      ),
+      band: "typical",
+      note: "",
+    });
+  }
+
+  for (const it of items) {
+    it.band = bandFor(it.percentile);
+    it.note = BAND_NOTE[it.band];
+  }
+
+  return { items, loggedDays, confident: loggedDays >= 14 };
+}

@@ -30,6 +30,11 @@ import OnThisDayCard from "@/components/OnThisDayCard";
 import WhenConsistent from "@/components/WhenConsistent";
 import PillarDeepDives from "@/components/PillarDeepDives";
 import CorrelationExplorer from "@/components/CorrelationExplorer";
+import ForecastCard from "@/components/ForecastCard";
+import WhatChangedCard from "@/components/WhatChangedCard";
+import BenchmarksCard from "@/components/BenchmarksCard";
+import GoalsCard from "@/components/GoalsCard";
+import ExperimentsCard from "@/components/ExperimentsCard";
 import { getTz } from "@/lib/tz";
 import { compileTimeline } from "@/lib/engine";
 import { personalModel, identityReflection } from "@/lib/reflect";
@@ -53,7 +58,7 @@ const LAG_DAYS = 3;
 
 export default function InsightsPage() {
   const router = useRouter();
-  const { state, loading } = useAppState();
+  const { state, loading, updateSettings } = useAppState();
   const access = getAccess(state);
 
   // Time-decayed peek: free / post-trial users still get the intelligence
@@ -337,6 +342,10 @@ export default function InsightsPage() {
           </motion.div>
         )}
 
+        {/* What changed week-over-week — a calm narrative read. Self-gates
+            until two comparable weeks exist. Peek-delayed for free. */}
+        <WhatChangedCard state={intelState} />
+
         {/* Consistency calendar — the days you showed up, over time. Renders
             from the (peek-delayed for free) intelState, once there's enough
             history to be meaningful. */}
@@ -360,8 +369,19 @@ export default function InsightsPage() {
             rest of the page). */}
         <PersonalRecords state={intelState} />
 
+        {/* How you compare — where consistency falls within a built-in
+            reference range (NOT peer data; the card says so). Peek-delayed. */}
+        <BenchmarksCard state={intelState} />
+
         {/* Month-in-review — shareable summary of the current month. */}
         <MonthlyReport state={intelState} />
+
+        {/* What you're steering toward — outcome goals and self-experiments.
+            These use full live `state` (the user's own targets + check-ins,
+            not the gated intelligence layer) so progress reflects reality and
+            a brand-new user can set one from day one. */}
+        <GoalsCard state={state} onUpdate={updateSettings} />
+        <ExperimentsCard state={state} onUpdate={updateSettings} />
 
         {/* "Your next habit" — the growth counterpart to the friction
             suggestions: the highest-leverage curated behavior the user
@@ -413,6 +433,9 @@ export default function InsightsPage() {
         <WhenConsistent state={intelState} />
         <BehaviorReportCard rows={adherence} />
         <PillarDeepDives state={intelState} />
+        {/* Where your body metrics are heading — confident linear trend
+            projection (renders only with a real, well-fit trend). */}
+        <ForecastCard state={intelState} />
         <CorrelationExplorer
           logs={access.premium ? state.dailyLogs : intelState.dailyLogs}
           premium={access.premium}

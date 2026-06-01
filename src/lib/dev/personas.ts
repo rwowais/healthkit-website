@@ -181,11 +181,14 @@ export function buildPersona(kind: PersonaKind): AppState {
   s.settings.subscriptionStatus = "active";
   s.settings.weeklyGoal = 6;
   s.dailyLogs = range(0, 59, true);
+  // Clean, monotonic trends so the dev persona exercises the forecast card:
+  // weight drifting down, HRV rising (improving), resting HR falling
+  // (improving). `w` counts backward in time (w=0 today … w=7 ~5wks ago).
   for (let w = 0; w < 8; w++) {
     const k = addDaysToKey(today, -w * 5);
-    s.biomarkers.push({ id: `weight-${w}`, metric: "weight", value: 178 - w * 0.3, date: k });
-    s.biomarkers.push({ id: `hrv-${w}`, metric: "hrv", value: 52 + (w % 3), date: k });
-    s.biomarkers.push({ id: `restingHr-${w}`, metric: "restingHr", value: 58 + (w % 2), date: k });
+    s.biomarkers.push({ id: `weight-${w}`, metric: "weight", value: 182 - w * 0.6, date: k });
+    s.biomarkers.push({ id: `hrv-${w}`, metric: "hrv", value: 50 + (7 - w) * 1.2, date: k });
+    s.biomarkers.push({ id: `restingHr-${w}`, metric: "restingHR", value: 56 + w * 0.5, date: k });
   }
   return s;
 }
