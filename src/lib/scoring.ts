@@ -219,9 +219,11 @@ export function freezeStatus(state: AppState): FreezeStatus {
   const settings = state.settings;
   const today = dateKeyInTz(getTz(settings));
   const floor = addDaysToKey(today, -(FREEZE_WINDOW_DAYS - 1));
-  const used = (settings.usedFreezeDates ?? []).filter(
-    (d) => d >= floor && d <= today
-  ).length;
+  // Dedupe defensively — a date should only ever cost one token even if it
+  // somehow appears twice (e.g. a cross-device merge before the union fix).
+  const used = new Set(
+    (settings.usedFreezeDates ?? []).filter((d) => d >= floor && d <= today)
+  ).size;
   const activeTotal = (state.dailyLogs ?? []).filter(hasAnyActivity).length;
   const allowance = FREEZE_BASE_ALLOWANCE + (activeTotal >= 60 ? 1 : 0);
   return {

@@ -27,8 +27,16 @@ const LOW = 2;
 const MID = 3;
 const HIGH = 5;
 
+// A negator immediately before a sentiment word (within ~2 words) flips its
+// meaning ("not tired", "wasn't stressed") — so we skip the match rather than
+// record the opposite of what the user meant.
+const NEGATOR = /\b(?:not|never|barely|hardly|wasn'?t|isn'?t|aren'?t|didn'?t|don'?t|no|without)\s+(?:\w+\s+){0,2}$/;
+
 function firstMatch(text: string, res: [RegExp, number][]): number | undefined {
-  for (const [re, val] of res) if (re.test(text)) return val;
+  for (const [re, val] of res) {
+    const m = re.exec(text);
+    if (m && !NEGATOR.test(text.slice(0, m.index))) return val;
+  }
   return undefined;
 }
 
@@ -38,11 +46,14 @@ export function parseQuickLog(input: string): QuickLogParse {
   const understood: string[] = [];
 
   // ── Sleep duration: "7h", "7.5 hrs", "slept 8 hours" ──
+  // Gate on a sleep cue so "8 hours of meetings" / "ran for 2h" aren't misread
+  // as sleep. The canonical "slept 7h" / "7.5 hours sleep" both qualify.
   let sleepHours: number | undefined;
+  const hasSleepCue = /\b(?:sleep|slept|asleep|bed|woke|wake|nap|rested)\b/.test(t);
   const dur =
     t.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hours)\b/) ??
     t.match(/slept\s+(\d+(?:\.\d+)?)\b/);
-  if (dur) {
+  if (dur && hasSleepCue) {
     const h = parseFloat(dur[1]);
     if (h > 0 && h <= 16) {
       sleepHours = h;

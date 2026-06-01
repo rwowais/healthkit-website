@@ -51,10 +51,15 @@ export function goalProgress(state: AppState, goal: OutcomeGoal): GoalProgress {
   let start = goal.startValue ?? 0;
   let unit = "days";
   let detail = "";
+  // Which direction is "good" — used only for the degenerate denom===0 case
+  // (target===start), where the start→target vector can't encode direction.
+  // Streak / weekly-active are higher-is-better; biomarker comes from its def.
+  let betterHigher = true;
 
   if (goal.kind === "biomarker" && goal.metric) {
     const def = biomarkerDef(goal.metric);
     unit = def?.unit ?? "";
+    betterHigher = def?.direction !== "lower";
     current = latestBiomarker(state, goal.metric);
     // Anchor: the value when the goal was set; fall back to current so a
     // missing anchor degrades gracefully instead of dividing by zero.
@@ -81,7 +86,9 @@ export function goalProgress(state: AppState, goal: OutcomeGoal): GoalProgress {
     pct = 0;
     achieved = false;
   } else if (denom === 0) {
-    achieved = denom >= 0 ? current >= target : current <= target;
+    // Already at the anchor value === target: "achieved" depends on the
+    // goal's own direction, not the (zero) start→target vector.
+    achieved = betterHigher ? current >= target : current <= target;
     pct = achieved ? 1 : 0;
   } else {
     pct = Math.max(0, Math.min(1, (current - start) / denom));
@@ -181,14 +188,15 @@ export function experimentReadout(
 
   const concluded = !!exp.concludedAt;
   const active = !concluded && today <= exp.endDate;
-  const daysLeft = Math.max(
-    0,
-    Math.floor(
-      (Date.UTC(...(exp.endDate.split("-").map(Number) as [number, number, number])) -
-        Date.UTC(...(today.split("-").map(Number) as [number, number, number]))) /
-        86_400_000
-    )
-  );
+  // Epoch-day index for a YYYY-MM-DD key. NOTE: Date.UTC's month arg is
+  // 0-based, so we must pass m-1 — passing the raw 1-based month shifts both
+  // dates ~1 month and, across a month boundary, the shift doesn't cancel
+  // (off by several days). This helper makes the difference correct.
+  const epochDay = (key: string): number => {
+    const [y, m, d] = key.split("-").map(Number);
+    return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
+  };
+  const daysLeft = Math.max(0, epochDay(exp.endDate) - epochDay(today));
 
   const thresh = 0.3; // both /5 scales and hours: ~a third of a point/hour
   let verdict: ExperimentReadout["verdict"];

@@ -191,6 +191,7 @@ export default function GoalsCard({
                 Metric
               </label>
               <select
+                aria-label="Goal metric"
                 value={metric}
                 onChange={(e) => setMetric(e.target.value)}
                 className={FIELD}
@@ -215,6 +216,7 @@ export default function GoalsCard({
             <input
               type="number"
               inputMode="decimal"
+              aria-label="Goal target value"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               placeholder={

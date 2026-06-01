@@ -216,6 +216,7 @@ export default function BehaviorSheet({
                 one you already do is what makes it stick.
               </p>
               <select
+                aria-label="Stack this behavior after another habit"
                 value={ov.stackAfter ?? ""}
                 onChange={(e) =>
                   patch({ stackAfter: e.target.value || undefined })

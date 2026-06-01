@@ -211,6 +211,7 @@ export default function ExperimentsCard({
               Outcome to measure
             </label>
             <select
+              aria-label="Outcome to measure"
               value={metric}
               onChange={(e) => setMetric(e.target.value as Experiment["metric"])}
               className={FIELD}

@@ -152,7 +152,7 @@ function slicesDiffer(a: AppState, b: AppState): boolean {
 }
 
 /** Non-destructive union of two states (keeps the most-progressed day). */
-function mergeStates(local: AppState, cloud: AppState): AppState {
+export function mergeStates(local: AppState, cloud: AppState): AppState {
   const byDate = new Map<string, AppState["dailyLogs"][number]>();
   const score = (l: AppState["dailyLogs"][number]) =>
     Object.values(l.behaviorCompletions ?? {}).filter(Boolean).length * 1000 +
@@ -173,6 +173,17 @@ function mergeStates(local: AppState, cloud: AppState): AppState {
   const uniq = (xs: string[]) => Array.from(new Set(xs));
   const laterIso = (x?: string, y?: string) =>
     !x ? y : !y ? x : new Date(x) > new Date(y) ? x : y;
+  // By-id union for object arrays (outcome goals / experiments): keep every
+  // entry from both devices; on id collision, the later-spread wins per-field
+  // (so an achievedAt/concludedAt stamp set on either device survives). Same
+  // pattern biomarkers + customPacks already use — without it, the bare
+  // `...local.settings` spread would silently drop the other device's goals.
+  const mergeById = <T extends { id: string }>(a?: T[], b?: T[]): T[] => {
+    const m = new Map<string, T>();
+    for (const x of [...(a ?? []), ...(b ?? [])])
+      m.set(x.id, { ...m.get(x.id), ...x });
+    return [...m.values()];
+  };
 
   return {
     ...cloud,
@@ -206,6 +217,25 @@ function mergeStates(local: AppState, cloud: AppState): AppState {
           ...(local.settings.celebratedMilestones ?? []),
         ]),
       ],
+      // Spent freeze tokens are append-only + streak-protective exactly like
+      // restDays — union them so a freeze spent on one device can't be lost
+      // (which would silently break the protected day's streak on merge).
+      usedFreezeDates: [
+        ...new Set([
+          ...(cloud.settings.usedFreezeDates ?? []),
+          ...(local.settings.usedFreezeDates ?? []),
+        ]),
+      ],
+      // Outcome goals + self-experiments: by-id union so neither device's
+      // entries are dropped on the first cross-device merge.
+      outcomeGoals: mergeById(
+        cloud.settings.outcomeGoals,
+        local.settings.outcomeGoals
+      ),
+      experiments: mergeById(
+        cloud.settings.experiments,
+        local.settings.experiments
+      ),
     },
     dailyLogs: [...byDate.values()].sort((a, b) =>
       a.date.localeCompare(b.date)

@@ -419,7 +419,10 @@ body {
 input, textarea, select { font-family: inherit; }
 input::placeholder, textarea::placeholder { color: var(--text-3); }
 
-/* Time input dark styling */
-input[type="time"]::-webkit-calendar-picker-indicator {
+/* Time-input picker indicator: only invert in DARK. In light mode (the
+   default theme) color-scheme already paints a dark indicator on the white
+   field — inverting it there washes it out to near-white. Scope to non-light. */
+:root:not([data-theme="light"])
+  input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
 }

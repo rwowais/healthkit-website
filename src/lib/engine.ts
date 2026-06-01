@@ -543,7 +543,8 @@ export function applySnoozes(
  */
 export function applyStacks(
   items: TimelineItem[],
-  overrides: Record<string, BehaviorOverride> | undefined
+  overrides: Record<string, BehaviorOverride> | undefined,
+  snoozes?: Record<string, "later" | "tomorrow">
 ): TimelineItem[] {
   if (!overrides || items.length === 0) return items;
   // Clone so adopting an anchor's block doesn't mutate the caller's items.
@@ -554,10 +555,23 @@ export function applyStacks(
   for (const it of clones) {
     const target = overrides[it.canonicalKey]?.stackAfter;
     if (!target) continue;
+    // A follower the user snoozed today keeps the snooze's placement — don't
+    // drag it back to the anchor's block (snooze "later" relocated it to the
+    // evening; a "tomorrow" item is already gone). Stacking resumes tomorrow.
+    if (snoozes?.[it.canonicalKey]) continue;
     const anchor =
       byCanon.get(target) ?? clones.find((c) => effectiveKey(c) === target);
     if (!anchor || anchor.canonicalKey === it.canonicalKey) continue;
-    it.block = anchor.block; // file with the anchor
+    // File with the anchor AND inherit its clock time, so the follower reads
+    // as "right after X": same block, same effective time (effectiveMinutes
+    // reads customTime/anchor/offsetMin, NOT block). Without rebasing the
+    // time, a cross-block stack (e.g. an evening item stacked after a morning
+    // one) would render its old evening time inside the morning block and sit
+    // out of clock order / misplace the NOW divider.
+    it.block = anchor.block;
+    it.customTime = anchor.customTime;
+    it.anchor = anchor.anchor;
+    it.offsetMin = anchor.offsetMin;
     it.stackedAfter = anchor.title;
     const arr = followers.get(anchor.canonicalKey) ?? [];
     arr.push(it);
@@ -691,11 +705,9 @@ function logHasActivity(l: DailyLog): boolean {
  */
 function vacationDates(state: AppState): Set<string> {
   const out = new Set<string>();
-  const periods = state.settings?.vacationPeriods ?? [];
-  if (periods.length === 0) return out;
   const tz = getTz(state.settings);
   const today = dateKeyInTz(tz);
-  for (const p of periods) {
+  for (const p of state.settings?.vacationPeriods ?? []) {
     if (!p?.start) continue;
     const end = p.end ?? today;
     let cursor = p.start;
@@ -706,6 +718,12 @@ function vacationDates(state: AppState): Set<string> {
       cursor = addDaysToKey(cursor, 1);
     }
   }
+  // Mirror storage.getVacationDates so adaptation's gapDays treats a planned
+  // rest day and a spent streak-freeze as transparent too — otherwise a
+  // single frozen/rest day wrongly tips the day into "Welcome back / rebuild"
+  // even though the streak (which DOES union these) is intact.
+  for (const day of state.settings?.restDays ?? []) if (day) out.add(day);
+  for (const day of state.settings?.usedFreezeDates ?? []) if (day) out.add(day);
   return out;
 }
 

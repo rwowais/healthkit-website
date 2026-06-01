@@ -560,7 +560,8 @@ export default function TodayPage() {
     // final within-block order ("after X, do Y").
     return applyStacks(
       applySnoozes(injectOneOffs(shaped, log), log),
-      state.behaviorOverrides
+      state.behaviorOverrides,
+      log.snoozes
     );
   }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate, log]);
 
@@ -1523,10 +1524,15 @@ export default function TodayPage() {
                     : {}),
                 });
               }
+              // Merge, don't clobber: if the user already wrote a reflection
+              // today, append the quick-log line instead of overwriting it.
+              const prev = (log.dayNote ?? "").trim();
+              const note =
+                prev && !prev.includes(v.note) ? `${prev}\n${v.note}` : v.note;
               updateRatings(selectedDate, {
                 ...(v.energy != null ? { energy: v.energy } : {}),
                 ...(v.mood != null ? { mood: v.mood } : {}),
-                note: v.note,
+                note,
               });
             }}
           />
@@ -2602,6 +2608,16 @@ export default function TodayPage() {
                                       Undo
                                     </button>
                                   </div>
+                                )}
+                                {/* Habit-stacking cue — "After X", shown on a
+                                    behavior the user anchored to follow
+                                    another. Makes the reorder legible instead
+                                    of an unexplained jump. */}
+                                {!editMode && it.stackedAfter && (
+                                  <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--text-3)]">
+                                    <Icon name="arrowRight" size={10} />
+                                    After {it.stackedAfter}
+                                  </p>
                                 )}
                                 {/* Visual link from avoid-card to the
                                     target behavior(s) it references —
