@@ -14,6 +14,8 @@ import DailyCheckInCard from "@/components/today/DailyCheckInCard";
 import BulkMoveSheet from "@/components/today/BulkMoveSheet";
 import WorkoutSwapSheet from "@/components/today/WorkoutSwapSheet";
 import WeekAhead from "@/components/today/WeekAhead";
+import MorningBriefing from "@/components/today/MorningBriefing";
+import MilestoneMoment from "@/components/today/MilestoneMoment";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -180,6 +182,7 @@ export default function TodayPage() {
     updateRatings,
     installPack,
     setBehaviorOverride,
+    updateSettings,
     refresh,
   } = useAppState();
   const router = useRouter();
@@ -979,6 +982,32 @@ export default function TodayPage() {
             <Icon name="chevron" size={12} />
           </button>
         </div>
+
+        {/* Milestone moment — rare, celebratory; only on the day a mark is
+            freshly crossed, dismissed via "Mark it" (records the id). */}
+        <MilestoneMoment
+          state={state}
+          onCelebrate={(id) =>
+            updateSettings({
+              celebratedMilestones: [
+                ...(state.settings.celebratedMilestones ?? []),
+                id,
+              ],
+            })
+          }
+        />
+
+        {/* Morning briefing — a calm frame for the day (morning block only,
+            hidden once the day's already closed). */}
+        {!dayComplete && (
+          <MorningBriefing
+            state={state}
+            items={timeline}
+            cb={cb}
+            overnight={overnight}
+            isToday={isToday}
+          />
+        )}
 
         {/* Day complete — calm reward */}
         {dayComplete && (

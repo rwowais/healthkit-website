@@ -11,6 +11,7 @@ import type { AppState } from "@/lib/types";
 import { calculateStreak } from "@/lib/scoring";
 import { getVacationDates } from "@/lib/storage";
 import { getTz, dateKeyInTz, addDaysToKey } from "@/lib/tz";
+import { shareCardImage } from "@/lib/shareCard";
 import { Eyebrow } from "@/components/ui";
 import { Icon } from "@/components/ui/icons";
 
@@ -40,71 +41,15 @@ export default function ShareProgressCard({ state }: { state: AppState }) {
 
   if (activeDays < 5) return null;
 
-  const share = async () => {
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1080;
-      canvas.height = 1080;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const F = "system-ui, -apple-system, 'Segoe UI', sans-serif";
-      const bg = ctx.createLinearGradient(0, 0, 1080, 1080);
-      bg.addColorStop(0, "#0E1014");
-      bg.addColorStop(1, "#171A21");
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, 1080, 1080);
-      const glow = ctx.createRadialGradient(880, 200, 0, 880, 200, 760);
-      glow.addColorStop(0, "rgba(134,217,156,0.22)");
-      glow.addColorStop(1, "rgba(134,217,156,0)");
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, 1080, 1080);
-      ctx.fillStyle = "#86D99C";
-      ctx.font = `600 34px ${F}`;
-      ctx.fillText("PROTOCOLIZE", 90, 140);
-      ctx.fillStyle = "#F4F5F7";
-      ctx.font = `800 240px ${F}`;
-      ctx.fillText(String(activeDays), 84, 600);
-      ctx.fillStyle = "#D6DAE0";
-      ctx.font = `600 46px ${F}`;
-      ctx.fillText("active days in the last month", 92, 678);
-      ctx.fillStyle = "#8A8F99";
-      ctx.font = `400 36px ${F}`;
-      ctx.fillText(
+  const share = () =>
+    shareCardImage({
+      big: String(activeDays),
+      label: "active days in the last month",
+      sub:
         streak >= 2
           ? `${streak}-day streak · consistency compounds.`
           : "Consistency compounds.",
-        92,
-        762
-      );
-      ctx.fillStyle = "#5A5F68";
-      ctx.font = `400 30px ${F}`;
-      ctx.fillText("your longevity operating system", 92, 1000);
-
-      const blob: Blob | null = await new Promise((res) =>
-        canvas.toBlob(res, "image/png")
-      );
-      if (!blob) return;
-      const file = new File([blob], "protocolize-progress.png", {
-        type: "image/png",
-      });
-      if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-        try {
-          await navigator.share({ files: [file], title: "My progress" });
-          return;
-        } catch {
-          /* user cancelled or share failed → fall through to download */
-        }
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "protocolize-progress.png";
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      /* canvas/share unavailable — no-op rather than crash */
-    }
-  };
+    });
 
   return (
     <button
