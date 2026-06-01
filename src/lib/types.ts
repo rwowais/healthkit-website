@@ -173,6 +173,14 @@ export interface UserSettings {
   vacationPeriods?: Array<{ start: string; end: string | null }>;
 
   /**
+   * Milestone moments already shown + dismissed (e.g. "streak-30",
+   * "completions-100"). A milestone only surfaces on the day it's freshly
+   * crossed; this list just stops it from re-appearing on reload that day.
+   * Device-synced so the celebration doesn't repeat across devices.
+   */
+  celebratedMilestones?: string[];
+
+  /**
    * Opt out of the home-screen app icon badge. When true, the badge
    * is cleared on every load and we never set it again — useful for
    * users who interpret the number as a notification count and find

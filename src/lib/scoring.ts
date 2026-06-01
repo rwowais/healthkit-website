@@ -183,7 +183,7 @@ export function weeklyActiveDays(logs: DailyLog[]): number {
 }
 
 /** Check if a daily log has any meaningful activity */
-function hasAnyActivity(log: DailyLog): boolean {
+export function hasAnyActivity(log: DailyLog): boolean {
   const hasSleep = log.sleepCompletions.some((c) => c.completed);
   const hasExercise = log.exerciseEntries.some((e) => e.completed);
   const hasNutrition = Object.values(log.nutritionScorecard).some(

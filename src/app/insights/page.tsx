@@ -24,6 +24,11 @@ import MoodEnergyTrends from "@/components/MoodEnergyTrends";
 import BehaviorReportCard from "@/components/BehaviorReportCard";
 import JournalHistory from "@/components/JournalHistory";
 import ShareProgressCard from "@/components/ShareProgressCard";
+import PersonalRecords from "@/components/PersonalRecords";
+import OnThisDayCard from "@/components/OnThisDayCard";
+import WhenConsistent from "@/components/WhenConsistent";
+import PillarDeepDives from "@/components/PillarDeepDives";
+import CorrelationExplorer from "@/components/CorrelationExplorer";
 import { getTz } from "@/lib/tz";
 import { compileTimeline } from "@/lib/engine";
 import { personalModel, identityReflection } from "@/lib/reflect";
@@ -350,6 +355,10 @@ export default function InsightsPage() {
             enough activity to be worth sharing. */}
         <ShareProgressCard state={state} />
 
+        {/* Your records — quiet bests to beat (peek-delayed for free, like the
+            rest of the page). */}
+        <PersonalRecords state={intelState} />
+
         {/* "Your next habit" — the growth counterpart to the friction
             suggestions: the highest-leverage curated behavior the user
             isn't doing yet. Advisory, never pushy; taps through to the
@@ -391,10 +400,17 @@ export default function InsightsPage() {
           </button>
         )}
 
-        {/* Reflection set: how you've felt, what's sticking, your journal —
-            each self-gates on having enough data. */}
+        {/* Reflection set: how you've felt, when you follow through, what's
+            sticking, per-pillar deep-dives, the correlation explorer, a
+            gentle look-back, and your journal — each self-gates on enough
+            data. CorrelationExplorer takes full live logs (it's premium-gated
+            internally); everything else uses the peek-delayed intelState. */}
         <MoodEnergyTrends logs={intelState.dailyLogs} />
+        <WhenConsistent state={intelState} />
         <BehaviorReportCard rows={adherence} />
+        <PillarDeepDives state={intelState} />
+        <CorrelationExplorer logs={state.dailyLogs} premium={access.premium} />
+        <OnThisDayCard state={intelState} />
         <JournalHistory logs={intelState.dailyLogs} />
 
         {/* What matters most — consolidated. Keystone and "Proven for you"

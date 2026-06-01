@@ -81,18 +81,25 @@ export function TrendArea({
           fill={color}
         />
       ))}
-      {data.map((d, i) => (
-        <text
-          key={`l${i}`}
-          x={x(i)}
-          y={H - 6}
-          textAnchor="middle"
-          fontSize="9"
-          fill="var(--text-3)"
-        >
-          {d.label}
-        </text>
-      ))}
+      {data.map((d, i) => {
+        // Thin labels to ~6 max so dense series (e.g. 30-day trends) stay
+        // legible instead of smearing into an unreadable run. Always keep the
+        // first and last.
+        const step = Math.max(1, Math.ceil(n / 6));
+        if (!(i === 0 || i === n - 1 || i % step === 0)) return null;
+        return (
+          <text
+            key={`l${i}`}
+            x={x(i)}
+            y={H - 6}
+            textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}
+            fontSize="9"
+            fill="var(--text-3)"
+          >
+            {d.label}
+          </text>
+        );
+      })}
       {unit && (
         <text x={pad} y={12} fontSize="9" fill="var(--text-3)">
           {Math.round(peak)}
