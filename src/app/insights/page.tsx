@@ -23,6 +23,7 @@ import ConsistencyCalendar from "@/components/ConsistencyCalendar";
 import MoodEnergyTrends from "@/components/MoodEnergyTrends";
 import BehaviorReportCard from "@/components/BehaviorReportCard";
 import JournalHistory from "@/components/JournalHistory";
+import ShareProgressCard from "@/components/ShareProgressCard";
 import { getTz } from "@/lib/tz";
 import { compileTimeline } from "@/lib/engine";
 import { personalModel, identityReflection } from "@/lib/reflect";
@@ -340,6 +341,14 @@ export default function InsightsPage() {
             weeks={12}
           />
         )}
+
+        {/* Share your progress — a calm, opt-in way to save/share an image
+            of how consistently you've shown up. Growth feature, so it uses
+            full live `state` (not the peek-delayed view): the number a user
+            shares should reflect reality, and "active days" is a basic
+            engagement stat, not the gated intelligence layer. Self-gates on
+            enough activity to be worth sharing. */}
+        <ShareProgressCard state={state} />
 
         {/* "Your next habit" — the growth counterpart to the friction
             suggestions: the highest-leverage curated behavior the user
