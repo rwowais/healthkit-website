@@ -18,12 +18,17 @@ export const PILLAR_LIST: Pillar[] = [
 
 export function sleepDurationMinutes(log: DailyLog): number | null {
   const { actualBedtime, actualWakeTime } = log.sleepLog;
-  if (!actualBedtime || !actualWakeTime) return null;
-  const [bh, bm] = actualBedtime.split(":").map(Number);
-  const [wh, wm] = actualWakeTime.split(":").map(Number);
-  let d = wh * 60 + wm - (bh * 60 + bm);
-  if (d <= 0) d += 1440;
-  return d;
+  if (actualBedtime && actualWakeTime) {
+    const [bh, bm] = actualBedtime.split(":").map(Number);
+    const [wh, wm] = actualWakeTime.split(":").map(Number);
+    let d = wh * 60 + wm - (bh * 60 + bm);
+    if (d <= 0) d += 1440;
+    return d;
+  }
+  // Fall back to a directly-stored duration (e.g. from the natural-language
+  // quick log "slept 7h") when bed/wake times weren't recorded.
+  const stored = log.sleepLog.sleepDurationMinutes;
+  return typeof stored === "number" && stored > 0 ? stored : null;
 }
 
 export function pillarTracked(log: DailyLog, p: Pillar): boolean {

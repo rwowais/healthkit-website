@@ -2610,6 +2610,56 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
 export const STANDALONE_ATOMS_REGISTRY: ReadonlyArray<BehaviorDef> =
   STANDALONE_ATOMS;
 
+// ── Additional library packs ──────────────────────────────────────
+// Composed entirely from already-validated STANDALONE_ATOMS, so there's no
+// new content to author, validate, or keep from drifting. Defined here
+// (after STANDALONE_ATOMS) and appended to PACKS below so the catalog
+// (activePacks → PACKS, read at runtime) serves them. Opt-in from the
+// Library — NOT in DEFAULT_INSTALLED.
+function pickAtoms(keys: string[]): BehaviorDef[] {
+  return keys
+    .map((k) => STANDALONE_ATOMS.find((a) => a.canonicalKey === k))
+    .filter((a): a is BehaviorDef => !!a);
+}
+
+const EXTRA_PACKS: ProtocolPack[] = [
+  {
+    id: "mobility-joints",
+    name: "Mobility & Joints",
+    tagline: "Stay supple, counter sitting",
+    goal: "Protect range of motion and joint health as you age",
+    accent: "var(--recovery)",
+    icon: "stretch",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: pickAtoms([
+      "stretching",
+      "foam-rolling",
+      "yoga-session",
+      "standing-desk",
+    ]),
+  },
+  {
+    id: "calm-mind",
+    name: "Calm Mind",
+    tagline: "A quieter, clearer head",
+    goal: "Lower baseline stress and sharpen focus with a daily mental practice",
+    accent: "var(--sleep)",
+    icon: "lungs",
+    source: "official",
+    durationLabel: "Ongoing",
+    behaviors: pickAtoms([
+      "meditation",
+      "breath-work",
+      "gratitude-journal",
+      "journaling",
+    ]),
+  },
+];
+
+// Append once at module init (before any runtime read of PACKS).
+PACKS.push(...EXTRA_PACKS);
+
 export function listBehaviorAtoms(): BehaviorAtom[] {
   const byKey = new Map<string, BehaviorAtom>();
   for (const pack of activePacks()) {

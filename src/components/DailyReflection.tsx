@@ -34,6 +34,10 @@ interface DailyReflectionProps {
   currentNote: string;
   onMood: (mood: number) => void;
   onNote: (note: string) => void;
+  /** A rotating, day-stable reflection prompt (see lib/prompts). Used as the
+   *  note disclosure label + textarea placeholder so a blank box becomes a
+   *  gentle question. Falls back to a neutral prompt when omitted. */
+  prompt?: string;
 }
 
 const MOODS: {
@@ -51,6 +55,7 @@ export default function DailyReflection({
   currentNote,
   onMood,
   onNote,
+  prompt,
 }: DailyReflectionProps) {
   const [note, setNote] = useState(currentNote);
   const [showNote, setShowNote] = useState(false);
@@ -105,19 +110,25 @@ export default function DailyReflection({
       {!showNote ? (
         <button
           onClick={() => setShowNote(true)}
-          className="press tr-fast mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-3)] underline-offset-2 hover:underline"
+          className="press tr-fast mt-4 inline-flex items-center gap-1 text-left text-[12px] font-medium text-[var(--text-3)] underline-offset-2 hover:underline"
         >
-          + Add a one-line note
+          + {prompt ?? "Add a one-line note"}
         </button>
       ) : (
         <div className="mt-4">
+          {prompt && (
+            <p className="mb-2 text-[13px] italic leading-relaxed text-[var(--text-2)]">
+              {prompt}
+            </p>
+          )}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onBlur={() => onNote(note.trim())}
-            placeholder="What mattered today?"
+            placeholder={prompt ?? "What mattered today?"}
             rows={2}
             maxLength={280}
+            autoFocus
             className="w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3 py-2 text-[13px] leading-relaxed text-[var(--text-1)] outline-none placeholder:text-[var(--text-4)]"
           />
           <p className="t-caption mt-1 text-right">

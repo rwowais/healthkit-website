@@ -14,6 +14,18 @@ import type { BehaviorOverride, TimeBlock } from "@/lib/types";
 const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
+// Evidence-tier badge — an at-a-glance "how settled is the science here"
+// signal, so the deep-dive (rationale + evidence + framing) is framed with
+// the right confidence. Calm language, no clinical jargon.
+const TIER: Record<
+  NonNullable<TimelineItem["evidenceTier"]>,
+  { label: string; color: string }
+> = {
+  established: { label: "Established", color: "var(--vitality)" },
+  emerging: { label: "Emerging evidence", color: "var(--readiness)" },
+  exploratory: { label: "Exploratory", color: "var(--warm)" },
+};
+
 /**
  * One shared, calm editor for any behavior: rationale, evidence,
  * provenance, and full personalization — when (block + exact time),
@@ -87,6 +99,17 @@ export default function BehaviorSheet({
             <p className="t-body leading-relaxed text-[var(--text-1)]">
               {item.rationale}
             </p>
+            {item.evidenceTier && (
+              <span
+                className="mt-2.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide"
+                style={{
+                  color: TIER[item.evidenceTier].color,
+                  background: `color-mix(in srgb, ${TIER[item.evidenceTier].color} 15%, transparent)`,
+                }}
+              >
+                {TIER[item.evidenceTier].label}
+              </span>
+            )}
             {/* Pack-list moved to AboutThisBehavior — the provenance
                 helper formats it more carefully ("From Better Sleep"
                 vs "Common across X protocols you've installed") with

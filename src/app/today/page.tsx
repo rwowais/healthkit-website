@@ -19,6 +19,7 @@ import MilestoneMoment from "@/components/today/MilestoneMoment";
 import WeeklyGoal from "@/components/today/WeeklyGoal";
 import QuickAdd from "@/components/today/QuickAdd";
 import StreakFreeze from "@/components/today/StreakFreeze";
+import QuickLog from "@/components/today/QuickLog";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -71,6 +72,7 @@ import {
   nowMinutesInTz,
 } from "@/lib/tz";
 import { identityReflection } from "@/lib/reflect";
+import { reflectionPrompt } from "@/lib/prompts";
 import BehaviorSheet from "@/components/BehaviorSheet";
 import { Skeleton, Eyebrow, Sheet, Button } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -1506,6 +1508,30 @@ export default function TodayPage() {
           />
         )}
 
+        {/* Natural-language quick log — type one line to fill the check-in.
+            Collapsed by default; available all day (also sets the note). */}
+        {isToday && (
+          <QuickLog
+            onApply={(v) => {
+              if (v.sleepQuality != null || v.sleepDurationMinutes != null) {
+                updateSleepLog(selectedDate, {
+                  ...(v.sleepQuality != null
+                    ? { sleepQuality: v.sleepQuality }
+                    : {}),
+                  ...(v.sleepDurationMinutes != null
+                    ? { sleepDurationMinutes: v.sleepDurationMinutes }
+                    : {}),
+                });
+              }
+              updateRatings(selectedDate, {
+                ...(v.energy != null ? { energy: v.energy } : {}),
+                ...(v.mood != null ? { mood: v.mood } : {}),
+                note: v.note,
+              });
+            }}
+          />
+        )}
+
         {/* Monthly identity reflection — calm pointer to the full (gated)
             view on Insights; one at a time, dismissible per month. */}
         {showIdentity && identity && (
@@ -2742,6 +2768,7 @@ export default function TodayPage() {
               currentNote={log.dayNote ?? ""}
               onMood={(m) => updateRatings(selectedDate, { mood: m })}
               onNote={(note) => updateRatings(selectedDate, { note })}
+              prompt={reflectionPrompt(selectedDate)}
             />
           )}
       </div>
