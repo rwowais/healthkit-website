@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Sheet, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { blockLabel, type TimelineItem } from "@/lib/engine";
+import { effectiveMinutes, nudgeTimeWithinBlock } from "@/lib/time";
 import {
   buildAtomRegistry,
   evidenceFraming,
@@ -44,6 +45,7 @@ export default function BehaviorSheet({
   snoozed,
   stackOptions,
   blockLabels,
+  settings,
 }: {
   item: TimelineItem | null;
   override: BehaviorOverride | undefined;
@@ -54,6 +56,9 @@ export default function BehaviorSheet({
   isEnabled?: boolean;
   onSnooze?: (mode: "later" | "tomorrow" | null) => void;
   snoozed?: "later" | "tomorrow";
+  /** Wake/bed/boundaries — so "move earlier/later" can nudge the actual clock
+   *  time (keeping the timeline ordered by time). */
+  settings: { wakeTime: string; bedtime: string; blockBoundaries?: { morning: string; afternoon: string; evening: string } };
   /** Other behaviors this one can be stacked after (habit stacking). Each
    *  `key` is the anchor's canonicalKey. Omitted/empty → control hidden. */
   stackOptions?: { key: string; title: string }[];
@@ -178,37 +183,66 @@ export default function BehaviorSheet({
             />
           </div>
 
-          {/* Manual order within the block — nudges sortIndex; default
-              ordering (clock) is unchanged until the user moves something. */}
-          <div className="mt-5">
-            <p className="t-eyebrow">
-              Order in {blockLabel(item.block, blockLabels).toLowerCase()}
-            </p>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={() => patch({ sortIndex: (ov.sortIndex ?? 0) - 1 })}
-                className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
-                style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
-              >
-                ↑ Move earlier
-              </button>
-              <button
-                onClick={() => patch({ sortIndex: (ov.sortIndex ?? 0) + 1 })}
-                className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
-                style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
-              >
-                ↓ Move later
-              </button>
+          {/* Move earlier / later nudges the ACTUAL clock time in 15-min
+              steps (clamped to this block), so the timeline stays ordered by
+              time — no hidden order index that could float a later item above
+              an earlier one. The new time shows live in "Or a specific time"
+              above. Hidden for "anytime" (no clock). */}
+          {item.block !== "anytime" && (
+            <div className="mt-5">
+              <p className="t-eyebrow">
+                Time in {blockLabel(item.block, blockLabels).toLowerCase()}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() =>
+                    patch({
+                      customTime: nudgeTimeWithinBlock(
+                        effectiveMinutes(
+                          { ...item, customTime: ov.customTime ?? item.customTime },
+                          settings
+                        ) ?? 0,
+                        item.block,
+                        -15,
+                        settings
+                      ),
+                    })
+                  }
+                  className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+                  style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+                >
+                  ↑ 15 min earlier
+                </button>
+                <button
+                  onClick={() =>
+                    patch({
+                      customTime: nudgeTimeWithinBlock(
+                        effectiveMinutes(
+                          { ...item, customTime: ov.customTime ?? item.customTime },
+                          settings
+                        ) ?? 0,
+                        item.block,
+                        15,
+                        settings
+                      ),
+                    })
+                  }
+                  className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+                  style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+                >
+                  ↓ 15 min later
+                </button>
+              </div>
+              {!!ov.customTime && (
+                <button
+                  onClick={() => patch({ customTime: undefined })}
+                  className="press tr-fast mt-2 text-[12px] font-semibold text-[var(--readiness)]"
+                >
+                  Reset to its usual time
+                </button>
+              )}
             </div>
-            {!!ov.sortIndex && (
-              <button
-                onClick={() => patch({ sortIndex: undefined })}
-                className="press tr-fast mt-2 text-[12px] font-semibold text-[var(--readiness)]"
-              >
-                Reset to default order
-              </button>
-            )}
-          </div>
+          )}
 
           {/* Habit stacking — anchor this behavior to follow another, so it
               files right after it ("after X, do Y"). Cue-based chaining. */}

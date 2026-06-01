@@ -2988,6 +2988,7 @@ export default function TodayPage() {
 
       <BehaviorSheet
         item={detail}
+        settings={state.settings}
         override={
           detail ? state.behaviorOverrides?.[detail.canonicalKey] : undefined
         }

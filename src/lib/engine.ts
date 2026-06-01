@@ -363,22 +363,20 @@ export function compileTimeline(
     .sort((a, b) => {
       const blockDiff = BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block];
       if (blockDiff !== 0) return blockDiff;
-      // Manual reorder: an explicit sortIndex (set via "move earlier/later")
-      // wins within a block. Both default to 0 → falls through to the clock
-      // sort below, so default ordering is unchanged.
-      const siDiff = (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
-      if (siDiff !== 0) return siDiff;
-      // Near-time tiebreaker: items within 5 minutes of each other
-      // are treated as visually concurrent — break by leverage desc
-      // so an Essential (lev 3) like Morning sunlight floats above
-      // a stack of lev-1 supplements that happen to land 1-2 min
-      // earlier on the clock. Without this, sunlight at 8:01 sat
-      // below six supplements at 8:00, even though it's the
-      // headline behavior of the block.
+      // INTEGRITY: within a block, order strictly by clock time. A later item
+      // can never render above an earlier one. ("Move earlier/later" now
+      // nudges the actual time, so reordering and the clock can't disagree.)
       const dt = clock(a) - clock(b);
+      // Items within ~5 min are one visual slot — break the near-tie by
+      // leverage (an Essential like Morning sunlight floats above a stack of
+      // lev-1 supplements at the same minute), then a legacy manual index
+      // (kept only as a same-slot tiebreaker so old data still sequences),
+      // then the tiny clock delta. None of these can cross a real time gap.
       if (Math.abs(dt) < 5) {
         const levDiff = b.leverage - a.leverage;
         if (levDiff !== 0) return levDiff;
+        const siDiff = (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+        if (siDiff !== 0) return siDiff;
       }
       return dt || b.leverage - a.leverage;
     });

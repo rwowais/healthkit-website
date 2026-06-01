@@ -223,29 +223,37 @@ describe("blockForMinutes — custom block boundaries", () => {
   });
 });
 
-describe("compileTimeline — manual reorder via sortIndex", () => {
-  it("a negative sortIndex floats a behavior to the top of its block", () => {
+describe("compileTimeline — within-block order holds time integrity", () => {
+  it("a sortIndex can't float a later-timed behavior above an earlier one", () => {
     const base = getDefaultState();
-    const state: AppState = {
-      ...base,
-      installedPacks: ["longevity-foundation"],
-      settings: { ...base.settings, wakeTime: "07:00", bedtime: "22:30" },
-    };
-    const morning = compileTimeline(state, 0)
+    const settings = { ...base.settings, wakeTime: "07:00", bedtime: "22:30" };
+    const morning = compileTimeline(
+      { ...base, installedPacks: ["longevity-foundation"], settings },
+      0
+    )
       .filter((i) => i.block === "morning")
       .map((i) => i.canonicalKey);
     expect(morning.length).toBeGreaterThan(1);
-    const target = morning[morning.length - 1]; // last by clock
-    const moved: AppState = {
-      ...state,
+    const [early, late] = [morning[0], morning[1]];
+    // `late` is pinned to a later clock time but given a strongly-negative
+    // manual index. Time must still win — the index cannot drag it above the
+    // earlier item (the bug the founder hit: 8:30 PM sitting above 7:30 PM).
+    const state: AppState = {
+      ...base,
+      installedPacks: ["longevity-foundation"],
+      settings,
       behaviorOverrides: {
-        ...base.behaviorOverrides,
-        [target]: { sortIndex: -10 },
+        [early]: { customTime: "07:30" },
+        [late]: { customTime: "09:00", sortIndex: -10 },
       },
     };
-    const reordered = compileTimeline(moved, 0)
-      .filter((i) => i.block === "morning")
+    const order = compileTimeline(state, 0)
+      .filter(
+        (i) =>
+          i.block === "morning" &&
+          (i.canonicalKey === early || i.canonicalKey === late)
+      )
       .map((i) => i.canonicalKey);
-    expect(reordered[0]).toBe(target); // now first
+    expect(order).toEqual([early, late]); // time order, not the -10 index
   });
 });

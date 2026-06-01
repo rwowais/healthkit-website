@@ -150,6 +150,38 @@ export function blockStartClock(
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/**
+ * Nudge a behavior's clock time by `deltaMin`, clamped to its own block so a
+ * small "move earlier / later" never silently changes the block. "HH:MM" out.
+ * (Not meaningful for "anytime", which carries no clock — callers hide it.)
+ */
+export function nudgeTimeWithinBlock(
+  curMin: number,
+  block: TimeBlock,
+  deltaMin: number,
+  settings: BlockSettings
+): string {
+  const b = resolveBlockBounds(settings);
+  let lo: number;
+  let hi: number;
+  if (block === "morning") {
+    lo = b.morning;
+    hi = b.afternoon - 1;
+  } else if (block === "afternoon") {
+    lo = b.afternoon;
+    hi = b.evening - 1;
+  } else {
+    // evening (and any other timed block) runs from its start until bedtime.
+    lo = b.evening;
+    const bed = settings.bedtime ? parseHM(settings.bedtime) : 1439;
+    hi = bed > b.evening ? bed : 1439;
+  }
+  const next = Math.min(hi, Math.max(lo, Math.round(curMin) + deltaMin));
+  const h = Math.floor(next / 60);
+  const m = next % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export function blockForMinutes(min: number, settings: BlockSettings): TimeBlock {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
   const wake = parseHM(settings.wakeTime);

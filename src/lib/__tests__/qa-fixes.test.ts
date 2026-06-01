@@ -18,6 +18,7 @@ import {
   addDaysToKey,
   dayIndexOfKeyInTz,
 } from "@/lib/tz";
+import { nudgeTimeWithinBlock } from "@/lib/time";
 
 const TODAY = dateKeyInTz(getTz(getDefaultState().settings));
 const dk = (off: number) => addDaysToKey(TODAY, -off);
@@ -250,6 +251,25 @@ describe("publish diff — interaction identity", () => {
     const d = diffBundles(withInteractions([]), next);
     expect(d.interactionsAdded).toHaveLength(2); // both survive the identity key
     expect(new Set(d.interactionsAdded.map((i) => i.key)).size).toBe(2);
+  });
+});
+
+// ── Move earlier/later nudges the time, clamped to the block ──
+describe("nudgeTimeWithinBlock", () => {
+  const settings = { wakeTime: "07:00", bedtime: "22:30" }; // default bounds
+  it("steps the time by the delta", () => {
+    expect(nudgeTimeWithinBlock(19 * 60, "evening", 15, settings)).toBe("19:15");
+    expect(nudgeTimeWithinBlock(19 * 60, "evening", -15, settings)).toBe("18:45");
+  });
+  it("clamps to the block's start (can't leave the block earlier)", () => {
+    // evening starts 17:00 — nudging earlier from 17:05 stops at 17:00
+    expect(nudgeTimeWithinBlock(17 * 60 + 5, "evening", -15, settings)).toBe("17:00");
+  });
+  it("clamps evening to bedtime (can't push past bed)", () => {
+    expect(nudgeTimeWithinBlock(22 * 60 + 20, "evening", 15, settings)).toBe("22:30");
+  });
+  it("morning stays before the afternoon boundary", () => {
+    expect(nudgeTimeWithinBlock(11 * 60 + 55, "morning", 15, settings)).toBe("11:59");
   });
 });
 

@@ -1415,6 +1415,7 @@ export default function ProtocolsPage() {
 
       <BehaviorSheet
         item={detail}
+        settings={state.settings}
         override={
           detail ? state.behaviorOverrides?.[detail.canonicalKey] : undefined
         }
