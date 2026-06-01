@@ -13,6 +13,7 @@ import DailyReflection from "@/components/DailyReflection";
 import DailyCheckInCard from "@/components/today/DailyCheckInCard";
 import BulkMoveSheet from "@/components/today/BulkMoveSheet";
 import WorkoutSwapSheet from "@/components/today/WorkoutSwapSheet";
+import WeekAhead from "@/components/today/WeekAhead";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -490,6 +491,7 @@ export default function TodayPage() {
     setTrialExtAcked(t);
   };
   const [offset, setOffset] = useState(0);
+  const [weekOpen, setWeekOpen] = useState(false);
   const selectedDate = useMemo(
     () => addDaysToKey(dateKeyInTz(tz), -offset),
     [tz, offset]
@@ -969,6 +971,13 @@ export default function TodayPage() {
               </span>
             )}
           </div>
+          <button
+            onClick={() => setWeekOpen(true)}
+            className="press tap-44 mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--readiness)]"
+          >
+            The week ahead
+            <Icon name="chevron" size={12} />
+          </button>
         </div>
 
         {/* Day complete — calm reward */}
@@ -2745,6 +2754,14 @@ export default function TodayPage() {
           "before bed", morning sunlight says "anchors the circadian
           clock", caffeine cutoff says "10h half-life", etc. The user
           can still proceed; we educate, not block. */}
+      <Sheet
+        open={weekOpen}
+        onClose={() => setWeekOpen(false)}
+        title="The week ahead"
+      >
+        <WeekAhead state={state} />
+      </Sheet>
+
       <Sheet
         open={!!pendingMove}
         onClose={() => setPendingMove(null)}
