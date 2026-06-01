@@ -46,9 +46,16 @@ export type IconName =
   | "user"
   | "bulb"
   | "flame"
-  | "arrowRight";
+  | "arrowRight"
+  | "search";
 
 const P: Record<IconName, React.ReactNode> = {
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.35-4.35" />
+    </>
+  ),
   sun: (
     <>
       <circle cx="12" cy="12" r="4" />

@@ -66,6 +66,10 @@ export default function ProtocolsPage() {
   // Sort the discover-sheet behaviors by evidence strength (most-proven
   // first) — the visible half of the founder's evidence-rank ask.
   const [evSort, setEvSort] = useState(false);
+  // Discover search + goal filter — helps the catalog stay navigable as it
+  // grows past a couple dozen packs.
+  const [discoverQuery, setDiscoverQuery] = useState("");
+  const [goalFilter, setGoalFilter] = useState<string>("all");
   // Hash routing: /protocols#discover opens the catalog directly. Lets
   // the old /library route redirect here while landing on the right
   // segment, and lets onboarding deep-link "browse more protocols"
@@ -153,6 +157,27 @@ export default function ProtocolsPage() {
   // (e.g., Jetlag Recovery) appear here even when an older CMS bundle
   // is live — they're appended after the bundle's own protocols.
   const catalog = useMemo(() => activePacks(), []);
+  // Distinct goals across the catalog, for the Discover filter chips.
+  const goals = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of catalog) if (p.goal) set.add(p.goal);
+    return [...set].sort();
+  }, [catalog]);
+  // Discover catalog after search + goal filter (name, tagline, goal, and
+  // behavior titles all match the query).
+  const filteredCatalog = useMemo(() => {
+    const q = discoverQuery.trim().toLowerCase();
+    return catalog.filter((p) => {
+      if (goalFilter !== "all" && p.goal !== goalFilter) return false;
+      if (!q) return true;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.tagline.toLowerCase().includes(q) ||
+        (p.goal ?? "").toLowerCase().includes(q) ||
+        p.behaviors.some((b) => b.title.toLowerCase().includes(q))
+      );
+    });
+  }, [catalog, discoverQuery, goalFilter]);
   const installedSet = useMemo(
     () => new Set(state?.installedPacks ?? []),
     [state]
@@ -408,8 +433,37 @@ export default function ProtocolsPage() {
               Research-backed protocol systems. Install any combination —
               overlapping behaviors merge automatically.
             </p>
+            <div className="mt-4">
+              <input
+                value={discoverQuery}
+                onChange={(e) => setDiscoverQuery(e.target.value)}
+                placeholder="Search protocols & behaviors"
+                aria-label="Search protocols"
+                className="w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-4)]"
+              />
+              {goals.length > 1 && (
+                <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+                  {["all", ...goals].map((g) => {
+                    const active = goalFilter === g;
+                    return (
+                      <button
+                        key={g}
+                        onClick={() => setGoalFilter(g)}
+                        className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[12.5px] font-semibold capitalize"
+                        style={{
+                          background: active ? "var(--text-1)" : "var(--surface-2)",
+                          color: active ? "var(--bg)" : "var(--text-2)",
+                        }}
+                      >
+                        {g === "all" ? "All" : g}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <div className="mt-4 flex flex-col gap-4">
-              {catalog.map((pack, i) => {
+              {filteredCatalog.map((pack, i) => {
                 const isInstalled = installedSet.has(pack.id);
                 return (
                   <motion.button
@@ -478,6 +532,22 @@ export default function ProtocolsPage() {
                 );
               })}
             </div>
+            {filteredCatalog.length === 0 && (
+              <div className="panel mt-2 p-6 text-center">
+                <p className="text-[14px] text-[var(--text-2)]">
+                  No protocols match that search.
+                </p>
+                <button
+                  onClick={() => {
+                    setDiscoverQuery("");
+                    setGoalFilter("all");
+                  }}
+                  className="press tr-fast mt-3 text-[13px] font-semibold text-[var(--readiness)]"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
           </section>
         )}
 

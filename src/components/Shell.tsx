@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -7,6 +8,7 @@ import { ToastProvider } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import Reminders from "@/components/Reminders";
 import SyncIndicator from "@/components/SyncIndicator";
+import GlobalSearch from "@/components/GlobalSearch";
 import { useAppState } from "@/hooks/useAppState";
 
 // Library + Protocols merged into a single hub. Discovery (browse + install
@@ -40,6 +42,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const { state } = useAppState();
+  const [searchOpen, setSearchOpen] = useState(false);
   const isActive = (href: string) =>
     pathname === href || pathname?.startsWith(href + "/");
   // Filter tabs based on user settings. The supplements tab is
@@ -79,23 +82,34 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   link's accessible name and re-announces as part of it. */}
               <SyncIndicator />
             </div>
-            <nav className="hidden items-center gap-1 lg:flex">
-              {NAV.map((n) => (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className={`tr-fast rounded-[var(--r-pill)] px-4 py-2 text-[13px] font-medium ${
-                    isActive(n.href)
-                      ? "bg-[var(--surface-3)] text-[var(--text-1)]"
-                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
-                  }`}
-                >
-                  {n.label}
-                </Link>
-              ))}
-            </nav>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setSearchOpen(true)}
+                aria-label="Search"
+                className="press tr-fast grid h-9 w-9 place-items-center rounded-full text-[var(--text-3)] hover:text-[var(--text-1)]"
+              >
+                <Icon name="search" size={18} />
+              </button>
+              <nav className="hidden items-center gap-1 lg:flex">
+                {NAV.map((n) => (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className={`tr-fast rounded-[var(--r-pill)] px-4 py-2 text-[13px] font-medium ${
+                      isActive(n.href)
+                        ? "bg-[var(--surface-3)] text-[var(--text-1)]"
+                        : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                    }`}
+                  >
+                    {n.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
           </div>
         </header>
+
+        <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
 
         <main className="mx-auto max-w-[600px] px-5 pb-32 pt-6 lg:pb-12">
           <AnimatePresence mode="wait">
