@@ -9,7 +9,6 @@
  * user; it never claims to have silently rearranged their day. The parent
  * owns the per-day "acknowledged" dismissal so the read recedes once seen.
  */
-import { motion } from "framer-motion";
 import { Eyebrow } from "@/components/ui";
 import type { AdaptMode } from "@/lib/engine";
 
@@ -51,11 +50,7 @@ export default function DailyCheckInCard({
       ? "You're well-recovered — a good day to go as planned."
       : "You're steady. Today stands as planned; adjust anything that doesn't fit.";
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="card p-5"
-      >
+      <div className="card anim-rise p-5">
         <Eyebrow color={ease ? "var(--recovery)" : "var(--readiness)"}>
           Today&rsquo;s read
         </Eyebrow>
@@ -68,17 +63,13 @@ export default function DailyCheckInCard({
         >
           Got it
         </button>
-      </motion.div>
+      </div>
     );
   }
 
   // ── Prompts: the two-tap check-in ──
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="card p-5"
-    >
+    <div className="card anim-rise p-5">
       <Eyebrow>Morning check-in</Eyebrow>
       <p className="t-caption mt-1.5">
         Two taps — so today can meet you where you are.
@@ -128,6 +119,6 @@ export default function DailyCheckInCard({
           </button>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }

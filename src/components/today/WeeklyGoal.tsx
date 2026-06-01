@@ -30,7 +30,9 @@ export default function WeeklyGoal({ state }: { state: AppState }) {
       <div className="min-w-0">
         <Eyebrow color={color}>This week</Eyebrow>
         <p className="mt-1 text-[14px] font-semibold text-[var(--text-1)]">
-          {done} of {goal} active days
+          {met
+            ? `${done} active ${done === 1 ? "day" : "days"} this week`
+            : `${done} of ${goal} active days`}
         </p>
         <p className="text-[12px] text-[var(--text-3)]">
           {met
