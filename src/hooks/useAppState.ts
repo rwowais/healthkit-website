@@ -36,6 +36,7 @@ import {
   updateSupplement as updateSupplementFn,
   removeSupplement as removeSupplementFn,
   setVacationMode as setVacationModeFn,
+  useStreakFreeze as useStreakFreezeFn,
   installPack as installPackFn,
   uninstallPack as uninstallPackFn,
   setBehaviorOverride as setBehaviorOverrideFn,
@@ -313,6 +314,9 @@ export function useAppState() {
   const setVacationMode = useCallback((on: boolean) => {
     setState((prev) => setVacationModeFn(prev, on));
   }, []);
+  const useStreakFreeze = useCallback((dateKey: string) => {
+    setState((prev) => useStreakFreezeFn(prev, dateKey));
+  }, []);
 
   const toggleBehavior = useCallback((date: string, key: string) => {
     setState((prev) => toggleBehaviorFn(prev, date, key));
@@ -411,6 +415,7 @@ export function useAppState() {
     removeSupplement,
     // Vacation
     setVacationMode,
+    useStreakFreeze,
     // Protocol OS
     toggleBehavior,
     swapBehavior,

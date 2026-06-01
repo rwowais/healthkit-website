@@ -700,7 +700,7 @@ export default function ProtocolsPage() {
               if (items.length === 0) return null;
               return (
                 <div key={block}>
-                  <Eyebrow>{blockLabel(block)}</Eyebrow>
+                  <Eyebrow>{blockLabel(block, state.settings.blockLabels)}</Eyebrow>
                   <div className="well mt-3 space-y-1.5 p-1.5">
                     {items.map((it) => {
                       const disabled = overrides[it.canonicalKey]?.disabled;

@@ -30,6 +30,8 @@ export default function BehaviorSheet({
   isEnabled = true,
   onSnooze,
   snoozed,
+  stackOptions,
+  blockLabels,
 }: {
   item: TimelineItem | null;
   override: BehaviorOverride | undefined;
@@ -40,6 +42,12 @@ export default function BehaviorSheet({
   isEnabled?: boolean;
   onSnooze?: (mode: "later" | "tomorrow" | null) => void;
   snoozed?: "later" | "tomorrow";
+  /** Other behaviors this one can be stacked after (habit stacking). Each
+   *  `key` is the anchor's canonicalKey. Omitted/empty → control hidden. */
+  stackOptions?: { key: string; title: string }[];
+  /** Custom day-block display names (settings.blockLabels), so the sheet's
+   *  "Order in X" / "Why X?" copy matches the user's renamed sections. */
+  blockLabels?: { morning?: string; afternoon?: string; evening?: string; anytime?: string };
 }) {
   const [showWhy, setShowWhy] = useState(false);
   if (!item) return null;
@@ -55,7 +63,8 @@ export default function BehaviorSheet({
   const whyText =
     item.timingReason ??
     `Recommended in the ${blockLabel(
-      item.recommendedBlock
+      item.recommendedBlock,
+      blockLabels
     ).toLowerCase()} based on the science behind this behavior.`;
 
   const patch = (p: Partial<BehaviorOverride>) => onChange({ ...ov, ...p });
@@ -146,7 +155,7 @@ export default function BehaviorSheet({
               ordering (clock) is unchanged until the user moves something. */}
           <div className="mt-5">
             <p className="t-eyebrow">
-              Order in {blockLabel(item.block).toLowerCase()}
+              Order in {blockLabel(item.block, blockLabels).toLowerCase()}
             </p>
             <div className="mt-2 flex gap-2">
               <button
@@ -173,6 +182,32 @@ export default function BehaviorSheet({
               </button>
             )}
           </div>
+
+          {/* Habit stacking — anchor this behavior to follow another, so it
+              files right after it ("after X, do Y"). Cue-based chaining. */}
+          {stackOptions && stackOptions.length > 0 && (
+            <div className="mt-5">
+              <p className="t-eyebrow">Stack after</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-[var(--text-3)]">
+                Do this right after another habit — anchoring a new habit to
+                one you already do is what makes it stick.
+              </p>
+              <select
+                value={ov.stackAfter ?? ""}
+                onChange={(e) =>
+                  patch({ stackAfter: e.target.value || undefined })
+                }
+                className="mt-2 w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[14px] text-[var(--text-1)] outline-none"
+              >
+                <option value="">No anchor — use its own time</option>
+                {stackOptions.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    After {o.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Snooze for today — "later today" or "tomorrow" (per-day). */}
           {onSnooze && (
@@ -243,7 +278,7 @@ export default function BehaviorSheet({
               className="mt-3 flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-3)]"
             >
               <Icon name="info" size={12} />
-              Why {blockLabel(item.block).toLowerCase()}?
+              Why {blockLabel(item.block, blockLabels).toLowerCase()}?
               <Icon
                 name="chevron"
                 size={12}

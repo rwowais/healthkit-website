@@ -71,6 +71,9 @@ export interface TimelineItem extends BehaviorDef {
   sortIndex?: number;
   /** Added for today only (DailyLog.oneOffs), not part of the protocol. */
   oneOff?: boolean;
+  /** Habit stacking: title of the anchor this item is filed right after
+   *  (populated by applyStacks). Display-only — surfaces an "after X" caption. */
+  stackedAfter?: string;
 }
 
 /**
@@ -527,6 +530,52 @@ export function applySnoozes(
     }
     out.push(it);
   }
+  return out;
+}
+
+/**
+ * Habit stacking: reorder so each behavior with an override `stackAfter`
+ * sits in its anchor's block, immediately after it ("after X, do Y"). Pure;
+ * run LAST in the timeline pipeline so it owns the final within-block order.
+ * Anchors are matched by canonicalKey, then effectiveKey. A stack whose
+ * anchor isn't in today's timeline is ignored (the behavior keeps its normal
+ * placement). Handles chains (A→B→C) and multiple followers per anchor.
+ */
+export function applyStacks(
+  items: TimelineItem[],
+  overrides: Record<string, BehaviorOverride> | undefined
+): TimelineItem[] {
+  if (!overrides || items.length === 0) return items;
+  // Clone so adopting an anchor's block doesn't mutate the caller's items.
+  const clones = items.map((it) => ({ ...it }));
+  const byCanon = new Map(clones.map((it) => [it.canonicalKey, it]));
+  const followers = new Map<string, TimelineItem[]>();
+  const isFollower = new Set<string>();
+  for (const it of clones) {
+    const target = overrides[it.canonicalKey]?.stackAfter;
+    if (!target) continue;
+    const anchor =
+      byCanon.get(target) ?? clones.find((c) => effectiveKey(c) === target);
+    if (!anchor || anchor.canonicalKey === it.canonicalKey) continue;
+    it.block = anchor.block; // file with the anchor
+    it.stackedAfter = anchor.title;
+    const arr = followers.get(anchor.canonicalKey) ?? [];
+    arr.push(it);
+    followers.set(anchor.canonicalKey, arr);
+    isFollower.add(it.canonicalKey);
+  }
+  if (followers.size === 0) return items; // no active stacks → untouched
+  const emitted = new Set<string>();
+  const out: TimelineItem[] = [];
+  const emit = (it: TimelineItem) => {
+    if (emitted.has(it.canonicalKey)) return;
+    emitted.add(it.canonicalKey);
+    out.push(it);
+    for (const f of followers.get(it.canonicalKey) ?? []) emit(f);
+  };
+  for (const it of clones) if (!isFollower.has(it.canonicalKey)) emit(it);
+  // Safety: emit any follower whose anchor was missing or cyclic.
+  for (const it of clones) if (!emitted.has(it.canonicalKey)) out.push(it);
   return out;
 }
 
@@ -1623,7 +1672,12 @@ export function shapeTimeline(
   return shaped;
 }
 
-export function blockLabel(b: TimeBlock): string {
+export function blockLabel(
+  b: TimeBlock,
+  labels?: { morning?: string; afternoon?: string; evening?: string; anytime?: string }
+): string {
+  const custom = labels?.[b]?.trim();
+  if (custom) return custom;
   return b === "anytime"
     ? "Anytime"
     : b.charAt(0).toUpperCase() + b.slice(1);

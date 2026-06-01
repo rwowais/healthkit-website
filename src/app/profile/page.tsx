@@ -233,16 +233,18 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        {/* Day blocks — when morning / afternoon / evening begin. Lets a
-            shift worker or night owl file behaviors under the section that
-            matches their real day, instead of the fixed clock defaults. */}
+        {/* Day blocks — rename and re-time the day's sections. Lets a shift
+            worker or night owl reshape their day (e.g. Dawn / Midday /
+            Wind-down, with custom start times) so behaviors file where they
+            belong. Renaming is display-only; the block model is unchanged. */}
         <Card>
           <Eyebrow>Day blocks</Eyebrow>
           <p className="t-caption mt-2">
-            When your morning, afternoon, and evening begin. Behaviors file
-            under the section matching their time.
+            Rename and re-time your day&rsquo;s sections — call them whatever
+            fits your life and set when each begins. Behaviors file under the
+            section matching their time.
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 space-y-3">
             {(
               [
                 ["morning", "Morning", "05:00"],
@@ -250,37 +252,61 @@ export default function ProfilePage() {
                 ["evening", "Evening", "17:00"],
               ] as const
             ).map(([key, label, def]) => (
-              <div key={key}>
-                <p className="t-caption mb-1.5">{label}</p>
-                <input
-                  type="time"
-                  value={s.blockBoundaries?.[key] ?? def}
-                  onChange={(e) => {
-                    const cur = s.blockBoundaries ?? {
-                      morning: "05:00",
-                      afternoon: "12:00",
-                      evening: "17:00",
-                    };
-                    updateSettings({
-                      blockBoundaries: { ...cur, [key]: e.target.value },
-                    });
-                  }}
-                  className={input}
-                />
+              <div key={key} className="flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="t-caption mb-1.5">{label}</p>
+                  <input
+                    type="text"
+                    value={s.blockLabels?.[key] ?? ""}
+                    placeholder={`Name (default: ${label})`}
+                    onChange={(e) =>
+                      updateSettings({
+                        blockLabels: {
+                          ...(s.blockLabels ?? {}),
+                          [key]: e.target.value || undefined,
+                        },
+                      })
+                    }
+                    className={input}
+                  />
+                </div>
+                <div className="w-[7.5rem] shrink-0">
+                  <p className="t-caption mb-1.5">Starts</p>
+                  <input
+                    type="time"
+                    value={s.blockBoundaries?.[key] ?? def}
+                    onChange={(e) => {
+                      const cur = s.blockBoundaries ?? {
+                        morning: "05:00",
+                        afternoon: "12:00",
+                        evening: "17:00",
+                      };
+                      updateSettings({
+                        blockBoundaries: { ...cur, [key]: e.target.value },
+                      });
+                    }}
+                    className={input}
+                  />
+                </div>
               </div>
             ))}
           </div>
-          {s.blockBoundaries && (
+          {(s.blockBoundaries || s.blockLabels) && (
             <button
-              onClick={() => updateSettings({ blockBoundaries: undefined })}
+              onClick={() =>
+                updateSettings({
+                  blockBoundaries: undefined,
+                  blockLabels: undefined,
+                })
+              }
               className="press tr-fast mt-3 text-[12px] font-semibold text-[var(--readiness)]"
             >
               Reset to default
             </button>
           )}
           <p className="t-caption mt-2 text-[var(--text-4)]">
-            Times must go in order; otherwise the 5am / 12pm / 5pm defaults
-            apply.
+            Start times must go in order; otherwise the 5am / 12pm / 5pm
+            defaults apply.
           </p>
         </Card>
 
@@ -570,6 +596,41 @@ export default function ProfilePage() {
                 No reminders fire between these times — a wind-down window so
                 nothing buzzes overnight. Clear a field to turn it off.
               </p>
+              <div className="mt-3">
+                <Row label="Smart timing">
+                  <button
+                    onClick={() =>
+                      updateSettings({
+                        smartReminders: s.smartReminders ? undefined : true,
+                      })
+                    }
+                    role="switch"
+                    aria-checked={!!s.smartReminders}
+                    aria-label="Smart reminder timing"
+                    className="tap-44 tr-fast h-7 w-12 rounded-full p-1"
+                    style={{
+                      background: s.smartReminders
+                        ? "var(--vitality)"
+                        : "var(--surface-3)",
+                    }}
+                  >
+                    <div
+                      className="tr-fast h-5 w-5 rounded-full bg-white"
+                      style={{
+                        transform: s.smartReminders
+                          ? "translateX(20px)"
+                          : "translateX(0)",
+                      }}
+                    />
+                  </button>
+                </Row>
+                <p className="t-caption mt-1 leading-relaxed">
+                  Learns when you actually complete each behavior and nudges
+                  you then, instead of a fixed time. It improves as you log —
+                  until there&rsquo;s enough history, reminders use the
+                  scheduled time.
+                </p>
+              </div>
             </div>
           )}
           {s.notificationsEnabled && (

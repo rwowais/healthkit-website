@@ -107,6 +107,12 @@ export interface UserSettings {
    *  Lets a shift worker / night owl define when their morning, afternoon,
    *  and evening begin so behaviors file under the right section. */
   blockBoundaries?: { morning: string; afternoon: string; evening: string };
+  /** Optional custom display names for the day blocks (e.g. "Dawn",
+   *  "Midday", "Wind-down"). Display-only — the engine's block model is
+   *  unchanged; this just renames the section headers. Combined with
+   *  blockBoundaries (when each begins), it lets a user reshape the day's
+   *  sections to fit their life. Absent keys fall back to the defaults. */
+  blockLabels?: { morning?: string; afternoon?: string; evening?: string; anytime?: string };
   weekStartsOn: 0 | 1;
   /** Target active days per week (1–7). Undefined/0 = no goal. Powers the
    *  Today weekly progress ring. */
@@ -682,6 +688,15 @@ export interface BehaviorOverride {
   /** Manual order within its block (lower = earlier). Absent = follow the
    *  clock. Adjusted via "move earlier / later" in the behavior editor. */
   sortIndex?: number;
+  /**
+   * Habit stacking: the canonicalKey (or effectiveKey) of an anchor behavior
+   * this one should follow ("after X, do Y"). When the anchor is present in
+   * the day's timeline, the engine files this behavior in the anchor's block,
+   * immediately after it. Cue-based chaining — anchoring a new habit to an
+   * established one is what makes it stick. Ignored if the anchor isn't
+   * scheduled today.
+   */
+  stackAfter?: string;
 }
 
 // ── Outcome goals & self-experiments ──────────────────────────────

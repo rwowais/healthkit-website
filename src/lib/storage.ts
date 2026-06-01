@@ -1,5 +1,5 @@
 import { STORAGE_KEY, LEGACY_STORAGE_KEYS } from "./constants";
-import { getTz, dayIndexOfKeyInTz, dateKeyInTz } from "./tz";
+import { getTz, dayIndexOfKeyInTz, dateKeyInTz, nowMinutesInTz } from "./tz";
 import {
   SUPPLEMENT_CANONICAL_KEYS,
   isSupplementBehavior,
@@ -623,7 +623,24 @@ export function toggleBehavior(
 
   const score = computeBehaviorScore(state, date, bc);
 
-  const updated: DailyLog = { ...log, behaviorCompletions: bc, score };
+  // Smart-reminder learning: when a behavior is checked ON for *today*,
+  // stamp the clock time so reminders can learn the user's real rhythm.
+  // Only for today (a past-day toggle has no meaningful "now"); cleared on
+  // un-check. Additive + lossless for older logs without the field.
+  const tz = getTz(state.settings);
+  let bcm = log.behaviorCompletionMinutes;
+  if (date === dateKeyInTz(tz)) {
+    bcm = { ...(log.behaviorCompletionMinutes ?? {}) };
+    if (bc[key]) bcm[key] = Math.round(nowMinutesInTz(tz));
+    else delete bcm[key];
+  }
+
+  const updated: DailyLog = {
+    ...log,
+    behaviorCompletions: bc,
+    behaviorCompletionMinutes: bcm,
+    score,
+  };
   const idx = state.dailyLogs.findIndex((l) => l.date === date);
   const dailyLogs =
     idx >= 0
@@ -863,7 +880,28 @@ export function getVacationDates(state: AppState): Set<string> {
   for (const day of state.settings?.restDays ?? []) {
     if (day) out.add(day);
   }
+  // Streak-freeze tokens the user spent: transparent like a rest day, but
+  // reactive ("protect today") rather than planned. Bridges a gap so the
+  // streak survives a genuinely off day.
+  for (const day of state.settings?.usedFreezeDates ?? []) {
+    if (day) out.add(day);
+  }
   return out;
+}
+
+/**
+ * Spend a streak-freeze token to protect `dateKey` (idempotent — a day
+ * already frozen is a no-op). The caller is responsible for checking
+ * availability via freezeStatus(); this just records the spend. The frozen
+ * day flows into getVacationDates, so the streak walks through it.
+ */
+export function useStreakFreeze(state: AppState, dateKey: string): AppState {
+  const used = state.settings.usedFreezeDates ?? [];
+  if (used.includes(dateKey)) return state;
+  return {
+    ...state,
+    settings: { ...state.settings, usedFreezeDates: [...used, dateKey] },
+  };
 }
 
 /**

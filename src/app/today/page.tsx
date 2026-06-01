@@ -18,6 +18,7 @@ import MorningBriefing from "@/components/today/MorningBriefing";
 import MilestoneMoment from "@/components/today/MilestoneMoment";
 import WeeklyGoal from "@/components/today/WeeklyGoal";
 import QuickAdd from "@/components/today/QuickAdd";
+import StreakFreeze from "@/components/today/StreakFreeze";
 import { useAppState } from "@/hooks/useAppState";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
@@ -29,6 +30,7 @@ import {
   applySwaps,
   injectOneOffs,
   applySnoozes,
+  applyStacks,
   adapt,
   shapeTimeline,
   masteredKeys,
@@ -188,6 +190,7 @@ export default function TodayPage() {
     setBehaviorOverride,
     updateSettings,
     setSnooze,
+    useStreakFreeze,
     refresh,
   } = useAppState();
   const router = useRouter();
@@ -551,8 +554,12 @@ export default function TodayPage() {
     });
     // Per-day plan, applied after shaping so one-offs are always visible and
     // snoozes operate on the final list: inject today-only behaviors, then
-    // hide/relocate snoozed ones.
-    return applySnoozes(injectOneOffs(shaped, log), log);
+    // hide/relocate snoozed ones. Habit stacking runs last so it owns the
+    // final within-block order ("after X, do Y").
+    return applyStacks(
+      applySnoozes(injectOneOffs(shaped, log), log),
+      state.behaviorOverrides
+    );
   }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate, log]);
 
   // Just-graduated behaviors today. We render their titles (from the
@@ -1068,6 +1075,20 @@ export default function TodayPage() {
             </p>
           </div>
         )}
+
+        {/* Streak freeze — protect a streak on an off day (self-gates on a
+            real streak at risk + an available token; flips to a confirmation
+            once spent). Not on a planned rest day (already protected). */}
+        {isToday &&
+          !(state.settings.restDays ?? []).includes(selectedDate) && (
+            <StreakFreeze
+              state={state}
+              dateKey={selectedDate}
+              streak={liveStreak}
+              log={log}
+              onUse={useStreakFreeze}
+            />
+          )}
 
         {/* Day complete — calm reward */}
         {dayComplete && (
@@ -1976,7 +1997,7 @@ export default function TodayPage() {
                 >
                   <span className="flex items-center gap-2">
                     <Eyebrow color={isCurrent ? accent : undefined}>
-                      {blockLabel(block)}
+                      {blockLabel(block, settings.blockLabels)}
                     </Eyebrow>
                     {isCurrent && (
                       <span
@@ -1992,7 +2013,7 @@ export default function TodayPage() {
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-3)]">
                     {editMode && dragKey
-                      ? `Drop here to move to ${blockLabel(block)}`
+                      ? `Drop here to move to ${blockLabel(block, settings.blockLabels)}`
                       : fullyDone
                       ? "Complete"
                       : blockDone > 0
@@ -2231,7 +2252,7 @@ export default function TodayPage() {
                                                 : undefined,
                                           }}
                                         >
-                                          {blockLabel(target)}
+                                          {blockLabel(target, settings.blockLabels)}
                                           {target === block && (
                                             <span className="ml-2 text-[10.5px] text-[var(--text-4)]">
                                               current
@@ -2958,6 +2979,19 @@ export default function TodayPage() {
             : undefined
         }
         snoozed={detail ? log.snoozes?.[detail.canonicalKey] : undefined}
+        blockLabels={settings.blockLabels}
+        stackOptions={
+          detail
+            ? timeline
+                .filter(
+                  (i) =>
+                    i.canonicalKey !== detail.canonicalKey &&
+                    !i.oneOff &&
+                    i.block !== "anytime"
+                )
+                .map((i) => ({ key: i.canonicalKey, title: i.title }))
+            : undefined
+        }
       />
     </Shell>
   );

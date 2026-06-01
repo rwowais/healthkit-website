@@ -12,6 +12,7 @@ import {
   isDone,
 } from "@/lib/engine";
 import { effectiveMinutes, inQuietHours } from "@/lib/time";
+import { learnedReminderMinutes } from "@/lib/smartReminders";
 import { getTz, dateKeyInTz, dayIndexInTz, nowMinutesInTz } from "@/lib/tz";
 import {
   pushAvailable,
@@ -71,8 +72,12 @@ export default function Reminders() {
     const times: string[] = [];
     for (const it of items) {
       if (it.muted) continue;
-      const t = effectiveMinutes(it, state.settings);
-      if (t == null) continue;
+      const sched = effectiveMinutes(it, state.settings);
+      if (sched == null) continue;
+      // Smart timing: fire at the learned typical completion time when there's
+      // enough history (else the scheduled time). Only retimes already-timed
+      // behaviors — untimed "anytime" items stay reminder-free.
+      const t = learnedReminderMinutes(state, it.canonicalKey) ?? sched;
       const h = Math.floor(t / 60) % 24;
       const m = t % 60;
       const hm = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -131,8 +136,11 @@ export default function Reminders() {
       if (it.muted || isDone(log, it.canonicalKey)) continue;
       // Per-behavior opt-out: the user silenced reminders for this one.
       if (state.behaviorOverrides?.[it.canonicalKey]?.reminderOff) continue;
-      const t = effectiveMinutes(it, state.settings);
-      if (t == null) continue;
+      const sched = effectiveMinutes(it, state.settings);
+      if (sched == null) continue;
+      // Smart timing: prefer the learned typical completion time when there's
+      // enough history (see learnedReminderMinutes); else the scheduled time.
+      const t = learnedReminderMinutes(state, it.canonicalKey) ?? sched;
       // Quiet hours: never fire inside the user's do-not-disturb window.
       if (inQuietHours(t, state.settings.quietHours)) continue;
       const deltaMin = t - now;

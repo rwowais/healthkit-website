@@ -1,6 +1,6 @@
 import { SCORE_WEIGHTS } from "./constants";
 import { addDaysToKey, dateKeyInTz, getTz } from "./tz";
-import type { DailyLog, ProtocolItem, UserSettings } from "./types";
+import type { AppState, DailyLog, ProtocolItem, UserSettings } from "./types";
 
 /**
  * Calculate the daily score (0-100) for a given day's log.
@@ -192,6 +192,44 @@ export function weeklyActiveDays(
     }
   }
   return n;
+}
+
+/**
+ * Streak-freeze bank. A small, self-replenishing monthly allowance of
+ * "freeze" tokens the user can spend to protect their streak on a genuinely
+ * off day — softer than a planned rest day, no all-or-nothing pressure. A
+ * spent day is unioned into getVacationDates, so calculateStreak walks
+ * through it transparently (bridges the gap; never counts up OR breaks).
+ *
+ * Model: a rolling 30-day allowance (not a hoardable bank), so it can never
+ * get permanently stuck at zero — used tokens "expire" out of the window.
+ * Base 2/month, +1 once the user has real history (≥60 active days ever).
+ */
+export const FREEZE_WINDOW_DAYS = 30;
+export const FREEZE_BASE_ALLOWANCE = 2;
+
+export interface FreezeStatus {
+  allowance: number;
+  usedRecent: number;
+  available: number;
+  windowDays: number;
+}
+
+export function freezeStatus(state: AppState): FreezeStatus {
+  const settings = state.settings;
+  const today = dateKeyInTz(getTz(settings));
+  const floor = addDaysToKey(today, -(FREEZE_WINDOW_DAYS - 1));
+  const used = (settings.usedFreezeDates ?? []).filter(
+    (d) => d >= floor && d <= today
+  ).length;
+  const activeTotal = (state.dailyLogs ?? []).filter(hasAnyActivity).length;
+  const allowance = FREEZE_BASE_ALLOWANCE + (activeTotal >= 60 ? 1 : 0);
+  return {
+    allowance,
+    usedRecent: used,
+    available: Math.max(0, allowance - used),
+    windowDays: FREEZE_WINDOW_DAYS,
+  };
 }
 
 /** Check if a daily log has any meaningful activity */
