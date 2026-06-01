@@ -383,6 +383,11 @@ export function applySwaps(
 ): TimelineItem[] {
   const swaps = log?.swaps;
   if (!swaps || Object.keys(swaps).length === 0) return items;
+  // No base timeline → nothing to swap. A recorded swap must never
+  // *introduce* a behavior into an empty timeline: that re-populated a
+  // vacation-emptied day (compileTimeline returns [] under vacation) with a
+  // lone swap target, so the calm "you're on a break" surface never showed.
+  if (items.length === 0) return items;
   // Index existing items by canonicalKey for O(1) lookups.
   const byKey = new Map(items.map((it) => [it.canonicalKey, it]));
   // 1. Annotate originals.

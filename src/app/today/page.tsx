@@ -821,6 +821,26 @@ export default function TodayPage() {
     // Two empty-state cases: vacation mode on (intentional break), or
     // no packs installed (needs onboarding nudge). Different copy + CTA.
     const onVacation = !!state.settings.vacationMode;
+    // How many days the current break has run (inclusive), from the open
+    // vacation period's start — a gentle "Day N" so a long rest still feels
+    // acknowledged rather than blank.
+    let breakDay = 0;
+    if (onVacation) {
+      const open = [...(state.settings.vacationPeriods ?? [])]
+        .reverse()
+        .find((p) => p.end === null);
+      if (open?.start) {
+        const todayKey = dateKeyInTz(getTz(state.settings));
+        const [ay, am, ad] = open.start.split("-").map(Number);
+        const [by, bm, bd] = todayKey.split("-").map(Number);
+        if (ay && by) {
+          const diff = Math.round(
+            (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000
+          );
+          breakDay = Math.max(1, diff + 1);
+        }
+      }
+    }
     return (
       <Shell>
         <div className="flex flex-col gap-6">
@@ -846,6 +866,11 @@ export default function TodayPage() {
             <p className="t-section text-[var(--text-1)]">
               {onVacation ? "You're on a break" : "Your day is a blank canvas"}
             </p>
+            {onVacation && breakDay > 0 && (
+              <p className="t-eyebrow mt-1.5 text-[var(--warm)]">
+                Day {breakDay}
+              </p>
+            )}
             <p className="t-caption mt-2 max-w-[280px] leading-relaxed">
               {onVacation
                 ? "Your streak is paused, your data is safe, your packs will resume the moment you're ready."
