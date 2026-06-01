@@ -173,6 +173,7 @@ export function Segmented<T extends string>({
           <button
             key={o.value}
             onClick={() => onChange(o.value)}
+            aria-pressed={active}
             className={`tr-fast flex-1 rounded-[var(--r-pill)] py-2 text-[13px] font-semibold ${
               active
                 ? "bg-[var(--surface-3)] text-[var(--text-1)]"

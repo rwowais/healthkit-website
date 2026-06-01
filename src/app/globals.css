@@ -91,7 +91,8 @@
   --text-1: #14161A;
   --text-2: #45494F;
   --text-3: #5F636B;
-  --text-4: #8A8F98;
+  --text-4: #6E727B; /* darkened from #8A8F98 (~2.8:1, failed AA) → ~4.5:1 on
+                        light surfaces, while staying dimmer than --text-3 */
 
   /* Accents — deepened for legibility on light (≈4.5:1 as small text) */
   --sleep: #5258C4;

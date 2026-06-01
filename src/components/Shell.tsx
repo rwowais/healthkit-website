@@ -86,7 +86,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => setSearchOpen(true)}
                 aria-label="Search"
-                className="press tr-fast grid h-9 w-9 place-items-center rounded-full text-[var(--text-3)] hover:text-[var(--text-1)]"
+                className="press tap-44 tr-fast grid h-9 w-9 place-items-center rounded-full text-[var(--text-3)] hover:text-[var(--text-1)]"
               >
                 <Icon name="search" size={18} />
               </button>
@@ -95,6 +95,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={n.href}
                     href={n.href}
+                    aria-current={isActive(n.href) ? "page" : undefined}
                     className={`tr-fast rounded-[var(--r-pill)] px-4 py-2 text-[13px] font-medium ${
                       isActive(n.href)
                         ? "bg-[var(--surface-3)] text-[var(--text-1)]"
@@ -133,6 +134,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={n.href}
                   href={n.href}
+                  aria-current={active ? "page" : undefined}
                   className="press relative flex min-w-[58px] flex-col items-center gap-1.5 py-1"
                   style={{
                     color: active ? "var(--text-1)" : "var(--text-3)",

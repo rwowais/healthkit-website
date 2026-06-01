@@ -160,21 +160,21 @@ export function nowMinutesInTz(
  * IANA zone.
  */
 export function dayIndexOfKeyInTz(
-  tz: string,
+  _tz: string,
   dateKey: string
 ): number {
-  // Parse the key components manually so we don't depend on the local
-  // timezone for the construction.
+  // A YYYY-MM-DD key is ALREADY a local calendar date, and a calendar
+  // date's weekday is timezone-invariant (2024-01-01 is a Monday
+  // everywhere). So we derive the weekday of Y-M-D directly in UTC and
+  // do NOT re-project into `_tz` — re-projecting a noon-UTC anchor rolled
+  // into the next calendar day for offsets past +12 (Auckland-DST +13,
+  // Kiritimati +14), returning the wrong weekday for those users and
+  // corrupting weekday analytics + the adherence scheduling denominator.
+  // `_tz` is kept in the signature for call-site clarity but intentionally
+  // unused.
   const [y, m, d] = dateKey.split("-").map(Number);
   if (!y || !m || !d) return 0;
-  // Build a UTC instant at "noon UTC" on that calendar day, then ask
-  // Intl what weekday that lands on IN tz. Noon UTC is between 0am
-  // and 1pm in every IANA zone except the most extreme — for those
-  // we'd still want the user-local calendar day, which is what the
-  // key represents. The key authoritatively defines the calendar
-  // day; we only need a consistent weekday derivation.
-  const anchor = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-  return dayIndexInTz(tz, anchor);
+  return dayIndexInTz("UTC", new Date(Date.UTC(y, m - 1, d, 12, 0, 0)));
 }
 
 /**

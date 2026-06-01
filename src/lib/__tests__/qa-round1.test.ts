@@ -11,6 +11,7 @@ import { experimentReadout, goalProgress } from "@/lib/goals";
 import { parseQuickLog } from "@/lib/quicklog";
 import { freezeStatus } from "@/lib/scoring";
 import { mergeStates } from "@/lib/datasource";
+import { dayIndexOfKeyInTz } from "@/lib/tz";
 
 const BASE = getDefaultState();
 const TODAY = dateKeyInTz(getTz(BASE.settings));
@@ -119,6 +120,37 @@ describe("F13: goalProgress denom===0 respects direction", () => {
       createdAt: "x",
     });
     expect(gp.achieved).toBe(false); // current 60 > target 55 → not achieved
+  });
+});
+
+describe("F-E1: dayIndexOfKeyInTz weekday is timezone-invariant (incl. ≥+13)", () => {
+  it("returns the same weekday in every zone — 2024-01-01 is Monday (0)", () => {
+    // A calendar date's weekday doesn't depend on tz. The +13/+14 zones were
+    // the bug (noon-UTC anchor rolled to the next day).
+    for (const tz of [
+      "UTC",
+      "America/New_York",
+      "Asia/Tokyo",
+      "Pacific/Auckland", // +13 (DST)
+      "Pacific/Kiritimati", // +14
+      "Pacific/Tongatapu", // +13
+    ]) {
+      expect(dayIndexOfKeyInTz(tz, "2024-01-01")).toBe(0); // Monday
+    }
+  });
+  it("advances correctly across a week", () => {
+    const days = [
+      "2024-01-01",
+      "2024-01-02",
+      "2024-01-03",
+      "2024-01-04",
+      "2024-01-05",
+      "2024-01-06",
+      "2024-01-07",
+    ];
+    expect(days.map((d) => dayIndexOfKeyInTz("Pacific/Kiritimati", d))).toEqual([
+      0, 1, 2, 3, 4, 5, 6,
+    ]);
   });
 });
 

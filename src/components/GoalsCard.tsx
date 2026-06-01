@@ -160,7 +160,7 @@ export default function GoalsCard({
               <button
                 onClick={() => remove(p.goal.id)}
                 aria-label="Remove goal"
-                className="press tr-fast grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--text-4)]"
+                className="press tap-44 tr-fast grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--text-4)]"
                 style={{ background: "var(--surface-3)" }}
               >
                 <Icon name="ban" size={13} />

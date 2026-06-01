@@ -135,7 +135,7 @@ export default function ExperimentsCard({
             return (
               <div key={r.exp.id} className="panel p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-[14px] font-semibold leading-snug text-[var(--text-1)]">
+                  <p className="min-w-0 break-words text-[14px] font-semibold leading-snug text-[var(--text-1)]">
                     {r.exp.hypothesis}
                   </p>
                   <span

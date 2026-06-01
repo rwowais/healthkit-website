@@ -26,16 +26,11 @@ import {
 import SupplementSheet from "@/components/SupplementSheet";
 import type { Supplement, TimeBlock } from "@/lib/types";
 import { getTz, addDaysToKey, dateKeyInTz } from "@/lib/tz";
+import { blockLabel } from "@/lib/engine";
 
 type ViewMode = "stack" | "browse" | "grid";
 
 const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
-const BLOCK_LABEL: Record<TimeBlock, string> = {
-  morning: "Morning",
-  afternoon: "Afternoon",
-  evening: "Evening",
-  anytime: "Anytime",
-};
 
 function SupplementsInner() {
   const {
@@ -152,6 +147,7 @@ function SupplementsInner() {
                 ?.supplementCompletions ?? {}
             }
             stateSupplements={userSupplements}
+            blockLabels={state.settings.blockLabels}
           />
         )}
 
@@ -233,6 +229,7 @@ function StackView({
   today,
   completions,
   stateSupplements,
+  blockLabels,
 }: {
   byBlock: Record<TimeBlock, Supplement[]>;
   onEdit: (s: Supplement) => void;
@@ -244,6 +241,13 @@ function StackView({
   today: string;
   completions: Record<string, boolean>;
   stateSupplements: Supplement[];
+  /** Custom day-block display names (settings.blockLabels). */
+  blockLabels?: {
+    morning?: string;
+    afternoon?: string;
+    evening?: string;
+    anytime?: string;
+  };
 }) {
   const empty = stateSupplements.length === 0;
   if (empty) {
@@ -293,7 +297,7 @@ function StackView({
         return (
           <div key={b}>
             <div className="mb-2 flex items-center justify-between">
-              <Eyebrow>{BLOCK_LABEL[b]}</Eyebrow>
+              <Eyebrow>{blockLabel(b, blockLabels)}</Eyebrow>
               {prog && (
                 <span className="text-[11px] font-semibold text-[var(--text-3)]">
                   {prog.done}/{prog.total} today

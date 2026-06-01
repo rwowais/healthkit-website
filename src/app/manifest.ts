@@ -96,10 +96,10 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
       {
-        name: "Library",
-        short_name: "Library",
+        name: "Discover",
+        short_name: "Discover",
         description: "Discover protocol packs",
-        url: "/library?source=shortcut",
+        url: "/protocols?source=shortcut#discover",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
     ],

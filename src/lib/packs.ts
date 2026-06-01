@@ -2627,7 +2627,10 @@ const EXTRA_PACKS: ProtocolPack[] = [
     id: "mobility-joints",
     name: "Mobility & Joints",
     tagline: "Stay supple, counter sitting",
-    goal: "Protect range of motion and joint health as you age",
+    // `goal` is the Discover filter TAG (must match the short-tag convention
+    // so it groups under a chip), not a description — the tagline carries the
+    // human phrasing.
+    goal: "longevity",
     accent: "var(--recovery)",
     icon: "stretch",
     source: "official",
@@ -2643,7 +2646,7 @@ const EXTRA_PACKS: ProtocolPack[] = [
     id: "calm-mind",
     name: "Calm Mind",
     tagline: "A quieter, clearer head",
-    goal: "Lower baseline stress and sharpen focus with a daily mental practice",
+    goal: "focus",
     accent: "var(--sleep)",
     icon: "lungs",
     source: "official",

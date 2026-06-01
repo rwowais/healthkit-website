@@ -1510,8 +1510,9 @@ export default function TodayPage() {
         )}
 
         {/* Natural-language quick log — type one line to fill the check-in.
-            Collapsed by default; available all day (also sets the note). */}
-        {isToday && (
+            Collapsed by default. Hidden once the day's closed (nothing left
+            to log; keeps the "day complete" moment calm). */}
+        {isToday && !dayComplete && (
           <QuickLog
             onApply={(v) => {
               if (v.sleepQuality != null || v.sleepDurationMinutes != null) {
@@ -2852,6 +2853,7 @@ export default function TodayPage() {
       <BulkMoveSheet
         open={bulkMoveOpen}
         count={selectedKeys.size}
+        blockLabels={settings.blockLabels}
         onClose={() => setBulkMoveOpen(false)}
         onSelectBlock={(b) => {
           const moves: {

@@ -91,8 +91,8 @@ export default function InsightsPage() {
     [intelState]
   );
   const week = useMemo(
-    () => weeklyActiveDays(intelState.dailyLogs),
-    [intelState.dailyLogs]
+    () => weeklyActiveDays(intelState.dailyLogs, intelState.settings),
+    [intelState.dailyLogs, intelState.settings]
   );
 
   const insights = useMemo<Insight[]>(() => {

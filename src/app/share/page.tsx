@@ -34,7 +34,7 @@ function ShareInner() {
   const search = useSearchParams();
   const router = useRouter();
   const toast = useToast();
-  const { state, upsertCustomPack, updateSettings } = useAppState();
+  const { state, upsertCustomPack } = useAppState();
 
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -101,10 +101,7 @@ function ShareInner() {
         durationLabel: "Ongoing",
         behaviors: [newBehavior],
       });
-      // Also install the pack so the behavior actually surfaces.
-      if (!state.installedPacks.includes(packId)) {
-        updateSettings({}); // touches state so the pack list gets persisted
-      }
+      // upsertCustomPack auto-installs the pack, so it surfaces immediately.
     }
     toast.show("Saved to your clippings");
     router.push("/protocols");
