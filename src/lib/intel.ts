@@ -39,14 +39,24 @@ export {
  * Monday. Day-of-week scheduling shouldn't make keystone / weekly review
  * blind to behaviors that only run on, say, weekends.
  */
+// Memoized by state identity: analyticsItems compiles all 7 weekdays, and
+// it's called from keystone / whatWorks / suggestions / behaviorStats — the
+// last of which runs per-behavior inside render loops. State is replaced
+// immutably on every update, so caching on the object reference is safe and
+// collapses N×(7 compiles) per render into one.
+const _analyticsItemsCache = new WeakMap<AppState, TimelineItem[]>();
 function analyticsItems(state: AppState): TimelineItem[] {
+  const cached = _analyticsItemsCache.get(state);
+  if (cached) return cached;
   const map = new Map<string, TimelineItem>();
   for (let d = 0; d < 7; d++) {
     for (const it of compileTimeline(state, d)) {
       if (!map.has(it.canonicalKey)) map.set(it.canonicalKey, it);
     }
   }
-  return [...map.values()];
+  const out = [...map.values()];
+  _analyticsItemsCache.set(state, out);
+  return out;
 }
 
 /**
@@ -126,6 +136,15 @@ export function behaviorStats(
   // otherwise a sanctioned break would reset a behavior's "N days running"
   // while the global "your streak holds" promise says otherwise.
   const vac = vacationDates(state);
+  // The behavior's scheduled weekdays (Mon=0..Sun=6); undefined = every day.
+  // A Mon/Wed/Fri behavior must not have its streak reset by the off-days it
+  // was never scheduled to run — those are transparent, like vacation days.
+  // (Mirrors masteredKeys, which also walks scheduled days only.)
+  const daysActive = analyticsItems(state).find(
+    (i) => i.canonicalKey === key
+  )?.daysActive;
+  const scheduledOn = (dk: string) =>
+    !daysActive || !!daysActive[dayIndexOfKeyInTz(tz, dk)];
   let streak = 0;
   for (let i = 0; i < 365; i++) {
     // Step back through calendar days using addDaysToKey so DST + tz
@@ -135,6 +154,7 @@ export function behaviorStats(
     if (done) streak++;
     else if (i === 0) continue; // today not done yet — don't break
     else if (vac.has(dk)) continue; // sanctioned break — transparent
+    else if (!scheduledOn(dk)) continue; // not scheduled that day — transparent
     else break;
   }
   let last7 = 0;
@@ -326,6 +346,7 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
         dimension: "energy" | "sleep" | "overall";
         delta: number;
         d: number;
+        days: number;
       }
     | null = null;
   for (const it of items) {
@@ -383,7 +404,12 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
       1,
       Math.round(mean(src.done) - mean(src.not))
     );
-    best = { key: k, title: it.title, dimension, delta, d };
+    // Sample size behind the CLAIM: the days on which the named dimension was
+    // actually logged (not the full felt-index count). A user who logs sleep
+    // daily but energy rarely shouldn't see an energy claim captioned "across
+    // {all} check-ins" when the energy gap rests on far fewer.
+    const days = src.done.length + src.not.length;
+    best = { key: k, title: it.title, dimension, delta, d, days };
   }
   return best
     ? {
@@ -391,7 +417,7 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
         title: best.title,
         dimension: best.dimension,
         delta: best.delta,
-        days: logs.length,
+        days: best.days,
       }
     : null;
 }
@@ -469,10 +495,15 @@ export function suggestions(state: AppState): Suggestion[] {
       if (!bc) continue;
       for (const k in bc) if (bc[k]) engagedKeysEver.add(k);
     }
+    // A pack counts as established only when a behavior EXCLUSIVE to it was
+    // engaged. A shared behavior (merged across packs by canonicalKey) is
+    // ambiguous — engaging it can't tell us which pack is lived-in — so it
+    // must not mark a freshly-installed pack that happens to share that key
+    // as established (that would nag the new pack's brand-new slots day one).
     const establishedPacks = new Set<string>();
     for (const o of items)
-      if (engagedKeysEver.has(o.canonicalKey))
-        for (const p of o.fromPacks ?? []) establishedPacks.add(p);
+      if (engagedKeysEver.has(o.canonicalKey) && o.fromPacks?.length === 1)
+        establishedPacks.add(o.fromPacks[0]);
     for (const it of items) {
       if (state.behaviorOverrides?.[it.canonicalKey]?.disabled) continue;
       // Never tell the user to pause their own keystone — that's a
@@ -771,6 +802,10 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
   // Coach continuity: re-derive what we would have flagged LAST week and
   // report whether it actually moved — the system "remembering".
   let continuity: string | undefined;
+  // Whether last week's flagged behavior actually rose this week. Tracked as
+  // a boolean so downstream logic never has to string-match the (CMS-editable)
+  // continuity copy.
+  let continuityHolding = false;
   const prevTracked = dayList(7).filter((l) => l.score > 0);
   if (prevTracked.length >= 4) {
     let pKey: string | null = null;
@@ -790,9 +825,9 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
       const nowC = tracked.filter(
         (l) => l.behaviorCompletions?.[pKey]
       ).length;
-      continuity =
-        nowC > pMin
-          ? renderTemplate(
+      continuityHolding = nowC > pMin;
+      continuity = continuityHolding
+        ? renderTemplate(
               getInsightTemplate(
                 "continuity-holding",
                 "Last week we flagged “{title}” — you lifted it to {count} of {total} days. It's holding."
@@ -824,8 +859,7 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
   // for another. Calling that out with its own variant prevents the
   // misread of a real, conscious rebalance as "a meh week."
   const rebalanced =
-    !!continuity &&
-    continuity.includes("holding") &&
+    continuityHolding &&
     (delta == null || (delta > -5 && delta < 5)) &&
     avgThis >= 50 &&
     avgThis < 75;

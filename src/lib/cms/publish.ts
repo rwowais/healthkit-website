@@ -18,6 +18,7 @@ import {
   type KnowledgeBundle,
 } from "../knowledge";
 import type { ProtocolPack, Interaction } from "../types";
+import { PACKS } from "../packs";
 import { assembleBundleFromCMS } from "./authoring";
 import { validateAtom } from "../engine";
 
@@ -98,6 +99,8 @@ export interface RuleChange {
 export interface InteractionChange {
   /** Human label, e.g. "caffeine ✕ sleep (timing)". */
   label: string;
+  /** Full identity (incl. direction + condition) — unique React key. */
+  key: string;
   aKey: string;
   bKey: string;
   type: string;
@@ -338,7 +341,14 @@ export function diffBundles(
   // field changing (nudge, severity, gapHours, evidenceTier, source…) is a
   // "changed". A severity flip (soft↔firm) or a new conflict silently
   // muting a behavior MUST be reviewable before it ships.
-  const interKey = (i: Interaction) => `${i.aKey}|${i.bKey}|${i.type}`;
+  // Identity must include direction + condition: two interactions on the same
+  // (aKey,bKey,type) but with different gates/directions are distinct rules,
+  // and collapsing them here would hide one from the pre-publish review (and,
+  // mirrored in the engine, drop it at runtime).
+  const interKey = (i: Interaction) =>
+    `${i.aKey}|${i.bKey}|${i.type}|${i.direction ?? "a_to_b"}|${
+      i.condition ? JSON.stringify(i.condition) : ""
+    }`;
   const interLabel = (i: Interaction) => {
     const verb =
       i.type === "conflict"
@@ -372,6 +382,7 @@ export function diffBundles(
     const ref = (n ?? p).i;
     const change: InteractionChange = {
       label: interLabel(ref),
+      key: k,
       aKey: ref.aKey,
       bKey: ref.bKey,
       type: ref.type,
@@ -643,6 +654,31 @@ export function validateBundleGovernance(
         );
       }
     }
+  }
+
+  // Interactions — previously exempt from governance. A firm conflict can
+  // silently MUTE a behavior, so flag the two ways one ships broken:
+  //  • references a key in neither this bundle's protocols nor the built-in
+  //    catalog → the rule is inert (the engine can't resolve the behavior);
+  //  • "firm" severity on a non-conflict type → firm only mutes for conflicts,
+  //    so it has no effect (likely an authoring mistake).
+  // Warnings (not errors): a dangling ref is harmless at runtime, and built-in
+  // references are legitimate, so we never block a publish on this.
+  const builtinKeys = new Set<string>();
+  for (const p of PACKS)
+    for (const b of p.behaviors) builtinKeys.add(b.canonicalKey);
+  for (const ix of bundle.interactions ?? []) {
+    const id = `${ix.aKey} → ${ix.bKey} (${ix.type})`;
+    for (const k of [ix.aKey, ix.bKey]) {
+      if (!knownKeys.has(k) && !builtinKeys.has(k))
+        warnings.push(
+          `interaction ${id}: references "${k}", absent from this bundle's protocols and the built-in catalog — it will be inert.`
+        );
+    }
+    if (ix.severity === "firm" && ix.type !== "conflict")
+      warnings.push(
+        `interaction ${id}: "firm" severity only mutes for type "conflict"; on "${ix.type}" it has no muting effect.`
+      );
   }
   return { errors, warnings };
 }

@@ -69,9 +69,11 @@ export function personalModel(state: AppState): Trait[] {
     blockMean[0].m - blockMean[blockMean.length - 1].m >= 0.18
   ) {
     const top = blockMean[0].b;
+    // "afternoon"/"evening" take "an"; "morning" takes "a".
+    const article = /^[aeiou]/.test(top) ? "an" : "a";
     out.push({
       icon: top === "evening" ? "moon" : "sun",
-      label: `You're a ${top}-leverage person`,
+      label: `You're ${article} ${top}-leverage person`,
       detail: `Your ${top} behaviors stick the most — that's where to protect first.`,
     });
   }

@@ -825,12 +825,20 @@ export function getSignals(state: AppState): Signals {
   const readiness = deviceReadiness(state);
   if (readiness != null) recoveryProxy = readiness;
 
-  // evening adherence yesterday
+  // evening adherence yesterday — count only the evening items that were
+  // actually SHAPED onto the board (the same set the score/board show), so
+  // conflict-muted, mastered-to-maintenance, or swapped-away items don't
+  // inflate the denominator and falsely trip "protect tonight". Mirror the
+  // score pipeline's shaping (swaps → shape with mastered). keystoneKey isn't
+  // available here (it lives in intel), but the keystone is rarely a muted
+  // evening item, so omitting it doesn't materially change the count.
   let eveningMissedYesterday = false;
   if (yLog && logHasActivity(yLog)) {
-    const yItems = compileTimeline(state, isoDayOf(yLog.date, tz)).filter(
-      (i) => i.block === "evening"
-    );
+    const yItems = shapeTimeline(
+      applySwaps(compileTimeline(state, isoDayOf(yLog.date, tz)), yLog),
+      "normal",
+      { mastered: masteredKeys(state, yLog.date) }
+    ).filter((i) => !i.muted && i.block === "evening");
     if (yItems.length >= 2) {
       const done = yItems.filter(
         (i) => yLog.behaviorCompletions?.[i.canonicalKey]
@@ -1240,7 +1248,17 @@ export const BUILTIN_INTERACTIONS: readonly Interaction[] = CONFLICT_PAIRS.map(
 export function resolvedInteractions(): Interaction[] {
   const byKey = new Map<string, Interaction>();
   for (const i of [...BUILTIN_INTERACTIONS, ...activeInteractions()]) {
-    byKey.set(`${i.aKey}|${i.bKey}|${i.type}`, i);
+    // Identity includes direction + condition so two rules on the same
+    // (aKey,bKey,type) but with different gates/directions both survive
+    // (matches the publish-diff identity). A built-in conflict has no
+    // direction/condition → key "…|a_to_b|", so a CMS conflict on the same
+    // pair (default direction, no gate) still overrides it as before.
+    byKey.set(
+      `${i.aKey}|${i.bKey}|${i.type}|${i.direction ?? "a_to_b"}|${
+        i.condition ? JSON.stringify(i.condition) : ""
+      }`,
+      i
+    );
   }
   return [...byKey.values()];
 }

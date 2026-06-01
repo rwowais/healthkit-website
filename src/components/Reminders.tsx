@@ -150,7 +150,11 @@ export default function Reminders() {
       // Quiet hours: never fire inside the user's do-not-disturb window.
       if (inQuietHours(t, state.settings.quietHours)) continue;
       const deltaMin = t - now;
-      if (deltaMin <= 0 || deltaMin > 12 * 60) continue;
+      // Fire when the scheduled minute is NOW (deltaMin === 0) too — the
+      // server path matches the current minute via times.includes(hm), so
+      // dropping deltaMin===0 here meant a behavior due "this minute" never
+      // fired in-tab. Only skip already-past (<0) or far-future (>12h) times.
+      if (deltaMin < 0 || deltaMin > 12 * 60) continue;
       scheduled++;
       const id = window.setTimeout(() => {
         navigator.serviceWorker.ready
@@ -164,7 +168,7 @@ export default function Reminders() {
             })
           )
           .catch(() => {});
-      }, deltaMin * 60 * 1000);
+      }, Math.max(0, deltaMin) * 60 * 1000);
       timers.push(id);
     }
 

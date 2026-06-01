@@ -858,6 +858,37 @@ export async function saveInteraction(
   if (!r.a_key.trim() || !r.b_key.trim())
     return { ok: false, reason: "Both behavior keys are required." };
   try {
+    const nextVersion = ((r.version as number | undefined) ?? 0) + 1;
+    if (r.id) {
+      // UPDATE — patch ONLY the fields the caller actually provided. The old
+      // full-row update coalesced every missing optional to null/default, so
+      // merely flipping status (or editing one field) silently wiped the
+      // `condition` / `bound` gate a caller didn't include — broadening a
+      // narrowly-scoped firm mute to fire unconditionally for everyone. With
+      // a patch, an omitted field is left as-is; pass an explicit null to clear.
+      const patch: Record<string, unknown> = { version: nextVersion };
+      const set = (k: string, v: unknown) => {
+        if (v !== undefined) patch[k] = v;
+      };
+      set("a_key", r.a_key?.trim());
+      set("b_key", r.b_key?.trim());
+      set("type", r.type);
+      set("severity", r.severity);
+      set("gap_hours", r.gap_hours);
+      set("bound", r.bound);
+      set("condition", r.condition);
+      set("direction", r.direction);
+      set("nudge", r.nudge);
+      set("evidence_tier", r.evidence_tier);
+      set("source", r.source);
+      set("status", r.status);
+      const { error } = await sb
+        .from("cms_interactions")
+        .update(patch)
+        .eq("id", r.id);
+      if (error) return { ok: false, reason: error.message };
+      return { ok: true };
+    }
     const row: Record<string, unknown> = {
       a_key: r.a_key.trim(),
       b_key: r.b_key.trim(),
@@ -871,11 +902,9 @@ export async function saveInteraction(
       evidence_tier: r.evidence_tier ?? null,
       source: r.source ?? null,
       status: r.status ?? "draft",
-      version: ((r.version as number | undefined) ?? 0) + 1,
+      version: nextVersion,
     };
-    const { error } = r.id
-      ? await sb.from("cms_interactions").update(row).eq("id", r.id)
-      : await sb.from("cms_interactions").insert(row);
+    const { error } = await sb.from("cms_interactions").insert(row);
     if (error) return { ok: false, reason: error.message };
     return { ok: true };
   } catch (e) {
@@ -1599,7 +1628,12 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
     try {
       const { data: tplRows } = await sb
         .from("cms_insight_templates")
-        .select("kind, template, conditions, status");
+        .select("kind, template, conditions, status")
+        // Deterministic order → stable bundle checksum across re-assembles
+        // (Postgres returns rows in arbitrary physical order otherwise, which
+        // would make identical content checksum differently and defeat the
+        // "no changes since last publish" guard).
+        .order("kind");
       for (const row of (tplRows ?? []) as {
         kind: string;
         template: string;
@@ -1653,7 +1687,14 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
         .from("cms_interactions")
         .select(
           "a_key, b_key, type, severity, gap_hours, bound, condition, direction, nudge, evidence_tier, source, source_verified_at, status"
-        );
+        )
+        // Deterministic order → stable bundle checksum (see insight templates
+        // above). Order by the full identity so two rows sharing a
+        // (a_key,b_key,type) triple still sort stably.
+        .order("a_key")
+        .order("b_key")
+        .order("type")
+        .order("direction");
       for (const row of (interactionRows ?? []) as Array<
         Record<string, unknown>
       >) {

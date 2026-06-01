@@ -173,23 +173,70 @@ function mergeDailyLog(
       out[k] = !!(x?.[k] || y?.[k]); // done on EITHER device → done
     return out;
   };
-  const completed = (arr?: { completed?: boolean }[]) =>
-    (arr ?? []).filter((e) => e.completed).length;
-  const richerByCompleted = <T extends { completed?: boolean }>(
-    x?: T[],
-    y?: T[]
-  ): T[] => (completed(y) >= completed(x) ? y ?? x ?? [] : x ?? []);
-  const answered = (sc?: AppState["dailyLogs"][number]["nutritionScorecard"]) =>
-    sc
-      ? [
-          sc.hitProteinTarget,
-          sc.ateFruitsVeggies,
-          sc.stayedHydrated,
-          sc.avoidedProcessedSugar,
-          sc.finishedEatingOnTime,
-          sc.minimizedAlcohol,
-        ].filter((v) => v != null).length + (sc.customItems?.length ?? 0)
-      : 0;
+  // Merge two arrays of {itemId} entries BY id, so an entry the user recorded
+  // on one device is never dropped because the other device's array happened
+  // to have more "completed" rows (the old whole-array pick lost the loser's
+  // distinct entries — e.g. a logged workout, a skip reason). Colliding ids
+  // are reconciled by `combine`; a's order is preserved, b-only ids append.
+  const mergeByItemId = <T extends { itemId: string }>(
+    x: T[] | undefined,
+    y: T[] | undefined,
+    combine: (ax: T, by: T) => T
+  ): T[] => {
+    const out = new Map<string, T>();
+    for (const e of x ?? []) out.set(e.itemId, e);
+    for (const e of y ?? []) {
+      const prev = out.get(e.itemId);
+      out.set(e.itemId, prev ? combine(prev, e) : e);
+    }
+    return [...out.values()];
+  };
+  type ExEntry = AppState["dailyLogs"][number]["exerciseEntries"][number];
+  type SupEntry = AppState["dailyLogs"][number]["supplementEntries"][number];
+  type SleepC = AppState["dailyLogs"][number]["sleepCompletions"][number];
+  type Scorecard = AppState["dailyLogs"][number]["nutritionScorecard"];
+  // Exercise-entry richness: a completed entry dominates; ties break on how
+  // much detail (duration / intensity / feeling / note) was filled in.
+  const exRich = (e: ExEntry) =>
+    (e.completed ? 8 : 0) +
+    (e.durationMinutes != null ? 1 : 0) +
+    (e.intensity != null ? 1 : 0) +
+    (e.feeling != null ? 1 : 0) +
+    (e.note && e.note.trim() ? 1 : 0);
+  // Per-question field-merge of the nutrition scorecard (prefer the answered
+  // side, prefer b/local on a tie) so two devices answering DIFFERENT
+  // questions don't clobber each other; union custom items by label; keep a
+  // written note rather than an empty one.
+  const mergeScorecard = (ax?: Scorecard, by?: Scorecard): Scorecard => {
+    if (!ax) return by as Scorecard;
+    if (!by) return ax;
+    const pick = <V,>(p: V, q: V): V => (q != null ? q : p);
+    const custom = new Map<string, Scorecard["customItems"][number]>();
+    for (const c of ax.customItems ?? []) custom.set(c.label, c);
+    for (const c of by.customItems ?? []) {
+      const prev = custom.get(c.label);
+      custom.set(
+        c.label,
+        prev ? { label: c.label, answer: c.answer ?? prev.answer } : c
+      );
+    }
+    return {
+      hitProteinTarget: pick(ax.hitProteinTarget, by.hitProteinTarget),
+      ateFruitsVeggies: pick(ax.ateFruitsVeggies, by.ateFruitsVeggies),
+      stayedHydrated: pick(ax.stayedHydrated, by.stayedHydrated),
+      avoidedProcessedSugar: pick(
+        ax.avoidedProcessedSugar,
+        by.avoidedProcessedSugar
+      ),
+      finishedEatingOnTime: pick(
+        ax.finishedEatingOnTime,
+        by.finishedEatingOnTime
+      ),
+      minimizedAlcohol: pick(ax.minimizedAlcohol, by.minimizedAlcohol),
+      customItems: [...custom.values()],
+      note: by.note && by.note.trim() ? by.note : ax.note,
+    };
+  };
   return {
     ...b,
     date: a.date,
@@ -205,16 +252,34 @@ function mergeDailyLog(
     supplementSkips: Array.from(
       new Set([...(a.supplementSkips ?? []), ...(b.supplementSkips ?? [])])
     ),
-    exerciseEntries: richerByCompleted(a.exerciseEntries, b.exerciseEntries),
-    sleepCompletions: richerByCompleted(a.sleepCompletions, b.sleepCompletions),
-    supplementEntries:
-      (b.supplementEntries?.length ?? 0) >= (a.supplementEntries?.length ?? 0)
-        ? b.supplementEntries
-        : a.supplementEntries,
-    nutritionScorecard:
-      answered(b.nutritionScorecard) >= answered(a.nutritionScorecard)
-        ? b.nutritionScorecard
-        : a.nutritionScorecard,
+    exerciseEntries: mergeByItemId<ExEntry>(
+      a.exerciseEntries,
+      b.exerciseEntries,
+      (ax, by) => (exRich(by) >= exRich(ax) ? by : ax)
+    ),
+    sleepCompletions: mergeByItemId<SleepC>(
+      a.sleepCompletions,
+      b.sleepCompletions,
+      (ax, by) => ({ itemId: ax.itemId, completed: !!(ax.completed || by.completed) })
+    ),
+    supplementEntries: mergeByItemId<SupEntry>(
+      a.supplementEntries,
+      b.supplementEntries,
+      (ax, by) => {
+        const taken = !!(ax.taken || by.taken);
+        return {
+          itemId: ax.itemId,
+          taken,
+          // taking it wins over a skip; only "skipped" when neither took it
+          skipped: !taken && !!(ax.skipped || by.skipped),
+          skipReason:
+            by.skipReason && by.skipReason.trim()
+              ? by.skipReason
+              : ax.skipReason,
+        };
+      }
+    ),
+    nutritionScorecard: mergeScorecard(a.nutritionScorecard, b.nutritionScorecard),
     sleepLog: {
       actualBedtime: b.sleepLog?.actualBedtime ?? a.sleepLog?.actualBedtime ?? null,
       actualWakeTime: b.sleepLog?.actualWakeTime ?? a.sleepLog?.actualWakeTime ?? null,
@@ -224,7 +289,15 @@ function mergeDailyLog(
     },
     energyLevel: b.energyLevel ?? a.energyLevel ?? null,
     moodLevel: b.moodLevel ?? a.moodLevel ?? null,
-    dayNote: (b.dayNote && b.dayNote.trim() ? b.dayNote : a.dayNote) || "",
+    // Free-text can't auto-merge cleanly; never silently drop typed content.
+    // Two distinct non-empty notes (offline on both devices) → keep both
+    // (local first); otherwise keep whichever side actually wrote something.
+    dayNote: (() => {
+      const an = a.dayNote?.trim() ?? "";
+      const bn = b.dayNote?.trim() ?? "";
+      if (an && bn && an !== bn) return `${bn}\n${an}`;
+      return bn || an || "";
+    })(),
     score: Math.max(a.score ?? 0, b.score ?? 0),
     swaps: { ...(a.swaps ?? {}), ...(b.swaps ?? {}) },
     swapAutoCompleted: {

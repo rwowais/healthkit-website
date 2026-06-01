@@ -19,7 +19,7 @@ import {
   KNOWN_CONFIG_KEYS,
   KNOWN_INSIGHT_KINDS,
 } from "@/lib/cms/introspect";
-import { getCfgNumber, activeInsightTemplates } from "@/lib/knowledge";
+import { getCfgNumber } from "@/lib/knowledge";
 import { getDefaultState } from "@/lib/storage";
 import { adapt, compileTimeline, shapeTimeline } from "@/lib/engine";
 import { bundleChecksum } from "@/lib/knowledge";
@@ -5010,7 +5010,7 @@ function AdminHomeInner() {
           <div className="space-y-4">
             <div className={card} style={surf}>
               <div className="flex items-center justify-between gap-2">
-                <Eyebrow>What's about to ship</Eyebrow>
+                <Eyebrow>What&apos;s about to ship</Eyebrow>
                 <button
                   onClick={refreshDiff}
                   disabled={diffBusy}
@@ -5193,26 +5193,17 @@ function AdminHomeInner() {
                   ))}
                   {/* Interactions (conflicts / timing / synergy) */}
                   {diff.interactionsAdded.map((i) => (
-                    <p
-                      key={`inter+${i.aKey}|${i.bKey}|${i.type}`}
-                      className="text-[var(--vitality)]"
-                    >
+                    <p key={`inter+${i.key}`} className="text-[var(--vitality)]">
                       + interaction <b>{i.label}</b>
                     </p>
                   ))}
                   {diff.interactionsChanged.map((i) => (
-                    <p
-                      key={`inter~${i.aKey}|${i.bKey}|${i.type}`}
-                      className="text-[var(--warm)]"
-                    >
+                    <p key={`inter~${i.key}`} className="text-[var(--warm)]">
                       ~ interaction <b>{i.label}</b>
                     </p>
                   ))}
                   {diff.interactionsRemoved.map((i) => (
-                    <p
-                      key={`inter-${i.aKey}|${i.bKey}|${i.type}`}
-                      className="text-[var(--alert)]"
-                    >
+                    <p key={`inter-${i.key}`} className="text-[var(--alert)]">
                       − interaction <b>{i.label}</b>
                     </p>
                   ))}

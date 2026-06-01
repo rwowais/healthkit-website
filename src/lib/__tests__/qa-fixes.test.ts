@@ -9,9 +9,15 @@ import { describe, it, expect } from "vitest";
 import type { AppState, DailyLog, Interaction } from "@/lib/types";
 import { getDefaultState } from "@/lib/storage";
 import { compileTimeline } from "@/lib/engine";
-import { suggestions } from "@/lib/intel";
+import { suggestions, behaviorStats } from "@/lib/intel";
+import { mergeStates } from "@/lib/datasource";
 import { buildCatalogBundle, diffBundles } from "@/lib/cms/publish";
-import { getTz, dateKeyInTz, addDaysToKey } from "@/lib/tz";
+import {
+  getTz,
+  dateKeyInTz,
+  addDaysToKey,
+  dayIndexOfKeyInTz,
+} from "@/lib/tz";
 
 const TODAY = dateKeyInTz(getTz(getDefaultState().settings));
 const dk = (off: number) => addDaysToKey(TODAY, -off);
@@ -149,5 +155,126 @@ describe("#6 suggestions — pack-tenure gate", () => {
       type: "retime",
       key: skip.canonicalKey,
     });
+  });
+});
+
+// ── Round-4: sync merge keeps per-field detail (no whole-array clobber) ──
+describe("sync merge — per-field, no data loss", () => {
+  const dayWith = (date: string, over: Partial<DailyLog>): DailyLog =>
+    ({ ...mkLog(date, {}, 50), ...over }) as unknown as DailyLog;
+
+  it("keeps distinct exercise entries logged on different devices", () => {
+    const cloud = { ...getDefaultState() };
+    const local = { ...getDefaultState() };
+    cloud.dailyLogs = [
+      dayWith("2026-05-20", {
+        exerciseEntries: [
+          {
+            itemId: "run",
+            completed: true,
+            durationMinutes: 45,
+            intensity: 3,
+            feeling: 5,
+            note: "great run",
+          },
+        ],
+      }),
+    ];
+    local.dailyLogs = [
+      dayWith("2026-05-20", {
+        exerciseEntries: [
+          {
+            itemId: "lift",
+            completed: true,
+            durationMinutes: 30,
+            intensity: 2,
+            feeling: 4,
+            note: "",
+          },
+        ],
+      }),
+    ];
+    const day = mergeStates(local, cloud).dailyLogs.find(
+      (l) => l.date === "2026-05-20"
+    )!;
+    expect(day.exerciseEntries.map((e) => e.itemId).sort()).toEqual([
+      "lift",
+      "run",
+    ]);
+    // The losing side's per-entry detail survives.
+    expect(
+      day.exerciseEntries.find((e) => e.itemId === "run")?.durationMinutes
+    ).toBe(45);
+  });
+
+  it("field-merges the nutrition scorecard (distinct answers survive)", () => {
+    const empty = mkLog("x", {}, 0).nutritionScorecard;
+    const cloud = { ...getDefaultState() };
+    const local = { ...getDefaultState() };
+    cloud.dailyLogs = [
+      dayWith("2026-05-20", {
+        nutritionScorecard: { ...empty, hitProteinTarget: "yes" },
+      }),
+    ];
+    local.dailyLogs = [
+      dayWith("2026-05-20", {
+        nutritionScorecard: { ...empty, stayedHydrated: "yes" },
+      }),
+    ];
+    const sc = mergeStates(local, cloud).dailyLogs.find(
+      (l) => l.date === "2026-05-20"
+    )!.nutritionScorecard;
+    expect(sc.hitProteinTarget).toBe("yes");
+    expect(sc.stayedHydrated).toBe("yes");
+  });
+});
+
+// ── Round-4: interaction identity includes condition (no diff collision) ──
+describe("publish diff — interaction identity", () => {
+  const withInteractions = (xs: Interaction[]) => ({
+    ...buildCatalogBundle(3),
+    interactions: xs,
+  });
+  it("treats condition-distinct interactions as separate, not collapsed", () => {
+    const next = withInteractions([
+      { aKey: "creatine", bKey: "sleep", type: "timing", severity: "soft", nudge: "n" },
+      {
+        aKey: "creatine",
+        bKey: "sleep",
+        type: "timing",
+        severity: "soft",
+        nudge: "n",
+        condition: { goal: "muscle" },
+      },
+    ]);
+    const d = diffBundles(withInteractions([]), next);
+    expect(d.interactionsAdded).toHaveLength(2); // both survive the identity key
+    expect(new Set(d.interactionsAdded.map((i) => i.key)).size).toBe(2);
+  });
+});
+
+// ── Round-4: per-behavior streak skips non-scheduled days ──
+describe("behaviorStats — scheduled-day streak", () => {
+  it("does not reset a non-daily behavior's streak on its OFF days", () => {
+    const tz = getTz(getDefaultState().settings);
+    const wToday = dayIndexOfKeyInTz(tz, dk(0));
+    const wPrev = dayIndexOfKeyInTz(tz, dk(2));
+    // Schedule only today's + two-days-ago weekdays; yesterday is an off-day.
+    const daysActive = [false, false, false, false, false, false, false];
+    daysActive[wToday] = true;
+    daysActive[wPrev] = true;
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+      behaviorOverrides: { zone2: { daysActive } } as AppState["behaviorOverrides"],
+      // done on both scheduled days; the off-day (yesterday) is simply absent.
+      dailyLogs: [
+        mkLog(dk(2), { zone2: true }, 60),
+        mkLog(dk(0), { zone2: true }, 60),
+      ],
+    };
+    // Streak = 2 (today + two-days-ago); the unscheduled off-day between them
+    // is transparent rather than a reset. (Pre-fix this returned 1.)
+    expect(behaviorStats(st, "zone2").streak).toBe(2);
   });
 });

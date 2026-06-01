@@ -406,6 +406,7 @@ function BrowseView({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search supplements"
+        aria-label="Search supplements"
         className="w-full rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3.5 py-3 text-[14px] text-[var(--text-1)] outline-none"
       />
       <Card>
