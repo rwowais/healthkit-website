@@ -415,7 +415,6 @@ export const PACKS: ProtocolPack[] = [
       HYDRATE_AM,
       MORNING_SUNLIGHT,
       PROTEIN_BREAKFAST,
-      OMEGA3_AM,
       B({
         canonicalKey: "zone2",
         timingReason:
@@ -508,7 +507,6 @@ export const PACKS: ProtocolPack[] = [
         leverage: 2,
         kind: "action",
       }),
-      MAGNESIUM_PM,
       WIND_DOWN,
     ],
   },
@@ -583,7 +581,6 @@ export const PACKS: ProtocolPack[] = [
         kind: "avoid",
       }),
       EXTRA_SLEEP,
-      MAGNESIUM_PM,
       WIND_DOWN,
     ],
   },
@@ -641,7 +638,6 @@ export const PACKS: ProtocolPack[] = [
       // canonicalKey that defeated the merge contract.
       DELAY_CAFFEINE,
       NO_ARRIVAL_ALCOHOL,
-      STRATEGIC_MELATONIN,
       WIND_DOWN,
     ],
   },
@@ -883,7 +879,6 @@ export const PACKS: ProtocolPack[] = [
       }),
       SOCIAL_CONNECTION,
       WIND_DOWN,
-      MAGNESIUM_PM,
     ],
   },
   {
@@ -965,7 +960,6 @@ export const PACKS: ProtocolPack[] = [
         intensity: "high",
         daysActive: [false, true, false, true, false, false, true],
       }),
-      OMEGA3_AM,
       B({
         canonicalKey: "bp-check",
         timingReason:
@@ -1303,7 +1297,6 @@ export const PACKS: ProtocolPack[] = [
       }),
       DIM_LIGHTS,
       SCREENS_OFF,
-      MAGNESIUM_PM,
       WIND_DOWN,
     ],
   },
@@ -1413,6 +1406,47 @@ export interface BehaviorAtom extends BehaviorDef {
  * `_REGISTRY` alias below is what cross-module callers should use.
  */
 const STANDALONE_ATOMS: BehaviorDef[] = [
+  // Supplement atoms that used to live inside protocol packs. Protocols no
+  // longer recommend supplements, but these stay in the user-curated
+  // Supplements → Browse catalog (curatedSupplementCatalog reads PACKS ∪
+  // STANDALONE_ATOMS). magnesium / omega-3 / melatonin reuse the existing
+  // shared constants; D3 + creatine were only in the two removed
+  // supplement-only packs, so their defs are restored here.
+  MAGNESIUM_PM,
+  OMEGA3_AM,
+  STRATEGIC_MELATONIN,
+  B({
+    canonicalKey: "vitamin-d3",
+    timingReason:
+      "With a morning fat-containing meal — fat aids absorption. If you take warfarin, the K2 component is contraindicated — switch to D3-only.",
+    title: "Vitamin D3 + K2",
+    block: "morning",
+    anchor: "wake",
+    offsetMin: 90,
+    dose: "2,000–5,000 IU D3 + K2",
+    rationale:
+      "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries. K2 directly antagonizes warfarin — anyone on warfarin should take D3 alone, not D3+K2.",
+    recommendedBy: ["Clinical research"],
+    icon: "sun",
+    leverage: 2,
+    kind: "action",
+  }),
+  B({
+    canonicalKey: "creatine",
+    timingReason:
+      "Anytime — for creatine, daily consistency matters far more than the clock.",
+    title: "Creatine monohydrate",
+    block: "anytime",
+    anchor: "wake",
+    offsetMin: 120,
+    dose: "5 g daily",
+    rationale:
+      "The most evidence-backed supplement — strength, power, and cognition.",
+    recommendedBy: ["Clinical research"],
+    icon: "flask",
+    leverage: 2,
+    kind: "action",
+  }),
   B({
     canonicalKey: "sleep-regularity",
     timingReason:

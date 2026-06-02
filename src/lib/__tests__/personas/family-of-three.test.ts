@@ -599,10 +599,12 @@ describe("Family of three — 365-day stress test, invariants at every checkpoin
     const { supplementsForBlock, supplementFromBehavior } = await import(
       "@/lib/supplements"
     );
-    const { PACKS } = await import("@/lib/packs");
-    const omega3Atom = PACKS.find(
-      (p) => p.id === "longevity-foundation"
-    )?.behaviors.find((b) => b.canonicalKey === "omega-3");
+    // omega-3 now lives in the standalone supplement library (protocols no
+    // longer embed supplements); its contraindications must carry through.
+    const { STANDALONE_ATOMS_REGISTRY } = await import("@/lib/packs");
+    const omega3Atom = STANDALONE_ATOMS_REGISTRY.find(
+      (b) => b.canonicalKey === "omega-3"
+    );
     expect(omega3Atom).toBeDefined();
     const supp = supplementFromBehavior(omega3Atom!, "longevity-foundation");
     expect(supp.contraindications).toContain("anticoagulants");

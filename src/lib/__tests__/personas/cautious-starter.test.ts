@@ -41,7 +41,7 @@ import {
   getFreePacks,
   getFreeInsightDays,
 } from "@/lib/entitlements";
-import { PACKS } from "@/lib/packs";
+import { PACKS, STANDALONE_ATOMS_REGISTRY } from "@/lib/packs";
 import {
   supplementsForBlock,
   supplementFromBehavior,
@@ -289,8 +289,11 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
     // high-dose omega-3 is contraindicated for anticoagulant users
     // (bleeding-risk interaction). Verify whether the curated atom in
     // packs.ts encodes this.
-    const omega3 = PACKS.find((p) => p.id === "longevity-foundation")
-      ?.behaviors.find((b) => b.canonicalKey === "omega-3");
+    // omega-3 now lives in the standalone supplement library (protocols no
+    // longer embed supplements); its contraindications must still be encoded.
+    const omega3 = STANDALONE_ATOMS_REGISTRY.find(
+      (b) => b.canonicalKey === "omega-3"
+    );
     expect(omega3).toBeDefined();
     // EXPECTED: omega-3 atom should list "anticoagulants" in
     // contraindications. ACTUAL: it lists none.
@@ -305,7 +308,7 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
     // installed; she'd have to add manually), the suppression chain
     // depends on s.contraindications being populated from the curated
     // atom. Verify that supplementFromBehavior carries it through.
-    const omega3 = PACKS.find((p) => p.id === "longevity-foundation")!.behaviors.find(
+    const omega3 = STANDALONE_ATOMS_REGISTRY.find(
       (b) => b.canonicalKey === "omega-3"
     )!;
     const supp: Supplement = supplementFromBehavior(omega3, "longevity-foundation");
@@ -334,7 +337,7 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
     const hasOmega = tl.some((it) => it.canonicalKey === "omega-3");
     expect(hasOmega).toBe(false); // confirmed routed away
     // But isSupplementBehavior identifies it correctly:
-    const omega3 = PACKS.find((p) => p.id === "longevity-foundation")!.behaviors.find(
+    const omega3 = STANDALONE_ATOMS_REGISTRY.find(
       (b) => b.canonicalKey === "omega-3"
     )!;
     expect(isSupplementBehavior(omega3)).toBe(true);
