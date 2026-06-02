@@ -56,3 +56,29 @@ rule that prevents it.
   Run such agents sequentially, or give each its own server/port.
 - Bash cwd resets between calls — always `cd /Users/rami/Claude/healthkit-website &&`
   before npx tsc/next/vitest, or they run from the wrong dir.
+
+## Verification (what the preview can and can't prove)
+
+- **Synthetic clicks + the desktop preview CANNOT reproduce iOS touch bugs.**
+  `preview_eval`'s `.click()` dispatches a click directly, bypassing the real
+  pointerdown→pointerup→browser-synthesized-click path where touch /
+  pointer-capture / compositing bugs live; the preview is desktop Chromium,
+  not iOS WebKit. Burned: declared an iOS "dead first tap" sheet bug "verified
+  fixed" via synthetic clicks when the fix hadn't held on the founder's phone,
+  twice. **Rule:** never claim "verified in-browser" for TOUCH/iOS behavior —
+  say it needs on-device confirmation, and fix the bug CLASS by construction
+  (e.g. keep a sheet's scroll container a SEPARATE element from anything
+  transformed/animated/backdrop-blurred) rather than guarding one symptom.
+  State + logic bugs (stale React state, wrong sort, NaN) ARE preview-
+  verifiable — be precise about which kind you're claiming.
+- **Verify an agent's finding before editing on it — they over-flag.** A QA
+  agent reported "weekday insight uses device tz"; FALSE —
+  `new Date("YYYY-MM-DDT00:00:00").getDay()` is tz-invariant for a date
+  string (local-midnight parse). Fixing it would have been pure churn. **Rule:**
+  read the actual code + reason it through before acting on a subagent's claim.
+- **Removing catalog content can silently break a DERIVED list.**
+  `curatedSupplementCatalog()` builds the Supplements→Browse list from
+  PACKS ∪ STANDALONE_ATOMS; removing the supplement-only packs dropped
+  vitamin-d3 + creatine from Browse (I'd told the founder they stayed — wrong).
+  **Rule:** when deleting content, grep what reads it downstream (derived/
+  dedup-by-key catalogs) and confirm nothing else sourced exclusively from it.
