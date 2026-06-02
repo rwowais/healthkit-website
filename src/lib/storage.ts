@@ -1264,7 +1264,13 @@ export function addBiomarker(
     date: entry.date && entry.date <= today ? entry.date : today,
     id: `bm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   };
-  return { ...state, biomarkers: [...state.biomarkers, e] };
+  // One reading per (metric, date): a second entry for the same day is a
+  // correction, not a new data point — otherwise the same calendar day
+  // plotted twice on the trend and showed two history rows. Last write wins.
+  const deduped = state.biomarkers.filter(
+    (b) => !(b.metric === e.metric && b.date === e.date)
+  );
+  return { ...state, biomarkers: [...deduped, e] };
 }
 
 export function deleteBiomarker(state: AppState, id: string): AppState {

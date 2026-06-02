@@ -458,8 +458,17 @@ function BrowseView({
                 </div>
                 <button
                   onClick={() => {
-                    if (installed) onRemove(s.id);
-                    else onInstall(s);
+                    if (installed) {
+                      // Confirm before removing — matches the editor sheet's
+                      // guard, so a stray tap in Browse can't silently drop a
+                      // supplement. (History is preserved either way.)
+                      if (
+                        window.confirm(
+                          `Stop tracking ${s.name}? Your history is kept.`
+                        )
+                      )
+                        onRemove(s.id);
+                    } else onInstall(s);
                   }}
                   className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
                   style={{
@@ -545,31 +554,56 @@ function GridView({
             {supplements.map((s) => {
               let done = 0;
               const cells = days.map((d) => {
+                // Off-days (a supplement scheduled only some weekdays via
+                // daysActive, [Mon..Sun]) can't be taken, so they must not
+                // count against its rate — else a Mon/Wed/Fri supplement caps
+                // near 43% even at perfect adherence.
+                const dow = dayIndexOfKeyInTz(tz, d);
+                const scheduled =
+                  !s.daysActive ||
+                  s.daysActive.length !== 7 ||
+                  s.daysActive[dow] !== false;
                 const log = logByDate.get(d);
                 const isDone = log?.[s.id] === true;
                 if (isDone) done++;
-                return { d, isDone };
+                return { d, isDone, scheduled };
               });
-              const rate = Math.round((done / days.length) * 100);
+              const scheduledCount = cells.filter((c) => c.scheduled).length;
+              const rate = scheduledCount
+                ? Math.round((done / scheduledCount) * 100)
+                : 0;
               return (
                 <tr key={s.id}>
                   <td className="pr-2 py-1 text-[12.5px] text-[var(--text-1)] truncate max-w-[140px]">
                     {s.name}
                   </td>
-                  {cells.map(({ d, isDone }) => (
+                  {cells.map(({ d, isDone, scheduled }) => (
                     <td
                       key={d}
                       className="text-center"
-                      title={`${d} — ${isDone ? "done" : "missed"}`}
+                      title={`${d} — ${
+                        !scheduled
+                          ? "not scheduled"
+                          : isDone
+                          ? "done"
+                          : "missed"
+                      }`}
                     >
                       <span
                         className="inline-block h-3 w-3 rounded-[3px]"
-                        style={{
-                          background: isDone
-                            ? "var(--vitality)"
-                            : "var(--surface-3)",
-                          opacity: isDone ? 1 : 0.5,
-                        }}
+                        style={
+                          !scheduled
+                            ? {
+                                border: "1px dashed var(--hairline-strong)",
+                                opacity: 0.4,
+                              }
+                            : {
+                                background: isDone
+                                  ? "var(--vitality)"
+                                  : "var(--surface-3)",
+                                opacity: isDone ? 1 : 0.5,
+                              }
+                        }
                       />
                     </td>
                   ))}

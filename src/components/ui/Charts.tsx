@@ -171,9 +171,16 @@ export function Sparkline({
   if (data.length < 2) {
     return <div style={{ width, height }} />;
   }
-  const peak = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = peak - min || 1;
+  // Scale to the data's OWN range, not anchored to 0. Biomarker values
+  // (weight ~72, HRV ~50, resting HR ~60) never approach 0, so the old
+  // 0-anchored baseline crushed every point to the top and the trend line
+  // looked flat. 15% headroom top+bottom keeps the stroke off the edges; a
+  // constant series renders as a centered flat line.
+  const lo = Math.min(...data);
+  const hi = Math.max(...data);
+  const pad = (hi - lo) * 0.15 || 1;
+  const min = lo - pad;
+  const range = hi - lo + pad * 2;
   const pts = data
     .map((v, i) => {
       const x = (i * width) / (data.length - 1);

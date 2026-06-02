@@ -2830,8 +2830,13 @@ export default function TodayPage() {
           </span>
           <button
             onClick={() => {
-              setSnoozed((s) =>
-                Array.from(new Set([...s, ...selectedKeys]))
+              // Route through the PERSISTED per-day snooze (log.snoozes) — the
+              // field the timeline actually hides on (applySnoozes). Writing
+              // the local `snoozed` array only affected Up Next, so the items
+              // stayed fully visible and "Snooze" looked like a no-op.
+              // "tomorrow" = hide today, return tomorrow, matching the tooltip.
+              selectedKeys.forEach((k) =>
+                setSnooze(selectedDate, k, "tomorrow")
               );
               setSelectedKeys(new Set());
             }}

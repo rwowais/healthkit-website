@@ -154,12 +154,16 @@ export default function InsightsPage() {
   // "insights forming — ~N to go" countdown (keystone/whatWorks gate at 10).
   const loggedDays = useMemo(
     () =>
-      intelState.dailyLogs.filter(
+      // Count from FULL state, not the 3-day-delayed intelState — the
+      // cold-start "~N check-ins to go" countdown should reflect the days the
+      // user has ACTUALLY logged. The delayed peek told a brand-new free user
+      // they were up to 3 check-ins behind where they really were.
+      state.dailyLogs.filter(
         (l) =>
           l.score > 0 ||
           Object.values(l.behaviorCompletions ?? {}).some(Boolean)
       ).length,
-    [intelState.dailyLogs]
+    [state.dailyLogs]
   );
   const model = useMemo(() => personalModel(intelState), [intelState]);
   const identity = useMemo(

@@ -263,7 +263,24 @@ export default function OnboardingPage() {
     activeDataSource.load().then((st) => {
       // "Re-run setup" (/onboarding?redo=1) deliberately re-enters even for an
       // already-onboarded user, so don't bounce them to /today.
-      if (!isRedo() && st.settings.completedOnboarding) router.replace("/today");
+      if (!isRedo()) {
+        if (st.settings.completedOnboarding) router.replace("/today");
+        return;
+      }
+      // Re-tune: PREFILL the form from the user's current settings. Without
+      // this the fields sit at their hardcoded defaults, and finish() would
+      // Object.assign those defaults over the user's real settings — silently
+      // wiping wake/bed/goal/focus. Only seed values that already exist.
+      const cs = st.settings;
+      if (cs.name) setName(cs.name);
+      if (cs.primaryGoal) setGoal(cs.primaryGoal);
+      if (cs.overwhelm) setOverwhelm(cs.overwhelm);
+      if (cs.sleepBaseline) setSleepBaseline(cs.sleepBaseline);
+      if (Array.isArray(cs.focusAreas)) setFocus(cs.focusAreas);
+      if (cs.experience) setExperience(cs.experience);
+      if (typeof cs.hasWearable === "boolean") setHasWearable(cs.hasWearable);
+      if (cs.bedtime) setBedtime(cs.bedtime);
+      if (cs.wakeTime) setWakeTime(cs.wakeTime);
     });
   }, [router]);
 
