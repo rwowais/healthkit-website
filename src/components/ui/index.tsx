@@ -224,6 +224,9 @@ export function Sheet({
   dismissible?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // The inner scroll container is a SEPARATE element from the panel (see the
+  // render below for why). scrollTop is read off this, not the panel.
+  const scrollRef = useRef<HTMLDivElement>(null);
   // Stable onClose ref. Callers pass inline arrows
   // (`onClose={() => setX(null)}`), which become a new function identity
   // on every parent render. Putting `onClose` in the effect deps would
@@ -327,7 +330,8 @@ export function Sheet({
     )
       return;
     // If the user is touching scrolled-down content, let them scroll.
-    if (panel.scrollTop > 0) return;
+    // scrollTop now lives on the inner scroller, not the panel itself.
+    if ((scrollRef.current?.scrollTop ?? 0) > 0) return;
     dragStartRef.current = { y: e.clientY, t: Date.now() };
     setDragging(true);
     panel.setPointerCapture?.(e.pointerId);
@@ -378,34 +382,57 @@ export function Sheet({
       }}
       onClick={onClose}
     >
+      {/* The panel is the visual chrome + drag/focus host. The entrance
+          animation, the drag transform, AND the backdrop blur (.glass) all
+          live HERE — never on the scroll container below. iOS WebKit gives a
+          scroll container that is also transformed / animated / blurred a
+          stale tap hit-region until the first scroll — the "tap a control,
+          nothing happens; scroll a little, now it works" bug. Keeping
+          overflow on a separate, untransformed child kills that whole class
+          of bug by construction (not by guard). */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={title ?? "Dialog"}
         tabIndex={-1}
-        className="anim-sheet glass no-scrollbar max-h-[88vh] w-full max-w-[480px] overflow-y-auto rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] p-6 pb-[max(24px,env(safe-area-inset-bottom))] outline-none sm:max-h-[85vh] sm:rounded-[var(--r-xl)] sm:border touch-pan-y"
+        className="anim-sheet glass flex max-h-[88vh] w-full max-w-[480px] flex-col rounded-t-[var(--r-xl)] border-t border-[var(--hairline-strong)] outline-none sm:max-h-[85vh] sm:rounded-[var(--r-xl)] sm:border"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         style={{
-          transform: `translateY(${dragY}px)`,
+          // Only apply a transform WHILE dragging. A persistent transform —
+          // even an identity translateY(0) — is itself one of the iOS layer
+          // triggers above, so at rest the panel carries no transform at all.
+          transform: dragging || dragY ? `translateY(${dragY}px)` : undefined,
           transition: dragging
             ? "none"
             : "transform 220ms cubic-bezier(0.32, 0.72, 0, 1)",
           willChange: dragging ? "transform" : undefined,
         }}
       >
+        {/* Drag handle + title: fixed chrome, outside the scroll area. */}
+        <div className="shrink-0 px-6 pt-6">
+          <div
+            className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden"
+            aria-hidden="true"
+          />
+          {title && (
+            <h3 className="t-section mb-5 text-[var(--text-1)]">{title}</h3>
+          )}
+        </div>
+        {/* The ONLY scroll container. No transform / animation / backdrop
+            filter on this element, so its tap hit-region is always correct.
+            min-h-0 lets it shrink (and thus scroll) inside the flex column;
+            with short content the panel still hugs the content height. */}
         <div
-          className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden"
-          aria-hidden="true"
-        />
-        {title && (
-          <h3 className="t-section mb-5 text-[var(--text-1)]">{title}</h3>
-        )}
-        {children}
+          ref={scrollRef}
+          className="no-scrollbar min-h-0 touch-pan-y overflow-y-auto overscroll-contain px-6 pb-[max(24px,env(safe-area-inset-bottom))]"
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
