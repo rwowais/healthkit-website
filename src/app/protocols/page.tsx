@@ -203,6 +203,19 @@ export default function ProtocolsPage() {
     () => (state ? compileTimeline(state, 0) : []),
     [state]
   );
+  // Bind the open editor sheet to the LIVE compiled behavior, not the frozen
+  // snapshot from when its row was tapped — otherwise editing block/time in
+  // the sheet updates the stored override but the sheet keeps rendering the
+  // old block (the When pill + copy key off item.block). Fall back to the
+  // snapshot if the item drops out of the timeline so the sheet stays usable.
+  const detailItem = useMemo(
+    () =>
+      detail
+        ? timeline.find((t) => t.canonicalKey === detail.canonicalKey) ??
+          detail
+        : null,
+    [detail, timeline]
+  );
   const adaptation = useMemo(() => adapt(state), [state]);
   const easedSet = useMemo(
     () =>
@@ -1414,7 +1427,7 @@ export default function ProtocolsPage() {
       </Sheet>
 
       <BehaviorSheet
-        item={detail}
+        item={detailItem}
         settings={state.settings}
         override={
           detail ? state.behaviorOverrides?.[detail.canonicalKey] : undefined

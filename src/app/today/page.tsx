@@ -567,6 +567,23 @@ export default function TodayPage() {
     );
   }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate, log]);
 
+  // Keep the open detail sheet bound to the LIVE timeline item, not the
+  // frozen snapshot captured when the row was tapped. Without this, editing
+  // the behavior's block/time inside the sheet updates the stored override
+  // (and the list behind the sheet) but the sheet itself keeps rendering the
+  // OLD block — the "tap Afternoon, nothing highlights, it doesn't move" bug,
+  // since the When pill + "Time in…/Why…" copy all key off item.block. Fall
+  // back to the snapshot if the item has left the timeline (e.g. just
+  // disabled or filtered out) so the sheet stays open and usable.
+  const detailItem = useMemo(
+    () =>
+      detail
+        ? timeline.find((t) => t.canonicalKey === detail.canonicalKey) ??
+          detail
+        : null,
+    [detail, timeline]
+  );
+
   // Just-graduated behaviors today. We render their titles (from the
   // full pre-shape timeline) so the toast can name what tipped over —
   // anonymous "you mastered something" is colder than "Morning sunlight
@@ -2987,7 +3004,7 @@ export default function TodayPage() {
       </Sheet>
 
       <BehaviorSheet
-        item={detail}
+        item={detailItem}
         settings={state.settings}
         override={
           detail ? state.behaviorOverrides?.[detail.canonicalKey] : undefined
