@@ -53,6 +53,22 @@ export function setThemePref(pref: ThemePref): void {
 }
 
 /**
+ * Keep a "System" preference live: when the OS flips light/dark while the
+ * app is open, re-apply so it follows along (previously it only updated on
+ * the next load/navigation). No-op unless the stored preference is "system".
+ * Returns a cleanup function. Mounted once, app-wide, by <ThemeWatcher/>.
+ */
+export function watchSystemTheme(): () => void {
+  if (typeof window === "undefined" || !window.matchMedia) return () => {};
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => {
+    if (getThemePref() === "system") applyTheme("system");
+  };
+  mq.addEventListener?.("change", onChange);
+  return () => mq.removeEventListener?.("change", onChange);
+}
+
+/**
  * The pre-hydration script, stringified for inline injection in <body>.
  * Mirrors getThemePref + applyTheme but self-contained (runs before any
  * module loads). Kept tiny and defensive — any failure leaves the dark

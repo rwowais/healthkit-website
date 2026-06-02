@@ -142,7 +142,14 @@ export default function ProfilePage() {
           <input
             value={s.name}
             placeholder="Your name"
+            maxLength={40}
             onChange={(e) => updateSettings({ name: e.target.value })}
+            onBlur={(e) => {
+              // Trim leading/trailing space on blur (not on change — that
+              // would block typing a space between first and last name).
+              const t = e.target.value.trim();
+              if (t !== s.name) updateSettings({ name: t });
+            }}
             className={`mt-3 ${input}`}
           />
           {s.primaryGoal && (

@@ -529,7 +529,7 @@ export default function InsightsPage() {
                       </p>
                     )}
                     <p className="mt-3 text-[12px] font-medium text-[var(--text-4)]">
-                      Measured across {ks.days} of your check-ins.
+                      Measured across {ks.days} active days.
                     </p>
                   </div>
                 </motion.div>

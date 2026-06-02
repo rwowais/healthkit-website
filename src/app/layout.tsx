@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorker from "@/components/ServiceWorker";
+import ThemeWatcher from "@/components/ThemeWatcher";
 import SyncConflictPrompt from "@/components/SyncConflictPrompt";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StorageSafetyNet from "@/components/StorageSafetyNet";
@@ -167,6 +168,7 @@ export default function RootLayout({
             {children}
             <SyncConflictPrompt />
             <ServiceWorker />
+            <ThemeWatcher />
             <StorageSafetyNet />
             <TimezoneSentry />
             <InstallPrompt />
