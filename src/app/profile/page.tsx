@@ -1028,8 +1028,14 @@ export default function ProfilePage() {
                       bedtime: s.bedtime || "23:00",
                       wakeTime: s.wakeTime || "07:00",
                       timezone: s.timezone || "",
-                      subscriptionStatus: "trial",
-                      trialStartDate: new Date().toISOString(),
+                      // Carry the user's existing trial / entitlement across a
+                      // reset (retention) instead of restarting or dropping it.
+                      // Without tier + premiumTrialEndsAt, getAccess read the
+                      // user as expired-free immediately after a reset.
+                      tier: s.tier,
+                      subscriptionStatus: s.subscriptionStatus ?? "trial",
+                      trialStartDate: s.trialStartDate,
+                      premiumTrialEndsAt: s.premiumTrialEndsAt,
                       notificationsEnabled: false,
                       weekStartsOn: 1,
                       completedOnboarding: true,

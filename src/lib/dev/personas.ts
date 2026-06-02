@@ -176,7 +176,7 @@ export function buildPersona(kind: PersonaKind): AppState {
   }
 
   // power
-  s.installedPacks = ["longevity-foundation", "better-sleep", "daily-essentials"];
+  s.installedPacks = ["longevity-foundation", "better-sleep", "deep-focus"];
   s.settings.tier = "premium";
   s.settings.subscriptionStatus = "active";
   s.settings.weeklyGoal = 6;

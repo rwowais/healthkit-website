@@ -513,52 +513,6 @@ export const PACKS: ProtocolPack[] = [
     ],
   },
   {
-    id: "daily-essentials",
-    name: "Daily Essentials",
-    tagline: "Close common nutrient gaps with an evidence-based core.",
-    goal: "supplements",
-    accent: "var(--warm)",
-    icon: "pill",
-    source: "official",
-    durationLabel: "Ongoing",
-    behaviors: [
-      B({
-        canonicalKey: "vitamin-d3",
-        timingReason:
-          "With a morning fat-containing meal — fat aids absorption. If you take warfarin, the K2 component is contraindicated — switch to D3-only.",
-        title: "Vitamin D3 + K2",
-        block: "morning",
-        anchor: "wake",
-        offsetMin: 90,
-        dose: "2,000–5,000 IU D3 + K2",
-        rationale:
-          "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries. K2 directly antagonizes warfarin — anyone on warfarin should take D3 alone, not D3+K2.",
-        recommendedBy: ["Clinical research"],
-        icon: "sun",
-        leverage: 2,
-        kind: "action",
-      }),
-      OMEGA3_AM,
-      B({
-        canonicalKey: "creatine",
-        timingReason:
-          "Anytime — for creatine, daily consistency matters far more than the clock.",
-        title: "Creatine monohydrate",
-        block: "anytime",
-        anchor: "wake",
-        offsetMin: 120,
-        dose: "5 g daily",
-        rationale:
-          "The most evidence-backed supplement — strength, power, and cognition.",
-        recommendedBy: ["Clinical research"],
-        icon: "flask",
-        leverage: 2,
-        kind: "action",
-      }),
-      MAGNESIUM_PM,
-    ],
-  },
-  {
     id: "deep-focus",
     name: "Deep Focus",
     tagline: "Protect attention and sustain clear, focused work.",
@@ -1080,53 +1034,6 @@ export const PACKS: ProtocolPack[] = [
       // showing two near-identical avoid cards stacked on top of each
       // other.
       LAST_MEAL_3H,
-    ],
-  },
-  {
-    id: "longevity-supplements",
-    name: "Longevity Stack",
-    tagline:
-      "A minimal, evidence-backed supplement stack — close common gaps, no megadoses.",
-    goal: "supplements",
-    accent: "var(--warm)",
-    icon: "pill",
-    source: "official",
-    durationLabel: "Ongoing",
-    behaviors: [
-      OMEGA3_AM,
-      B({
-        canonicalKey: "vitamin-d3",
-        timingReason:
-          "With a morning fat-containing meal — fat aids absorption. If you take warfarin, the K2 component is contraindicated — switch to D3-only.",
-        title: "Vitamin D3 + K2",
-        block: "morning",
-        anchor: "wake",
-        offsetMin: 90,
-        dose: "2,000–5,000 IU D3 + K2",
-        rationale:
-          "Corrects widespread insufficiency; K2 directs calcium to bone, not arteries. K2 directly antagonizes warfarin — anyone on warfarin should take D3 alone, not D3+K2.",
-        recommendedBy: ["Clinical research"],
-        icon: "sun",
-        leverage: 2,
-        kind: "action",
-      }),
-      B({
-        canonicalKey: "creatine",
-        timingReason:
-          "Anytime — for creatine, daily consistency matters far more than the clock.",
-        title: "Creatine monohydrate",
-        block: "anytime",
-        anchor: "wake",
-        offsetMin: 120,
-        dose: "5 g daily",
-        rationale:
-          "The most evidence-backed supplement — strength, power, and cognition.",
-        recommendedBy: ["Clinical research"],
-        icon: "flask",
-        leverage: 2,
-        kind: "action",
-      }),
-      MAGNESIUM_PM,
     ],
   },
   {

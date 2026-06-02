@@ -397,8 +397,8 @@ describe("blockIntelligence — calm per-block notes", () => {
 
   it("returns null on a sparse block with no training stack", () => {
     let st = getDefaultState();
-    // Only Daily Essentials installed → no morning training; supplements.
-    st = { ...st, installedPacks: ["daily-essentials"] };
+    // No packs installed → no morning training stack at all.
+    st = { ...st, installedPacks: [] };
     const tl = compileTimeline(st, 0);
     expect(blockIntelligence(tl, "morning", 0)).toBeNull();
   });
@@ -411,11 +411,9 @@ describe("blockIntelligence — calm per-block notes", () => {
       installedPacks: [
         "longevity-foundation",
         "better-sleep",
-        "daily-essentials",
         "deep-focus",
         "morning-momentum",
         "cognitive-performance",
-        "longevity-supplements",
       ],
     };
     const tl = compileTimeline(st, 0);

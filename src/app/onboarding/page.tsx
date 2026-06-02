@@ -34,7 +34,6 @@ const FOCUS: Chip[] = [
   { key: "nutrition", label: "Nutrition", icon: "leaf" },
   { key: "stress", label: "Stress & recovery", icon: "lungs" },
   { key: "focus", label: "Focus", icon: "sparkle" },
-  { key: "supplements", label: "Supplements", icon: "pill" },
 ];
 const EXP: Chip[] = [
   { key: "new", label: "New to this", sub: "Start gently" },
@@ -208,7 +207,8 @@ export default function OnboardingPage() {
       const extras = new Set<string>();
       if (starter !== "longevity-foundation")
         extras.add("longevity-foundation");
-      if (focus.includes("supplements")) extras.add("daily-essentials");
+      // (Supplements are never recommended by a protocol — users curate them
+      // themselves under the Supplements tab.)
       // Avoid stacking two metabolic packs: "blood-sugar" is already the
       // body-goal starter and covers the same ground, so only layer in
       // metabolic-health when it isn't already the chosen starter. (The
