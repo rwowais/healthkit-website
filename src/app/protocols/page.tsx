@@ -757,7 +757,7 @@ export default function ProtocolsPage() {
                                 disabled: !disabled,
                               })
                             }
-                            className="press tr-fast h-[26px] w-[44px] shrink-0 rounded-full p-[3px]"
+                            className="press tr-fast tap-44 h-[26px] w-[44px] shrink-0 rounded-full p-[3px]"
                             style={{
                               background: disabled
                                 ? "var(--surface-3)"

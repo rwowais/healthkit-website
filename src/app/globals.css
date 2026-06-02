@@ -422,6 +422,22 @@ body {
 input, textarea, select { font-family: inherit; }
 input::placeholder, textarea::placeholder { color: var(--text-3); }
 
+/* iOS Safari zooms the entire page when you focus a text field whose
+   font-size is under 16px — a jarring lurch on every input tap. On touch
+   devices, force all text-entry controls to >=16px so focus never zooms.
+   Scoped to coarse pointers so the denser desktop design is untouched;
+   !important is needed to beat Tailwind's per-element text-[..px] utilities.
+   checkbox/radio/range/file are excluded — font-size would distort their
+   native sizing and they don't trigger zoom. This kills the whole input-zoom
+   class in one place, so a new sub-16px input can never reintroduce it. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Time-input picker indicator: only invert in DARK. In light mode (the
    default theme) color-scheme already paints a dark indicator on the white
    field — inverting it there washes it out to near-white. Scope to non-light. */

@@ -181,7 +181,7 @@ export default function ExperimentsCard({
                   )}
                   <button
                     onClick={() => remove(r.exp.id)}
-                    className="press tr-fast text-[12px] font-semibold text-[var(--text-4)]"
+                    className="press tr-fast tap-44 text-[12px] font-semibold text-[var(--text-4)]"
                   >
                     Remove
                   </button>

@@ -205,7 +205,7 @@ export default function SupplementSheet({
               </div>
               <button
                 onClick={() => patch({ inventory: undefined })}
-                className="press tr-fast text-[12.5px] font-semibold text-[var(--text-3)]"
+                className="press tr-fast tap-44 text-[12.5px] font-semibold text-[var(--text-3)]"
               >
                 Stop tracking inventory
               </button>

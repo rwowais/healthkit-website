@@ -1487,7 +1487,7 @@ export default function TodayPage() {
                 onClick={() =>
                   ackMastery(freshlyMasteredToShow.map((m) => m.key))
                 }
-                className="press tr-fast mt-3 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
+                className="press tr-fast tap-44 mt-3 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
                 style={{
                   background: "var(--surface-2)",
                   color: "var(--text-2)",
@@ -2818,7 +2818,7 @@ export default function TodayPage() {
               );
               setSelectedKeys(new Set());
             }}
-            className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+            className="press tr-fast tap-44 shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
             style={{
               background: "var(--surface-3)",
               color: "var(--text-1)",
@@ -2829,7 +2829,7 @@ export default function TodayPage() {
           </button>
           <button
             onClick={() => setBulkMoveOpen(true)}
-            className="press tr-fast shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+            className="press tr-fast tap-44 shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
             style={{
               background: "var(--text-1)",
               color: "var(--bg)",
@@ -2840,7 +2840,7 @@ export default function TodayPage() {
           </button>
           <button
             onClick={() => setSelectedKeys(new Set())}
-            className="press ml-auto shrink-0 text-[11.5px] text-[var(--text-3)]"
+            className="press tap-44 ml-auto shrink-0 text-[11.5px] text-[var(--text-3)]"
           >
             Clear
           </button>
