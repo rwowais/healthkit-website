@@ -244,6 +244,20 @@ export function clampToWindow(
   return Math.min(w.hi, Math.max(w.lo, m));
 }
 
+/** The distinct day-blocks a behavior's window spans — used by the editor to
+ *  gray out the blocks a HARD window forbids. Empty for no window. */
+export function windowBlocks(
+  item: WindowItem,
+  settings: BlockSettings
+): TimeBlock[] {
+  const w = resolveTimeWindow(item, settings);
+  if (!w || w.lo > w.hi) return [];
+  const out = new Set<TimeBlock>();
+  for (let t = w.lo; t <= w.hi; t += 15) out.add(blockForMinutes(t, settings));
+  out.add(blockForMinutes(w.hi, settings));
+  return [...out];
+}
+
 export function blockForMinutes(min: number, settings: BlockSettings): TimeBlock {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
   const wake = parseHM(settings.wakeTime);

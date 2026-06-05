@@ -4,7 +4,15 @@ import { useMemo, useState } from "react";
 import { Sheet, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { blockLabel, type TimelineItem } from "@/lib/engine";
-import { effectiveMinutes, nudgeTimeWithinBlock } from "@/lib/time";
+import {
+  effectiveMinutes,
+  nudgeTimeWithinBlock,
+  resolveTimeWindow,
+  windowBlocks,
+  clampToWindow,
+  minutesToHM,
+  parseHM,
+} from "@/lib/time";
 import {
   buildAtomRegistry,
   evidenceFraming,
@@ -86,6 +94,28 @@ export default function BehaviorSheet({
 
   const patch = (p: Partial<BehaviorOverride>) => onChange({ ...ov, ...p });
 
+  // Hard scheduling guardrail (circadian/safety windows): when set, the editor
+  // disables the blocks the window forbids and clamps any time the user picks
+  // back into the window — so a constrained behavior (e.g. morning light) can't
+  // be moved where its science forbids. Soft windows don't restrict here; the
+  // engine flags them (item.timingOff) and we show a calm note below.
+  const hardWindow = item.timeWindow?.strict
+    ? resolveTimeWindow(item, settings)
+    : null;
+  const allowedBlocks = hardWindow
+    ? new Set<TimeBlock>(windowBlocks(item, settings))
+    : null;
+  const nudge = (delta: number) => {
+    const cur =
+      effectiveMinutes(
+        { ...item, customTime: ov.customTime ?? item.customTime },
+        settings
+      ) ?? 0;
+    let t = nudgeTimeWithinBlock(cur, item.block, delta, settings);
+    if (hardWindow) t = minutesToHM(clampToWindow(parseHM(t), item, settings));
+    patch({ customTime: t });
+  };
+
   return (
     <Sheet open={!!item} onClose={onClose} title={item.title}>
       <div className="space-y-6">
@@ -145,10 +175,15 @@ export default function BehaviorSheet({
           >
             {BLOCKS.map((b) => {
               const on = effBlock === b && !ov.customTime;
+              // A hard window forbids blocks outside its range (e.g. morning
+              // light can't go to afternoon/evening) — disable those pills.
+              const forbidden = allowedBlocks != null && !allowedBlocks.has(b);
               return (
                 <button
                   key={b}
-                  onClick={() =>
+                  disabled={forbidden}
+                  onClick={() => {
+                    if (forbidden) return;
                     // Pick a block → clear the exact-time pin (the item shows a
                     // time inside the new block) and break any stack anchor, so
                     // "Evening" can't keep showing an afternoon clock.
@@ -156,12 +191,21 @@ export default function BehaviorSheet({
                       block: b === item.recommendedBlock ? undefined : b,
                       customTime: undefined,
                       stackAfter: undefined,
-                    })
+                    });
+                  }}
+                  title={
+                    forbidden
+                      ? `${item.title} stays in its ${blockLabel(
+                          item.recommendedBlock,
+                          blockLabels
+                        ).toLowerCase()} window`
+                      : undefined
                   }
-                  className="flex-1 rounded-[var(--r-pill)] py-2 text-[12px] font-semibold capitalize tr-fast"
+                  className="flex-1 rounded-[var(--r-pill)] py-2 text-[12px] font-semibold capitalize tr-fast disabled:cursor-not-allowed"
                   style={{
                     background: on ? color : "transparent",
                     color: on ? "var(--bg)" : "var(--text-3)",
+                    opacity: forbidden ? 0.35 : 1,
                   }}
                 >
                   {b}
@@ -169,6 +213,19 @@ export default function BehaviorSheet({
               );
             })}
           </div>
+          {hardWindow && (
+            <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-4)]">
+              Held in its{" "}
+              {blockLabel(item.recommendedBlock, blockLabels).toLowerCase()}{" "}
+              window — {item.timingReason ?? "its timing is part of why it works."}
+            </p>
+          )}
+          {item.timingOff && !hardWindow && (
+            <p className="mt-2 text-[11px] leading-relaxed text-[var(--warm)]">
+              A bit outside its usual window —{" "}
+              {item.timingReason ?? "its timing matters a little here."}
+            </p>
+          )}
           <div className="mt-3 flex items-center gap-2.5">
             <span className="text-[12px] text-[var(--text-3)]">
               Or a specific time
@@ -176,9 +233,16 @@ export default function BehaviorSheet({
             <input
               type="time"
               value={ov.customTime ?? ""}
-              onChange={(e) =>
-                patch({ customTime: e.target.value || undefined })
-              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return patch({ customTime: undefined });
+                // Hard window: clamp the typed time back into the allowed range
+                // so a constrained behavior can't be set out of its window.
+                const m = hardWindow
+                  ? clampToWindow(parseHM(v), item, settings)
+                  : parseHM(v);
+                patch({ customTime: minutesToHM(m) });
+              }}
               className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3 py-2 text-[14px] text-[var(--text-1)] outline-none"
             />
           </div>
@@ -195,38 +259,14 @@ export default function BehaviorSheet({
               </p>
               <div className="mt-2 flex gap-2">
                 <button
-                  onClick={() =>
-                    patch({
-                      customTime: nudgeTimeWithinBlock(
-                        effectiveMinutes(
-                          { ...item, customTime: ov.customTime ?? item.customTime },
-                          settings
-                        ) ?? 0,
-                        item.block,
-                        -15,
-                        settings
-                      ),
-                    })
-                  }
+                  onClick={() => nudge(-15)}
                   className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
                   style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
                 >
                   ↑ 15 min earlier
                 </button>
                 <button
-                  onClick={() =>
-                    patch({
-                      customTime: nudgeTimeWithinBlock(
-                        effectiveMinutes(
-                          { ...item, customTime: ov.customTime ?? item.customTime },
-                          settings
-                        ) ?? 0,
-                        item.block,
-                        15,
-                        settings
-                      ),
-                    })
-                  }
+                  onClick={() => nudge(15)}
                   className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
                   style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
                 >

@@ -4,6 +4,7 @@ import {
   isWithinWindow,
   clampToWindow,
   minutesToHM,
+  windowBlocks,
 } from "@/lib/time";
 import { compileTimeline } from "@/lib/engine";
 import { getDefaultState } from "@/lib/storage";
@@ -55,6 +56,12 @@ describe("time-window helpers", () => {
     expect(minutesToHM(540)).toBe("09:00");
     expect(minutesToHM(720)).toBe("12:00");
     expect(minutesToHM(1110)).toBe("18:30");
+  });
+
+  it("windowBlocks reports which blocks a window spans", () => {
+    expect(windowBlocks(sunlight, settings)).toEqual(["morning"]);
+    expect(windowBlocks(windDown, settings)).toEqual(["evening"]);
+    expect(windowBlocks(free, settings)).toEqual([]);
   });
 });
 
