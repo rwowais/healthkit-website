@@ -24,6 +24,9 @@ import {
   blockForMinutes,
   blockStartClock,
   resolveBlockBounds,
+  clampToWindow,
+  isWithinWindow,
+  minutesToHM,
 } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
@@ -45,6 +48,10 @@ export interface TimelineItem extends BehaviorDef {
    *  won't re-file the item by its clock time. A customTime alone does NOT
    *  pin the block — the block then follows the custom clock time. */
   blockPinned: boolean;
+  /** Set by compileTimeline when this item has a SOFT timeWindow and its
+   *  current time falls outside it — the UI shows a calm "a bit off" note.
+   *  HARD windows never set this (they clamp the time back in instead). */
+  timingOff?: boolean;
   /**
    * Governance class — computed at compile time. Downstream consumers
    * (keystone, suggestions, mastery, leverageTag) can branch on this
@@ -343,9 +350,26 @@ export function compileTimeline(
   // the custom clock time.
   for (const it of merged.values()) {
     if (it.block === "anytime") continue;
-    if (it.blockPinned) continue;
     const m = effectiveMinutes(it, settings);
-    if (m != null) it.block = blockForMinutes(m, settings);
+    if (m == null) continue;
+    // HARD time-window guardrail (circadian/safety): clamp an out-of-window
+    // time back into the window and re-derive the block from the clamped time,
+    // OVERRIDING any block pin (you can't pin morning light to the evening).
+    // This also self-heals bad stored data — a morning-sunlight stuck at noon
+    // snaps back into its window here, so Today files it under Morning again.
+    if (it.timeWindow?.strict) {
+      const clamped = clampToWindow(m, it, settings);
+      if (!isWithinWindow(m, it, settings)) it.customTime = minutesToHM(clamped);
+      it.block = blockForMinutes(clamped, settings);
+      continue;
+    }
+    // SOFT window: allow the time, but flag it when out of range so the UI can
+    // show a calm "a bit off" note. Does not move the time.
+    if (it.timeWindow) it.timingOff = !isWithinWindow(m, it, settings);
+    // Clock-based block: file under the section matching the resolved time,
+    // unless the user explicitly pinned the block (drag/move).
+    if (it.blockPinned) continue;
+    it.block = blockForMinutes(m, settings);
   }
   const bounds = resolveBlockBounds(settings);
   const blockStartMin = (b: TimeBlock) =>

@@ -571,6 +571,21 @@ export interface BehaviorDef {
    * here is the only change needed to wire it through.
    */
   contraindications?: SafetyFlag[];
+  /**
+   * Optional scheduling guardrail. The behavior's effective time must fall in
+   * [anchorBase + min, anchorBase + max] minutes, where anchorBase is the
+   * user's wake (or bed, if `anchor === "bed"`). Offsets are relative to the
+   * SAME anchor the behavior already uses.
+   *   • strict: true  → HARD. The engine clamps an out-of-window time back in
+   *     and re-files the block from the clamped time (overriding any pin), and
+   *     the editor won't let the user leave the window. For circadian/safety
+   *     behaviors that are nonsensical out of place — e.g. morning light must
+   *     stay within ~2h of waking; a pre-bed wind-down can't move to morning.
+   *   • strict falsy  → SOFT. The time is allowed but the item is flagged
+   *     (timingOff) so the UI can show a calm "a bit off" note.
+   * Absent → unconstrained (freely placeable, the default for most behaviors).
+   */
+  timeWindow?: { min: number; max: number; strict?: boolean };
 }
 
 /**

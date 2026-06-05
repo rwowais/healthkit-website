@@ -14,6 +14,9 @@ const B = (b: BehaviorDef): BehaviorDef => b;
 
 const MORNING_SUNLIGHT = B({
   canonicalKey: "morning-sunlight",
+  // Circadian guardrail (HARD): light has to land within ~2h of waking to set
+  // the clock — it can never be scheduled into the afternoon/evening.
+  timeWindow: { min: 0, max: 120, strict: true },
   timingReason:
     "Placed within ~30 min of waking — that's when light most powerfully sets your circadian clock.",
   title: "Morning sunlight",
@@ -83,6 +86,9 @@ const MAGNESIUM_PM = B({
 
 const WIND_DOWN = B({
   canonicalKey: "wind-down",
+  // HARD: a pre-bed calming ritual only makes sense in the hours before bed
+  // (anchor=bed); it can't be dragged into the morning.
+  timeWindow: { min: -240, max: 0, strict: true },
   // Sequenced relative to the other pre-bed essentials:
   //   bed -90: cool-room (the room takes time to cool)
   //   bed -60: screens-off (start of low-light period)
@@ -255,6 +261,9 @@ const SOCIAL_CONNECTION = B({
 
 const SCREENS_OFF = B({
   canonicalKey: "screens-off",
+  // HARD: a pre-bed screen cutoff only makes sense in the evening run-up to
+  // bed (anchor=bed), not earlier in the day.
+  timeWindow: { min: -180, max: 0, strict: true },
   timingReason:
     "~1h before bed — removes the most alerting light source so the wind-down can actually land.",
   title: "Screens off",
@@ -269,6 +278,9 @@ const SCREENS_OFF = B({
 
 const DIM_LIGHTS = B({
   canonicalKey: "dim-lights",
+  // HARD: dimming lights is an evening (pre-bed) circadian behavior; it
+  // belongs in the hours before bed, never the morning.
+  timeWindow: { min: -240, max: 0, strict: true },
   timingReason:
     "~2h before bed — bright evening light is what most delays melatonin.",
   title: "Dim the lights",

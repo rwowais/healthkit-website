@@ -182,6 +182,68 @@ export function nudgeTimeWithinBlock(
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** "HH:MM" (24h) for a minutes-since-midnight value (wrapped to 0..1439). */
+export function minutesToHM(min: number): string {
+  const n = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(
+    n % 60
+  ).padStart(2, "0")}`;
+}
+
+/** Shape the time-window helpers read off a behavior. */
+type WindowItem = {
+  anchor: string;
+  timeWindow?: { min: number; max: number; strict?: boolean };
+};
+
+/**
+ * Resolve a behavior's allowed scheduling window to absolute clock minutes
+ * [lo, hi] (0..1439), or null if it has none. Offsets are relative to the
+ * behavior's own anchor (wake, or bed when anchor === "bed"). A window that
+ * would wrap past midnight (lo > hi after normalize — only with an unusual
+ * late bedtime) is treated as "no clamp": the authored circadian windows
+ * never wrap, and this degrades safely instead of clamping wrongly.
+ */
+export function resolveTimeWindow(
+  item: WindowItem,
+  settings: { wakeTime: string; bedtime: string }
+): { lo: number; hi: number; strict: boolean } | null {
+  const w = item.timeWindow;
+  if (!w) return null;
+  const wake = parseHM(settings.wakeTime);
+  let bed = parseHM(settings.bedtime);
+  if (bed <= wake) bed += 1440;
+  const base = item.anchor === "bed" ? bed : wake;
+  const norm = (x: number) => ((Math.round(x) % 1440) + 1440) % 1440;
+  return { lo: norm(base + w.min), hi: norm(base + w.max), strict: !!w.strict };
+}
+
+/** Is a clock time (minutes) inside the behavior's window? True if it has no
+ *  window, a wrapping/degenerate one, or the time is within it. */
+export function isWithinWindow(
+  min: number | null,
+  item: WindowItem,
+  settings: { wakeTime: string; bedtime: string }
+): boolean {
+  const w = resolveTimeWindow(item, settings);
+  if (!w || min == null || w.lo > w.hi) return true;
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return m >= w.lo && m <= w.hi;
+}
+
+/** Clamp a clock time (minutes) into the behavior's window; returns it
+ *  unchanged if the behavior has no window (or a wrapping one). */
+export function clampToWindow(
+  min: number,
+  item: WindowItem,
+  settings: { wakeTime: string; bedtime: string }
+): number {
+  const w = resolveTimeWindow(item, settings);
+  if (!w || w.lo > w.hi) return min;
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return Math.min(w.hi, Math.max(w.lo, m));
+}
+
 export function blockForMinutes(min: number, settings: BlockSettings): TimeBlock {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
   const wake = parseHM(settings.wakeTime);
