@@ -23,7 +23,7 @@ import {
   effectiveMinutes,
   blockForMinutes,
   blockStartClock,
-  parseHM,
+  resolveBlockBounds,
 } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
@@ -347,16 +347,24 @@ export function compileTimeline(
     const m = effectiveMinutes(it, settings);
     if (m != null) it.block = blockForMinutes(m, settings);
   }
-  const wakeMin = parseHM(settings.wakeTime);
+  const bounds = resolveBlockBounds(settings);
+  const blockStartMin = (b: TimeBlock) =>
+    b === "evening"
+      ? bounds.evening
+      : b === "afternoon"
+      ? bounds.afternoon
+      : bounds.morning;
+  // Within-block order = minutes since THIS block's start (wrapped 0..1439),
+  // so the list always reads top-to-bottom in clock order — an earlier time
+  // can never sort below a later one. (The old key was minutes-since-WAKE,
+  // which wrapped a pre-wake morning item — e.g. 5:00am for a 7:00 riser — to
+  // the end of the day, sinking it below 8:00am.) Wrapping by the block start
+  // also keeps the evening tail right: a 12:30am wind-down still sorts after
+  // 11pm. Cross-block order is owned by BLOCK_ORDER, consulted before this.
   const clock = (it: TimelineItem) => {
     const m = effectiveMinutes(it, settings);
-    // Minutes since wake (wrapped to 0..1439) so within-block ordering
-    // follows the sequence the user actually reaches items — a post-midnight
-    // time (e.g. 1:00am) sorts AFTER the same block's evening items, not
-    // before. For normal daytime schedules this preserves clock order.
-    return m == null
-      ? Number.MAX_SAFE_INTEGER
-      : (((m - wakeMin) % 1440) + 1440) % 1440;
+    if (m == null || it.block === "anytime") return Number.MAX_SAFE_INTEGER;
+    return (((Math.round(m) - blockStartMin(it.block)) % 1440) + 1440) % 1440;
   };
   return [...merged.values()]
     .filter((it) => !it.daysActive || it.daysActive[dayIndex])
