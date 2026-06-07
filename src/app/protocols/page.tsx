@@ -33,6 +33,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
+import { isSupplementKey } from "@/lib/supplements";
 import type { ProtocolPack, TimeBlock, BehaviorDef } from "@/lib/types";
 
 const BLOCKS: TimeBlock[] = ["morning", "afternoon", "evening", "anytime"];
@@ -119,12 +120,26 @@ export default function ProtocolsPage() {
   //              we don't have curated.
   const [addMode, setAddMode] = useState<"library" | "custom">("library");
   const [atomQuery, setAtomQuery] = useState("");
-  const atoms = useMemo(() => listBehaviorAtoms(), []);
+  const atoms = useMemo(
+    () =>
+      // Supplements are Browse-only — never offer them as protocol behaviors;
+      // compileTimeline drops supplement-keyed rows, so a picked supplement
+      // would just vanish from the timeline.
+      listBehaviorAtoms().filter(
+        (a) => !isSupplementKey(a.canonicalKey) && a.icon !== "pill"
+      ),
+    []
+  );
   // Phase 7: while someone free-types a custom behavior, surface a matching
   // library atom so they can LINK it (derivedFrom) and inherit the whole
   // intelligence layer — timing, evidence, interactions — instead of a thin
   // custom the engine can't see. Conservative match; opt-in.
-  const suggestedAtom = useMemo(() => matchAtom(bDraft.title), [bDraft.title]);
+  const suggestedAtom = useMemo(() => {
+    const a = matchAtom(bDraft.title);
+    // Don't suggest a supplement atom for a custom PROTOCOL behavior — it would
+    // be dropped from the timeline (supplements live in Supplements → Browse).
+    return a && !isSupplementKey(a.canonicalKey) && a.icon !== "pill" ? a : null;
+  }, [bDraft.title]);
   const filteredAtoms = useMemo(() => {
     const q = atomQuery.trim().toLowerCase();
     // Filter out atoms already in the draft so the picker never shows

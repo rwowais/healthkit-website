@@ -253,7 +253,13 @@ export function keystone(state: AppState): Keystone | null {
         (otherNot.length - 1) * variance(otherNot, mN)) /
         (otherDone.length + otherNot.length - 2)
     );
-    const d = pooledSD > 0 ? (mD - mN) / pooledSD : 99;
+    // Zero within-group variance with a real positive gap (mD > mN) is a
+    // PERFECT separation — the strongest signal — so it keeps the 99 sentinel
+    // (the min-sample gates above already block small-n coincidences). But zero
+    // variance with NO positive gap (mD <= mN: no difference, or the behavior
+    // tracks with WORSE days) is not a positive keystone and must fail the gate.
+    // Mirrors the cohenD helper below; the old `: 99` fired even when mD <= mN.
+    const d = pooledSD > 0 ? (mD - mN) / pooledSD : mD > mN ? 99 : 0;
     if (d < dThreshold) continue;
     if (!best || d > best.d) {
       // De-circularised delta: the lift in *other* behaviors kept,
@@ -333,6 +339,9 @@ export function whatWorks(state: AppState): OutcomeInsight | null {
         (b.length - 1) * variance(b, mB)) /
         (a.length + b.length - 2)
     );
+    // Zero variance with a positive gap (mA > mB) is a perfect separation, the
+    // strongest signal (sample-size gates handle small-n); mA <= mB → no
+    // positive effect. (This helper was already correct — left unchanged.)
     return sd > 0 ? (mA - mB) / sd : mA > mB ? 99 : 0;
   };
 

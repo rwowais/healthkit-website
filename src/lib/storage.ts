@@ -374,6 +374,27 @@ function normalize(s: AppState): AppState {
         return { ...l, supplementCompletions: nextSuppDone };
       });
 
+  // Backfill the legacy per-pillar arrays on EVERY log so the scoring/metrics
+  // helpers (hasAnyActivity, calculate*Score, pillarTracked) can never throw on
+  // an imported / cloud / pre-migration log that lacks them. hasAnyActivity runs
+  // via calculateStreak on every Today/Insights render, so one such log
+  // white-screened the whole app ("Cannot read properties of undefined").
+  const ensureLogShape = (l: DailyLog): DailyLog => ({
+    ...l,
+    sleepCompletions: Array.isArray(l.sleepCompletions)
+      ? l.sleepCompletions
+      : [],
+    exerciseEntries: Array.isArray(l.exerciseEntries) ? l.exerciseEntries : [],
+    nutritionScorecard:
+      l.nutritionScorecard && typeof l.nutritionScorecard === "object"
+        ? l.nutritionScorecard
+        : ({} as DailyLog["nutritionScorecard"]),
+    supplementEntries: Array.isArray(l.supplementEntries)
+      ? l.supplementEntries
+      : [],
+    completions: Array.isArray(l.completions) ? l.completions : [],
+  });
+
   return {
     ...s,
     settings: { ...d.settings, ...s.settings },
@@ -384,7 +405,9 @@ function normalize(s: AppState): AppState {
     // so without sorting here, a Supabase load looked "changed" to the
     // fixed-point guard and triggered redundant cross-instance save churn.
     // Sorting makes a round-trip a true fixed point.
-    dailyLogs: [...migratedLogs].sort((a, b) => a.date.localeCompare(b.date)),
+    dailyLogs: migratedLogs
+      .map(ensureLogShape)
+      .sort((a, b) => a.date.localeCompare(b.date)),
     biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
     insights: Array.isArray(s.insights) ? s.insights : [],
     // NOTE: the persisted streak is kept verbatim here (recomputing it in

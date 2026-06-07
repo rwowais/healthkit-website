@@ -83,12 +83,15 @@ export default function InsightsPage() {
 
   const streak = useMemo(
     () =>
+      // Streaks are an engagement stat, not gated correlation intelligence —
+      // read FULL live state so the free-tier 3-day peek delay doesn't black out
+      // "shown up N days running" or make it disagree with Today's streak.
       calculateStreak(
-        intelState.dailyLogs,
-        getVacationDates(intelState),
-        intelState.settings
+        state.dailyLogs,
+        getVacationDates(state),
+        state.settings
       ),
-    [intelState]
+    [state]
   );
   const week = useMemo(
     () => weeklyActiveDays(intelState.dailyLogs, intelState.settings),
@@ -171,16 +174,19 @@ export default function InsightsPage() {
     [intelState]
   );
   const topStreaks = useMemo(() => {
-    return compileTimeline(intelState, 0)
+    // "Strongest behaviors" is streak-derived — compute from full live state so
+    // it doesn't blank out for free users (behaviorStats anchors at real today,
+    // which the 3-day-delayed intelState has no logs for → every streak → 0).
+    return compileTimeline(state, 0)
       .map((it) => ({
         title: it.title,
         icon: it.icon as IconName,
-        ...behaviorStats(intelState, it.canonicalKey),
+        ...behaviorStats(state, it.canonicalKey),
       }))
       .filter((b) => b.streak >= 3)
       .sort((a, b) => b.streak - a.streak)
       .slice(0, 3);
-  }, [intelState]);
+  }, [state]);
 
   const nothing =
     insights.length === 0 &&
@@ -394,14 +400,14 @@ export default function InsightsPage() {
 
         {/* Your records — quiet bests to beat (peek-delayed for free, like the
             rest of the page). */}
-        <PersonalRecords state={intelState} />
+        <PersonalRecords state={state} />
 
         {/* How you compare — where consistency falls within a built-in
             reference range (NOT peer data; the card says so). Peek-delayed. */}
         <BenchmarksCard state={intelState} />
 
         {/* Month-in-review — shareable summary of the current month. */}
-        <MonthlyReport state={intelState} />
+        <MonthlyReport state={state} />
 
         {/* What you're steering toward — outcome goals and self-experiments.
             These use full live `state` (the user's own targets + check-ins,

@@ -259,7 +259,7 @@ export default function SupplementSheet({
               onClick={() => {
                 if (
                   window.confirm(
-                    `Remove ${draft.name}? Your past completion data will be cleared.`
+                    `Remove ${draft.name}? Your past completion history is kept.`
                   )
                 ) {
                   onRemove();

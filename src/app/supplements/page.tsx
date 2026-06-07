@@ -565,7 +565,7 @@ function GridView({
                   s.daysActive[dow] !== false;
                 const log = logByDate.get(d);
                 const isDone = log?.[s.id] === true;
-                if (isDone) done++;
+                if (isDone && scheduled) done++;
                 return { d, isDone, scheduled };
               });
               const scheduledCount = cells.filter((c) => c.scheduled).length;
