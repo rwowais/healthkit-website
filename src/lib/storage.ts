@@ -465,6 +465,16 @@ export function clearAllData(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
     for (const k of LEGACY_STORAGE_KEYS) localStorage.removeItem(k);
+    // Also clear the app's transient sync/cache namespace (pz:*): the
+    // pending-sync dirty flag, the per-uid reconcile markers, per-day snooze
+    // caches, etc. Leaving pz:pending-sync or pz:recon:<uid> behind makes the
+    // NEXT account/session on this device take a corrupting dirty-merge (its
+    // real cloud settings overwritten by local defaults) or skip the
+    // first-sign-in merge prompt — both silent cross-account data loss.
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("pz:")) localStorage.removeItem(k);
+    }
   } catch {
     /* ignore */
   }

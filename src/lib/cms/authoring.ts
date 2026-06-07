@@ -58,6 +58,11 @@ export function backfillBuiltinFields(base: BehaviorDef): BehaviorDef {
   if (bi.customTime) out.customTime = bi.customTime;
   if (bi.category) out.category = bi.category;
   if (bi.intensity) out.intensity = bi.intensity;
+  // CRITICAL: the hard scheduling guardrail (circadian/safety time windows) is
+  // not a CMS-editable column, so it must be re-attached here or every publish
+  // silently ships morning-sunlight / wind-down / dim-lights / screens-off with
+  // timeWindow undefined — the engine's hard clamp + editor lock then go dead.
+  if (bi.timeWindow) out.timeWindow = bi.timeWindow;
   return out;
 }
 

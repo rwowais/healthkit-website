@@ -28,7 +28,10 @@ export interface DataSource {
   load(): Promise<AppState>;
   save(state: AppState): Promise<void>;
   /** Wipe the off-device copy (no-op for local). */
-  clearRemote(): Promise<void>;
+  /** Remove the user's cloud copy. Returns true if the cloud row is confirmed
+   *  gone (or there is nothing to clear); false if the remote delete failed, so
+   *  the caller must NOT wipe local + claim success (the data would resurrect). */
+  clearRemote(): Promise<boolean>;
   /** True when this source persists off-device. */
   readonly isCloud: boolean;
 }
@@ -47,8 +50,9 @@ class LocalDataSource implements DataSource {
       window.dispatchEvent(new CustomEvent("pz:state"));
     }
   }
-  async clearRemote(): Promise<void> {
-    /* nothing off-device */
+  async clearRemote(): Promise<boolean> {
+    /* nothing off-device — treat as already cleared */
+    return true;
   }
 }
 
@@ -487,6 +491,18 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
       ...(cloud.behaviorOverrides ?? {}),
       ...(local.behaviorOverrides ?? {}),
     },
+    // The dirty path is LOCAL-PREFERRING (preserve un-pushed local edits). These
+    // slices were previously inherited from `...cloud` only, so an un-pushed
+    // local supplement edit (add/remove/dose/inventory), supplementMeta or
+    // legacy-protocol change was silently discarded — then pushed back up,
+    // making the loss permanent across devices. Reconcile them too:
+    //  • supplements: by-id union, local wins on collision (like biomarkers).
+    //  • supplementMeta / protocols: shallow-merge with local winning per key.
+    //  • insights: derived/recomputed → prefer the local (more-recent-intent) set.
+    supplements: mergeById(cloud.supplements, local.supplements),
+    supplementMeta: { ...cloud.supplementMeta, ...local.supplementMeta },
+    protocols: { ...cloud.protocols, ...local.protocols },
+    insights: local.insights ?? cloud.insights,
   };
 }
 
@@ -589,7 +605,16 @@ class SupabaseDataSource implements DataSource {
     const docDays = base.dailyLogs ?? [];
     const missing: DailyLog[] = [];
     for (const d of docDays) {
-      if (!byDate.has(d.date)) {
+      const row = byDate.get(d.date);
+      if (row) {
+        // Day present in BOTH the per-day table and the document: recency-merge
+        // (mergeDailyLog) rather than letting the table row win verbatim — else
+        // a freshly field-merged or newer local edit for that day is silently
+        // discarded (defeating the whole per-log recency model). The doc day `d`
+        // is the more-recent-intent side (wins genuine ties), matching the
+        // local-preferring dirty-load path that produced it.
+        byDate.set(d.date, mergeDailyLog(row, d));
+      } else {
         byDate.set(d.date, d);
         missing.push(d);
       }
@@ -848,12 +873,12 @@ class SupabaseDataSource implements DataSource {
     }
   }
 
-  async clearRemote(): Promise<void> {
+  async clearRemote(): Promise<boolean> {
     const sb = getSupabase();
-    if (!sb) return;
+    if (!sb) return true; // no cloud configured — nothing to clear
     try {
       const userId = await getUserId();
-      if (!userId) return;
+      if (!userId) return true; // not signed in — no cloud row of ours
       // Drop the cloud row so a local reset isn't immediately
       // re-hydrated from the server on the next load.
       const { error } = await sb
@@ -870,12 +895,14 @@ class SupabaseDataSource implements DataSource {
       } catch {
         /* table may not exist yet — nothing to clear */
       }
+      return true; // cloud row confirmed removed
     } catch {
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent(SAVE_ERROR_EVENT, { detail: "cloud-clear" })
         );
       }
+      return false; // delete failed — cloud row may survive; do NOT claim success
     }
   }
 }

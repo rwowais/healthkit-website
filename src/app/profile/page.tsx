@@ -1018,7 +1018,18 @@ export default function ProfilePage() {
               // get the full fresh-start path.
               const hasSession =
                 supabaseEnabled && (await getUserId()) !== null;
-              await activeDataSource.clearRemote();
+              const cloudCleared = await activeDataSource.clearRemote();
+              if (hasSession && !cloudCleared) {
+                // The cloud row may have survived (offline / transient error).
+                // Do NOT wipe local and claim success — the "deleted" data
+                // would resurrect from the cloud on the next load. Bail so the
+                // user can retry; the cloud-clear failure was already surfaced.
+                toast.show(
+                  "Couldn't clear your cloud data — check your connection and try again."
+                );
+                setConfirmReset(false);
+                return;
+              }
               clearAllData();
               if (hasSession) {
                 // Mint a minimal state that skips onboarding so the
@@ -1043,6 +1054,11 @@ export default function ProfilePage() {
                       subscriptionStatus: s.subscriptionStatus ?? "trial",
                       trialStartDate: s.trialStartDate,
                       premiumTrialEndsAt: s.premiumTrialEndsAt,
+                      // Preserve medical/safety flags across a reset. This seed
+                      // sets completedOnboarding=true (skips the flow), so the
+                      // user is never re-asked — dropping safetyFlags here would
+                      // silently un-suppress contraindicated behaviors.
+                      safetyFlags: s.safetyFlags,
                       notificationsEnabled: false,
                       weekStartsOn: 1,
                       completedOnboarding: true,
