@@ -1373,8 +1373,16 @@ function stableRank(a: TimelineItem, b: TimelineItem): number {
   );
 }
 
-/** At scale, never let a load-reduction mode mute a block to nothing. */
-function guaranteePerBlock(items: TimelineItem[]): TimelineItem[] {
+/** At scale, never let a load-reduction mode mute a block to nothing. The
+ *  optional `eligible` predicate restricts WHICH muted item may be resurrected
+ *  in an all-muted block — recovery mode passes it so a block whose only items
+ *  are demoted training (RECOVERY_DEMOTE) is allowed to stay quiet instead of
+ *  resurrecting e.g. strength, which would contradict the "the demanding work
+ *  is set aside" recovery contract. Default (other modes): any item may fill. */
+function guaranteePerBlock(
+  items: TimelineItem[],
+  eligible: (it: TimelineItem) => boolean = () => true
+): TimelineItem[] {
   const byBlock = new Map<string, TimelineItem[]>();
   for (const it of items) {
     (byBlock.get(it.block) ?? byBlock.set(it.block, []).get(it.block)!).push(
@@ -1384,7 +1392,9 @@ function guaranteePerBlock(items: TimelineItem[]): TimelineItem[] {
   const keepKeys = new Set<string>();
   for (const group of byBlock.values()) {
     if (group.some((g) => !g.muted)) continue;
-    const top = [...group].sort(stableRank)[0];
+    // Only an ELIGIBLE item may be resurrected; if none qualify the block stays
+    // empty (recovery: an only-demoted-training block should go quiet).
+    const top = [...group].filter(eligible).sort(stableRank)[0];
     if (top) keepKeys.add(top.canonicalKey);
   }
   return keepKeys.size
@@ -1649,7 +1659,14 @@ export function shapeTimeline(
             (RECOVERY_PROMOTE.has(effectiveKey(a)) ? 1 : 0) ||
           BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block]
       );
-    shaped = guaranteePerBlock(shaped);
+    // Recovery: a block holding ONLY demoted training must stay quiet — never
+    // resurrect a RECOVERY_DEMOTE item (it would contradict the recovery
+    // headline). guaranteePerBlock may still un-mute a non-demoted item so a
+    // block emptied by some OTHER mute isn't left blank.
+    shaped = guaranteePerBlock(
+      shaped,
+      (it) => !RECOVERY_DEMOTE.has(effectiveKey(it))
+    );
   } else if (mode === "rebuild") {
     // Deterministic, block-diverse, keystone-first: at most 2 per block,
     // exactly the 3 highest-leverage that span the day — never a random
