@@ -1,13 +1,8 @@
 name: e2e
 
-# Full-stack live E2E. Reads plain REPOSITORY secrets — no GitHub
-# "Environments" required (Settings → Secrets and variables → Actions →
-# New repository secret):
-#   PROD_SUPABASE_URL / PROD_SUPABASE_ANON_KEY / PROD_SUPABASE_SERVICE_ROLE_KEY
-#   STAGING_* (optional — the staging job auto-skips until you add them)
-#
-# Prod runs on pushes to main + manual dispatch (not on every PR, to limit
-# test-user churn in the real DB). Staging runs on PRs + pushes once set up.
+# Full-stack live E2E. Prod secrets live in the "Production" GitHub
+# Environment; staging secrets (optional) are repository secrets.
+# Prod runs on pushes to main + manual dispatch; staging on PRs once set up.
 
 on:
   pull_request:
@@ -54,9 +49,8 @@ jobs:
 
   prod:
     runs-on: ubuntu-latest
-    # Don't create test users in the real DB on every PR — only on pushes to
-    # main and manual ("Run workflow") triggers.
     if: github.event_name != 'pull_request'
+    environment: Production
     env:
       CI: "true"
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
