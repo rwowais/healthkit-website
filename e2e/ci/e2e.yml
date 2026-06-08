@@ -1,49 +1,88 @@
 name: e2e
 
-# Full-stack live end-to-end tests. Pull requests run against STAGING only;
-# pushes to main also run against PRODUCTION (per the chosen test strategy).
-# Secrets live in GitHub Environments named "staging" and "prod" — see
-# e2e/README.md. The prod environment can carry protection rules / reviewers.
+# Full-stack live E2E. Reads plain REPOSITORY secrets — no GitHub
+# "Environments" required (Settings → Secrets and variables → Actions →
+# New repository secret):
+#   PROD_SUPABASE_URL / PROD_SUPABASE_ANON_KEY / PROD_SUPABASE_SERVICE_ROLE_KEY
+#   STAGING_* (optional — the staging job auto-skips until you add them)
+#
+# Prod runs on pushes to main + manual dispatch (not on every PR, to limit
+# test-user churn in the real DB). Staging runs on PRs + pushes once set up.
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
-# Don't pile up overlapping runs on the same ref.
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  e2e:
+  staging:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # PRs → staging only. Push to main → staging + prod.
-        target: ${{ github.event_name == 'push' && fromJSON('["staging","prod"]') || fromJSON('["staging"]') }}
-    environment: ${{ matrix.target }}
+    env:
+      CI: "true"
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - id: cfg
+        run: echo "ok=${{ secrets.STAGING_SUPABASE_URL != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.cfg.outputs.ok != 'true'
+        run: echo "::notice::Staging secrets not set — skipping staging E2E."
+      - if: steps.cfg.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.cfg.outputs.ok == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - name: Install Playwright browser
+      - if: steps.cfg.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.cfg.outputs.ok == 'true'
         run: npx playwright install --with-deps chromium
-      - name: Run live E2E against ${{ matrix.target }}
+      - if: steps.cfg.outputs.ok == 'true'
         run: npm run test:e2e
-        env:
-          CI: "true"
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      - name: Upload report
-        if: ${{ !cancelled() }}
+      - if: ${{ steps.cfg.outputs.ok == 'true' && !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.target }}
+          name: playwright-report-staging
+          path: playwright-report/
+          retention-days: 7
+
+  prod:
+    runs-on: ubuntu-latest
+    # Don't create test users in the real DB on every PR — only on pushes to
+    # main and manual ("Run workflow") triggers.
+    if: github.event_name != 'pull_request'
+    env:
+      CI: "true"
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PROD_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - id: cfg
+        run: echo "ok=${{ secrets.PROD_SUPABASE_URL != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.cfg.outputs.ok != 'true'
+        run: echo "::notice::Prod secrets not set — skipping prod E2E."
+      - if: steps.cfg.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.cfg.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - if: steps.cfg.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.cfg.outputs.ok == 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.cfg.outputs.ok == 'true'
+        run: npm run test:e2e
+      - if: ${{ steps.cfg.outputs.ok == 'true' && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-prod
           path: playwright-report/
           retention-days: 7

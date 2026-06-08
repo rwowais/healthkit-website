@@ -39,17 +39,22 @@ step that the assistant can't do.
 1. Get each project's keys from the Supabase dashboard
    (Project → Settings → API): the **Project URL**, the **anon** public key,
    and the **service_role** secret key.
-2. In GitHub → repo **Settings → Environments**, create two environments:
-   **`staging`** and **`prod`**. (Optionally add required reviewers to `prod`.)
-3. In **each** environment add these three secrets:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
+2. In GitHub → repo **Settings → Secrets and variables → Actions →
+   New repository secret**, add the **prod** project's three values. (No GitHub
+   "Environments" needed — plain repository secrets are simpler.)
+   - `PROD_SUPABASE_URL`
+   - `PROD_SUPABASE_ANON_KEY`
+   - `PROD_SUPABASE_SERVICE_ROLE_KEY`
+3. *(Optional, later)* To also test against staging on pull requests, add the
+   staging project's three as `STAGING_SUPABASE_URL`,
+   `STAGING_SUPABASE_ANON_KEY`, `STAGING_SUPABASE_SERVICE_ROLE_KEY`. The staging
+   job auto-skips until these exist.
 
 That's it. From then on:
-- **Pull requests** run the suite against **staging**.
-- **Pushes to `main`** run it against **staging + prod** (creating and then
-  deleting throwaway test users in each).
+- **Pushes to `main`** (and manual runs via Actions → e2e → "Run workflow")
+  run the suite against **prod** — creating and then deleting throwaway test
+  users.
+- **Pull requests** run against **staging**, once its secrets are added.
 
 The service-role key is only ever read in Node (setup/teardown + the API-level
 specs). It is never inlined into the browser bundle.
