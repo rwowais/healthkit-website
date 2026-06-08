@@ -1,0 +1,49 @@
+name: e2e
+
+# Full-stack live end-to-end tests. Pull requests run against STAGING only;
+# pushes to main also run against PRODUCTION (per the chosen test strategy).
+# Secrets live in GitHub Environments named "staging" and "prod" — see
+# e2e/README.md. The prod environment can carry protection rules / reviewers.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Don't pile up overlapping runs on the same ref.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # PRs → staging only. Push to main → staging + prod.
+        target: ${{ github.event_name == 'push' && fromJSON('["staging","prod"]') || fromJSON('["staging"]') }}
+    environment: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Run live E2E against ${{ matrix.target }}
+        run: npm run test:e2e
+        env:
+          CI: "true"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.target }}
+          path: playwright-report/
+          retention-days: 7

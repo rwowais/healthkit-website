@@ -206,6 +206,7 @@ function AuthInner() {
                   type="email"
                   inputMode="email"
                   autoFocus
+                  data-testid="auth-email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@email.com"
@@ -214,6 +215,7 @@ function AuthInner() {
                 {(mode === "signin" || mode === "signup") && (
                   <input
                     type="password"
+                    data-testid="auth-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
@@ -231,6 +233,7 @@ function AuthInner() {
                 <button
                   onClick={submit}
                   disabled={busy || !email.trim()}
+                  data-testid="auth-submit"
                   className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)] disabled:opacity-40"
                 >
                   {busy
