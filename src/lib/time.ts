@@ -219,42 +219,61 @@ export function resolveTimeWindow(
 }
 
 /** Is a clock time (minutes) inside the behavior's window? True if it has no
- *  window, a wrapping/degenerate one, or the time is within it. */
+ *  window or the time is within it. A window where lo > hi WRAPS past midnight
+ *  (e.g. a bed-anchored wind-down for a 00:30 bedtime spans ~20:30–00:30) and
+ *  is a real interval, not "no window". */
 export function isWithinWindow(
   min: number | null,
   item: WindowItem,
   settings: { wakeTime: string; bedtime: string }
 ): boolean {
   const w = resolveTimeWindow(item, settings);
-  if (!w || min == null || w.lo > w.hi) return true;
+  if (!w || min == null) return true;
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
-  return m >= w.lo && m <= w.hi;
+  return w.lo <= w.hi ? m >= w.lo && m <= w.hi : m >= w.lo || m <= w.hi;
 }
 
 /** Clamp a clock time (minutes) into the behavior's window; returns it
- *  unchanged if the behavior has no window (or a wrapping one). */
+ *  unchanged if the behavior has no window. Handles a midnight-wrapping window
+ *  (lo > hi) by snapping to whichever edge is nearer on the 24h circle. */
 export function clampToWindow(
   min: number,
   item: WindowItem,
   settings: { wakeTime: string; bedtime: string }
 ): number {
   const w = resolveTimeWindow(item, settings);
-  if (!w || w.lo > w.hi) return min;
+  if (!w) return min;
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
-  return Math.min(w.hi, Math.max(w.lo, m));
+  const inside =
+    w.lo <= w.hi ? m >= w.lo && m <= w.hi : m >= w.lo || m <= w.hi;
+  if (inside) return m;
+  if (w.lo <= w.hi) return Math.min(w.hi, Math.max(w.lo, m));
+  // Wrapping window: clamp to the nearer edge on the circular 24h clock.
+  const dist = (a: number, b: number) => {
+    const d = Math.abs(a - b);
+    return Math.min(d, 1440 - d);
+  };
+  return dist(m, w.lo) <= dist(m, w.hi) ? w.lo : w.hi;
 }
 
 /** The distinct day-blocks a behavior's window spans — used by the editor to
- *  gray out the blocks a HARD window forbids. Empty for no window. */
+ *  gray out the blocks a HARD window forbids. Empty for no window. Handles a
+ *  midnight-wrapping window (lo > hi) by enumerating across the wrap. */
 export function windowBlocks(
   item: WindowItem,
   settings: BlockSettings
 ): TimeBlock[] {
   const w = resolveTimeWindow(item, settings);
-  if (!w || w.lo > w.hi) return [];
+  if (!w) return [];
   const out = new Set<TimeBlock>();
-  for (let t = w.lo; t <= w.hi; t += 15) out.add(blockForMinutes(t, settings));
-  out.add(blockForMinutes(w.hi, settings));
+  const add = (t: number) => out.add(blockForMinutes(t, settings));
+  if (w.lo <= w.hi) {
+    for (let t = w.lo; t <= w.hi; t += 15) add(t);
+  } else {
+    for (let t = w.lo; t < 1440; t += 15) add(t);
+    for (let t = 0; t <= w.hi; t += 15) add(t);
+  }
+  add(w.hi);
   return [...out];
 }
 

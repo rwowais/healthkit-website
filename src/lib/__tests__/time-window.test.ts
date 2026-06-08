@@ -104,3 +104,39 @@ describe("engine: a hard window self-heals a mis-scheduled circadian behavior", 
     expect(meal!.block).toBe("afternoon");
   });
 });
+
+describe("bed-anchored window that wraps past midnight (night-owl bedtime)", () => {
+  // bed 00:30, wake 07:00 → a wind-down window {min:-240,max:0} resolves to
+  // ~20:30–00:30, i.e. lo (1230) > hi (30): a real midnight-spanning interval
+  // that used to be treated as "no window" (clamp/editor silently broke).
+  const lateSettings = { wakeTime: "07:00", bedtime: "00:30" };
+  const windDown = {
+    anchor: "bed" as const,
+    timeWindow: { min: -240, max: 0, strict: true },
+  };
+
+  it("resolves to a wrapping interval (lo > hi)", () => {
+    const w = resolveTimeWindow(windDown, lateSettings)!;
+    expect(w.lo).toBe(1230); // 20:30
+    expect(w.hi).toBe(30); // 00:30
+    expect(w.lo).toBeGreaterThan(w.hi);
+  });
+
+  it("isWithinWindow treats the wrap as a real interval", () => {
+    expect(isWithinWindow(1380, windDown, lateSettings)).toBe(true); // 23:00 in
+    expect(isWithinWindow(15, windDown, lateSettings)).toBe(true); // 00:15 in
+    expect(isWithinWindow(720, windDown, lateSettings)).toBe(false); // noon out
+    expect(isWithinWindow(1200, windDown, lateSettings)).toBe(false); // 20:00 out
+  });
+
+  it("clampToWindow snaps to the nearer wrap edge", () => {
+    expect(clampToWindow(720, windDown, lateSettings)).toBe(1230); // noon → 20:30
+    expect(clampToWindow(1380, windDown, lateSettings)).toBe(1380); // 23:00 stays
+  });
+
+  it("windowBlocks is non-empty across the wrap (editor not fully disabled)", () => {
+    const blocks = windowBlocks(windDown, lateSettings);
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks).toContain("evening");
+  });
+});
