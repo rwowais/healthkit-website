@@ -1,7 +1,18 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { WebSocket as NodeWebSocket } from "ws";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+
+// supabase-js's createClient eagerly instantiates a Realtime client, which
+// needs a WebSocket constructor. Node 20 (the CI runtime) has no global
+// WebSocket, so createClient throws "Node.js 20 detected without native
+// WebSocket support" — even though this harness never uses realtime. Provide
+// one. (Browsers have WebSocket natively, so the app itself is unaffected.)
+const g = globalThis as { WebSocket?: unknown };
+if (typeof g.WebSocket === "undefined") {
+  g.WebSocket = NodeWebSocket;
+}
 
 /**
  * Shared E2E helpers. The service-role key is read from the environment and

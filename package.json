@@ -38,6 +38,6 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.6",
-    "ws": "^8.20.1"
+    "ws": "^8.21.0"
   }
 }
