@@ -8,9 +8,13 @@ import {
   shapeTimeline,
   injectOneOffs,
   applySnoozes,
+  applySwaps,
+  applyStacks,
+  masteredKeys,
   adapt,
   isDone,
 } from "@/lib/engine";
+import { keystone } from "@/lib/intel";
 import { effectiveMinutes, inQuietHours } from "@/lib/time";
 import { learnedReminderMinutes } from "@/lib/smartReminders";
 import { getTz, dateKeyInTz, dayIndexInTz, nowMinutesInTz } from "@/lib/tz";
@@ -62,12 +66,21 @@ export default function Reminders() {
     // exact customTime is honored (resolveMinutes only did anchor math).
     const today = dateKeyInTz(tz);
     const log = getLogForDate(state, today);
-    const items = applySnoozes(
-      injectOneOffs(
-        shapeTimeline(compileTimeline(state, dayIdx), adapt(state).mode),
-        log
-      ),
-      log
+    // Mirror Today's exact pipeline so reminders fire for precisely the set
+    // visible on the board: applySwaps first (a swapped-away workout's original
+    // is muted), shapeTimeline WITH the keystone + mastered opts (a graduated /
+    // keystone-protected behavior mutes the same way), then one-offs (honoring
+    // overrides), snoozes, and stacks (so a stacked follower fires at its
+    // rebased time). Without this, reminders pinged hidden/swapped behaviors.
+    const swapped = applySwaps(compileTimeline(state, dayIdx), log);
+    const shaped = shapeTimeline(swapped, adapt(state).mode, {
+      keystoneKey: keystone(state)?.key,
+      mastered: masteredKeys(state, today),
+    });
+    const items = applyStacks(
+      applySnoozes(injectOneOffs(shaped, log, state.behaviorOverrides), log),
+      state.behaviorOverrides,
+      log.snoozes
     );
     const times: string[] = [];
     for (const it of items) {
@@ -123,12 +136,21 @@ export default function Reminders() {
     const today = dateKeyInTz(tz);
     const dayIdx = dayIndexInTz(tz);
     const log = getLogForDate(state, today);
-    const items = applySnoozes(
-      injectOneOffs(
-        shapeTimeline(compileTimeline(state, dayIdx), adapt(state).mode),
-        log
-      ),
-      log
+    // Mirror Today's exact pipeline so reminders fire for precisely the set
+    // visible on the board: applySwaps first (a swapped-away workout's original
+    // is muted), shapeTimeline WITH the keystone + mastered opts (a graduated /
+    // keystone-protected behavior mutes the same way), then one-offs (honoring
+    // overrides), snoozes, and stacks (so a stacked follower fires at its
+    // rebased time). Without this, reminders pinged hidden/swapped behaviors.
+    const swapped = applySwaps(compileTimeline(state, dayIdx), log);
+    const shaped = shapeTimeline(swapped, adapt(state).mode, {
+      keystoneKey: keystone(state)?.key,
+      mastered: masteredKeys(state, today),
+    });
+    const items = applyStacks(
+      applySnoozes(injectOneOffs(shaped, log, state.behaviorOverrides), log),
+      state.behaviorOverrides,
+      log.snoozes
     );
     // tz-aware: deltas use the same wall-clock basis as the target so an
     // in-tab reminder fires at the right local time (and doesn't drift ~60min

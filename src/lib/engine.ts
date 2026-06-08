@@ -498,7 +498,8 @@ export function injectOneOffs(
           dose?: string;
         }>;
       }
-    | undefined
+    | undefined,
+  overrides?: Record<string, BehaviorOverride>
 ): TimelineItem[] {
   const oneOffs = log?.oneOffs;
   if (!oneOffs || oneOffs.length === 0) return items;
@@ -515,20 +516,26 @@ export function injectOneOffs(
   const next = [...items];
   for (const o of oneOffs) {
     if (present.has(o.key)) continue;
+    // Honor a user move/edit of this one-off. The move-menu / drag / editor all
+    // write a behaviorOverride keyed by o.key; without reading it here,
+    // injectOneOffs rebuilt the row at its original block every render, so the
+    // move silently snapped back (a dead control).
+    const ov = overrides?.[o.key];
+    const block = ov?.block ?? o.block;
     next.push({
       canonicalKey: o.key,
       title: o.title,
-      block: o.block,
+      block,
       anchor: "wake",
       offsetMin: 0,
-      customTime: ONEOFF_TIME[o.block],
-      dose: o.dose,
+      customTime: ov?.customTime ?? ONEOFF_TIME[block],
+      dose: ov?.dose ?? o.dose,
       rationale: "",
       icon: o.icon ?? "check",
       leverage: 1,
       kind: "action",
       recommendedBlock: o.block,
-      retimed: false,
+      retimed: !!ov?.block || !!ov?.customTime,
       blockPinned: true,
       trustTier: "custom",
       fromPacks: [],

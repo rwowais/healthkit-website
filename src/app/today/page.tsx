@@ -64,6 +64,7 @@ import {
   isOvernight,
   type Suggestion,
 } from "@/lib/intel";
+import { windowBlocks } from "@/lib/time";
 import {
   getTz,
   dateKeyInTz,
@@ -446,12 +447,25 @@ export default function TodayPage() {
     toBlock: TimeBlock
   ) => {
     if (moves.length === 0) return;
-    const contradicts = moves.filter(
+    // Hard time-window guard: a strict-window behavior (morning sunlight,
+    // wind-down, …) can't be moved to a block its window doesn't reach — the
+    // engine clamps it straight back, leaving a contradictory override behind.
+    // Drop those moves so the Today move-menu / bulk-move match the editor's
+    // disabled blocks instead of silently no-op'ing.
+    const allowed = moves.filter((m) => {
+      const it = timeline.find((t) => t.canonicalKey === m.key);
+      if (it?.timeWindow?.strict) {
+        return windowBlocks(it, state.settings).includes(toBlock);
+      }
+      return true;
+    });
+    if (allowed.length === 0) return;
+    const contradicts = allowed.filter(
       (m) =>
         m.recommendedBlock !== toBlock && m.recommendedBlock !== "anytime"
     );
     if (contradicts.length === 0 || toBlock === "anytime") {
-      commitBlockMove(moves, toBlock);
+      commitBlockMove(allowed, toBlock);
       return;
     }
     setPendingMove({
@@ -512,6 +526,19 @@ export default function TodayPage() {
     [tz, offset]
   );
   const isToday = offset === 0;
+  // Scrubbing off "today" makes the day read-only, but the sticky bulk-action
+  // bar + move/swap sheets aren't per-row gated like the inline handles — so
+  // their actions could write Snooze / a global override onto a frozen past
+  // day. Collapse all edit/move/swap state whenever we leave today.
+  useEffect(() => {
+    if (!isToday) {
+      setEditMode(false);
+      setSelectedKeys(new Set());
+      setBulkMoveOpen(false);
+      setSwapForKey(null);
+      setMoveMenuKey(null);
+    }
+  }, [isToday]);
   // Past bedtime but before the pre-dawn run-up to wake: a calm "rest"
   // state, NOT the resurrected evening block. Drives the header greeting,
   // suppresses the Up Next hero, and gates the partial-close copy.
@@ -561,7 +588,7 @@ export default function TodayPage() {
     // hide/relocate snoozed ones. Habit stacking runs last so it owns the
     // final within-block order ("after X, do Y").
     return applyStacks(
-      applySnoozes(injectOneOffs(shaped, log), log),
+      applySnoozes(injectOneOffs(shaped, log, state.behaviorOverrides), log),
       state.behaviorOverrides,
       log.snoozes
     );
@@ -855,7 +882,22 @@ export default function TodayPage() {
     );
   }
 
-  if (timeline.length === 0) {
+  // Supplements are now Browse-only and independent of behavior packs, so a
+  // user whose day is all supplements (no behaviors today) must NOT get the
+  // "blank canvas / discover protocols" empty state — they have a real stack to
+  // take. Only show the empty state when there's nothing scheduled at all.
+  const hasSupplementsToday = (
+    ["morning", "afternoon", "evening", "anytime"] as TimeBlock[]
+  ).some(
+    (b) =>
+      supplementsForBlock(
+        state.supplements ?? [],
+        b,
+        selDayIdx,
+        state.settings.safetyFlags ?? {}
+      ).length > 0
+  );
+  if (timeline.length === 0 && !hasSupplementsToday) {
     // Two empty-state cases: vacation mode on (intentional break), or
     // no packs installed (needs onboarding nudge). Different copy + CTA.
     const onVacation = !!state.settings.vacationMode;
