@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import AuthGate from "@/components/AuthGate";
 import ServiceWorker from "@/components/ServiceWorker";
 import ThemeWatcher from "@/components/ThemeWatcher";
 import SyncConflictPrompt from "@/components/SyncConflictPrompt";
@@ -165,7 +166,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <ErrorBoundary>
           <MotionProvider>
-            {children}
+            <AuthGate>{children}</AuthGate>
             <SyncConflictPrompt />
             <ServiceWorker />
             <ThemeWatcher />

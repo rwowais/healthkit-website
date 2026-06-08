@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { loadState } from "@/lib/storage";
+import { getSupabase, supabaseEnabled } from "@/lib/supabase";
 import { Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 
@@ -19,9 +20,33 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const state = loadState();
-    if (state.settings.completedOnboarding) router.replace("/today");
-    else setChecking(false);
+    let alive = true;
+    if (supabaseEnabled) {
+      // Account-gated: only an active session skips the landing. A signed-in
+      // visitor goes straight to the app (its own guard routes a brand-new
+      // account into onboarding); everyone else sees the landing and must
+      // create an account / log in. We do NOT honor a stale local
+      // completedOnboarding here — without a session there's no account yet.
+      const sb = getSupabase();
+      if (!sb) {
+        setChecking(false);
+      } else {
+        sb.auth.getSession().then(({ data: { session } }) => {
+          if (!alive) return;
+          if (session) router.replace("/today");
+          else setChecking(false);
+        });
+      }
+    } else {
+      // Guest / local dev (no Supabase): resume into the app if onboarding
+      // was already completed on this device.
+      const state = loadState();
+      if (state.settings.completedOnboarding) router.replace("/today");
+      else setChecking(false);
+    }
+    return () => {
+      alive = false;
+    };
   }, [router]);
 
   if (checking) return null;
@@ -87,10 +112,12 @@ export default function LandingPage() {
             calm day that reshapes itself around your recovery and bandwidth.
           </p>
           <button
-            onClick={() => router.push("/onboarding")}
+            onClick={() =>
+              router.push(supabaseEnabled ? "/auth?mode=signup" : "/onboarding")
+            }
             className="press tr-fast mt-10 rounded-[var(--r-pill)] bg-[var(--text-1)] px-7 py-3.5 text-[15px] font-semibold text-[var(--bg)]"
           >
-            Build my system
+            {supabaseEnabled ? "Create your free account" : "Build my system"}
           </button>
         </motion.div>
       </section>

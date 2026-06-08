@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { loadState } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
-import { getUserId } from "@/lib/supabase";
+import { getUserId, supabaseEnabled } from "@/lib/supabase";
 import { PACKS, packById } from "@/lib/packs";
 import { Button, Eyebrow } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -660,21 +660,34 @@ export default function OnboardingPage() {
                   clinician before changing your health routine.
                 </p>
                 <div className="mt-7 space-y-2.5">
-                  <Button full onClick={() => finish(true)}>
-                    Keep my system across devices
-                  </Button>
-                  {/* Equal-weight secondary so the choice reads as a
-                      genuine fork (not "click the big button to
-                      proceed"). A non-technical user testing the
-                      flow reported the ghost text felt like fine
-                      print they had to ignore. */}
-                  <Button
-                    full
-                    variant="ghost"
-                    onClick={() => finish(false)}
-                  >
-                    Continue without an account
-                  </Button>
+                  {supabaseEnabled ? (
+                    // Account-first flow: they're already signed in (the wall
+                    // guarantees it before onboarding renders). One button to
+                    // enter — and on a fresh setup (not a re-tune) this is
+                    // where the 14-day trial starts.
+                    <Button full onClick={() => finish(true)}>
+                      {isRedo() ? "Save changes" : "Start my 14 days"}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button full onClick={() => finish(true)}>
+                        Keep my system across devices
+                      </Button>
+                      {/* Equal-weight secondary so the choice reads as a
+                          genuine fork (not "click the big button to
+                          proceed"). A non-technical user testing the
+                          flow reported the ghost text felt like fine
+                          print they had to ignore. Guest fork only exists
+                          when accounts are off (local dev). */}
+                      <Button
+                        full
+                        variant="ghost"
+                        onClick={() => finish(false)}
+                      >
+                        Continue without an account
+                      </Button>
+                    </>
+                  )}
                 </div>
               </>
             )}

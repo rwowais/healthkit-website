@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   signInEmail,
@@ -16,9 +16,14 @@ import { Icon } from "@/components/ui/icons";
 
 type Mode = "signin" | "signup" | "magic" | "forgot" | "sent";
 
-export default function AuthPage() {
+function AuthInner() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
+  const params = useSearchParams();
+  // The landing "Create your free account" CTA links here with ?mode=signup
+  // so the account-first funnel opens straight on the sign-up form.
+  const [mode, setMode] = useState<Mode>(
+    params.get("mode") === "signup" ? "signup" : "signin"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -303,21 +308,35 @@ export default function AuthPage() {
                 </>
               )}
             </p>
-            <button
-              onClick={() => router.push("/onboarding")}
-              className="press text-[13px] font-medium text-[var(--text-4)]"
-            >
-              Continue without an account →
-            </button>
+            {/* Guest bypass exists ONLY when accounts are off (local dev).
+                With Supabase configured the app is account-gated, so this
+                escape hatch would defeat the wall — hide it. */}
             {!supabaseEnabled && (
-              <p className="px-2 text-[12px] leading-relaxed text-[var(--text-4)]">
-                Accounts aren&apos;t enabled in this build — you can still
-                use everything; your data is saved on this device.
-              </p>
+              <>
+                <button
+                  onClick={() => router.push("/onboarding")}
+                  className="press text-[13px] font-medium text-[var(--text-4)]"
+                >
+                  Continue without an account →
+                </button>
+                <p className="px-2 text-[12px] leading-relaxed text-[var(--text-4)]">
+                  Accounts aren&apos;t enabled in this build — you can still
+                  use everything; your data is saved on this device.
+                </p>
+              </>
             )}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  // useSearchParams requires a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={null}>
+      <AuthInner />
+    </Suspense>
   );
 }
