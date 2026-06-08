@@ -1273,6 +1273,13 @@ export function addBiomarker(
   state: AppState,
   entry: Omit<BiomarkerEntry, "id">
 ): AppState {
+  // Defensive value guard: biomarkers are all strictly positive measurements,
+  // so a NaN / Infinity / ≤0 reading is always bad data. Drop it here so
+  // non-UI callers (cloud sync, import, a future API) can't poison the bands,
+  // trends, and "latest value" that read it — mirrors the UI's submit check.
+  if (!Number.isFinite(entry.value) || entry.value <= 0) {
+    return state;
+  }
   // Free-tier cap: getFreeBiomarkers() distinct metrics. Re-adding a
   // reading for a metric already tracked is fine (it's just another
   // data point on an existing metric); adding a NEW distinct metric

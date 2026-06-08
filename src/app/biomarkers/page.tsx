@@ -53,8 +53,12 @@ export default function BiomarkersPage() {
     // silently logging 12, the way parseFloat would.
     const trimmed = val.trim();
     const n = trimmed === "" ? NaN : Number(trimmed);
-    if (Number.isNaN(n)) {
-      toast.show("Enter a number");
+    // Reject empty, partially-numeric ("12abc"), non-finite (Infinity), and
+    // non-positive input. Every tracked marker (weight, HRV, BP, VO2max, grip,
+    // …) is a strictly positive measurement, so 0 or a negative is always a
+    // typo — and it would otherwise poison bands, trends, and sparklines.
+    if (!Number.isFinite(n) || n <= 0) {
+      toast.show("Enter a number above 0");
       return;
     }
     // Free tier: cap distinct tracked markers.

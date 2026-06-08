@@ -22,9 +22,9 @@ const METRICS: { value: Experiment["metric"]; label: string }[] = [
 ];
 
 const VERDICT: Record<string, { color: string; label: string }> = {
-  better: { color: "var(--vitality)", label: "Helped" },
-  worse: { color: "var(--alert)", label: "Didn't help" },
-  "no-change": { color: "var(--text-3)", label: "No effect" },
+  better: { color: "var(--vitality)", label: "Higher" },
+  worse: { color: "var(--alert)", label: "Lower" },
+  "no-change": { color: "var(--text-3)", label: "No change" },
   inconclusive: { color: "var(--readiness)", label: "Gathering data" },
 };
 

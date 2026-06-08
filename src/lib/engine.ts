@@ -16,6 +16,7 @@ import type {
   ProtocolPack,
   TimeBlock,
   TrustTier,
+  UserSettings,
 } from "./types";
 import { activePacks, activeAdaptationRules, activeInteractions } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
@@ -27,6 +28,7 @@ import {
   clampToWindow,
   isWithinWindow,
   minutesToHM,
+  windowBlocks,
 } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
@@ -371,6 +373,34 @@ export function compileTimeline(
     if (it.blockPinned) continue;
     it.block = blockForMinutes(m, settings);
   }
+  return sortTimeline(
+    [...merged.values()].filter(
+      (it) => !it.daysActive || it.daysActive[dayIndex]
+    ),
+    settings
+  );
+}
+
+/**
+ * Canonical timeline ordering: cross-block by BLOCK_ORDER, then within a block
+ * strictly by clock time — minutes since THIS block's start, wrapped 0..1439 so
+ * the list always reads top-to-bottom in clock order (an earlier time can never
+ * sort below a later one). Wrapping by the block start keeps the evening tail
+ * right (a 12:30am wind-down still sorts after 11pm) and stops a pre-wake
+ * morning item — 5:00am for a 7:00 riser — from sinking below 8:00am. Items
+ * within ~5 min are one visual slot, broken by leverage (an Essential like
+ * Morning sunlight floats above a stack of lev-1 supplements at the same
+ * minute) then a legacy manual sortIndex; neither can cross a real time gap.
+ *
+ * Exported because placement is mutated AFTER compileTimeline: injectOneOffs
+ * appends one-offs and applySnoozes relocates a "later" item to the evening,
+ * both leaving the array out of clock order. Re-running this before applyStacks
+ * restores the invariant without disturbing stacking adjacency (applied last).
+ */
+export function sortTimeline(
+  items: TimelineItem[],
+  settings: UserSettings
+): TimelineItem[] {
   const bounds = resolveBlockBounds(settings);
   const blockStartMin = (b: TimeBlock) =>
     b === "evening"
@@ -378,40 +408,23 @@ export function compileTimeline(
       : b === "afternoon"
       ? bounds.afternoon
       : bounds.morning;
-  // Within-block order = minutes since THIS block's start (wrapped 0..1439),
-  // so the list always reads top-to-bottom in clock order — an earlier time
-  // can never sort below a later one. (The old key was minutes-since-WAKE,
-  // which wrapped a pre-wake morning item — e.g. 5:00am for a 7:00 riser — to
-  // the end of the day, sinking it below 8:00am.) Wrapping by the block start
-  // also keeps the evening tail right: a 12:30am wind-down still sorts after
-  // 11pm. Cross-block order is owned by BLOCK_ORDER, consulted before this.
   const clock = (it: TimelineItem) => {
     const m = effectiveMinutes(it, settings);
     if (m == null || it.block === "anytime") return Number.MAX_SAFE_INTEGER;
     return (((Math.round(m) - blockStartMin(it.block)) % 1440) + 1440) % 1440;
   };
-  return [...merged.values()]
-    .filter((it) => !it.daysActive || it.daysActive[dayIndex])
-    .sort((a, b) => {
-      const blockDiff = BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block];
-      if (blockDiff !== 0) return blockDiff;
-      // INTEGRITY: within a block, order strictly by clock time. A later item
-      // can never render above an earlier one. ("Move earlier/later" now
-      // nudges the actual time, so reordering and the clock can't disagree.)
-      const dt = clock(a) - clock(b);
-      // Items within ~5 min are one visual slot — break the near-tie by
-      // leverage (an Essential like Morning sunlight floats above a stack of
-      // lev-1 supplements at the same minute), then a legacy manual index
-      // (kept only as a same-slot tiebreaker so old data still sequences),
-      // then the tiny clock delta. None of these can cross a real time gap.
-      if (Math.abs(dt) < 5) {
-        const levDiff = b.leverage - a.leverage;
-        if (levDiff !== 0) return levDiff;
-        const siDiff = (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
-        if (siDiff !== 0) return siDiff;
-      }
-      return dt || b.leverage - a.leverage;
-    });
+  return [...items].sort((a, b) => {
+    const blockDiff = BLOCK_ORDER[a.block] - BLOCK_ORDER[b.block];
+    if (blockDiff !== 0) return blockDiff;
+    const dt = clock(a) - clock(b);
+    if (Math.abs(dt) < 5) {
+      const levDiff = b.leverage - a.leverage;
+      if (levDiff !== 0) return levDiff;
+      const siDiff = (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+      if (siDiff !== 0) return siDiff;
+    }
+    return dt || b.leverage - a.leverage;
+  });
 }
 
 /**
@@ -553,7 +566,8 @@ export function injectOneOffs(
  */
 export function applySnoozes(
   items: TimelineItem[],
-  log: { snoozes?: Record<string, "later" | "tomorrow"> } | undefined
+  log: { snoozes?: Record<string, "later" | "tomorrow"> } | undefined,
+  settings?: UserSettings
 ): TimelineItem[] {
   const snoozes = log?.snoozes;
   if (!snoozes || Object.keys(snoozes).length === 0) return items;
@@ -562,6 +576,19 @@ export function applySnoozes(
     const mode = snoozes[it.canonicalKey];
     if (mode === "tomorrow") continue; // hidden today
     if (mode === "later" && it.block !== "evening") {
+      // A HARD time-window behavior (e.g. morning sunlight, anchored to the
+      // first couple hours after waking) must never be shoved into the evening
+      // past its circadian window — that's exactly the "morning light at
+      // night" class of bug the window guardrail exists to prevent. When we
+      // know the user's settings and the evening block falls outside this
+      // item's window, leave it in place: "later" can't legally move it.
+      if (it.timeWindow?.strict && settings) {
+        const allowed = windowBlocks(it, settings);
+        if (allowed.length > 0 && !allowed.includes("evening")) {
+          out.push(it);
+          continue;
+        }
+      }
       // Relocate to the evening with an evening-anchored time (~2h before bed)
       // so it reads as a real evening slot, not the original morning clock
       // time sitting at the top of the block.

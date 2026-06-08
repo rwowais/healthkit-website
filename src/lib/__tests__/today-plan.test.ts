@@ -3,7 +3,12 @@
  * after shapeTimeline.
  */
 import { describe, it, expect } from "vitest";
-import { injectOneOffs, applySnoozes, type TimelineItem } from "@/lib/engine";
+import {
+  injectOneOffs,
+  applySnoozes,
+  sortTimeline,
+  type TimelineItem,
+} from "@/lib/engine";
 import { getDefaultState, addOneOff, toggleBehavior } from "@/lib/storage";
 import { dateKeyInTz } from "@/lib/tz";
 import type { AppState, TimeBlock } from "@/lib/types";
@@ -80,6 +85,97 @@ describe("injectOneOffs — representative block times", () => {
     expect(am[0].customTime).toBe("08:00");
     const any = injectOneOffs([], { oneOffs: [{ key: "z", title: "Z", block: "anytime" }] });
     expect(any[0].customTime).toBeUndefined();
+  });
+});
+
+describe("applySnoozes — 'later' respects a HARD time window", () => {
+  // Defaults: wake 06:30, bed 22:30 → a strict morning window (0–120m after
+  // wake) lands 06:30–08:30 = morning only; a wind-down window (−240–0m before
+  // bed) lands 18:30–22:30 = evening.
+  const settings = getDefaultState().settings;
+  const strictMorning = (): TimelineItem =>
+    ({
+      ...item("morning-sunlight", "morning"),
+      anchor: "wake",
+      offsetMin: 30,
+      timeWindow: { min: 0, max: 120, strict: true },
+    }) as TimelineItem;
+
+  it("does NOT shove a strict morning-window item into the evening", () => {
+    const out = applySnoozes(
+      [strictMorning()],
+      { snoozes: { "morning-sunlight": "later" } },
+      settings
+    );
+    // Stayed in the morning — "later" can't move it past its circadian window.
+    expect(out.find((i) => i.canonicalKey === "morning-sunlight")?.block).toBe(
+      "morning"
+    );
+  });
+
+  it("still relocates a window-less behavior to the evening", () => {
+    const out = applySnoozes(
+      [item("walk", "morning")],
+      { snoozes: { walk: "later" } },
+      settings
+    );
+    expect(out.find((i) => i.canonicalKey === "walk")?.block).toBe("evening");
+  });
+
+  it("relocates a strict item whose window DOES include the evening", () => {
+    const windDown = {
+      ...item("wind-down", "afternoon"),
+      anchor: "bed",
+      offsetMin: -120,
+      timeWindow: { min: -240, max: 0, strict: true },
+    } as TimelineItem;
+    const out = applySnoozes(
+      [windDown],
+      { snoozes: { "wind-down": "later" } },
+      settings
+    );
+    expect(out.find((i) => i.canonicalKey === "wind-down")?.block).toBe(
+      "evening"
+    );
+  });
+
+  it("without settings, falls back to the legacy relocate (back-compat)", () => {
+    const out = applySnoozes([strictMorning()], {
+      snoozes: { "morning-sunlight": "later" },
+    });
+    expect(out.find((i) => i.canonicalKey === "morning-sunlight")?.block).toBe(
+      "evening"
+    );
+  });
+});
+
+describe("sortTimeline — restores clock order after post-shape mutation", () => {
+  const settings = getDefaultState().settings;
+  const at = (key: string, block: TimeBlock, time: string): TimelineItem =>
+    ({ ...item(key, block), customTime: time }) as TimelineItem;
+
+  it("re-sorts a one-off appended out of order back into clock position", () => {
+    // injectOneOffs appends; a 06:45 one-off lands AFTER 07:00 + 08:00 items.
+    const mutated = [
+      at("a", "morning", "07:00"),
+      at("b", "morning", "08:00"),
+      at("early", "morning", "06:45"),
+    ];
+    const morning = sortTimeline(mutated, settings)
+      .filter((i) => i.block === "morning")
+      .map((i) => i.canonicalKey);
+    expect(morning).toEqual(["early", "a", "b"]);
+  });
+
+  it("keeps cross-block order (morning before evening) regardless of input order", () => {
+    const mutated = [
+      at("ev", "evening", "21:00"),
+      at("am", "morning", "07:00"),
+    ];
+    expect(sortTimeline(mutated, settings).map((i) => i.canonicalKey)).toEqual([
+      "am",
+      "ev",
+    ]);
   });
 });
 

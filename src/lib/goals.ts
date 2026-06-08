@@ -213,11 +213,11 @@ export function experimentReadout(
       ? "Not enough difference to call yet."
       : `Need ~4 check-ins each side to compare (${baseVals.length} before, ${duringVals.length} during so far).`;
   } else if (verdict === "better") {
-    summary = `${label} ran ${Math.abs(delta!)}${unit} higher during the test than baseline. Worth keeping.`;
+    summary = `${label} averaged ${Math.abs(delta!)}${unit} higher during the test than your baseline. Can't prove the change caused it, but it's a promising sign.`;
   } else if (verdict === "worse") {
-    summary = `${label} ran ${Math.abs(delta!)}${unit} lower during the test. Probably not for you.`;
+    summary = `${label} averaged ${Math.abs(delta!)}${unit} lower during the test than your baseline. Might be the change, might be something else — worth a closer look.`;
   } else {
-    summary = `${label} barely moved (${delta! >= 0 ? "+" : ""}${delta}${unit}). No clear effect.`;
+    summary = `${label} barely moved (${delta! >= 0 ? "+" : ""}${delta}${unit}). No clear difference either way.`;
   }
 
   return {

@@ -32,6 +32,7 @@ import {
   injectOneOffs,
   applySnoozes,
   applyStacks,
+  sortTimeline,
   adapt,
   shapeTimeline,
   masteredKeys,
@@ -585,10 +586,20 @@ export default function TodayPage() {
     });
     // Per-day plan, applied after shaping so one-offs are always visible and
     // snoozes operate on the final list: inject today-only behaviors, then
-    // hide/relocate snoozed ones. Habit stacking runs last so it owns the
-    // final within-block order ("after X, do Y").
+    // hide/relocate snoozed ones. sortTimeline re-establishes clock order
+    // (injectOneOffs appends and applySnoozes relocates, both leaving the
+    // array out of order), then habit stacking runs LAST so it owns the final
+    // within-block adjacency ("after X, do Y"). Pass settings to applySnoozes
+    // so a "later" snooze can't shove a hard-window item past its window.
     return applyStacks(
-      applySnoozes(injectOneOffs(shaped, log, state.behaviorOverrides), log),
+      sortTimeline(
+        applySnoozes(
+          injectOneOffs(shaped, log, state.behaviorOverrides),
+          log,
+          settings
+        ),
+        settings
+      ),
       state.behaviorOverrides,
       log.snoozes
     );

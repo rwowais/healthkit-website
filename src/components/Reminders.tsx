@@ -78,7 +78,11 @@ export default function Reminders() {
       mastered: masteredKeys(state, today),
     });
     const items = applyStacks(
-      applySnoozes(injectOneOffs(shaped, log, state.behaviorOverrides), log),
+      applySnoozes(
+        injectOneOffs(shaped, log, state.behaviorOverrides),
+        log,
+        state.settings
+      ),
       state.behaviorOverrides,
       log.snoozes
     );
@@ -148,7 +152,11 @@ export default function Reminders() {
       mastered: masteredKeys(state, today),
     });
     const items = applyStacks(
-      applySnoozes(injectOneOffs(shaped, log, state.behaviorOverrides), log),
+      applySnoozes(
+        injectOneOffs(shaped, log, state.behaviorOverrides),
+        log,
+        state.settings
+      ),
       state.behaviorOverrides,
       log.snoozes
     );
