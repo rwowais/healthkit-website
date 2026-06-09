@@ -712,7 +712,12 @@ export default function ProfilePage() {
                 key: "thyroid-meds",
                 label: "Taking thyroid medication (levothyroxine)",
               },
-              { key: "ssri", label: "Taking SSRIs or SNRIs" },
+              // NOTE: 'ssri' (SSRIs/SNRIs) is intentionally NOT listed here.
+              // Nothing in the current catalog is contraindicated for SSRIs
+              // (no 5-HTP / St John's Wort / tryptophan atoms), so the toggle
+              // gated nothing — collecting a factor we ignore is a false
+              // promise. The `ssri` flag type is kept in types.ts; re-add this
+              // row the moment a serotonergic atom enters the Library.
               {
                 key: "eating-disorder-history",
                 label: "History with disordered eating",

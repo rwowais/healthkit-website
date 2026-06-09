@@ -131,35 +131,26 @@ export async function deleteAccount(): Promise<AuthResult> {
   if (!sb) return { ok: true };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "No active session." };
-  // Best-effort cleanup of every owned row (RLS allows own-row delete).
-  // Non-fatal: the RPC + FK cascade below are the source of truth.
-  for (const table of [
-    "protocolize_state",
-    "protocolize_logs",
-    "push_subscriptions",
-    "cms_admins",
-  ] as const) {
-    try {
-      await sb.from(table).delete().eq("user_id", user.id);
-    } catch {
-      /* ignore — cascade handles it */
-    }
-  }
-  // Ask the auth.users delete RPC to remove the user. The RPC is
-  // SECURITY DEFINER (defined in supabase/schema.sql) so it can
-  // delete the user row that RLS would otherwise block; this cascades
-  // any remaining owned rows.
+  // Delete the IDENTITY FIRST via the SECURITY DEFINER RPC (it can remove the
+  // auth.users row that RLS would otherwise block). That delete cascades
+  // protocolize_state / protocolize_logs / push_subscriptions / cms_admins via
+  // their FK `on delete cascade`, so a success here means the identity AND all
+  // owned data are gone together. This is the only ordering that can't strand a
+  // live login pointing at a wiped account: we never destroy data before the
+  // identity delete is confirmed.
   const { error: rpcErr } = await sb.rpc("delete_my_account");
   if (rpcErr) {
-    // Even if the RPC isn't installed, the data rows are already gone
-    // above — sign out and surface a soft warning for the auth row.
-    await sb.auth.signOut();
+    // The identity could NOT be removed. Do NOT wipe the data rows and report
+    // success — that would leave the user with a working login to an empty
+    // account, told it was deleted. Leave their data untouched, keep the
+    // session, and surface the failure honestly so they can retry / get help.
     return {
-      ok: true,
+      ok: false,
       error:
-        "Your data is deleted. Your sign-in record will be removed shortly — contact support if your login still works in 30 days.",
+        "We couldn't delete your account just now — nothing was removed. Please try again, or contact support if it keeps failing.",
     };
   }
+  // Identity + data are gone. Clear the local session.
   await sb.auth.signOut();
   return { ok: true };
 }

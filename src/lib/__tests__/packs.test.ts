@@ -22,7 +22,7 @@ import {
   validateAtom,
   trustTier,
 } from "@/lib/engine";
-import { PACKS } from "@/lib/packs";
+import { PACKS, STANDALONE_ATOMS_REGISTRY } from "@/lib/packs";
 import {
   buildAtomRegistry,
   auditOntology,
@@ -1013,5 +1013,18 @@ describe("safety contraindications (audit 2026-06-09)", () => {
     );
     expect(sauna).toBeTruthy();
     expect(sauna!.contraindications ?? []).toContain("anticoagulants");
+  });
+
+  it("iodine is contraindicated for thyroid-meds (makes that Profile toggle live)", () => {
+    // The 'thyroid-meds' safety toggle gated nothing until iodine declared it.
+    // Iodine's own rationale warns it can flare Hashimoto's / shift hormone
+    // needs, so anyone on thyroid medication should have it quietly left out.
+    const all = [
+      ...PACKS.flatMap((p) => p.behaviors),
+      ...STANDALONE_ATOMS_REGISTRY,
+    ];
+    const iodine = all.find((b) => b.canonicalKey === "iodine");
+    expect(iodine, "iodine atom should exist").toBeTruthy();
+    expect(iodine!.contraindications ?? []).toContain("thyroid-meds");
   });
 });

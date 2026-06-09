@@ -2122,6 +2122,12 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     dose: "150–300 mcg",
     rationale:
       "Essential for thyroid hormone synthesis; common deficiency outside iodized-salt regions. Important caveat: in autoimmune thyroiditis (Hashimoto's), even RDA-range iodine can flare disease; test thyroid antibodies first.",
+    // Anyone on thyroid medication is the high-risk group this atom's own
+    // rationale warns about (iodine can flare Hashimoto's / shift hormone
+    // requirements). Gate it behind the Profile 'thyroid-meds' flag so the
+    // supplement is quietly left out for them. This is what makes that toggle
+    // actually do something.
+    contraindications: ["thyroid-meds"],
     icon: "pill",
     leverage: 1,
     kind: "action",
