@@ -8,6 +8,7 @@
  */
 import type { AppState, DailyLog } from "./types";
 import { loadState, saveState, SAVE_ERROR_EVENT } from "./storage";
+import { DEFAULT_INSTALLED } from "./packs";
 import {
   markSaveStarted,
   markSaveSuccess,
@@ -181,12 +182,23 @@ export function getPendingConflict() {
 }
 
 export function hasMeaningfulData(s: AppState): boolean {
+  // installedPacks divergence from the pristine default seed IS meaningful
+  // guest data: a guest who curated their packs (the core onboarding action,
+  // or any Library install/remove) and then signs into a pre-existing account
+  // must reach the conflict prompt instead of silently losing their pack set.
+  // slicesDiffer() already compares installedPacks; without this the gate's
+  // first operand (hasMeaningfulData) short-circuits false for a packs-only
+  // guest and cloud silently wins (sweep 2026-06-09 HIGH #3).
+  const packsCustomized =
+    JSON.stringify([...(s.installedPacks ?? [])].sort()) !==
+    JSON.stringify([...DEFAULT_INSTALLED].sort());
   return (
     (s.dailyLogs?.length ?? 0) > 0 ||
     (s.biomarkers?.length ?? 0) > 0 ||
     (s.customPacks?.length ?? 0) > 0 ||
     (s.supplements?.length ?? 0) > 0 ||
-    Object.keys(s.behaviorOverrides ?? {}).length > 0
+    Object.keys(s.behaviorOverrides ?? {}).length > 0 ||
+    packsCustomized
   );
 }
 

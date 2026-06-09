@@ -46,6 +46,7 @@ import {
   setPackPaused as setPackPausedFn,
 } from "@/lib/storage";
 import { activeDataSource, STATE_EVENT } from "@/lib/datasource";
+import { STORAGE_KEY } from "@/lib/constants";
 import { fetchAndApplyPublished } from "@/lib/cms/publish";
 import { maybeExtendTrial } from "@/lib/entitlements";
 import type {
@@ -173,11 +174,24 @@ export function useAppState() {
         setState(maybeExtendTrial(raw));
       });
     };
+    // Cross-tab sync: the native `storage` event fires ONLY in OTHER tabs
+    // when they write localStorage — exactly the signal missing before, which
+    // let two guest tabs silently last-write-wins each other's check-ins
+    // (sweep 2026-06-09 HIGH #4). Re-reading on it means this tab picks up the
+    // other tab's write before its own next edit, so a later save builds on
+    // the merged truth instead of a stale snapshot. Can't self-loop (the
+    // writing tab never receives its own storage event), and the
+    // pendingSave/saving guard in sync() protects an in-flight local write.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY || e.key === null) sync();
+    };
     window.addEventListener(STATE_EVENT, sync);
+    window.addEventListener("storage", onStorage);
     window.addEventListener("focus", sync);
     document.addEventListener("visibilitychange", sync);
     return () => {
       window.removeEventListener(STATE_EVENT, sync);
+      window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", sync);
       document.removeEventListener("visibilitychange", sync);
     };

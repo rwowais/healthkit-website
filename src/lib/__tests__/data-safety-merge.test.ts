@@ -89,4 +89,19 @@ describe("first-sign-in conflict gate sees config slices (audit 2026-06-09)", ()
     t.supplements = [supp("s2", "Creatine")];
     expect(hasMeaningfulData(t)).toBe(true);
   });
+
+  it("hasMeaningfulData treats a curated installedPacks set as meaningful (HIGH #3)", () => {
+    // A pristine guest (default packs, nothing else) is NOT meaningful — cloud
+    // may win on first sign-in with no real loss.
+    expect(hasMeaningfulData(base())).toBe(false);
+    // But a guest who curated their packs (the core onboarding action) IS
+    // meaningful and must reach the conflict prompt instead of silent
+    // cloud-wins. Both a removal and an addition diverge from the seed.
+    const removed = base();
+    removed.installedPacks = ["longevity-foundation"]; // dropped better-sleep
+    expect(hasMeaningfulData(removed)).toBe(true);
+    const added = base();
+    added.installedPacks = [...(added.installedPacks ?? []), "heart-health"];
+    expect(hasMeaningfulData(added)).toBe(true);
+  });
 });

@@ -8,7 +8,7 @@ import { useAppState } from "@/hooks/useAppState";
 import { getAccess } from "@/lib/entitlements";
 import { clearAllData, exportState, importState, getDefaultState } from "@/lib/storage";
 import { getTz, dateKeyInTz } from "@/lib/tz";
-import { activeDataSource } from "@/lib/datasource";
+import { activeDataSource, mergeStates } from "@/lib/datasource";
 import { deleteAccount, supabaseEnabled } from "@/lib/auth";
 import { getUserId } from "@/lib/supabase";
 import { sendTestPush } from "@/lib/push";
@@ -119,10 +119,16 @@ export default function ProfilePage() {
         toast.show("Invalid backup file");
         return;
       }
-      // Push through the active data source so a restore also lands in
-      // the cloud — otherwise the next load lets the old cloud row win.
-      await activeDataSource.save(parsed);
-      toast.show("Data restored");
+      // MERGE the backup into current data — never a wholesale overwrite.
+      // A restore must not erase days/biomarkers/reflections recorded SINCE
+      // the backup was taken (sweep 2026-06-09 HIGH #1). Current is the
+      // more-recent side (wins per-field via recency-aware mergeDailyLog);
+      // the backup contributes any days/entries the current state is missing.
+      // Saving through the active source also lands the union in the cloud.
+      const current = await activeDataSource.load();
+      const merged = mergeStates(current, parsed);
+      await activeDataSource.save(merged);
+      toast.show("Backup merged into your data");
       setTimeout(() => window.location.reload(), 700);
     };
     r.readAsText(file);
