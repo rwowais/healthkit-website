@@ -61,16 +61,34 @@ export default async function globalSetup(config: FullConfig) {
   if (seedBErr) throw new Error(`seed B state failed: ${seedBErr.message}`);
 
   // Capture A's authenticated session by logging in through the real UI.
+  // global-setup is NOT auto-retried by Playwright, and the FIRST login of a
+  // run can eat a prod cold-start (occasionally >45s), so retry a few times
+  // with a generous per-attempt budget before giving up.
   fs.mkdirSync(AUTH_DIR, { recursive: true });
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ baseURL });
-    await page.goto("/auth");
-    await page.getByTestId("auth-email").fill(aEmail);
-    await page.getByTestId("auth-password").fill(password);
-    await page.getByTestId("auth-submit").click();
-    // Onboarded → the wall lets A straight through to Today.
-    await page.waitForURL("**/today", { timeout: 45_000 });
+    let signedIn = false;
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= 3 && !signedIn; attempt++) {
+      try {
+        await page.goto("/auth");
+        await page.getByTestId("auth-email").fill(aEmail);
+        await page.getByTestId("auth-password").fill(password);
+        await page.getByTestId("auth-submit").click();
+        // Onboarded → the wall lets A straight through to Today.
+        await page.waitForURL("**/today", { timeout: 90_000 });
+        signedIn = true;
+      } catch (e) {
+        lastErr = e;
+        await page.waitForTimeout(2000); // brief settle, then retry
+      }
+    }
+    if (!signedIn) {
+      throw new Error(
+        `A could not sign in after 3 attempts: ${String(lastErr)}`
+      );
+    }
     await page.context().storageState({ path: path.join(AUTH_DIR, "a.json") });
   } finally {
     await browser.close();
