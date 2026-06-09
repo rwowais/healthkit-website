@@ -235,6 +235,16 @@ export default function BehaviorSheet({
               {item.timingReason ?? "its timing matters a little here."}
             </p>
           )}
+          {/* A stacked behavior's timing is owned by its anchor — applyStacks
+              rebases it on every compile, so exact-time / nudge controls here
+              would be silently discarded. Hide them and say so. */}
+          {ov.stackAfter && (
+            <p className="mt-3 text-[12px] leading-relaxed text-[var(--text-3)]">
+              Timing follows the habit you stacked this after. Clear the stack
+              below (or pick a block above) to give it its own time.
+            </p>
+          )}
+          {!ov.stackAfter && (
           <div className="mt-3 flex items-center gap-2.5">
             <span className="text-[12px] text-[var(--text-3)]">
               Or a specific time
@@ -263,13 +273,15 @@ export default function BehaviorSheet({
               className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3 py-2 text-[14px] text-[var(--text-1)] outline-none"
             />
           </div>
+          )}
 
           {/* Move earlier / later nudges the ACTUAL clock time in 15-min
               steps (clamped to this block), so the timeline stays ordered by
               time — no hidden order index that could float a later item above
               an earlier one. The new time shows live in "Or a specific time"
-              above. Hidden for "anytime" (no clock). */}
-          {item.block !== "anytime" && (
+              above. Hidden for "anytime" (no clock) and for stacked items
+              (the anchor owns timing). */}
+          {item.block !== "anytime" && !ov.stackAfter && (
             <div className="mt-5">
               <p className="t-eyebrow">
                 Time in {blockLabel(item.block, blockLabels).toLowerCase()}
