@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import type { AppState, DailyLog, Interaction } from "@/lib/types";
 import { getDefaultState, toggleBehavior } from "@/lib/storage";
-import { compileTimeline } from "@/lib/engine";
+import { compileTimeline, adapt } from "@/lib/engine";
 import { suggestions, behaviorStats } from "@/lib/intel";
 import { mergeStates, chooseCloudLoad } from "@/lib/datasource";
 import { buildCatalogBundle, diffBundles } from "@/lib/cms/publish";
@@ -540,5 +540,74 @@ describe("behaviorStats — scheduled-day streak", () => {
     // Streak = 2 (today + two-days-ago); the unscheduled off-day between them
     // is transparent rather than a reset. (Pre-fix this returned 1.)
     expect(behaviorStats(st, "zone2").streak).toBe(2);
+  });
+});
+
+// ── A poor check-in must not silently re-ease the NEXT, un-rated day, and the
+//    banner/mode must not pre-judge a day the user hasn't rated (audit 2026-06-09). ──
+describe("recovery read is today-only — no carryover into an un-rated day", () => {
+  const emptyLog = (
+    date: string,
+    over: Partial<DailyLog> = {}
+  ): DailyLog =>
+    ({
+      date,
+      sleepCompletions: [],
+      exerciseEntries: [],
+      nutritionScorecard: {
+        hitProteinTarget: null,
+        ateFruitsVeggies: null,
+        stayedHydrated: null,
+        avoidedProcessedSugar: null,
+        finishedEatingOnTime: null,
+        minimizedAlcohol: null,
+        customItems: [],
+        note: "",
+      },
+      supplementEntries: [],
+      completions: [],
+      sleepLog: {
+        actualBedtime: null,
+        actualWakeTime: null,
+        sleepQuality: null,
+        sleepDurationMinutes: null,
+      },
+      energyLevel: null,
+      moodLevel: null,
+      dayNote: "",
+      score: 0,
+      pillarScores: { sleep: 0, exercise: 0, diet: 0, supplements: 0 },
+      behaviorCompletions: {},
+      ...over,
+    }) as unknown as DailyLog;
+
+  const poor = (date: string) =>
+    emptyLog(date, {
+      sleepLog: {
+        actualBedtime: null,
+        actualWakeTime: null,
+        sleepQuality: 1,
+        sleepDurationMinutes: null,
+      },
+      energyLevel: 1,
+      behaviorCompletions: { zone2: true },
+    });
+
+  it("poor check-in YESTERDAY + none today → not recovery/lighter (was: carried over)", () => {
+    const state = {
+      ...getDefaultState(),
+      dailyLogs: [poor(dk(1))],
+    } as AppState;
+    const mode = adapt(state).mode;
+    expect(mode).not.toBe("recovery");
+    expect(mode).not.toBe("lighter");
+  });
+
+  it("poor check-in TODAY still eases the day (the real signal is respected)", () => {
+    const state = {
+      ...getDefaultState(),
+      dailyLogs: [poor(dk(0))],
+    } as AppState;
+    expect(["recovery", "lighter"]).toContain(adapt(state).mode);
   });
 });

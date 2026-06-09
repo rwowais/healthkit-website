@@ -898,11 +898,15 @@ export function getSignals(state: AppState): Signals {
     }
   }
 
-  // Prefer *today's* check-in the moment it exists — otherwise the whole
-  // adaptive read (recovery/lighter/primed) is always a full day stale.
-  const sleepQuality =
-    tLog?.sleepLog?.sleepQuality ?? yLog?.sleepLog?.sleepQuality ?? null;
-  const energy = tLog?.energyLevel ?? yLog?.energyLevel ?? null;
+  // TODAY's check-in only — never inherit yesterday's sleep/energy for the
+  // adaptive read. Energy is an instantaneous reading and yesterday's sleep
+  // rating is 1-2 nights stale; carrying them forward silently re-eased a
+  // fresh, un-rated day and made the banner ("recovery is low") contradict the
+  // still-empty check-in card right below it (audit 2026-06-09). Before today's
+  // check-in, recoveryProxy stays null → the day is "normal", not demoted. A
+  // wearable's fresh daily readiness (below) still drives recovery without a tap.
+  const sleepQuality = tLog?.sleepLog?.sleepQuality ?? null;
+  const energy = tLog?.energyLevel ?? null;
   let recoveryProxy: number | null = null;
   const parts: { v: number; w: number }[] = [];
   if (sleepQuality != null)

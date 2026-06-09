@@ -39,19 +39,29 @@ export default function DailyCheckInCard({
 
   // ── Loop closed: show the read, advisory voice, user decides ──
   if (done) {
-    const ease =
+    // A "lightened" day uses the calm recovery hue — but the COPY must match
+    // WHY it's lighter. recovery/lighter are genuinely low-recovery reads;
+    // rebuild is about time away and essentials is about rebuilding consistency
+    // — neither implies low recovery, so claiming "you're running low" there
+    // flatly contradicts a user who just tapped Great sleep + High energy.
+    const lightened =
       mode === "recovery" ||
       mode === "lighter" ||
       mode === "essentials" ||
       mode === "rebuild";
-    const read = ease
-      ? "You're running a little low today. Going easier would serve you — ease back on the harder blocks if they don't feel right. Your call."
-      : mode === "primed"
-      ? "You're well-recovered — a good day to go as planned."
-      : "You're steady. Today stands as planned; adjust anything that doesn't fit.";
+    const read =
+      mode === "recovery" || mode === "lighter"
+        ? "You're running a little low today. Going easier would serve you — ease back on the harder blocks if they don't feel right. Your call."
+        : mode === "rebuild"
+        ? "Easing you back in after some time away — today's trimmed so restarting feels light. Build from here."
+        : mode === "essentials"
+        ? "Keeping today focused on a few essentials while your consistency rebuilds. Small wins compound."
+        : mode === "primed"
+        ? "You're well-recovered — a good day to go as planned."
+        : "You're steady. Today stands as planned; adjust anything that doesn't fit.";
     return (
       <div className="card anim-rise p-5">
-        <Eyebrow color={ease ? "var(--recovery)" : "var(--readiness)"}>
+        <Eyebrow color={lightened ? "var(--recovery)" : "var(--readiness)"}>
           Today&rsquo;s read
         </Eyebrow>
         <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
