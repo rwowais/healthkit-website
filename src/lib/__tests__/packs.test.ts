@@ -11,6 +11,8 @@ import {
   uninstallPack,
   duplicatePack,
   upsertCustomPack,
+  installPack,
+  setPackPaused,
   getDefaultState,
 } from "@/lib/storage";
 import { DEFAULT_INSTALLED } from "@/lib/packs";
@@ -40,6 +42,25 @@ import type { AppState, DailyLog, ProtocolPack } from "@/lib/types";
 
 const v3 = (over: Record<string, unknown>) =>
   JSON.stringify({ ...getDefaultState(), version: 3, ...over });
+
+describe("pausedPacks hygiene — no stale pause survives uninstall (audit 2026-06-09)", () => {
+  it("uninstall clears the pause flag; reinstall doesn't come back paused", () => {
+    let st = setPackPaused(getDefaultState(), "better-sleep", true);
+    expect(st.pausedPacks).toContain("better-sleep");
+    st = uninstallPack(st, "better-sleep");
+    expect(st.pausedPacks).not.toContain("better-sleep");
+    st = installPack(st, "better-sleep");
+    expect(st.installedPacks).toContain("better-sleep");
+    expect(st.pausedPacks ?? []).not.toContain("better-sleep");
+  });
+
+  it("normalize prunes a pause flag for a pack that isn't installed", () => {
+    const st = importState(
+      v3({ installedPacks: ["better-sleep"], pausedPacks: ["ghost-pack"] })
+    ) as AppState;
+    expect(st.pausedPacks).not.toContain("ghost-pack");
+  });
+});
 
 describe("installedPacks normalization (bug b)", () => {
   it("keeps an EXPLICIT empty list — does not resurrect defaults", () => {

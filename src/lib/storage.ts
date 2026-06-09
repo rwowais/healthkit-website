@@ -191,8 +191,12 @@ function normalize(s: AppState): AppState {
   const installedPacks = Array.isArray(s.installedPacks)
     ? uniq(s.installedPacks)
     : [...DEFAULT_INSTALLED];
+  // Prune pausedPacks down to packs that are actually installed. A pause flag
+  // left behind by uninstall→reinstall (older builds didn't clear it) would
+  // otherwise silently exclude a freshly-installed pack and render it "Paused"
+  // right after an "installed" toast. Pruning here also heals corrupted saves.
   const pausedPacks = Array.isArray(s.pausedPacks)
-    ? uniq(s.pausedPacks)
+    ? uniq(s.pausedPacks).filter((id) => installedPacks.includes(id))
     : [];
   // Heal forks created before the de-namespace fix: strip a leading
   // `custom-<digits>:` prefix off custom-pack behavior keys so an
@@ -1170,11 +1174,16 @@ export function installPack(state: AppState, id: string): AppState {
   // Without this check, any non-UI code path (cloud sync, import,
   // future API) could bypass the cap.
   if (!getAccess(state).premium) {
-    const pack = PACKS.find((p) => p.id === id);
-    const isOfficial = pack?.source === "official";
+    // Detect "official" against the SAME catalog the timeline + Library UI use
+    // (activePacks = published CMS bundle + built-in extras), not the static
+    // code PACKS — otherwise a CMS-only official pack reads as non-official and
+    // slips past the free cap, letting a free user exceed the advertised limit.
+    const catalog = activePacks();
+    const isOfficial =
+      catalog.find((p) => p.id === id)?.source === "official";
     if (isOfficial) {
       const officialInstalled = state.installedPacks.filter((pid) =>
-        PACKS.some((p) => p.id === pid && p.source === "official")
+        catalog.some((p) => p.id === pid && p.source === "official")
       ).length;
       if (officialInstalled >= getFreePacks()) return state;
     }
@@ -1186,6 +1195,8 @@ export function uninstallPack(state: AppState, id: string): AppState {
   return {
     ...state,
     installedPacks: state.installedPacks.filter((p) => p !== id),
+    // Clear any stale pause flag so reinstalling later doesn't come back paused.
+    pausedPacks: (state.pausedPacks ?? []).filter((p) => p !== id),
   };
 }
 
@@ -1219,6 +1230,7 @@ export function deleteCustomPack(state: AppState, id: string): AppState {
     ...state,
     customPacks: state.customPacks.filter((p) => p.id !== id),
     installedPacks: state.installedPacks.filter((p) => p !== id),
+    pausedPacks: (state.pausedPacks ?? []).filter((p) => p !== id),
   };
 }
 

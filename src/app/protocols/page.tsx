@@ -392,7 +392,10 @@ export default function ProtocolsPage() {
    * intelligence-layer hooks (CONFLICT_PAIRS, RECOVERY_DEMOTE,
    * CIRCADIAN, KEY_MESSAGE) still match via effectiveKey().
    */
-  const pickAtomToDraft = (atom: BehaviorAtom) => {
+  const pickAtomToDraft = (
+    atom: BehaviorAtom,
+    userFields?: Partial<BehaviorDef>
+  ) => {
     const packId = editingId ?? "draft";
     setDraft((d) => ({
       ...d,
@@ -405,6 +408,10 @@ export default function ProtocolsPage() {
           // Strip the atom's `fromOfficialPacks` metadata — that's
           // picker UI scaffolding, not part of the BehaviorDef shape.
           fromOfficialPacks: undefined as never,
+          // "Link it" passes the block/time/dose/rationale the user already
+          // typed in the same form, so those aren't silently dropped in favor
+          // of the atom's defaults. Only keys the user actually set are present.
+          ...(userFields ?? {}),
         } as BehaviorDef,
       ],
     }));
@@ -1194,7 +1201,20 @@ export default function ProtocolsPage() {
                     </span>
                     <button
                       onClick={() => {
-                        pickAtomToDraft(suggestedAtom);
+                        // Carry over what the user already typed in this form,
+                        // overriding the atom defaults (only set keys present).
+                        const userFields: Partial<BehaviorDef> = {
+                          block: bDraft.block,
+                        };
+                        if (bDraft.block !== "anytime" && bDraft.time)
+                          userFields.customTime = bDraft.time;
+                        if (bDraft.dose.trim())
+                          userFields.dose = bDraft.dose.trim();
+                        if (bDraft.rationale.trim())
+                          userFields.rationale = bDraft.rationale.trim();
+                        if (bDraft.timingReason.trim())
+                          userFields.timingReason = bDraft.timingReason.trim();
+                        pickAtomToDraft(suggestedAtom, userFields);
                         setBDraft({
                           title: "",
                           block: "morning",
@@ -1426,8 +1446,11 @@ export default function ProtocolsPage() {
                           return;
                         }
                         duplicatePack(p);
+                        // duplicatePack REPLACES the original with the fork —
+                        // say so, rather than "copy added" (which implies the
+                        // original stays alongside it).
                         toast.show(
-                          `Editable copy added — open “${p.name} (yours)” to edit`
+                          `Converted to an editable copy — “${p.name} (yours)” replaces the original`
                         );
                         setPackSheet(null);
                       }}
@@ -1443,14 +1466,38 @@ export default function ProtocolsPage() {
                   )}
                   <button
                     onClick={() => {
-                      if (p.source === "custom") deleteCustomPack(p.id);
-                      else uninstallPack(p.id);
-                      toast.show(`${p.name} removed from your system`);
+                      if (p.source === "custom") {
+                        // Deleting a custom protocol is PERMANENT — no recycle
+                        // bin, no other copy. Unlike uninstalling an official
+                        // pack (reinstall from Discover), this destroys its
+                        // authored behaviors, so guard it behind a confirm.
+                        if (
+                          !window.confirm(
+                            `Delete “${p.name}” permanently? Its custom behaviors can't be recovered.`
+                          )
+                        )
+                          return;
+                        deleteCustomPack(p.id);
+                        toast.show(`${p.name} deleted`);
+                      } else {
+                        uninstallPack(p.id);
+                        toast.show(
+                          `${p.name} removed — reinstall anytime from Discover`
+                        );
+                      }
                       setPackSheet(null);
                     }}
-                    className="press tr-fast w-full py-2 text-center text-[13px] font-medium text-[var(--text-3)]"
+                    className="press tr-fast w-full py-2 text-center text-[13px] font-medium"
+                    style={{
+                      color:
+                        p.source === "custom"
+                          ? "var(--alert)"
+                          : "var(--text-3)",
+                    }}
                   >
-                    Remove from system
+                    {p.source === "custom"
+                      ? "Delete protocol permanently"
+                      : "Remove from system"}
                   </button>
                 </div>
               </div>
