@@ -102,13 +102,29 @@ export default function AuthGate({
 
   const isPublic = isPublicPath(pathname);
 
-  // Redirect a signed-out visitor off any protected route. Effect (not
-  // render) so navigation is a side effect, never during render.
+  // Redirect a signed-out visitor off any protected route. Effect (not render)
+  // so navigation is a side effect, never during render. Before bouncing, do a
+  // fresh getSession() check: a just-completed password login navigates into a
+  // protected route, and its SIGNED_IN event can land a tick after this status
+  // was last set — without the re-check we'd kick a freshly-authenticated user
+  // straight back to /auth (a real "logged in but bounced to login" bug).
   useEffect(() => {
     if (!supabaseEnabled) return;
-    if (status === "anon" && !isPublic) {
+    if (status !== "anon" || isPublic) return;
+    let alive = true;
+    const sb = getSupabase();
+    if (!sb) {
       router.replace("/auth");
+      return;
     }
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (!alive) return;
+      if (session) setStatus("authed");
+      else router.replace("/auth");
+    });
+    return () => {
+      alive = false;
+    };
   }, [status, isPublic, router]);
 
   // Public routes always render (landing, auth, legal). Protected routes
