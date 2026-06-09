@@ -751,10 +751,33 @@ export default function TodayPage() {
     }
     return true;
   }, [log, state.supplements, state.settings.safetyFlags, selDayIdx]);
+  // Scheduled-supplement progress for the selected day (done = taken OR
+  // skipped). Lets a SUPPLEMENT-ONLY day (no behaviors) still reach "Day
+  // complete" and lets the progression headline report the stack instead of
+  // "Nothing scheduled" while supplement cards render right below it.
+  const suppProgToday = useMemo(() => {
+    const comp = log.supplementCompletions ?? {};
+    const skips = new Set(log.supplementSkips ?? []);
+    let total = 0;
+    let done = 0;
+    for (const block of BLOCKS) {
+      for (const s of supplementsForBlock(
+        state.supplements ?? [],
+        block,
+        selDayIdx,
+        state.settings.safetyFlags ?? {}
+      )) {
+        total++;
+        if (comp[s.id] || skips.has(s.id)) done++;
+      }
+    }
+    return { done, total };
+  }, [log, state.supplements, state.settings.safetyFlags, selDayIdx]);
   const dayComplete =
     isToday &&
-    prog.total > 0 &&
-    prog.done === prog.total &&
+    // Behaviors drive completion when present; otherwise a supplement-only day
+    // completes once every scheduled supplement is handled.
+    (prog.total > 0 ? prog.done === prog.total : suppProgToday.total > 0) &&
     allSuppHandledToday;
 
   /**
@@ -1250,8 +1273,11 @@ export default function TodayPage() {
           </motion.div>
         )}
 
-        {/* Adaptive banner — focal */}
-        {!dayComplete && (
+        {/* Adaptive banner — focal. Gated to TODAY: adapt()/getSignals()/
+            keystone() are computed from current state with no selectedDate
+            dependency, so showing them over a scrubbed past day mixed today's
+            "Recovery mode / Easing" read with yesterday's timeline. */}
+        {!dayComplete && isToday && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1374,7 +1400,11 @@ export default function TodayPage() {
                 )}
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-[13px] font-medium leading-snug text-[var(--text-2)]">
-                    {progressionPhrase(prog.done, prog.total, cb)}
+                    {progressionPhrase(
+                      prog.total > 0 ? prog.done : suppProgToday.done,
+                      prog.total > 0 ? prog.total : suppProgToday.total,
+                      cb
+                    )}
                   </p>
                   {prog.essentials > 0 && (
                     <span className="shrink-0 text-[12px] font-semibold text-[var(--text-3)]">
@@ -1931,9 +1961,16 @@ export default function TodayPage() {
                             disabled: true,
                           });
                         else if (a.type === "retime")
+                          // Clear any custom-time pin + stack anchor when making
+                          // it "anytime" — else effectiveMinutes keeps showing
+                          // the old clock time and the item stays visibly timed,
+                          // so the action fails to do what its label promises.
+                          // (Matches commitBlockMove's manual-move path.)
                           setBehaviorOverride(a.key, {
                             ...(state.behaviorOverrides?.[a.key] ?? {}),
                             block: a.block,
+                            customTime: undefined,
+                            stackAfter: undefined,
                           });
                         setDismissed((d) => [...d, sug.id]);
                       }}
@@ -2328,14 +2365,26 @@ export default function TodayPage() {
                                           "evening",
                                           "anytime",
                                         ] as TimeBlock[]
-                                      ).map((target) => (
+                                      ).map((target) => {
+                                        // A strict-window behavior can't move to
+                                        // a block its window doesn't reach —
+                                        // disable that target (mirrors the editor
+                                        // sheet) instead of accepting a dead tap.
+                                        const forbidden =
+                                          !!it.timeWindow?.strict &&
+                                          !windowBlocks(
+                                            it,
+                                            state.settings
+                                          ).includes(target);
+                                        return (
                                         <button
                                           key={target}
                                           role="menuitem"
-                                          disabled={target === block}
+                                          disabled={target === block || forbidden}
                                           onClick={() => {
                                             setMoveMenuKey(null);
-                                            if (target === block) return;
+                                            if (target === block || forbidden)
+                                              return;
                                             requestBlockMove(
                                               [
                                                 {
@@ -2365,7 +2414,8 @@ export default function TodayPage() {
                                             </span>
                                           )}
                                         </button>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </span>
