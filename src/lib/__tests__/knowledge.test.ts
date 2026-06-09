@@ -159,3 +159,45 @@ describe("knowledge bundle seam", () => {
     resetKnowledge();
   });
 });
+
+describe("stale-bundle healing — code metadata backfilled at load (audit 2026-06-09)", () => {
+  it("overlays category onto a thin bundle behavior, preserving CMS content", () => {
+    resetKnowledge();
+    applyPublishedBundle({
+      schema: BUNDLE_SCHEMA,
+      version: 9,
+      generatedAt: "t",
+      protocols: [
+        {
+          id: "longevity-foundation",
+          name: "Longevity Foundation",
+          // A thin behavior like the live prod bundle: no category/daysActive/
+          // contraindications/timeWindow — only authored content.
+          behaviors: [
+            {
+              canonicalKey: "zone2",
+              title: "Zone 2 movement (edited)",
+              block: "afternoon",
+              anchor: "wake",
+              offsetMin: 300,
+              leverage: 3,
+              dose: "20–45 min easy aerobic",
+              icon: "footprints",
+              kind: "action",
+              rationale: "CMS-authored rationale",
+            },
+          ],
+        },
+      ],
+      config: {},
+    });
+    const lf = activePacks().find((p) => p.id === "longevity-foundation")!;
+    const zone2 = lf.behaviors.find((b) => b.canonicalKey === "zone2")!;
+    // Healed from the code atom → workout swap + safety/scheduling return.
+    expect(zone2.category).toBe("workout");
+    // CMS-authored content is NOT clobbered by the heal.
+    expect(zone2.title).toBe("Zone 2 movement (edited)");
+    expect(zone2.rationale).toBe("CMS-authored rationale");
+    resetKnowledge();
+  });
+});

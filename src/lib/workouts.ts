@@ -34,12 +34,32 @@ import { activePacks } from "./knowledge";
 import { STANDALONE_ATOMS_REGISTRY } from "./packs";
 import type { AppState, BehaviorDef, DailyLog } from "./types";
 
-/** Cheap predicate: is this behavior tagged as a workout? */
+/**
+ * Curated workout canonicalKeys. The PRIMARY signal is `category: "workout"`,
+ * but a behavior served from a published CMS bundle can lose that field (the
+ * publish path only carries category when the CMS row has it), which silently
+ * removed Swap for every bundle-sourced workout. So we ALSO match these known
+ * keys (and their derivedFrom, for forks/atom-library picks) as a resilient
+ * fallback — no false positives, since these are all genuinely workouts.
+ */
+const WORKOUT_KEYS = new Set([
+  "zone2",
+  "strength",
+  "vo2max-intervals",
+  "tabata-hiit",
+  "extended-walk",
+  "weighted-vest-walk",
+]);
+
+/** Is this behavior a workout? (category tag, or a known curated workout key.) */
 export function isWorkoutBehavior(b: {
   category?: string;
   canonicalKey?: string;
+  derivedFrom?: string;
 }): boolean {
-  return b.category === "workout";
+  if (b.category === "workout") return true;
+  const k = b.derivedFrom ?? b.canonicalKey;
+  return k != null && WORKOUT_KEYS.has(k);
 }
 
 /**

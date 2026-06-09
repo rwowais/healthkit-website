@@ -17,8 +17,8 @@
  * P1 establishes + proves this seam. Nothing consumes the override yet
  * (no publish path exists until P3) — the app stays byte-identical.
  */
-import type { ProtocolPack, Interaction } from "./types";
-import { PACKS } from "./packs";
+import type { ProtocolPack, Interaction, BehaviorDef } from "./types";
+import { PACKS, STANDALONE_ATOMS_REGISTRY } from "./packs";
 
 export const BUNDLE_SCHEMA = 1;
 
@@ -138,12 +138,72 @@ export function isValidBundle(b: unknown): b is KnowledgeBundle {
  * overrides the built-in with the same id; a built-in id absent from
  * the bundle is appended at the end.
  */
+// ── Stale-bundle healing ──────────────────────────────────────────────
+// cms_behaviors has no columns for code-only structural/safety metadata, so a
+// bundle published before the publish-time backfill serves behaviors WITHOUT
+// it — silently disabling workout swap (category), scheduling (daysActive),
+// safety gating (contraindications), and hard-window clamps (timeWindow). We
+// heal a thin bundle at LOAD time by overlaying these from the matching code
+// atom (by canonicalKey), so an old snapshot self-repairs without a re-publish.
+// CMS-authored content (title/dose/rationale/block/timing/leverage) is never
+// touched — only undefined metadata fields are filled.
+const HEAL_FIELDS = [
+  "category",
+  "daysActive",
+  "contraindications",
+  "timeWindow",
+  "evidenceTier",
+  "targets",
+  "timingReason",
+  "derivedFrom",
+  "intensity",
+  "recommendedBy",
+] as const;
+
+let _codeAtomIndex: Map<string, BehaviorDef> | null = null;
+function codeAtomIndex(): Map<string, BehaviorDef> {
+  if (_codeAtomIndex) return _codeAtomIndex;
+  const m = new Map<string, BehaviorDef>();
+  for (const p of PACKS)
+    for (const b of p.behaviors) if (!m.has(b.canonicalKey)) m.set(b.canonicalKey, b);
+  for (const a of STANDALONE_ATOMS_REGISTRY)
+    if (!m.has(a.canonicalKey)) m.set(a.canonicalKey, a);
+  return (_codeAtomIndex = m);
+}
+
+function healProtocols(protocols: ProtocolPack[]): ProtocolPack[] {
+  const idx = codeAtomIndex();
+  return protocols.map((p) => ({
+    ...p,
+    behaviors: p.behaviors.map((b) => {
+      const base = idx.get(b.canonicalKey) as
+        | Record<string, unknown>
+        | undefined;
+      if (!base) return b;
+      const out = { ...b } as Record<string, unknown>;
+      for (const f of HEAL_FIELDS) {
+        if (out[f] === undefined && base[f] !== undefined) out[f] = base[f];
+      }
+      return out as unknown as BehaviorDef;
+    }),
+  }));
+}
+
+// Memoize the heal by the published-bundle identity (it changes rarely).
+let _healedFor: KnowledgeBundle | null = null;
+let _healedProtocols: ProtocolPack[] = [];
+
 export function activePacks(): ProtocolPack[] {
   const bundled = published?.protocols ?? [];
   if (bundled.length === 0) return PACKS;
-  const bundleIds = new Set(bundled.map((p) => p.id));
+  if (published !== _healedFor) {
+    _healedProtocols = healProtocols(bundled);
+    _healedFor = published;
+  }
+  const healed = _healedProtocols;
+  const bundleIds = new Set(healed.map((p) => p.id));
   const builtInExtras = PACKS.filter((p) => !bundleIds.has(p.id));
-  return [...bundled, ...builtInExtras];
+  return [...healed, ...builtInExtras];
 }
 
 export function activeConfig(): Record<string, number | string | boolean> {
