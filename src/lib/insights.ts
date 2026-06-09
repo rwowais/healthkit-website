@@ -24,11 +24,15 @@ export function derivedInsights(logs: DailyLog[]): string[] {
     if (sp == null || rec == null) continue;
     (sp >= 70 ? withSleep : withoutSleep).push(rec);
   }
-  if (withSleep.length >= 3 && withoutSleep.length >= 3) {
+  // Honest gate: ≥8 samples per bucket and a ≥8-point spread before naming a
+  // pattern (matches the rest of the intelligence layer). And NO superlative /
+  // causal "strongest lever" claim — that competed with the rigorously-gated
+  // keystone on the same screen and asserted causation from a correlation.
+  if (withSleep.length >= 8 && withoutSleep.length >= 8) {
     const diff = Math.round(avg(withSleep) - avg(withoutSleep));
-    if (diff >= 6) {
+    if (diff >= 8) {
       out.push(
-        `Your recovery runs ${diff} points higher on days you complete your sleep protocol. It's your strongest lever right now.`
+        `On days you complete your sleep protocol, your recovery tends to run about ${diff} points higher — a pattern worth noticing, not proof.`
       );
     }
   }
@@ -42,7 +46,7 @@ export function derivedInsights(logs: DailyLog[]): string[] {
       const d = Math.round(last7 - prev);
       if (d >= 5)
         out.push(
-          `You're trending up — your weekly average climbed ${d} points. Whatever you changed is working.`
+          `You're trending up — your weekly average climbed ${d} points over the last week.`
         );
       else if (d <= -5)
         out.push(

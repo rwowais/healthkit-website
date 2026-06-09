@@ -15,6 +15,8 @@ import {
   compileTimeline,
   effectiveKey,
   vacationDates,
+  applyConflictMutes,
+  resolvedInteractions,
   type TimelineItem,
 } from "./engine";
 import { packById, listBehaviorAtoms } from "./packs";
@@ -56,6 +58,34 @@ function analyticsItems(state: AppState): TimelineItem[] {
   }
   const out = [...map.values()];
   _analyticsItemsCache.set(state, out);
+  return out;
+}
+
+const _conflictMutedCache = new WeakMap<AppState, Set<string>>();
+/**
+ * Keys the engine currently SUPPRESSES via a firm cross-behavior conflict
+ * (e.g. Burnout Recovery's no-intense restraint mutes strength). The user
+ * can't naturally complete these — the app greys them out as "Resting today" —
+ * so intel must never nag them to retime/pause one, nor blame a "light week"
+ * on a keystone the app itself muted. Mirrors what the user actually sees
+ * (engine shapeTimeline → applyConflictMutes(…, resolvedInteractions())).
+ * Returns both canonicalKey and effectiveKey so either lookup matches.
+ */
+function conflictMutedKeys(state: AppState): Set<string> {
+  const cached = _conflictMutedCache.get(state);
+  if (cached) return cached;
+  const muted = applyConflictMutes(
+    compileTimeline(state, 0),
+    resolvedInteractions()
+  );
+  const out = new Set<string>();
+  for (const it of muted) {
+    if (it.muted && it.muteReason?.startsWith("conflict pair:")) {
+      out.add(it.canonicalKey);
+      out.add(effectiveKey(it));
+    }
+  }
+  _conflictMutedCache.set(state, out);
   return out;
 }
 
@@ -513,8 +543,14 @@ export function suggestions(state: AppState): Suggestion[] {
     for (const o of items)
       if (engagedKeysEver.has(o.canonicalKey) && o.fromPacks?.length === 1)
         establishedPacks.add(o.fromPacks[0]);
+    const cMuted = conflictMutedKeys(state);
     for (const it of items) {
       if (state.behaviorOverrides?.[it.canonicalKey]?.disabled) continue;
+      // The app suppresses this behavior via a firm conflict rule (the user
+      // sees it "Resting today" and can't complete it). Don't nag them to
+      // retime/pause it — and "Make it anytime" can't help anyway, since
+      // conflict mutes are block-independent, so it would be a dead-end loop.
+      if (cMuted.has(it.canonicalKey) || cMuted.has(effectiveKey(it))) continue;
       // Never tell the user to pause their own keystone — that's a
       // self-contradicting, trust-destroying suggestion.
       if (ks && it.canonicalKey === ks.key) continue;
@@ -601,6 +637,9 @@ export function suggestions(state: AppState): Suggestion[] {
   if (
     ks &&
     !state.behaviorOverrides?.[ks.key]?.disabled &&
+    // Don't blame a "light week" on an anchor the app itself suppresses via a
+    // conflict rule — its low completions are by design, not the user's doing.
+    !conflictMutedKeys(state).has(ks.key) &&
     state.dailyLogs.length >= 21 &&
     activeDays.length >= 5 &&
     !strongAdherence

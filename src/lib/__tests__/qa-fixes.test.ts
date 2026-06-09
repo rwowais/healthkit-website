@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import type { AppState, DailyLog, Interaction } from "@/lib/types";
 import { getDefaultState, toggleBehavior } from "@/lib/storage";
-import { compileTimeline, adapt } from "@/lib/engine";
+import { compileTimeline, adapt, effectiveKey } from "@/lib/engine";
 import { suggestions, behaviorStats } from "@/lib/intel";
 import { mergeStates, chooseCloudLoad } from "@/lib/datasource";
 import { buildCatalogBundle, diffBundles } from "@/lib/cms/publish";
@@ -609,5 +609,39 @@ describe("recovery read is today-only — no carryover into an un-rated day", ()
       dailyLogs: [poor(dk(0))],
     } as AppState;
     expect(["recovery", "lighter"]).toContain(adapt(state).mode);
+  });
+});
+
+// ── intel must never nag/credit a behavior the engine itself conflict-mutes
+//    (the user can't complete it; "make it anytime" can't help) (audit 2026-06-09). ──
+describe("suggestions skip conflict-muted behaviors", () => {
+  it("offers no retime/pause for a firm-conflict-muted behavior", () => {
+    // Fasting (delay-first-meal, from fasted-mornings) firm-conflict-mutes
+    // protein-breakfast — the user sees it "Resting today" and can't complete it.
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation", "fasted-mornings"],
+    };
+    const items = compileTimeline(st, 0);
+    const muted = items.find((i) => effectiveKey(i) === "protein-breakfast");
+    expect(muted, "protein-breakfast should be present and muted").toBeTruthy();
+
+    // Establish the packs and chronically skip ONLY the muted slot: complete
+    // every other behavior daily for 21 days. Pre-fix this nagged the muted one.
+    const others = Object.fromEntries(
+      items
+        .filter((i) => i.canonicalKey !== muted!.canonicalKey)
+        .map((i) => [i.canonicalKey, true])
+    );
+    const logs: DailyLog[] = [];
+    for (let i = 1; i <= 21; i++) logs.push(mkLog(dk(i), { ...others }, 70));
+
+    const sug = suggestions({ ...st, dailyLogs: logs });
+    const nag = sug.find(
+      (s) =>
+        (s.action.type === "retime" || s.action.type === "pause") &&
+        (s.action as { key?: string }).key === muted!.canonicalKey
+    );
+    expect(nag).toBeUndefined();
   });
 });
