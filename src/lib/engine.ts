@@ -174,11 +174,15 @@ export function compileTimeline(
   packsOverride?: ProtocolPack[],
   opts?: { includeDisabled?: boolean }
 ): TimelineItem[] {
-  // Vacation mode: returns an empty timeline. The user sees a calm
-  // "you're on a break" surface on Today, no packs auto-resume until
-  // they toggle it off in Profile. Streak math (in scoring.ts) skips
-  // these days so the user isn't penalized for the break.
-  if (state.settings?.vacationMode) return [];
+  // Vacation mode: returns an empty timeline so Today shows a calm
+  // "you're on a break" surface; no packs auto-resume until they toggle it
+  // off in Profile. Streak math (scoring.ts) skips these days so the user
+  // isn't penalized. EXCEPTION: a management surface (Protocols) passes
+  // { includeDisabled: true } to enumerate the frozen system so the editor
+  // stays legible — without this opt-in the whole "Your behaviors" editor
+  // vanished and stats read "0 behaviors" during a break, contradicting the
+  // reversible-freeze promise (sweep 2026-06-09 MEDIUM, vacation-mode).
+  if (state.settings?.vacationMode && !opts?.includeDisabled) return [];
   const installed = new Set(state.installedPacks ?? []);
   const paused = new Set(state.pausedPacks ?? []);
   const overrides = state.behaviorOverrides ?? {};

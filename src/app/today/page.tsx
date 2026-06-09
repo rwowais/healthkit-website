@@ -936,7 +936,16 @@ export default function TodayPage() {
         state.settings.safetyFlags ?? {}
       ).length > 0
   );
-  if (timeline.length === 0 && !hasSupplementsToday) {
+  // Vacation ALWAYS shows the calm break surface — even with supplements
+  // scheduled. Otherwise a vacationing user with any supplement fell through
+  // to the full render, where the adaptive banner, StreakFreeze prompt (which
+  // burns a real token) and the "every behavior done" celebration all fired —
+  // directly contradicting the "timeline goes quiet / streak is paused"
+  // promise (sweep 2026-06-09 MEDIUM, vacation-mode #242/#249/#256).
+  if (
+    state.settings.vacationMode ||
+    (timeline.length === 0 && !hasSupplementsToday)
+  ) {
     // Two empty-state cases: vacation mode on (intentional break), or
     // no packs installed (needs onboarding nudge). Different copy + CTA.
     const onVacation = !!state.settings.vacationMode;
