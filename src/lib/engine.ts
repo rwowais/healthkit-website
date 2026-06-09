@@ -1009,7 +1009,7 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
     // notices.
     const tone =
       s.gapDays > 30
-        ? "It's been a while — welcome back. I've trimmed today to a couple of essentials; the rest will catch back up on its own as you re-engage."
+        ? "It's been a while — welcome back. I've trimmed today to a few essentials; the rest will catch back up on its own as you re-engage."
         : s.gapDays > 7
         ? "It's been over a week — no problem. Today's pared back so restarting feels light. Build from here."
         : "It's been a few days — no problem. I've trimmed today to just a few essentials so restarting feels effortless.";
@@ -1584,15 +1584,14 @@ export function masteredKeys(
       daysActiveFor.set(b.canonicalKey, b.daysActive);
     }
   }
-  // Day-of-week helper — must match engine's Mon=0..Sun=6 convention.
-  const isoDow = (k: string): number => {
-    const j = new Date(k + "T00:00:00").getDay();
-    return j === 0 ? 6 : j - 1;
-  };
+  // Day-of-week via the canonical user-tz helper (Mon=0..Sun=6) — NOT
+  // new Date(k).getDay(), which uses the device tz and can land on the wrong
+  // weekday near a tz boundary, diverging from the rest of the engine.
+  const tz = getTz(state.settings);
   const isScheduledOn = (k: string, dkey: string): boolean => {
     const d = daysActiveFor.get(k);
     if (!d || d.length !== 7) return true;
-    return d[isoDow(dkey)] === true;
+    return d[dayIndexOfKeyInTz(tz, dkey)] === true;
   };
 
   // Swap-aware completion check: a behavior credited via swapBehavior

@@ -1323,11 +1323,16 @@ export default function TodayPage() {
               {[
                 {
                   k: "Recovery",
+                  // "High" is reserved for the same cutoff the engine calls
+                  // "Primed" (78) so the chip can't say High on a day the
+                  // engine declined to call primed; 60–77 reads "Good".
                   v:
                     sig.recoveryProxy == null
                       ? "Building"
-                      : sig.recoveryProxy >= 70
+                      : sig.recoveryProxy >= 78
                       ? "High"
+                      : sig.recoveryProxy >= 60
+                      ? "Good"
                       : sig.recoveryProxy >= 45
                       ? "Moderate"
                       : "Easing",
@@ -1337,7 +1342,7 @@ export default function TodayPage() {
                   c:
                     sig.recoveryProxy == null
                       ? "var(--text-3)"
-                      : sig.recoveryProxy >= 70
+                      : sig.recoveryProxy >= 78
                       ? "var(--vitality)"
                       : sig.recoveryProxy >= 45
                       ? "var(--readiness)"
