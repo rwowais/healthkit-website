@@ -308,6 +308,44 @@ describe("move to a block re-derives the displayed time", () => {
   });
 });
 
+// ── Pause reversibility: a paused behavior must stay findable so it can be
+//    resumed. The normal compile drops it; a management surface passes
+//    { includeDisabled: true } to render it dimmed with a working Resume. ──
+describe("paused behaviors remain findable (audit 2026-06-09)", () => {
+  const stWith = (ov: Record<string, unknown>): AppState =>
+    ({
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+      behaviorOverrides: ov,
+    }) as unknown as AppState;
+
+  it("the normal compile drops a paused behavior entirely", () => {
+    const tl = compileTimeline(stWith({ strength: { disabled: true } }), 0);
+    expect(tl.find((i) => i.canonicalKey === "strength")).toBeUndefined();
+  });
+
+  it("includeDisabled keeps it, flagged disabled, so Resume is reachable", () => {
+    const tl = compileTimeline(
+      stWith({ strength: { disabled: true } }),
+      0,
+      undefined,
+      { includeDisabled: true }
+    );
+    const item = tl.find((i) => i.canonicalKey === "strength");
+    expect(item, "paused behavior should be present under includeDisabled").toBeTruthy();
+    expect(item!.disabled).toBe(true);
+  });
+
+  it("an active behavior is never flagged disabled under includeDisabled", () => {
+    const tl = compileTimeline(stWith({}), 0, undefined, {
+      includeDisabled: true,
+    });
+    const item = tl.find((i) => i.canonicalKey === "strength");
+    expect(item).toBeTruthy();
+    expect(item!.disabled).toBeFalsy();
+  });
+});
+
 // ── Sync recency: updatedAt resolves genuine conflicts (un-check) ──
 describe("sync merge — recency via updatedAt", () => {
   const logAt = (

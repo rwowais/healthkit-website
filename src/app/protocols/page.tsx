@@ -218,6 +218,16 @@ export default function ProtocolsPage() {
     () => (state ? compileTimeline(state, 0) : []),
     [state]
   );
+  // The management list INCLUDES paused (disabled) behaviors so they render
+  // dimmed with a working Resume toggle. Without this they vanish from every
+  // surface and pause becomes a one-way trip — the row's existing dim/switch
+  // styling was dead code because the normal compile dropped them. `timeline`
+  // (active only) still drives stats, eased markers, discover, etc.
+  const manageRows = useMemo(
+    () =>
+      state ? compileTimeline(state, 0, undefined, { includeDisabled: true }) : [],
+    [state]
+  );
   // Bind the open editor sheet to the LIVE compiled behavior, not the frozen
   // snapshot from when its row was tapped — otherwise editing block/time in
   // the sheet updates the stored override but the sheet keeps rendering the
@@ -226,10 +236,10 @@ export default function ProtocolsPage() {
   const detailItem = useMemo(
     () =>
       detail
-        ? timeline.find((t) => t.canonicalKey === detail.canonicalKey) ??
+        ? manageRows.find((t) => t.canonicalKey === detail.canonicalKey) ??
           detail
         : null,
-    [detail, timeline]
+    [detail, manageRows]
   );
   const adaptation = useMemo(() => adapt(state), [state]);
   const easedSet = useMemo(
@@ -724,7 +734,9 @@ export default function ProtocolsPage() {
           </motion.div>
           <div className="flex flex-col gap-6">
             {BLOCKS.map((block) => {
-              const items = timeline.filter((i) => i.block === block);
+              // Include paused rows here (dimmed, with a working Resume toggle)
+              // so a paused behavior stays findable instead of vanishing.
+              const items = manageRows.filter((i) => i.block === block);
               if (items.length === 0) return null;
               return (
                 <div key={block}>
@@ -759,6 +771,11 @@ export default function ProtocolsPage() {
                               {it.title}
                             </p>
                             <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-[var(--text-3)]">
+                              {disabled && (
+                                <span style={{ color: "var(--text-2)" }}>
+                                  Paused · tap to resume
+                                </span>
+                              )}
                               {easedSet.has(it.canonicalKey) && (
                                 <span style={{ color: "var(--warm)" }}>
                                   Eased today

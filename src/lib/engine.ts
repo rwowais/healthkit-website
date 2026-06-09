@@ -88,6 +88,12 @@ export interface TimelineItem extends BehaviorDef {
   /** Habit stacking: title of the anchor this item is filed right after
    *  (populated by applyStacks). Display-only — surfaces an "after X" caption. */
   stackedAfter?: string;
+  /** True when the user has PAUSED this behavior (behaviorOverrides.disabled).
+   *  Only ever set on items compiled with `{ includeDisabled: true }`; the
+   *  normal compile drops disabled behaviors entirely. Lets a management
+   *  surface (Protocols) render the paused row dimmed with a working Resume
+   *  toggle instead of the row silently vanishing with no way back. */
+  disabled?: boolean;
 }
 
 /**
@@ -165,7 +171,8 @@ function isoDayOf(dateStr: string, tz: string) {
 export function compileTimeline(
   state: AppState,
   dayIndex: number,
-  packsOverride?: ProtocolPack[]
+  packsOverride?: ProtocolPack[],
+  opts?: { includeDisabled?: boolean }
 ): TimelineItem[] {
   // Vacation mode: returns an empty timeline. The user sees a calm
   // "you're on a break" surface on Today, no packs auto-resume until
@@ -202,7 +209,10 @@ export function compileTimeline(
     if (!installed.has(pack.id) || paused.has(pack.id)) continue;
     for (const b of pack.behaviors) {
       const ov: BehaviorOverride | undefined = overrides[b.canonicalKey];
-      if (ov?.disabled) continue;
+      // Normally a paused behavior is dropped entirely. A management surface
+      // can pass { includeDisabled: true } to keep it (flagged) so the user
+      // can find and resume it — otherwise pause is a one-way trip.
+      if (ov?.disabled && !opts?.includeDisabled) continue;
       // Supplements have their own surface (state.supplements +
       // SupplementBlockCard on Today). Skip them here so they don't
       // ALSO appear as inline behavior rows. Detection is broad —
@@ -241,6 +251,7 @@ export function compileTimeline(
           sortIndex: ov?.sortIndex,
           fromPacks: [pack.name],
           muted: false,
+          disabled: !!ov?.disabled,
           // Trust tier — derived from the originating behavior's
           // canonicalKey + derivedFrom. Two atoms merging by
           // effectiveKey may have different tiers (a custom-derived
@@ -251,6 +262,9 @@ export function compileTimeline(
           trustTier: trustTier(b),
         });
       } else {
+        // disabled is per-canonicalKey; if any contributing pack supplies this
+        // effective behavior un-paused, the merged row is active.
+        if (!ov?.disabled) existing.disabled = false;
         existing.leverage = Math.max(existing.leverage, b.leverage) as
           | 1
           | 2
