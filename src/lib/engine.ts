@@ -863,7 +863,12 @@ export function getSignals(state: AppState): Signals {
   // scoring.ts. A user returning from a 2-week trip should see
   // gapDays === 0, not 14.
   const active = [...logs]
-    .filter((l) => logHasActivity(l) && l.date !== tKey)
+    // `l.date < tKey` (strictly before today) excludes today AND any
+    // future-dated log. A future log (clock-skew / westward-tz artifact)
+    // would otherwise become `lastKey`, which the backward gap loop never
+    // reaches → gapDays runs to the 366 cap → adapt() falsely demotes the
+    // day into "rebuild / away 366 days" (sweep 2026-06-09 HIGH #8).
+    .filter((l) => logHasActivity(l) && l.date < tKey)
     .sort((a, b) => b.date.localeCompare(a.date));
   let gapDays = 0;
   const vacays = vacationDates(state);

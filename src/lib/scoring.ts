@@ -86,7 +86,7 @@ export function calculateStreak(
 ): number {
   if (logs.length === 0) return 0;
 
-  const sorted = [...logs]
+  let sorted = [...logs]
     .filter((log) => hasAnyActivity(log))
     .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -110,6 +110,14 @@ export function calculateStreak(
     todayStr = formatDateKey(today);
     yesterdayStr = formatDateKey(yesterday);
   }
+
+  // Ignore future-dated logs (clock-skew / westward-tz artifact). Without
+  // this, a stray "tomorrow"-key log sorts to the head, fails the
+  // today/yesterday/two-ago head check, and zeroes a streak the user has
+  // faithfully earned (sweep 2026-06-09 HIGH #8). normalize() also clamps
+  // these at load; this guards any other source (raw cloud row, merge, test).
+  sorted = sorted.filter((l) => l.date <= todayStr);
+  if (sorted.length === 0) return 0;
 
   // Allow vacation days to count as "current" for the head check —
   // a user who's been on vacation today shouldn't have their streak
@@ -242,6 +250,14 @@ export function hasAnyActivity(log: DailyLog): boolean {
     (v) => v !== null && v !== "" && (!Array.isArray(v) || v.length > 0)
   );
   const hasSupplements = log.supplementEntries.some((s) => s.taken || s.skipped);
+  // Live supplement model (supplementCompletions/supplementSkips). The legacy
+  // `supplementEntries` check above never sees it, so a supplement-only user
+  // who takes their stack every day was counted as having done NOTHING —
+  // streak, weekly goal, freeze bank and the cold-start countdown all frozen
+  // at zero despite perfect adherence (sweep 2026-06-09 HIGH #9).
+  const hasSuppLive =
+    Object.values(log.supplementCompletions ?? {}).some(Boolean) ||
+    (log.supplementSkips?.length ?? 0) > 0;
   const hasLegacy = log.completions.some((c) => c.completedAt !== null);
   // The Protocol-OS timeline is the actual product surface — a day with
   // any behavior completed (or a check-in) is unambiguously "active".
@@ -257,6 +273,7 @@ export function hasAnyActivity(log: DailyLog): boolean {
     hasExercise ||
     hasNutrition ||
     hasSupplements ||
+    hasSuppLive ||
     hasLegacy ||
     hasBehavior ||
     hasCheckin

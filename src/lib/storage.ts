@@ -67,6 +67,33 @@ function getDateString(date?: Date, tz?: string): string {
   })(), date ?? new Date());
 }
 
+/**
+ * Clamp future-dated daily logs to the user's local today (sweep 2026-06-09
+ * HIGH #8). A log dated AFTER today cannot represent a real past day — it is a
+ * clock-skew or westward-timezone artifact (e.g. a log written in Asia/Tokyo,
+ * then the device tz rewinds to America/Los_Angeles) — and it silently poisons
+ * the engine: calculateStreak's head check rejects it → streak collapses to 0,
+ * and getSignals' gap loop never reaches a future key → gapDays hits the 366
+ * cap → adapt() demotes the day into "rebuild / away 366 days". normalize()
+ * already clamps future biomarkers for the same reason; this does the same for
+ * logs. A genuine traveler keeps the day (re-keyed to today); if today already
+ * has a log, the future phantom is dropped so we never create a duplicate key.
+ */
+export function clampFutureLogs(logs: DailyLog[], today: string): DailyLog[] {
+  let hasToday = logs.some((l) => l.date === today);
+  const out: DailyLog[] = [];
+  for (const l of logs) {
+    if (l.date > today) {
+      if (hasToday) continue; // real today entry wins; drop the phantom
+      out.push({ ...l, date: today });
+      hasToday = true;
+    } else {
+      out.push(l);
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function createEmptySleepLog(): SleepLog {
   return {
     actualBedtime: null,
@@ -415,9 +442,7 @@ function normalize(s: AppState): AppState {
     // so without sorting here, a Supabase load looked "changed" to the
     // fixed-point guard and triggered redundant cross-instance save churn.
     // Sorting makes a round-trip a true fixed point.
-    dailyLogs: migratedLogs
-      .map(ensureLogShape)
-      .sort((a, b) => a.date.localeCompare(b.date)),
+    dailyLogs: clampFutureLogs(migratedLogs.map(ensureLogShape), today),
     biomarkers: (Array.isArray(s.biomarkers) ? s.biomarkers : []).map((b) =>
       b?.date && b.date > today ? { ...b, date: today } : b
     ),
