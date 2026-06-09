@@ -8,6 +8,7 @@ import { getAccess, getFreeBiomarkers } from "@/lib/entitlements";
 import {
   BIOMARKERS,
   biomarkerBand,
+  biomarkerFloor,
   targetText,
   type BiomarkerDef,
 } from "@/lib/biomarkers";
@@ -74,6 +75,13 @@ export default function BiomarkersPage() {
     // backstop) so the user can correct rather than silently poisoning bands.
     if (open.max != null && n > open.max) {
       toast.show(`That looks too high for ${open.label.toLowerCase()} — check the value`);
+      return;
+    }
+    // Plausibility floor — the symmetric guard. A low typo / wrong-unit paste
+    // (HRV 4 for 40) is just as poisoning as a high one. Catch it here too.
+    const floor = biomarkerFloor(open.key);
+    if (floor != null && n < floor) {
+      toast.show(`That looks too low for ${open.label.toLowerCase()} — check the value`);
       return;
     }
     // Free tier: cap distinct tracked markers.

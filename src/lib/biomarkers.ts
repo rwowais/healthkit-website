@@ -146,6 +146,45 @@ export function biomarkerDef(key: string): BiomarkerDef | undefined {
   return BIOMARKERS.find((b) => b.key === key);
 }
 
+/**
+ * Physiologic FLOORS — the symmetric partner to each def's `max` ceiling
+ * (sweep 2026-06-09 MEDIUM #277). A reading below this is a typo / wrong-unit
+ * paste (HRV 4 meant 40, systolic 6 meant 60) that would silently poison the
+ * metric's band, sparkline scale, forecast and the engine's recovery read.
+ * Set well below any real human value so only genuine mis-keys are caught.
+ */
+export const BIOMARKER_FLOORS: Record<string, number> = {
+  weight: 25,
+  waist: 30,
+  bodyFat: 2,
+  restingHR: 25,
+  hrv: 5,
+  systolic: 60,
+  diastolic: 35,
+  vo2max: 10,
+  gripStrength: 5,
+};
+
+/** The plausibility floor for a metric, or null if none is defined. */
+export function biomarkerFloor(metric: string): number | null {
+  return BIOMARKER_FLOORS[metric] ?? null;
+}
+
+/**
+ * Single source of truth for "is this a real reading?": finite, strictly
+ * positive, and within [floor, max]. Used by addBiomarker, the load-boundary
+ * scrub in normalize(), and the UI submit guard so an implausible value can
+ * never enter state through ANY path (UI, import, cloud, future API).
+ */
+export function isPlausibleBiomarker(metric: string, value: number): boolean {
+  if (!Number.isFinite(value) || value <= 0) return false;
+  const def = biomarkerDef(metric);
+  if (def?.max != null && value > def.max) return false;
+  const floor = biomarkerFloor(metric);
+  if (floor != null && value < floor) return false;
+  return true;
+}
+
 export interface Band {
   label: "Optimal" | "Good" | "Watch" | "Track";
   color: string;

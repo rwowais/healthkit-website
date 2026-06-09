@@ -8,9 +8,9 @@
  * for the reduction.
  */
 import { describe, it, expect } from "vitest";
-import { BIOMARKERS, biomarkerDef } from "@/lib/biomarkers";
+import { BIOMARKERS, biomarkerDef, isPlausibleBiomarker } from "@/lib/biomarkers";
 import { getSignals } from "@/lib/engine";
-import { getDefaultState, addBiomarker } from "@/lib/storage";
+import { getDefaultState, addBiomarker, scrubBiomarkers } from "@/lib/storage";
 import type { AppState } from "@/lib/types";
 
 function todayKey() {
@@ -112,5 +112,44 @@ describe("biomarker plausibility ceiling (audit 2026-06-09)", () => {
       expect(b.max, `${b.key} should declare a max`).toBeTypeOf("number");
       expect(b.max!).toBeGreaterThan(b.optimal);
     }
+  });
+});
+
+describe("biomarker plausibility floor + load-boundary scrub (sweep 2026-06-09 #277/#284)", () => {
+  it("isPlausibleBiomarker rejects a low typo, accepts a real reading", () => {
+    expect(isPlausibleBiomarker("hrv", 4)).toBe(false); // meant 40
+    expect(isPlausibleBiomarker("hrv", 40)).toBe(true);
+    expect(isPlausibleBiomarker("hrv", 650)).toBe(false); // ceiling
+    expect(isPlausibleBiomarker("hrv", 0)).toBe(false);
+    expect(isPlausibleBiomarker("systolic", 6)).toBe(false); // meant 60
+    expect(isPlausibleBiomarker("systolic", 118)).toBe(true);
+  });
+
+  it("addBiomarker drops a low typo (mirrors the ceiling guard)", () => {
+    const before = premium();
+    const after = addBiomarker(before, { metric: "hrv", value: 4, date: todayKey() });
+    expect(after.biomarkers?.length ?? 0).toBe(before.biomarkers?.length ?? 0);
+    // a real value still lands
+    const ok = addBiomarker(before, { metric: "hrv", value: 42, date: todayKey() });
+    expect(ok.biomarkers?.some((b) => b.metric === "hrv" && b.value === 42)).toBe(true);
+  });
+
+  it("scrubBiomarkers drops implausible readings + dedups (metric,date) at load", () => {
+    const today = todayKey();
+    const cleaned = scrubBiomarkers(
+      [
+        { id: "1", metric: "hrv", value: 4, date: today }, // low typo → dropped
+        { id: "2", metric: "hrv", value: 999, date: today }, // above max → dropped
+        { id: "3", metric: "systolic", value: 118, date: today }, // ok
+        { id: "4", metric: "systolic", value: 120, date: today }, // same (metric,date) → last wins
+        { id: "5", metric: "weight", value: -5, date: today }, // ≤0 → dropped
+      ],
+      today
+    );
+    expect(cleaned.find((b) => b.metric === "hrv")).toBeUndefined();
+    expect(cleaned.find((b) => b.metric === "weight")).toBeUndefined();
+    const sys = cleaned.filter((b) => b.metric === "systolic");
+    expect(sys).toHaveLength(1);
+    expect(sys[0].value).toBe(120);
   });
 });

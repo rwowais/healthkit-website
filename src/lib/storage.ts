@@ -5,7 +5,7 @@ import {
   isSupplementBehavior,
 } from "./supplements";
 import { calculateStreak } from "./scoring";
-import { biomarkerDef } from "./biomarkers";
+import { isPlausibleBiomarker } from "./biomarkers";
 import type {
   AppState,
   BiomarkerEntry,
@@ -92,6 +92,27 @@ export function clampFutureLogs(logs: DailyLog[], today: string): DailyLog[] {
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Scrub the biomarker list at the load boundary (sweep 2026-06-09 MEDIUM #284):
+ * clamp future dates to today, DROP implausible readings (non-finite / ≤0 /
+ * outside [floor, max]), and collapse (metric,date) duplicates last-write-wins.
+ * normalize() runs on EVERY load / import / cloud read, but the addBiomarker
+ * guard it mirrors does NOT run on those paths — so without this an implausible
+ * value from an imported backup or a legacy cloud row survived load and
+ * poisoned the metric's band, sparkline scale, forecast and the recovery read.
+ */
+export function scrubBiomarkers(list: unknown, today: string): BiomarkerEntry[] {
+  const arr = Array.isArray(list) ? (list as BiomarkerEntry[]) : [];
+  const byKey = new Map<string, BiomarkerEntry>();
+  for (const raw of arr) {
+    if (!raw || typeof raw !== "object") continue;
+    const b = raw.date && raw.date > today ? { ...raw, date: today } : raw;
+    if (!isPlausibleBiomarker(b.metric, b.value)) continue;
+    byKey.set(`${b.metric}|${b.date}`, b); // last-write-wins per (metric,date)
+  }
+  return [...byKey.values()];
 }
 
 function createEmptySleepLog(): SleepLog {
@@ -443,9 +464,7 @@ function normalize(s: AppState): AppState {
     // fixed-point guard and triggered redundant cross-instance save churn.
     // Sorting makes a round-trip a true fixed point.
     dailyLogs: clampFutureLogs(migratedLogs.map(ensureLogShape), today),
-    biomarkers: (Array.isArray(s.biomarkers) ? s.biomarkers : []).map((b) =>
-      b?.date && b.date > today ? { ...b, date: today } : b
-    ),
+    biomarkers: scrubBiomarkers(s.biomarkers, today),
     insights: Array.isArray(s.insights) ? s.insights : [],
     // NOTE: the persisted streak is kept verbatim here (recomputing it in
     // normalize() perturbs cloud-sync state comparison). Display surfaces
@@ -1318,18 +1337,12 @@ export function addBiomarker(
   state: AppState,
   entry: Omit<BiomarkerEntry, "id">
 ): AppState {
-  // Defensive value guard: biomarkers are all strictly positive measurements,
-  // so a NaN / Infinity / ≤0 reading is always bad data. Drop it here so
-  // non-UI callers (cloud sync, import, a future API) can't poison the bands,
-  // trends, and "latest value" that read it — mirrors the UI's submit check.
-  if (!Number.isFinite(entry.value) || entry.value <= 0) {
-    return state;
-  }
-  // Plausibility ceiling: a reading above the metric's max is a typo (HRV 650,
-  // systolic 1200, …) that would poison its band, sparkline scale and the
-  // engine's recovery read — drop it (mirrors the UI's submit check).
-  const def = biomarkerDef(entry.metric);
-  if (def?.max != null && entry.value > def.max) {
+  // Defensive plausibility guard: drop any reading that is non-finite, ≤0,
+  // above the metric's max ceiling, OR below its physiologic floor (a low typo
+  // like HRV 4 for 40). One predicate so non-UI callers (cloud sync, import, a
+  // future API) can't poison bands/trends/"latest value" through any path —
+  // mirrors the UI's submit check (sweep 2026-06-09 MEDIUM #277).
+  if (!isPlausibleBiomarker(entry.metric, entry.value)) {
     return state;
   }
   // Free-tier cap: getFreeBiomarkers() distinct metrics. Re-adding a
