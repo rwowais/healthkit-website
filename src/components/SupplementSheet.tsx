@@ -138,6 +138,10 @@ export default function SupplementSheet({
                   onClick={() => {
                     const next = [...days];
                     next[i] = !next[i];
+                    // Require ≥1 active day. An all-off supplement disappears
+                    // from the Stack on every weekday — a custom one would be
+                    // stranded with no way to re-open, edit, or delete it.
+                    if (next.every((d) => !d)) return;
                     patch({ daysActive: next });
                   }}
                   className="press tr-fast h-11 flex-1 rounded-[var(--r-sm)] text-[13px] font-bold"

@@ -171,7 +171,13 @@ function SupplementsInner() {
 
         {view === "grid" && (
           <GridView
-            supplements={userSupplements}
+            // Same safety suppressor as Stack + Today, so a contraindicated
+            // supplement (hidden everywhere else) doesn't show here as a row of
+            // empty cells reading "you keep missing this".
+            supplements={userSupplements.filter(
+              (s) =>
+                !isSupplementContraindicated(s, state.settings.safetyFlags ?? {})
+            )}
             logs={state.dailyLogs}
             tz={tz}
           />
