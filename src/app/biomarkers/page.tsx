@@ -47,6 +47,14 @@ export default function BiomarkersPage() {
     return m;
   }, [state.biomarkers]);
 
+  // Free tier tracks getFreeBiomarkers() distinct metrics. Once that's reached,
+  // metrics NOT already tracked are locked — show the lock up front rather than
+  // bouncing the user to /upgrade only AFTER they typed a value (audit 2026-06-09).
+  const capReached =
+    !access.premium &&
+    new Set((state.biomarkers ?? []).map((b) => b.metric)).size >=
+      getFreeBiomarkers();
+
   const submit = () => {
     if (!open) return;
     // Strict: reject empty and partially-numeric input ("12abc") rather than
@@ -118,22 +126,36 @@ export default function BiomarkersPage() {
               last && def.direction !== "range"
                 ? biomarkerBand(def, last.value)
                 : null;
+            // Locked = beyond the free cap and not already tracked. Route to
+            // upgrade on tap instead of opening the log sheet, so the user
+            // never types a reading only to be bounced and lose it.
+            const locked = capReached && hist.length === 0;
             return (
               <button
                 key={def.key}
                 onClick={() => {
+                  if (locked) {
+                    toast.show(
+                      `Free plan tracks ${getFreeBiomarkers()} metrics — upgrade to add more`
+                    );
+                    router.push("/upgrade");
+                    return;
+                  }
                   setOpen(def);
                   setVal("");
                   setDate(today);
                 }}
                 className="row row-tap flex w-full items-center gap-3.5 px-4 py-3.5 text-left"
+                style={{ opacity: locked ? 0.6 : 1 }}
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-[14.5px] font-semibold text-[var(--text-1)]">
                     {def.label}
                   </p>
                   <p className="mt-0.5 text-[12px] text-[var(--text-3)]">
-                    {last
+                    {locked
+                      ? "Premium — upgrade to track more"
+                      : last
                       ? `${last.value} ${def.unit}`
                       : `Tap to log · ${def.unit}`}
                   </p>
@@ -160,7 +182,7 @@ export default function BiomarkersPage() {
                   </span>
                 ) : (
                   <Icon
-                    name="plus"
+                    name={locked ? "shield" : "plus"}
                     size={16}
                     className="shrink-0 text-[var(--text-4)]"
                   />

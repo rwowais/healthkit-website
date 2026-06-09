@@ -1110,6 +1110,42 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
 }
 
 /**
+ * Canonical headline/tone for each adaptive mode. Used when a CMS rule changes
+ * the MODE but supplies no copy — without this the banner would keep the stale
+ * baseline copy (e.g. an eased "recovery" day labeled "Nothing needs easing
+ * today"). Mirrors baselineAdapt's per-mode strings.
+ */
+const MODE_DEFAULT_COPY: Record<
+  Adaptation["mode"],
+  { headline: string; tone: string }
+> = {
+  recovery: {
+    headline: "Recovery mode",
+    tone: "Today leans lighter — the demanding work is set aside. Keep anything that still feels right; this is the smart play, not a setback.",
+  },
+  lighter: {
+    headline: "Lighter day",
+    tone: "Lower the bar today — consistency beats intensity, and protecting recovery is part of the program.",
+  },
+  essentials: {
+    headline: "Essentials only",
+    tone: "Let's keep today simple — just the few behaviors that move the needle most. Small wins rebuild momentum.",
+  },
+  rebuild: {
+    headline: "Welcome back",
+    tone: "Easing you back in — today's trimmed so restarting feels light. Build from here.",
+  },
+  primed: {
+    headline: "Primed",
+    tone: "You're well recovered. A strong day to push your hardest training and deepest focus block.",
+  },
+  normal: {
+    headline: "Today",
+    tone: "Your day holds its full shape. Move through it block by block; momentum over perfection.",
+  },
+};
+
+/**
  * Public adapt: hardcoded baseline first, then any matching CMS rule
  * may override mode / headline / tone / reasons by priority. With no
  * published rules the function is byte-identical to the previous
@@ -1133,10 +1169,16 @@ export function adapt(state: AppState): Adaptation {
   const hit = pickMatchingRule(rules, ctx);
   if (!hit) return baseline;
   const e = sanitizeEffect(hit.effect);
+  const mode = e.setMode ?? baseline.mode;
+  // When the rule changes the mode but gives no copy, use that mode's canonical
+  // copy so the banner can't contradict the shaped timeline (an eased day
+  // labeled "Nothing needs easing"). A rule that doesn't change mode keeps the
+  // baseline copy exactly as before.
+  const def = mode !== baseline.mode ? MODE_DEFAULT_COPY[mode] : undefined;
   return {
-    mode: e.setMode ?? baseline.mode,
-    headline: e.headline ?? baseline.headline,
-    tone: e.tone ?? baseline.tone,
+    mode,
+    headline: e.headline ?? def?.headline ?? baseline.headline,
+    tone: e.tone ?? def?.tone ?? baseline.tone,
     reasons: e.reason
       ? [...baseline.reasons, e.reason]
       : baseline.reasons,
