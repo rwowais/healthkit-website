@@ -77,6 +77,7 @@ import { identityReflection } from "@/lib/reflect";
 import { reflectionPrompt } from "@/lib/prompts";
 import BehaviorSheet from "@/components/BehaviorSheet";
 import { Skeleton, Eyebrow, Sheet, Button } from "@/components/ui";
+import { getAccess } from "@/lib/entitlements";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { TimeBlock } from "@/lib/types";
 
@@ -511,6 +512,10 @@ export default function TodayPage() {
   const showTrialExtension =
     !!state.settings.trialExtendedAt &&
     trialExtAcked !== state.settings.trialExtendedAt;
+  // Reverse-trial legibility: the user clicked "Start my 14 days" in onboarding
+  // but Today never acknowledged the trial — no banner, no countdown. A calm
+  // status line keeps the clock visible (the whole conversion mechanic).
+  const access = getAccess(state);
   const ackTrialExtension = () => {
     const t = state.settings.trialExtendedAt ?? "";
     try {
@@ -1352,7 +1357,10 @@ export default function TodayPage() {
                 },
                 {
                   k: "Focus",
-                  v: ksItem ? ksItem.title : "Consistency",
+                  // Don't name a keystone the app is muting today (e.g. strength
+                  // suppressed by a no-intense conflict shows "Resting today" in
+                  // the list below) — that contradicts itself on one screen.
+                  v: ksItem && !ksItem.muted ? ksItem.title : "Consistency",
                   c: "var(--warm)",
                 },
               ].map((chip) => (
@@ -1477,6 +1485,29 @@ export default function TodayPage() {
             auto-extend was silent until now; surfacing it once makes the
             kindness *felt* (not just unmonetized). Dismissing stamps the
             local ack so it never reappears for this same extension. */}
+        {isToday && !showTrialExtension && access.inTrial && (
+          <div
+            className="flex items-center justify-between gap-3 rounded-[var(--r-md)] px-4 py-2.5"
+            style={{
+              background:
+                "color-mix(in srgb, var(--vitality) 8%, var(--surface-1))",
+              border: "1px solid var(--hairline)",
+            }}
+          >
+            <span className="text-[12.5px] text-[var(--text-2)]">
+              Premium trial — {access.trialDaysLeft}{" "}
+              {access.trialDaysLeft === 1 ? "day" : "days"} of full intelligence
+              left.
+            </span>
+            <button
+              onClick={() => router.push("/upgrade")}
+              className="press tr-fast shrink-0 text-[12px] font-semibold text-[var(--vitality)]"
+            >
+              Details
+            </button>
+          </div>
+        )}
+
         {isToday && showTrialExtension && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -2450,6 +2481,13 @@ export default function TodayPage() {
                                   // item. Re-enabling it when the user
                                   // taps Done.
                                   if (editMode) return;
+                                  // A conflict-muted ("Resting today") row is
+                                  // not part of today's plan — its completion
+                                  // is excluded from the score AND "Day
+                                  // complete", so a tap would write data the
+                                  // ring ignores while showing a checkmark
+                                  // (split-brain). Make it non-completable.
+                                  if (it.muted) return;
                                   // Haptic feedback: medium pulse on
                                   // marking done (definitive), light
                                   // tap on un-marking (correction).
