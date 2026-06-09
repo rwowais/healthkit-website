@@ -25,6 +25,9 @@ export interface BiomarkerDef {
   /** optimal band edge(s) */
   optimal: number; // for lower: <=optimal ; higher: >=optimal
   watch: number; // boundary into the "watch" zone
+  /** Plausibility ceiling — a reading above this is rejected as a typo (HRV
+   *  650, systolic 1200, …) before it can poison bands/sparklines/engine. */
+  max?: number;
   /** for range type: [lowOptimal, highOptimal] uses optimal & optimal2 */
   optimal2?: number;
   why: string;
@@ -42,6 +45,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "range",
     optimal: 0,
     watch: 0,
+    max: 600,
     why: "Tracked for trend, not an absolute target. Stable weight with rising strength is the goal.",
     step: 0.1,
     placeholder: "72.5",
@@ -54,6 +58,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "lower",
     optimal: 90,
     watch: 102,
+    max: 300,
     why: "Central adiposity is a stronger metabolic-risk signal than weight or BMI alone.",
     step: 0.5,
   },
@@ -65,6 +70,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "lower",
     optimal: 18,
     watch: 28,
+    max: 80,
     why: "Lower body-fat with preserved lean mass tracks with metabolic health.",
     step: 0.1,
   },
@@ -76,6 +82,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "lower",
     optimal: 60,
     watch: 75,
+    max: 250,
     why: "A lower resting heart rate generally reflects better cardiovascular fitness and recovery.",
   },
   {
@@ -86,6 +93,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "higher",
     optimal: 65,
     watch: 40,
+    max: 400,
     why: "Higher heart-rate variability reflects stronger autonomic balance and recovery capacity.",
   },
   {
@@ -96,6 +104,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "lower",
     optimal: 120,
     watch: 130,
+    max: 300,
     why: "Elevated systolic pressure is a leading modifiable driver of cardiovascular risk.",
   },
   {
@@ -106,6 +115,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "lower",
     optimal: 80,
     watch: 85,
+    max: 250,
     why: "Diastolic pressure complements systolic in assessing vascular load.",
   },
   {
@@ -116,6 +126,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "higher",
     optimal: 48,
     watch: 35,
+    max: 100,
     why: "Cardiorespiratory fitness is one of the strongest predictors of all-cause mortality.",
   },
   {
@@ -126,6 +137,7 @@ export const BIOMARKERS: BiomarkerDef[] = [
     direction: "higher",
     optimal: 45,
     watch: 30,
+    max: 150,
     why: "Grip strength is a robust proxy for total-body strength and longevity.",
   },
 ];

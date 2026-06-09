@@ -61,6 +61,13 @@ export default function BiomarkersPage() {
       toast.show("Enter a number above 0");
       return;
     }
+    // Plausibility ceiling — an HRV of 650 or a systolic of 1200 is a typo, not
+    // a reading. Catch it at the keystroke (addBiomarker also rejects it as a
+    // backstop) so the user can correct rather than silently poisoning bands.
+    if (open.max != null && n > open.max) {
+      toast.show(`That looks too high for ${open.label.toLowerCase()} — check the value`);
+      return;
+    }
     // Free tier: cap distinct tracked markers.
     const distinct = new Set(
       (state.biomarkers ?? []).map((b) => b.metric)

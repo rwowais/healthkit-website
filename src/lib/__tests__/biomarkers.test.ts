@@ -82,3 +82,35 @@ describe("biomarker reduction — body-only catalog", () => {
     expect(sig.bioRecoveryFlag).toBe(true);
   });
 });
+
+describe("biomarker plausibility ceiling (audit 2026-06-09)", () => {
+  // A fat-fingered reading (HRV 650, systolic 1200, weight 7200kg) is a typo,
+  // not a measurement. addBiomarker rejects anything above the per-metric `max`
+  // as a backstop so it can never poison bands, sparklines, or the engine's
+  // recovery read — even if it slips past the UI guard.
+  it("rejects an implausibly high reading (HRV 650 > max 400)", () => {
+    const before = premium();
+    const after = addBiomarker(before, {
+      metric: "hrv",
+      value: 650,
+      date: todayKey(),
+    });
+    // State is returned unchanged — no entry was appended.
+    expect(after.biomarkers.some((b) => b.metric === "hrv")).toBe(false);
+  });
+
+  it("rejects systolic 1200 but accepts a real 118", () => {
+    let st = premium();
+    st = addBiomarker(st, { metric: "systolic", value: 1200, date: todayKey() });
+    expect(st.biomarkers.some((b) => b.metric === "systolic")).toBe(false);
+    st = addBiomarker(st, { metric: "systolic", value: 118, date: todayKey() });
+    expect(st.biomarkers.some((b) => b.metric === "systolic" && b.value === 118)).toBe(true);
+  });
+
+  it("every body marker now declares a plausibility max", () => {
+    for (const b of BIOMARKERS) {
+      expect(b.max, `${b.key} should declare a max`).toBeTypeOf("number");
+      expect(b.max!).toBeGreaterThan(b.optimal);
+    }
+  });
+});

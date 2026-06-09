@@ -5,6 +5,7 @@ import {
   isSupplementBehavior,
 } from "./supplements";
 import { calculateStreak } from "./scoring";
+import { biomarkerDef } from "./biomarkers";
 import type {
   AppState,
   BiomarkerEntry,
@@ -1285,6 +1286,13 @@ export function addBiomarker(
   // non-UI callers (cloud sync, import, a future API) can't poison the bands,
   // trends, and "latest value" that read it — mirrors the UI's submit check.
   if (!Number.isFinite(entry.value) || entry.value <= 0) {
+    return state;
+  }
+  // Plausibility ceiling: a reading above the metric's max is a typo (HRV 650,
+  // systolic 1200, …) that would poison its band, sparkline scale and the
+  // engine's recovery read — drop it (mirrors the UI's submit check).
+  const def = biomarkerDef(entry.metric);
+  if (def?.max != null && entry.value > def.max) {
     return state;
   }
   // Free-tier cap: getFreeBiomarkers() distinct metrics. Re-adding a
