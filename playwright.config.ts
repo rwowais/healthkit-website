@@ -26,9 +26,9 @@ export default defineConfig({
   reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : "list",
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
-  // Generous per-test budget so a cold-start on the first prod login doesn't
-  // fail a test (the login waits below can run up to 90s).
-  timeout: 120_000,
+  // Generous per-test budget: the heaviest specs do a cold first login (~90s
+  // worst case) plus a multi-step UI drive and a DB poll.
+  timeout: 180_000,
   expect: { timeout: 15_000 },
   use: {
     baseURL,

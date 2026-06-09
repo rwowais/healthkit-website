@@ -55,7 +55,7 @@ test("guest data migrates into a new account on first sign-in", async ({
           return ((data?.state ?? {}) as { settings?: { name?: string } })
             .settings?.name ?? null;
         },
-        { timeout: 60_000, intervals: [1000, 2000, 3000] }
+        { timeout: 90_000, intervals: [1000, 2000, 3000] }
       )
       .toBe(marker);
   } finally {

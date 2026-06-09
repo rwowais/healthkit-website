@@ -16,8 +16,17 @@ test("completing onboarding activates the 14-day trial", async ({ browser }) => 
     const page = await ctx.newPage();
     await signInViaUI(page, user.email, user.password, "**/onboarding");
 
+    // Defensive: dismiss the "you've moved timezones?" prompt if it appears.
+    const notNow = page.getByRole("button", { name: "Not now" });
+    if (await notNow.isVisible().catch(() => false)) await notNow.click();
+
     // Only step 0 (name) gates "Continue"; the rest have sensible defaults.
-    await page.getByPlaceholder("Your first name").fill("E2E Tester");
+    const nameField = page.getByPlaceholder("Your first name");
+    await nameField.click();
+    await nameField.fill("E2E Tester");
+    await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled({
+      timeout: 15_000,
+    });
     for (let i = 0; i < 10; i++) {
       const finish = page.getByRole("button", { name: /Start my 14 days/ });
       if (await finish.isVisible().catch(() => false)) {
