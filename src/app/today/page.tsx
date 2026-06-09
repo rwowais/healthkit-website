@@ -2740,7 +2740,8 @@ export default function TodayPage() {
                                   isWorkoutBehavior(it) &&
                                   !it.muted &&
                                   !done &&
-                                  !it.swappedFrom && (
+                                  !it.swappedFrom &&
+                                  !it.swappedTo && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -3176,6 +3177,7 @@ export default function TodayPage() {
           isWorkoutBehavior(detailItem) &&
           !detailItem.muted &&
           !detailItem.swappedFrom &&
+          !detailItem.swappedTo &&
           !isDone(log, detail.canonicalKey)
             ? () => {
                 const k = detail.canonicalKey;

@@ -1,0 +1,152 @@
+ 1 [HIGH  ]      (data-risk) Restore-from-backup is a silent wholesale overwrite — every day tracked since the backup is erased, with merge helpers sitting unused right beside it
+        area=src/app/profile/page.tsx:114-129 (doImport) → src/lib/storage.ts:1364 (importState) → src/lib/datasource.ts:45-52 & 850-855 (save) | persona=import-backup-overwrites
+ 2 [HIGH  ]      (data-risk) New admin-authored behavior ships permanently thin (no category/timeWindow/contraindications/intensity) — heal can never fix a brand-new canonicalKey
+        area=src/lib/cms/authoring.ts createBehavior + backfillBuiltinFields ↔ src/lib/knowledge.ts healProtocols | persona=cms-publish-thin-bundle-source
+ 3 [HIGH  ]      (data-risk) First-sign-in conflict gate skipped for a packs-only guest → cloud silently wins, losing the guest's install/remove choices
+        area=src/lib/datasource.ts — hasMeaningfulData() (183-191) gating the genuineFirstSignIn check (740-753); fall-through to chooseCloudLoad (763) | persona=guest-packs-only-merge
+ 4 [HIGH  ]      (data-risk) Two guest tabs silently last-write-wins each other's check-ins (no cross-tab sync at all)
+        area=src/lib/datasource.ts (LocalDataSource.save) + src/lib/storage.ts (saveState) + src/hooks/useAppState.ts (sync listener) | persona=two-tabs-same-browser
+ 5 [HIGH  ] ⚠REG (bug) Swap-replacement workout silently vanishes (and scores 0) when the day is in recovery/essentials/rebuild mode
+        area=src/lib/engine.ts shapeTimeline (recovery branch 1743-1753, essentials 1714-1718, rebuild 1811-1819) vs applySwaps (481-511); pipeline at src/app/today/page.tsx:587-588 and src/lib/storage.ts:655-659 | persona=workout-swapper
+ 6 [HIGH  ] ⚠REG (bug) Swapped-away original workout resurrects as an active to-do (with its Swap chip back) in lighter/essentials mode — including the persona's own easier-swap path
+        area=src/lib/engine.ts shapeTimeline lighter branch (1820-1829) + essentials branch (1714-1718); chip gating src/app/today/page.tsx:2738-2755 | persona=workout-swapper
+ 7 [HIGH  ]      (inconsistency) Weekly review tells the burnout-recovery user to "tighten Strength training — your highest-leverage gap", the exact behavior the no-intense rule is resting
+        area=src/lib/intel.ts weeklyReview() focus (828-853) + continuity (862-906); src/app/insights/page.tsx:372 | persona=power-user-conflicts
+ 8 [HIGH  ]      (data-risk) A future-dated daily log silently zeroes the streak AND flips the day to "rebuild / away 366 days" — reachable by a westward traveler
+        area=src/lib/scoring.ts (calculateStreak head check) + src/lib/engine.ts (getSignals gap loop) + src/lib/storage.ts (normalize) | persona=traveler-tz
+ 9 [HIGH  ]      (data-risk) Supplement-only days never count as activity: streak, weekly goal, freeze bank and Insights countdown all stay frozen at zero despite perfect adherence
+        area=src/lib/scoring.ts (hasAnyActivity) + src/lib/storage.ts (toggleSupplement/bulkCheckSupplements/setSupplementsSkipped) | persona=supplement-only
+10 [MEDIUM]      (dead-option) Per-behavior "Reminder" toggle is a live, ON-by-default control on "anytime" behaviors that can never fire a reminder
+        area=BehaviorSheet per-behavior reminder toggle (src/components/BehaviorSheet.tsx) | persona=reminders-quiet-hours
+11 [MEDIUM]      (inconsistency) Background push fires reminders on days a behavior is NOT scheduled (daysActive ignored) and as a generic body — diverges from the day-aware, named in-tab path
+        area=push_subscriptions.reminder_times flat list (supabase/schema.sql, api/push/send-due, Reminders.tsx Effect 1) | persona=reminders-quiet-hours
+12 [MEDIUM]      (bug) Background push reminders for a weekend-only behavior fire every day (server has no day-of-week dimension)
+        area=src/app/api/push/send-due/route.ts (108-115) + subscribe/route.ts (77) + Reminders.tsx Effect 1 (62-123) | persona=weekend-only-custom
+13 [MEDIUM]      (safety) Biomarker log sheet: 'Value' and 'Date' inputs have no associated label (only a sibling <Eyebrow> <p>); Value autoFocuses unnamed
+        area=src/app/biomarkers/page.tsx:256-277 | persona=a11y-authed-surfaces
+14 [MEDIUM]      (inconsistency) Import has zero confirmation while the equally-destructive 'Reset all data' gets a full confirm Sheet — inconsistent guarding of destructive actions
+        area=src/app/profile/page.tsx:114-129 (Import) vs 1002-1011 (Reset confirm Sheet) | persona=import-backup-overwrites
+15 [MEDIUM]      (inconsistency) Sleep-schedule + Day-block + onboarding time pickers have no programmatic label (visible text is an unlinked <p>/<Eyebrow>)
+        area=src/app/profile/page.tsx:224-238 & 282-296; src/app/onboarding/page.tsx:506-520 | persona=a11y-authed-surfaces
+16 [MEDIUM]      (ux-confusion) Suggested default quiet hours (22:00→07:00) silently drop the night-shift user's core overnight reminders, and the copy is inverted for them
+        area=src/app/profile/page.tsx:571-606 (quiet-hours prefill + "nothing buzzes overnight" copy) → src/lib/smartReminders.ts:56-69 (resolveReminderMinutes returns null) | persona=night-shift
+17 [MEDIUM]      (ux-confusion) “Link it” silently discards the block the user picked when the linked atom's anchor disagrees
+        area=src/app/protocols/page.tsx:1213-1247 (Link-it userFields) + pickAtomToDraft:406-429; engine block re-file src/lib/engine.ts:372-394 | persona=custom-pack-author
+18 [MEDIUM]      (data-risk) “Make it editable” (fork) silently drops every prior per-behavior edit the author made on the official pack
+        area=src/app/protocols/page.tsx:1451-1477 (Make it editable) → duplicatePack src/lib/storage.ts:1253-1288; override prune storage.ts:283-321; override lookup engine.ts:211 | persona=custom-pack-author
+19 [MEDIUM]      (bug) Protocols view is WIPED during vacation — every behavior vanishes, stats read "0 behaviors" (includeDisabled escape hatch is dead)
+        area=src/app/protocols/page.tsx:217-241,265-274,757-758 + src/lib/engine.ts:181 vs 212-215 | persona=vacation-mode
+20 [MEDIUM]      (safety) Protocols 'Your system / Discover' tab control conveys the active tab by colour only (no aria-pressed/role=tab)
+        area=src/app/protocols/page.tsx:460-484 | persona=a11y-authed-surfaces
+21 [MEDIUM]      (inconsistency) PWA app-icon badge shows full pending count on day 1, contradicting the "nothing's expected of you yet" soft entry
+        area=src/app/today/page.tsx (badge effect) vs firstDaySoft soft-entry banner | persona=new-user-midday
+22 [MEDIUM]      (ux-confusion) First check-in tap flips the banner to a finished "Recovery mode" read while the check-in card below still shows the unanswered two-tap prompt
+        area=src/app/today/page.tsx (banner uses sig=getSignals; card uses done=both-taps) + src/components/today/DailyCheckInCard.tsx | persona=recovery-mode
+23 [MEDIUM]      (nonsense-but-works) StreakFreeze prompt fires during vacation — "Off day? Spend a freeze to keep your streak" while the streak is already frozen, and it burns a real token
+        area=src/app/today/page.tsx:1185-1194 + src/components/today/StreakFreeze.tsx:57 + src/lib/scoring.ts:218-235 + src/lib/storage.ts:955-962 | persona=vacation-mode
+24 [MEDIUM]      (inconsistency) Vacation Today shows an adaptive mode banner ("Recovery mode / Easing back") — contradicts "timeline goes quiet"
+        area=src/app/today/page.tsx:1285 (banner gate) + src/lib/engine.ts:1154-1185 adapt() | persona=vacation-mode
+25 [MEDIUM]      (inconsistency) Today's "Suggestion" card runs on stale pre-gap data and contradicts the "Welcome back, ease in" banner right above it
+        area=src/app/today/page.tsx:1957 (render) + src/lib/intel.ts:481-600 (suggestions()) | persona=long-gap-returner
+26 [MEDIUM]      (nonsense-but-works) Ticking all supplements on vacation triggers the full "You've closed the day — every behavior done" celebration
+        area=src/app/today/page.tsx:781-786 (dayComplete) + 1196-1240 (celebration) + 743-779 (suppProgToday/allSuppHandledToday) | persona=vacation-mode
+27 [MEDIUM]      (ux-confusion) Rebuild mode trims behaviors to "a few essentials" but the FULL supplement stack still renders and blocks "day complete"
+        area=src/app/today/page.tsx:781-786 (dayComplete) + 2079-2114 (supplement render) ; src/lib/supplements.ts supplementsForBlock ; src/lib/engine.ts:1768-1819 (rebuild shaping) | persona=long-gap-returner
+28 [MEDIUM]      (nonsense-but-works) Vacation user with ANY supplements never sees the "You're on a break" surface — Today renders fully active
+        area=src/app/today/page.tsx:928-1008 (hasSupplementsToday gate) + src/lib/supplements.ts:303-317 (supplementsForBlock) + src/lib/engine.ts:181 | persona=vacation-mode
+29 [MEDIUM]      (overclaim) /upgrade shows trial urgency ("Lock it in so nothing resets") + a live price selector that nothing can act on — contradicted by "coming soon / full access today" on the same screen
+        area=src/app/upgrade/page.tsx | persona=trial-active-day3
+30 [MEDIUM]      (overclaim) /upgrade sells "the full intelligence layer (Keystone, weekly review, … adaptive suggestions)" as Premium, but a lapsed-trial free user already gets all of it (live on Today, delayed on Insights) except the Correlation Explorer
+        area=src/app/upgrade/page.tsx (VALUE list) vs src/app/today/page.tsx + src/app/insights/page.tsx | persona=trial-expired-free
+31 [MEDIUM]      (overclaim) Upgrade page sells "weight trends" as driving biomarker-aware adaptation, but weight never affects the day
+        area=src/app/upgrade/page.tsx:27 (VALUE prop) ↔ src/lib/engine.ts:760 (biomarkerConcern) + biomarkers.ts:45 (weight def) | persona=paid-premium
+32 [MEDIUM]      (safety) BehaviorSheet 'Active days' + 'When' controls: single-letter buttons, no aria-pressed, no day names
+        area=src/components/BehaviorSheet.tsx:467-489 (Active days), 186-228 (When pills) | persona=a11y-authed-surfaces
+33 [MEDIUM]      (ux-confusion) CorrelationExplorer renders a full interactive 'compare your logs' tool on day zero, reporting '0 of 8 days' while the same page says 'check in for about a week'
+        area=src/components/CorrelationExplorer.tsx + src/app/insights/page.tsx | persona=first-ever-day-zero-empty
+34 [MEDIUM]      (safety) Correlation explorer: two native <select>s with no accessible name ('Compare A vs B')
+        area=src/components/CorrelationExplorer.tsx:20-40 (Select) used at 144-148 | persona=a11y-authed-surfaces
+35 [MEDIUM]      (safety) SupplementSheet modal has ZERO aria attributes — day toggles, When-pills and the inputs are unnamed/stateless to AT
+        area=src/components/SupplementSheet.tsx (whole file; 103-118, 132-157, 67-128) | persona=a11y-authed-surfaces
+36 [MEDIUM]      (ux-confusion) TimezoneSentry "Update" on a westward move rewinds the Today board behind already-logged days, orphaning that day's progress
+        area=src/components/TimezoneSentry.tsx (Update handler) + src/app/today/page.tsx (selectedDate) | persona=traveler-tz
+37 [MEDIUM]      (safety) Daily check-in sleep/energy rating buttons: selected rating signalled by colour only (no aria-pressed / radiogroup)
+        area=src/components/today/DailyCheckInCard.tsx:90-131 | persona=a11y-authed-surfaces
+38 [MEDIUM]      (inconsistency) Coverage gap let the installedPacks asymmetry ship: the 2026-06-09 gate test asserts supplements/overrides are 'meaningful' but never installedPacks
+        area=src/lib/__tests__/data-safety-merge.test.ts:58-91 — 'first-sign-in conflict gate sees config slices (audit 2026-06-09)' | persona=guest-packs-only-merge
+39 [MEDIUM]      (data-risk) Biomarker plausibility guard is one-sided: a ceiling but no floor — a low typo silently poisons bands and the recovery engine
+        area=src/lib/biomarkers.ts (BiomarkerDef — no `min`); src/lib/storage.ts:1300; src/app/biomarkers/page.tsx:68 | persona=biomarker-heavy
+40 [MEDIUM]      (ux-confusion) validateBundleGovernance warnings are computed then silently discarded — they never reach the admin
+        area=src/lib/cms/publish.ts publishBundle / PublishResult ↔ src/app/admin/page.tsx publish button | persona=cms-publish-thin-bundle-source
+41 [MEDIUM]      (data-risk) Cross-device merge takes max(premiumTrialEndsAt) — one clock-skewed device inflates the trial for the whole account, with no clamp
+        area=src/lib/datasource.ts:446-449 (mergeStates → laterIso on premiumTrialEndsAt) | persona=entitlement-clock-skew-rollback
+42 [MEDIUM]      (overclaim) Recovery-mode banner claims "the demanding work is set aside" even when the user has no demanding work installed (sleep-only persona = the default recovery user)
+        area=src/lib/engine.ts (baselineAdapt recovery branch + MODE_DEFAULT_COPY) → rendered in src/app/today/page.tsx adaptive banner | persona=recovery-mode
+43 [MEDIUM]      (bug) Mastery streak treats an override/atom-scheduled weekend-only behavior as daily — it can never graduate
+        area=src/lib/engine.ts masteredKeys() daysActiveFor lookup (lines 1580-1595, used in streak walk 1648-1654) | persona=weekend-only-custom
+44 [MEDIUM]      (data-risk) Trial/premium is computed purely from device Date.now() with no server-time anchor — rolling the clock back keeps Premium on forever (offline-unbounded)
+        area=src/lib/entitlements.ts:60-88 (getAccess); consumers storage.ts:1176,1315; engine.ts:953; insights/page.tsx:60 | persona=entitlement-clock-skew-rollback
+45 [MEDIUM]      (bug) One-shot trial-extension guard can be permanently burned by a forward clock jump, then never re-granted on correction
+        area=src/lib/entitlements.ts:95-122 (maybeExtendTrial) | persona=entitlement-clock-skew-rollback
+46 [MEDIUM]      (inconsistency) Insights "What's sticking" report shows the conflict-muted keystone (Strength) at 0% in alert-red — the app blames the user for a behavior it itself suppresses
+        area=src/lib/intel.ts behaviorAdherence() → src/components/BehaviorReportCard.tsx; src/app/insights/page.tsx:156,468 | persona=power-user-conflicts
+47 [MEDIUM] ⚠REG (inconsistency) Stored day score disagrees with the visible board after a swap in essentials mode (denominator excludes the completed replacement)
+        area=src/lib/storage.ts computeBehaviorScore (642-678) — shares the shapeTimeline pipeline with the two findings above | persona=workout-swapper
+48 [MEDIUM]      (data-risk) Import bypasses every entitlement clamp — an old/edited backup re-writes tier, trial window, biomarker count and installed-pack count verbatim
+        area=src/lib/storage.ts:179-437 (normalize) & 408-436 return; entitlement guards only at storage.ts:1176 (installPack) and 1315 (addBiomarker) | persona=import-backup-overwrites
+49 [MEDIUM]      (data-risk) normalize() heals future-dated biomarkers on load but does NOT scrub non-positive / above-max readings — the plausibility guarantee has a hole at the import/cloud boundary
+        area=src/lib/storage.ts:421-423 (normalize) vs storage.ts:1300-1309 (addBiomarker); parseState storage.ts:458-462 | persona=biomarker-heavy
+50 [MEDIUM]      (data-risk) Day boundary splits the night-shift user's single continuous waking period across two calendar dates at midnight
+        area=src/lib/storage.ts:619-621 (getLogForDate keyed purely on dateKeyInTz) + src/app/today/page.tsx:531-534 (selectedDate=dateKeyInTz at offset 0) + 781-786 (dayComplete) | persona=night-shift
+51 [MEDIUM]      (dead-option) The night-owl escape hatch (custom blockBoundaries) is structurally impossible to set for a wrap schedule — silently falls back to 5/12/17
+        area=src/lib/time.ts:108-133 (resolveBlockBounds ascending guard) vs src/lib/types.ts:105-109 (documented "shift worker / night owl" purpose) | persona=night-shift
+52 [MEDIUM]      (ux-confusion) Whole waking day mis-blocked: wake-anchored "morning" routine files under "Evening", bedtime routine files under "Morning"
+        area=src/lib/time.ts:293-299 (blockForMinutes awake-clock split) + src/lib/engine.ts:393 (it.block = blockForMinutes) | persona=night-shift
+53 [MEDIUM]      (ux-confusion) Bulk "Move to…" silently no-ops on hard-window behaviors (morning-sunlight, wind-down…) while the per-item move menu correctly disables those blocks
+        area=Today bulk-action bar / BulkMoveSheet — src/components/today/BulkMoveSheet.tsx + src/app/today/page.tsx | persona=iphone-se-onboarding-sheets
+54 [LOW   ]      (inconsistency) Reminders header comment claims in-tab + background dedupe via tag, but they use different tags — duplicate notification when app is open at the reminder minute
+        area=In-tab vs background notification tags (src/components/Reminders.tsx, api/push/send-due) | persona=reminders-quiet-hours
+55 [LOW   ]      (nonsense-but-works) Smart-timing learned time has no circular-clock handling — a behavior logged around midnight learns a nonsensical ~noon reminder
+        area=learnedReminderMinutes median (src/lib/smartReminders.ts) | persona=reminders-quiet-hours
+56 [LOW   ]      (dead-option) Custom day-block label has no length cap — a long label overflows the BulkMoveSheet grid buttons and the Today block headers on a phone
+        area=Profile block-label input → BulkMoveSheet / Today block headers — src/app/profile/page.tsx + src/components/today/BulkMoveSheet.tsx + src/app/today/page.tsx | persona=iphone-se-onboarding-sheets
+57 [LOW   ]      (ux-confusion) Quiet-hours window with equal start and end is silently inert while the UI presents it as an active do-not-disturb window
+        area=Quiet hours config vs inQuietHours (src/app/profile/page.tsx, src/lib/time.ts) | persona=reminders-quiet-hours
+58 [LOW   ]      (ux-confusion) Insights "Your next habit" recommends a specific behavior but sends you to a pack-only catalog where it can't be added
+        area=src/app/insights/page.tsx:424-459 (card) ↔ src/lib/intel.ts:1067-1111 (nextBestAddition) ↔ src/app/library/page.tsx (redirect to /protocols#discover) | persona=paid-premium
+59 [LOW   ]      (ux-confusion) Profile membership CTA reads "Restore full intelligence" for a lapsed-trial user, but on the live inert-Stripe path /upgrade can't restore anything ("paid plans are coming soon")
+        area=src/app/profile/page.tsx | persona=trial-expired-free
+60 [LOW   ]      (ux-confusion) No way to set a custom behavior's active days at creation — weekend-only requires a hidden second step
+        area=src/app/protocols/page.tsx custom builder addBehaviorToDraft (349-397) + pickAtomToDraft (406-430); create form UI (1187-1325) | persona=weekend-only-custom
+61 [LOW   ]      (inconsistency) Create-from-scratch behaviors are permanently keyed under the literal namespace "draft", not the saved pack id
+        area=src/app/protocols/page.tsx:351 & 410 (`packId = editingId ?? "draft"`) → customCanonicalKey src/lib/packs.ts:2694-2705; saved pack id page.tsx:323 | persona=custom-pack-author
+62 [LOW   ] ⚠REG (overclaim) 'Day complete' celebration tells a supplement-only user 'Every behavior, done.' when they have zero behaviors
+        area=src/app/today/page.tsx (dayComplete celebration copy, lines 1230-1237) | persona=supplement-only
+63 [LOW   ]      (inconsistency) The 'adaptive suggestions / keystone / weekly review' sold as the Premium intelligence layer render on Today for ALL tiers — the trial isn't actually gating those surfaces
+        area=src/app/today/page.tsx (suggestions, Focus chip, weekly/identity pointers) | persona=trial-active-day3
+64 [LOW   ]      (ux-confusion) Today empty-state tells a weekend-only user 'blank canvas — install a protocol' on weekdays, when they already have a system
+        area=src/app/today/page.tsx empty-state branch (939-1007) | persona=weekend-only-custom
+65 [LOW   ]      (inconsistency) Recovery chip can read "Good" while the banner says "Lighter day / Last night was rough" (poor sleep + high energy)
+        area=src/app/today/page.tsx signal-chip thresholds vs baselineAdapt sleep override | persona=recovery-mode
+66 [LOW   ]      (inconsistency) "Tomorrow's first focus" card is sourced from TODAY's compiled timeline, so a morning behavior scheduled today-but-not-tomorrow would be mislabeled as tomorrow's kickoff
+        area=src/app/today/page.tsx tomorrowFirstFocus (first-day soft entry card) | persona=new-user-midday
+67 [LOW   ]      (ux-confusion) Edit-mode move-menu is role='menu' but has no arrow-key navigation or aria-orientation (Tab-only)
+        area=src/app/today/page.tsx:2380-2456 | persona=a11y-authed-surfaces
+68 [LOW   ]      (ux-confusion) Inert-Stripe path: /upgrade shows a fully interactive 3-tier price selector that leads nowhere — selecting Annual/Monthly/Lifetime does nothing, the only real action is "Continue on the free plan"
+        area=src/app/upgrade/page.tsx | persona=trial-expired-free
+69 [LOW   ]      (ux-confusion) Toggling all 'Active days' off in the sheet makes a behavior vanish live with no 'paused' indication until reload
+        area=src/components/BehaviorSheet.tsx Active-days toggle (469-488); heal lives in storage.ts normalize (308-318), not in the live write | persona=weekend-only-custom
+70 [LOW   ]      (ux-confusion) BehaviorSheet on a 'Resting today' (conflict-muted) row still shows the reminder toggle ON, implying a notification will fire for a behavior that can't be done
+        area=src/components/BehaviorSheet.tsx:492-523 (Reminder toggle); src/components/Reminders.tsx:94,181 | persona=power-user-conflicts
+71 [LOW   ]      (ux-confusion) TimezoneSentry "Not now" is remembered permanently per device-timezone string — a repeat traveler never sees the prompt again for a city they once dismissed
+        area=src/components/TimezoneSentry.tsx (DISMISS_KEY logic) | persona=traveler-tz
+72 [LOW   ]      (ux-confusion) Blood pressure burns 2 of the 3 free metric slots, and nothing tells the user — a free biomarker user can't record a complete BP alongside one other marker
+        area=src/lib/biomarkers.ts:100,111 (systolic & diastolic are separate metrics); src/app/biomarkers/page.tsx:53-56, 138-140, 157 | persona=biomarker-heavy
+73 [LOW   ]      (nonsense-but-works) biomarkerBand tags dangerously-LOW 'lower-is-better' readings as green 'Optimal' with no caution
+        area=src/lib/biomarkers.ts:159-162 (biomarkerBand, 'lower' branch); rendered as a badge in src/app/biomarkers/page.tsx:173-182 | persona=biomarker-heavy
+74 [LOW   ]      (ux-confusion) Signed-in second tab's check-in is correctly NOT clobbered, but the two tabs stay visibly divergent until an unrelated refocus (no live cross-tab reconcile)
+        area=src/lib/datasource.ts (SupabaseDataSource.save concurrency guard + notify) + src/hooks/useAppState.ts | persona=two-tabs-same-browser
+75 [LOW   ]      (ux-confusion) "Nothing needs easing today" banner contradicts itself by listing a flagged biomarker as the day's reason
+        area=src/lib/engine.ts:1099-1109 (normal-mode adapt) → src/app/today/page.tsx:1315-1318,1434-1446 (banner tone + reason bullet) | persona=paid-premium
+76 [LOW   ]      (bug) Biomarker-aware ease can be silently masked when a recovery marker and a non-recovery marker are both in "Watch" the same day
+        area=src/lib/engine.ts:746-772 (biomarkerConcern pick) → engine.ts:1075 (bioRecoveryFlag ease branch) | persona=paid-premium

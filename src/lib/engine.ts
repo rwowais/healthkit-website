@@ -1876,6 +1876,30 @@ export function shapeTimeline(
     );
   }
 
+  // Swap markers are authoritative for *today*. applySwaps runs BEFORE this
+  // function, but every mode branch (recovery/essentials/lighter/rebuild)
+  // rebuilds `muted` from scratch with zero swap awareness — which silently
+  // (a) hid the replacement the user explicitly chose (and zeroed its score,
+  // since computeBehaviorScore counts only non-muted items), and
+  // (b) resurrected the swapped-away original as an un-completable active
+  // to-do that blocked "day complete". Re-assert swap state as the final word
+  // so a per-day swap survives any adaptation mode:
+  //   • the swapped-away original (swappedTo) stays muted/hidden, always;
+  //   • the chosen replacement (swappedFrom) is un-muted UNLESS a genuine
+  //     safety conflict-mute applies (muteReason "conflict …") — a real
+  //     restraint still wins over a manual swap, but a mere mode trim doesn't.
+  shaped = shaped.map((it) => {
+    if (it.swappedTo) return it.muted ? it : { ...it, muted: true };
+    if (
+      it.swappedFrom &&
+      it.muted &&
+      !(it.muteReason ?? "").startsWith("conflict")
+    ) {
+      return { ...it, muted: false, muteReason: undefined };
+    }
+    return it;
+  });
+
   return shaped;
 }
 
