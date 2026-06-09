@@ -180,22 +180,30 @@ export function getPendingConflict() {
   return pendingConflict;
 }
 
-function hasMeaningfulData(s: AppState): boolean {
+export function hasMeaningfulData(s: AppState): boolean {
   return (
     (s.dailyLogs?.length ?? 0) > 0 ||
     (s.biomarkers?.length ?? 0) > 0 ||
-    (s.customPacks?.length ?? 0) > 0
+    (s.customPacks?.length ?? 0) > 0 ||
+    (s.supplements?.length ?? 0) > 0 ||
+    Object.keys(s.behaviorOverrides ?? {}).length > 0
   );
 }
 
-function slicesDiffer(a: AppState, b: AppState): boolean {
+export function slicesDiffer(a: AppState, b: AppState): boolean {
+  const j = (v: unknown) => JSON.stringify(v ?? null);
   return (
-    JSON.stringify(a.dailyLogs ?? []) !==
-      JSON.stringify(b.dailyLogs ?? []) ||
-    JSON.stringify(a.biomarkers ?? []) !==
-      JSON.stringify(b.biomarkers ?? []) ||
-    JSON.stringify([...(a.installedPacks ?? [])].sort()) !==
-      JSON.stringify([...(b.installedPacks ?? [])].sort())
+    j(a.dailyLogs ?? []) !== j(b.dailyLogs ?? []) ||
+    j(a.biomarkers ?? []) !== j(b.biomarkers ?? []) ||
+    j([...(a.installedPacks ?? [])].sort()) !==
+      j([...(b.installedPacks ?? [])].sort()) ||
+    // Config a guest may have customized that a silent cloud-wins would
+    // otherwise discard on first sign-in (audit 2026-06-09 data-loss finding):
+    // custom packs, their supplement stack, and per-behavior overrides. Any
+    // divergence here now raises the conflict prompt instead of overwriting.
+    j(a.customPacks ?? []) !== j(b.customPacks ?? []) ||
+    j(a.supplements ?? []) !== j(b.supplements ?? []) ||
+    j(a.behaviorOverrides ?? {}) !== j(b.behaviorOverrides ?? {})
   );
 }
 

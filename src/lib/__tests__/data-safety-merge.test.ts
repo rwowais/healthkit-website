@@ -5,7 +5,7 @@
  * dropping un-pushed local edits (then pushing the loss back up).
  */
 import { describe, it, expect } from "vitest";
-import { mergeStates } from "@/lib/datasource";
+import { mergeStates, slicesDiffer, hasMeaningfulData } from "@/lib/datasource";
 import { getDefaultState } from "@/lib/storage";
 import type { AppState, Supplement } from "@/lib/types";
 
@@ -52,5 +52,41 @@ describe("mergeStates preserves local-only slices (dirty / local-preferring merg
     const local = base(); // no supplements set
     const merged = mergeStates(local, cloud);
     expect(merged.supplements?.some((x) => x.id === "cloud-1")).toBe(true);
+  });
+});
+
+describe("first-sign-in conflict gate sees config slices (audit 2026-06-09)", () => {
+  // Before the fix the gate compared only logs/biomarkers/installedPacks, so a
+  // guest with divergent supplements / custom packs / behavior overrides but
+  // matching logs was silently cloud-overwritten (data loss) instead of prompted.
+  it("slicesDiffer flags a divergent supplement stack", () => {
+    const a = base();
+    a.supplements = [supp("s1", "Magnesium")];
+    expect(slicesDiffer(a, base())).toBe(true);
+  });
+
+  it("slicesDiffer flags divergent custom packs and behavior overrides", () => {
+    const a1 = base();
+    a1.customPacks = [
+      { id: "custom-x" } as unknown as AppState["customPacks"][number],
+    ];
+    expect(slicesDiffer(a1, base())).toBe(true);
+
+    const a2 = base();
+    a2.behaviorOverrides = { "morning-sunlight": { customTime: "08:15" } };
+    expect(slicesDiffer(a2, base())).toBe(true);
+  });
+
+  it("slicesDiffer stays false for two identical default states", () => {
+    expect(slicesDiffer(base(), base())).toBe(false);
+  });
+
+  it("hasMeaningfulData counts supplements and overrides as meaningful", () => {
+    const s = base();
+    s.behaviorOverrides = { "wind-down": { block: "evening" } };
+    expect(hasMeaningfulData(s)).toBe(true);
+    const t = base();
+    t.supplements = [supp("s2", "Creatine")];
+    expect(hasMeaningfulData(t)).toBe(true);
   });
 });
