@@ -191,7 +191,7 @@ export function minutesToHM(min: number): string {
 }
 
 /** Shape the time-window helpers read off a behavior. */
-type WindowItem = {
+export type WindowItem = {
   anchor: string;
   timeWindow?: { min: number; max: number; strict?: boolean };
 };

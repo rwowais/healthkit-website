@@ -15,8 +15,11 @@ import {
   isDone,
 } from "@/lib/engine";
 import { keystone } from "@/lib/intel";
-import { effectiveMinutes, inQuietHours } from "@/lib/time";
-import { learnedReminderMinutes } from "@/lib/smartReminders";
+import { effectiveMinutes } from "@/lib/time";
+import {
+  learnedReminderMinutes,
+  resolveReminderMinutes,
+} from "@/lib/smartReminders";
 import { getTz, dateKeyInTz, dayIndexInTz, nowMinutesInTz } from "@/lib/tz";
 import {
   pushAvailable,
@@ -97,10 +100,16 @@ export default function Reminders() {
       // Smart timing: fire at the learned typical completion time when there's
       // enough history (else the scheduled time). Only retimes already-timed
       // behaviors — untimed "anytime" items stay reminder-free.
-      const t = learnedReminderMinutes(state, it.canonicalKey) ?? sched;
-      // Quiet hours: never POST a time inside the user's do-not-disturb window
-      // (the cron would otherwise push it overnight).
-      if (inQuietHours(t, state.settings.quietHours)) continue;
+      // Smart timing → hard-window clamp → quiet-hours fallback, in one place
+      // shared with the in-tab path (see resolveReminderMinutes). null = skip.
+      const t = resolveReminderMinutes(
+        learnedReminderMinutes(state, it.canonicalKey),
+        sched,
+        it,
+        state.settings,
+        state.settings.quietHours
+      );
+      if (t == null) continue;
       const h = Math.floor(t / 60) % 24;
       const m = t % 60;
       const hm = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -176,9 +185,15 @@ export default function Reminders() {
       if (sched == null) continue;
       // Smart timing: prefer the learned typical completion time when there's
       // enough history (see learnedReminderMinutes); else the scheduled time.
-      const t = learnedReminderMinutes(state, it.canonicalKey) ?? sched;
-      // Quiet hours: never fire inside the user's do-not-disturb window.
-      if (inQuietHours(t, state.settings.quietHours)) continue;
+      // Smart timing → hard-window clamp → quiet-hours fallback (shared helper).
+      const t = resolveReminderMinutes(
+        learnedReminderMinutes(state, it.canonicalKey),
+        sched,
+        it,
+        state.settings,
+        state.settings.quietHours
+      );
+      if (t == null) continue;
       const deltaMin = t - now;
       // Fire when the scheduled minute is NOW (deltaMin === 0) too — the
       // server path matches the current minute via times.includes(hm), so

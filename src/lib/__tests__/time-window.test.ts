@@ -8,6 +8,7 @@ import {
 } from "@/lib/time";
 import { compileTimeline } from "@/lib/engine";
 import { getDefaultState } from "@/lib/storage";
+import { resolveReminderMinutes } from "@/lib/smartReminders";
 
 const settings = { wakeTime: "07:00", bedtime: "22:30" };
 // morning light: anchor wake, allowed within 0–120 min of waking (7:00–9:00)
@@ -138,5 +139,38 @@ describe("bed-anchored window that wraps past midnight (night-owl bedtime)", () 
     const blocks = windowBlocks(windDown, lateSettings);
     expect(blocks.length).toBeGreaterThan(0);
     expect(blocks).toContain("evening");
+  });
+});
+
+describe("resolveReminderMinutes — clamp to window + quiet-hours fallback (audit 2026-06-09)", () => {
+  // sunlight: strict morning-light window 7:00–9:00; settings wake 07:00.
+  it("clamps a learned time that drifted outside a hard window back in", () => {
+    // User logged morning light at noon a few times → learned 12:00. The
+    // reminder must NOT fire at noon; it clamps to the 9:00 window edge.
+    expect(resolveReminderMinutes(720, 480, sunlight, settings)).toBe(540); // → 9:00
+  });
+
+  it("leaves a windowless behavior's learned time untouched", () => {
+    expect(resolveReminderMinutes(800, 600, free, settings)).toBe(800);
+  });
+
+  it("falls back to the scheduled time when the learned time is in quiet hours", () => {
+    // Learned 23:30 is inside 22:00–07:00 DND; scheduled 21:00 is not → use 21:00
+    // rather than dropping the reminder (the Smart-timing-drops-reminder bug).
+    const q = { start: "22:00", end: "07:00" };
+    expect(resolveReminderMinutes(23 * 60 + 30, 21 * 60, free, settings, q)).toBe(
+      21 * 60
+    );
+  });
+
+  it("returns null only when BOTH learned and scheduled fall in quiet hours", () => {
+    const q = { start: "22:00", end: "07:00" };
+    expect(
+      resolveReminderMinutes(23 * 60, 23 * 60 + 30, free, settings, q)
+    ).toBeNull();
+  });
+
+  it("no quiet hours → learned time passes through", () => {
+    expect(resolveReminderMinutes(600, 540, free, settings)).toBe(600);
   });
 });

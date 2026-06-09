@@ -555,10 +555,11 @@ export default function ProfilePage() {
             </button>
           </Row>
           <p className="t-caption mt-1 leading-relaxed">
-            Reminders fire at each behavior&apos;s scheduled time —
-            including when the app is closed, if you&apos;ve added
-            Protocolize to your home screen. iOS Safari requires
-            installing to the home screen first.
+            With the app open, reminders name each behavior at its time and
+            skip ones you&apos;ve already done. When it&apos;s closed (added to
+            your home screen) you&apos;ll get a gentle nudge to open Today at
+            those times — quiet hours apply. iOS Safari requires installing to
+            the home screen first.
           </p>
           {s.notificationsEnabled && (
             <div className="mt-3">
