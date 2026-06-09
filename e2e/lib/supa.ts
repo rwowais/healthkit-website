@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { WebSocket as NodeWebSocket } from "ws";
+import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -28,6 +29,8 @@ export const USERS_FILE = path.join(AUTH_DIR, "users.json");
 // (or a crashed run) created, and nothing else — critical when running in prod.
 export const EMAIL_PREFIX = "e2e-pw-";
 const DOMAIN = process.env.E2E_EMAIL_DOMAIN || "example.com";
+// The app's localStorage key for the whole AppState (src/lib/constants.ts).
+export const STORAGE_KEY = "protocolize-v3";
 
 export function env() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -119,4 +122,63 @@ export function freshState() {
     settings: { ...s.settings, completedOnboarding: false },
     installedPacks: [],
   };
+}
+
+/**
+ * Create a throwaway, email-confirmed test user (service-role) and optionally
+ * seed its cloud state row. The `e2e-pw-` email prefix lets global-teardown
+ * clean it up afterward.
+ */
+export async function createUser(
+  admin: SupabaseClient,
+  opts: { state?: object } = {}
+): Promise<{ id: string; email: string; password: string }> {
+  const email = makeEmail();
+  const password = `E2e!${randomUUID()}`;
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (error) throw new Error(`createUser failed: ${error.message}`);
+  const id = data.user!.id;
+  if (opts.state) {
+    const { error: e2 } = await admin
+      .from("protocolize_state")
+      .upsert({ user_id: id, state: opts.state });
+    if (e2) throw new Error(`seed state failed: ${e2.message}`);
+  }
+  return { id, email, password };
+}
+
+/**
+ * Sign in through the REAL /auth form and wait for the expected landing URL.
+ * Retries a few times with a generous budget because the first login of a run
+ * can eat a prod cold-start (see global-setup notes). Shared by global-setup
+ * and the authed specs.
+ */
+export async function signInViaUI(
+  page: Page,
+  email: string,
+  password: string,
+  expectUrl: string | RegExp | ((url: URL) => boolean),
+  opts: { attempts?: number; timeout?: number } = {}
+): Promise<void> {
+  const attempts = opts.attempts ?? 3;
+  const timeout = opts.timeout ?? 90_000;
+  let lastErr: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await page.goto("/auth");
+      await page.getByTestId("auth-email").fill(email);
+      await page.getByTestId("auth-password").fill(password);
+      await page.getByTestId("auth-submit").click();
+      await page.waitForURL(expectUrl, { timeout });
+      return;
+    } catch (e) {
+      lastErr = e;
+      await page.waitForTimeout(2000); // brief settle, then retry
+    }
+  }
+  throw new Error(`signInViaUI failed after ${attempts} attempts: ${String(lastErr)}`);
 }

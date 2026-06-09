@@ -8,6 +8,7 @@ import {
   makeEmail,
   onboardedState,
   freshState,
+  signInViaUI,
   AUTH_DIR,
   USERS_FILE,
 } from "./lib/supa";
@@ -68,27 +69,9 @@ export default async function globalSetup(config: FullConfig) {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ baseURL });
-    let signedIn = false;
-    let lastErr: unknown;
-    for (let attempt = 1; attempt <= 3 && !signedIn; attempt++) {
-      try {
-        await page.goto("/auth");
-        await page.getByTestId("auth-email").fill(aEmail);
-        await page.getByTestId("auth-password").fill(password);
-        await page.getByTestId("auth-submit").click();
-        // Onboarded → the wall lets A straight through to Today.
-        await page.waitForURL("**/today", { timeout: 90_000 });
-        signedIn = true;
-      } catch (e) {
-        lastErr = e;
-        await page.waitForTimeout(2000); // brief settle, then retry
-      }
-    }
-    if (!signedIn) {
-      throw new Error(
-        `A could not sign in after 3 attempts: ${String(lastErr)}`
-      );
-    }
+    // Onboarded → the wall lets A straight through to Today. (Retries inside —
+    // the first login of a run can eat a prod cold-start.)
+    await signInViaUI(page, aEmail, password, "**/today");
     await page.context().storageState({ path: path.join(AUTH_DIR, "a.json") });
   } finally {
     await browser.close();
