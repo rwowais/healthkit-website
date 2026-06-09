@@ -3166,6 +3166,24 @@ export default function TodayPage() {
         onChange={(next) => {
           if (detail) setBehaviorOverride(detail.canonicalKey, next);
         }}
+        // Surface workout swap from the sheet so it's discoverable, not just an
+        // easy-to-miss inline chip. Same gating as the chip: today, a workout,
+        // not muted, not already swapped, not yet done.
+        onSwap={
+          detail &&
+          isToday &&
+          detailItem &&
+          isWorkoutBehavior(detailItem) &&
+          !detailItem.muted &&
+          !detailItem.swappedFrom &&
+          !isDone(log, detail.canonicalKey)
+            ? () => {
+                const k = detail.canonicalKey;
+                setDetail(null);
+                setSwapForKey(k);
+              }
+            : undefined
+        }
         onToggleEnabled={
           detail
             ? () => {

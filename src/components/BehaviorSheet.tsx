@@ -48,6 +48,7 @@ export default function BehaviorSheet({
   onClose,
   onChange,
   onToggleEnabled,
+  onSwap,
   isEnabled = true,
   onSnooze,
   snoozed,
@@ -62,6 +63,10 @@ export default function BehaviorSheet({
   onClose: () => void;
   onChange: (next: BehaviorOverride) => void;
   onToggleEnabled?: () => void;
+  /** When provided (Today passes it only for a workout behavior that's still
+   *  swappable today), renders a "Swap for a different workout" action so swap
+   *  is reachable from the sheet, not just the small inline row chip. */
+  onSwap?: () => void;
   isEnabled?: boolean;
   onSnooze?: (mode: "later" | "tomorrow" | null) => void;
   snoozed?: "later" | "tomorrow";
@@ -571,6 +576,16 @@ export default function BehaviorSheet({
             (provenance line OR muteReason OR contraindication list);
             otherwise stays out of the way. */}
         <AboutThisBehavior item={item} />
+
+        {onSwap && (
+          <button
+            onClick={onSwap}
+            className="press tr-fast flex w-full items-center justify-center gap-1.5 rounded-[var(--r-pill)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--readiness)]"
+          >
+            <Icon name="arrowRight" size={14} />
+            Swap for a different workout today
+          </button>
+        )}
 
         {onToggleEnabled && (
           <button
