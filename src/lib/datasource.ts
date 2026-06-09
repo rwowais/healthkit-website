@@ -783,8 +783,13 @@ class SupabaseDataSource implements DataSource {
         state: local,
         updated_at: nowIso,
       });
-      lastCloudUpdatedAt =
-        (await this.readStateUpdatedAt(sb, userId)) ?? nowIso;
+      // If the head re-read fails, do NOT fall back to the client clock
+      // (nowIso): a server-skewed head would then look "ahead" of our
+      // client-clock baseline and the next save would mistake our own write for
+      // a remote one and drop it — the exact skew this baseline exists to avoid.
+      // Null disables the concurrency guard for one cycle (it requires a truthy
+      // baseline), so the next save re-reads and re-baselines off the server.
+      lastCloudUpdatedAt = await this.readStateUpdatedAt(sb, userId);
       clearPendingSync(); // local is now mirrored to the cloud row
       return await this.reconcileLogs(sb, userId, local);
     } catch {
@@ -853,8 +858,13 @@ class SupabaseDataSource implements DataSource {
       // our client clock — otherwise any client/server skew makes the
       // next save mistake our own write for a remote one and silently
       // drop it (every change after the first is lost).
-      lastCloudUpdatedAt =
-        (await this.readStateUpdatedAt(sb, userId)) ?? nowIso;
+      // If the head re-read fails, do NOT fall back to the client clock
+      // (nowIso): a server-skewed head would then look "ahead" of our
+      // client-clock baseline and the next save would mistake our own write for
+      // a remote one and drop it — the exact skew this baseline exists to avoid.
+      // Null disables the concurrency guard for one cycle (it requires a truthy
+      // baseline), so the next save re-reads and re-baselines off the server.
+      lastCloudUpdatedAt = await this.readStateUpdatedAt(sb, userId);
 
       // Dual-write the changed day(s) to the per-day table. Best effort:
       // the document write above already succeeded and stays the safety

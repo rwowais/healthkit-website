@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess } from "@/lib/entitlements";
-import { clearAllData, exportState, importState } from "@/lib/storage";
+import { clearAllData, exportState, importState, getDefaultState } from "@/lib/storage";
 import { getTz, dateKeyInTz } from "@/lib/tz";
 import { activeDataSource } from "@/lib/datasource";
 import { deleteAccount, supabaseEnabled } from "@/lib/auth";
@@ -1038,42 +1038,42 @@ export default function ProfilePage() {
               }
               clearAllData();
               if (hasSession) {
-                // Mint a minimal state that skips onboarding so the
-                // returning signed-in user lands on /today instead
-                // of the "what's your name" screen.
+                // Build the reset state from getDefaultState() so EVERY slice is
+                // present and EXPLICIT (installedPacks, protocols, supplementMeta,
+                // …). The old hand-built seed omitted installedPacks, so
+                // normalize() silently re-seeded DEFAULT_INSTALLED "by accident"
+                // and the reset was fragile to schema drift. We override only the
+                // fields intentionally preserved across a reset, and skip
+                // onboarding so the signed-in user lands on /today (not "what's
+                // your name"). Persist through the datasource (recreates the
+                // cloud row deterministically) instead of a raw localStorage
+                // write a tab-close could leave un-synced.
                 try {
-                  // Preserve the user's wake/bed/tz settings so a
-                  // signed-in reset doesn't silently overwrite
-                  // their schedule with stock defaults.
+                  const base = getDefaultState();
                   const seed = {
-                    version: 3,
+                    ...base,
                     settings: {
+                      ...base.settings,
                       name: s.name || "",
                       bedtime: s.bedtime || "23:00",
                       wakeTime: s.wakeTime || "07:00",
                       timezone: s.timezone || "",
                       // Carry the user's existing trial / entitlement across a
-                      // reset (retention) instead of restarting or dropping it.
-                      // Without tier + premiumTrialEndsAt, getAccess read the
-                      // user as expired-free immediately after a reset.
+                      // reset (retention) — without tier + premiumTrialEndsAt,
+                      // getAccess would read them as expired-free immediately.
                       tier: s.tier,
                       subscriptionStatus: s.subscriptionStatus ?? "trial",
                       trialStartDate: s.trialStartDate,
                       premiumTrialEndsAt: s.premiumTrialEndsAt,
-                      // Preserve medical/safety flags across a reset. This seed
-                      // sets completedOnboarding=true (skips the flow), so the
-                      // user is never re-asked — dropping safetyFlags here would
-                      // silently un-suppress contraindicated behaviors.
+                      // Preserve medical/safety flags — completedOnboarding=true
+                      // skips the flow, so dropping them would silently
+                      // un-suppress contraindicated behaviors.
                       safetyFlags: s.safetyFlags,
                       notificationsEnabled: false,
-                      weekStartsOn: 1,
                       completedOnboarding: true,
                     },
                   };
-                  localStorage.setItem(
-                    "protocolize-v3",
-                    JSON.stringify(seed)
-                  );
+                  await activeDataSource.save(seed);
                 } catch {}
               }
               setConfirmReset(false);
