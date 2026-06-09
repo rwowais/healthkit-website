@@ -22,9 +22,10 @@ import { useAppState } from "@/hooks/useAppState";
 import {
   curatedSupplementCatalog,
   supplementsForBlock,
+  isSupplementContraindicated,
 } from "@/lib/supplements";
 import SupplementSheet from "@/components/SupplementSheet";
-import type { Supplement, TimeBlock } from "@/lib/types";
+import type { Supplement, TimeBlock, SafetyFlag } from "@/lib/types";
 import {
   getTz,
   addDaysToKey,
@@ -159,6 +160,7 @@ function SupplementsInner() {
           <BrowseView
             catalog={catalog}
             installedIds={userIds}
+            flags={state.settings.safetyFlags ?? {}}
             onInstall={(s) => {
               haptic.medium();
               addSupplement(s);
@@ -390,11 +392,13 @@ function StackView({
 function BrowseView({
   catalog,
   installedIds,
+  flags,
   onInstall,
   onRemove,
 }: {
   catalog: Supplement[];
   installedIds: Set<string>;
+  flags: Partial<Record<SafetyFlag, boolean>>;
   onInstall: (s: Supplement) => void;
   onRemove: (id: string) => void;
 }) {
@@ -422,6 +426,10 @@ function BrowseView({
           )}
           {filtered.map((s) => {
             const installed = installedIds.has(s.id);
+            // A contraindicated supplement is hidden from the Stack + Today by
+            // the safety filter, so a working Add/Remove here is misleading
+            // (Add looked like nothing happened). Show an honest note instead.
+            const contra = isSupplementContraindicated(s, flags);
             return (
               <div
                 key={s.id}
@@ -456,30 +464,39 @@ function BrowseView({
                     )}
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    if (installed) {
-                      // Confirm before removing — matches the editor sheet's
-                      // guard, so a stray tap in Browse can't silently drop a
-                      // supplement. (History is preserved either way.)
-                      if (
-                        window.confirm(
-                          `Stop tracking ${s.name}? Your history is kept.`
+                {contra ? (
+                  <span
+                    className="shrink-0 text-right text-[11px] font-medium leading-tight text-[var(--text-3)]"
+                    style={{ maxWidth: 132 }}
+                  >
+                    Not recommended with your health settings
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (installed) {
+                        // Confirm before removing — matches the editor sheet's
+                        // guard, so a stray tap in Browse can't silently drop a
+                        // supplement. (History is preserved either way.)
+                        if (
+                          window.confirm(
+                            `Stop tracking ${s.name}? Your history is kept.`
+                          )
                         )
-                      )
-                        onRemove(s.id);
-                    } else onInstall(s);
-                  }}
-                  className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
-                  style={{
-                    background: installed
-                      ? "var(--surface-3)"
-                      : "var(--text-1)",
-                    color: installed ? "var(--text-2)" : "var(--bg)",
-                  }}
-                >
-                  {installed ? "Remove" : "Add"}
-                </button>
+                          onRemove(s.id);
+                      } else onInstall(s);
+                    }}
+                    className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
+                    style={{
+                      background: installed
+                        ? "var(--surface-3)"
+                        : "var(--text-1)",
+                      color: installed ? "var(--text-2)" : "var(--bg)",
+                    }}
+                  >
+                    {installed ? "Remove" : "Add"}
+                  </button>
+                )}
               </div>
             );
           })}

@@ -15,6 +15,7 @@ import {
   supplementBlockProgress,
   curatedSupplementCatalog,
   supplementFromBehavior,
+  isSupplementContraindicated,
 } from "@/lib/supplements";
 import type { BehaviorDef, Supplement } from "@/lib/types";
 
@@ -227,6 +228,15 @@ describe("supplementsForBlock — filtering + sort + safety", () => {
     expect(
       supplementsForBlock(list, "morning", 0, { anticoagulants: true }).length
     ).toBe(0);
+  });
+
+  it("isSupplementContraindicated drives the Browse 'not recommended' note (audit 2026-06-09)", () => {
+    const fish = sample({ contraindications: ["anticoagulants"] });
+    const plain = sample({ contraindications: [] });
+    expect(isSupplementContraindicated(fish, { anticoagulants: true })).toBe(true);
+    expect(isSupplementContraindicated(fish, {})).toBe(false);
+    expect(isSupplementContraindicated(fish)).toBe(false);
+    expect(isSupplementContraindicated(plain, { anticoagulants: true })).toBe(false);
   });
 
   it("orders curated before customs, alphabetical within each group", () => {

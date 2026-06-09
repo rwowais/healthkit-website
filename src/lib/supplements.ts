@@ -284,20 +284,32 @@ export function curatedSupplementCatalog(): Supplement[] {
  * daysActive and an optional safety-flags suppressor. Returns the
  * list in stable order (curated alphabetical, customs at the end).
  */
+/**
+ * True when one of the user's safety flags contraindicates this supplement.
+ * Single source of truth for the suppression rule — used by the block filter
+ * below AND by the Browse view, so a contraindicated supplement reads as
+ * "Not recommended with your health settings" instead of a misleading Add /
+ * Remove button (it would otherwise install but be hidden everywhere).
+ */
+export function isSupplementContraindicated(
+  s: Pick<Supplement, "contraindications">,
+  flags?: Partial<Record<SafetyFlag, boolean>>
+): boolean {
+  if (!s.contraindications || s.contraindications.length === 0) return false;
+  const userFlags = flags ?? {};
+  return s.contraindications.some((f) => userFlags[f] === true);
+}
+
 export function supplementsForBlock(
   all: Supplement[],
   block: TimeBlock,
   dayIndex: number,
   flags?: Partial<Record<SafetyFlag, boolean>>
 ): Supplement[] {
-  const userFlags = flags ?? {};
   return all
     .filter((s) => s.block === block)
     .filter((s) => !s.daysActive || s.daysActive[dayIndex])
-    .filter((s) => {
-      if (!s.contraindications || s.contraindications.length === 0) return true;
-      return !s.contraindications.some((f) => userFlags[f] === true);
-    })
+    .filter((s) => !isSupplementContraindicated(s, flags))
     .sort((a, b) => {
       if (a.source !== b.source) return a.source === "curated" ? -1 : 1;
       return a.name.localeCompare(b.name);
