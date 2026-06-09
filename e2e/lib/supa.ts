@@ -104,3 +104,19 @@ export function onboardedState() {
     currentStreak: 0,
   };
 }
+
+/**
+ * A minimal UN-onboarded state — an account that exists but hasn't finished
+ * setup. Seeding user B with this makes its sign-in a fast cloud read instead
+ * of racing the cold first-sign-in merge (which once took >45s on prod and
+ * flaked the "routed to onboarding" assertion). The behavior under test —
+ * completedOnboarding:false ⇒ routed to /onboarding — is identical.
+ */
+export function freshState() {
+  const s = onboardedState();
+  return {
+    ...s,
+    settings: { ...s.settings, completedOnboarding: false },
+    installedPacks: [],
+  };
+}

@@ -7,6 +7,7 @@ import {
   env,
   makeEmail,
   onboardedState,
+  freshState,
   AUTH_DIR,
   USERS_FILE,
 } from "./lib/supa";
@@ -47,11 +48,17 @@ export default async function globalSetup(config: FullConfig) {
   const aId = a.user!.id;
   const bId = b.user!.id;
 
-  // Seed A as an onboarded user (service-role bypasses RLS).
+  // Seed A as an onboarded user, and B as an existing-but-un-onboarded user
+  // (service-role bypasses RLS). Seeding B avoids a cold first-sign-in merge
+  // racing the "routed to onboarding" assertion.
   const { error: seedErr } = await admin
     .from("protocolize_state")
     .upsert({ user_id: aId, state: onboardedState() });
   if (seedErr) throw new Error(`seed A state failed: ${seedErr.message}`);
+  const { error: seedBErr } = await admin
+    .from("protocolize_state")
+    .upsert({ user_id: bId, state: freshState() });
+  if (seedBErr) throw new Error(`seed B state failed: ${seedBErr.message}`);
 
   // Capture A's authenticated session by logging in through the real UI.
   fs.mkdirSync(AUTH_DIR, { recursive: true });
