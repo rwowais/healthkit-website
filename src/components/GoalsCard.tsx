@@ -153,7 +153,10 @@ export default function GoalsCard({
                   {p.goal.label}
                 </p>
                 <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--text-3)]">
-                  {p.current != null && `Now ${p.current}${p.unit === "/wk" ? "" : ""} · `}
+                  {p.current != null &&
+                    `Now ${p.current}${
+                      p.unit === "/wk" ? "" : " " + p.unit
+                    } · `}
                   {p.detail}
                 </p>
               </div>

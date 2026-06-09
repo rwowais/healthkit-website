@@ -1133,10 +1133,23 @@ export function benchmarks(state: AppState): Benchmarks {
 
   const items: Benchmark[] = [];
 
-  // 30-day consistency: share of the last 30 days that were active.
+  // 30-day consistency: share of the active-eligible window that was active.
+  // Divide by the days the account could PLAUSIBLY have been active (capped at
+  // 30), not a hard 30 — else a 14-day-old user who logged all 14 days reads as
+  // 14/30 = 47% and gets punished at the most fragile point of the habit.
   const floor30 = addDaysToKey(today, -29);
   const active30 = active.filter((l) => l.date >= floor30 && l.date <= today).length;
-  const consistency = Math.round((active30 / 30) * 100);
+  const firstActive = active.reduce(
+    (min, l) => (l.date < min ? l.date : min),
+    today
+  );
+  const spanDays =
+    Math.round((Date.parse(today) - Date.parse(firstActive)) / 86_400_000) + 1;
+  const consistencyDenom = Math.min(30, Math.max(1, spanDays));
+  const consistency = Math.min(
+    100,
+    Math.round((active30 / consistencyDenom) * 100)
+  );
   items.push({
     key: "consistency",
     label: "30-day consistency",

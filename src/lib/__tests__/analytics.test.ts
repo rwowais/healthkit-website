@@ -14,6 +14,7 @@ import {
   correlate,
   completionsOnLog,
   monthlyReport,
+  benchmarks,
 } from "@/lib/analytics";
 import { getDefaultState } from "@/lib/storage";
 import { dateKeyInTz, addDaysToKey } from "@/lib/tz";
@@ -257,5 +258,30 @@ describe("monthlyReport", () => {
     expect(r.topBehaviors.length).toBeGreaterThan(0);
     expect(r.monthLabel.length).toBeGreaterThan(0);
     expect(r.monthShort.length).toBeGreaterThan(0);
+  });
+});
+
+describe("benchmarks — consistency uses observed span, not a hard 30 (audit 2026-06-09)", () => {
+  it("a 14-day-old account active every day reads ~100%, not 14/30=47%", () => {
+    const logs = Array.from({ length: 14 }, (_, i) =>
+      log(back(i), { behaviorCompletions: { x: true } })
+    );
+    const b = benchmarks(stateWith(logs));
+    const consistency = b.items.find((x) => x.key === "consistency");
+    expect(consistency, "consistency benchmark should exist").toBeTruthy();
+    // Pre-fix this was Math.round(14/30*100) = 47. Now it divides by the
+    // observed 14-day span → ~100% for a perfectly-consistent newcomer.
+    expect(consistency!.value).toBeGreaterThanOrEqual(90);
+  });
+
+  it("an established 30-day account that skipped half reads ~50%", () => {
+    // Active on even-offset days across a 30-day span → 15 of 30.
+    const logs = Array.from({ length: 15 }, (_, i) =>
+      log(back(i * 2), { behaviorCompletions: { x: true } })
+    );
+    const b = benchmarks(stateWith(logs));
+    const consistency = b.items.find((x) => x.key === "consistency")!;
+    expect(consistency.value).toBeLessThanOrEqual(60);
+    expect(consistency.value).toBeGreaterThanOrEqual(40);
   });
 });

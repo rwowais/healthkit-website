@@ -112,11 +112,19 @@ export default function CorrelationExplorer({
     };
   } else {
     const dirWord = res.direction === "positive" ? "higher" : "lower";
+    // A "weak" r (≈0.25–0.4, often at the n=8 floor) is nowhere near
+    // significant — hedge the bold title rather than stating it as fact.
+    // Reserve the affirmative headline for moderate+ correlations.
+    const affirmative =
+      res.direction === "positive"
+        ? `They move together`
+        : `They move in opposite directions`;
+    const hedged =
+      res.direction === "positive"
+        ? `A faint hint they move together`
+        : `A faint hint they move in opposite directions`;
     verdict = {
-      title:
-        res.direction === "positive"
-          ? `They move together`
-          : `They move in opposite directions`,
+      title: res.strength === "weak" ? hedged : affirmative,
       body: `On days your ${labelOf(a).toLowerCase()} was higher, your ${labelOf(
         b
       ).toLowerCase()} tended to be ${dirWord} too — a ${res.strength} pattern (r = ${res.r.toFixed(
