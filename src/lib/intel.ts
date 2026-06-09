@@ -825,8 +825,22 @@ export function weeklyReview(state: AppState): WeeklyReview | null {
       )
     );
 
-  // focus: weakest behavior among essentials
-  const essentials = items.filter((i) => i.leverage === 3);
+  // focus: weakest behavior among essentials. A behavior the app itself is
+  // actively suppressing via a firm conflict rule (e.g. Strength under a
+  // burnout-recovery "no intense training" restraint) is non-completable, so
+  // it always reads as 0 completions and would otherwise ALWAYS be picked as
+  // the week's "highest-leverage gap" — the coach telling the user to do more
+  // of the one thing their own protocol rests (sweep 2026-06-09 HIGH #7).
+  // Exclude conflict-muted keys here so neither `focus` nor `continuity`
+  // (both derived from `essentials`) can flag a suppressed behavior. Mirrors
+  // the same guard in suggestions() and keystone().
+  const cMuted = conflictMutedKeys(state);
+  const essentials = items.filter(
+    (i) =>
+      i.leverage === 3 &&
+      !cMuted.has(i.canonicalKey) &&
+      !cMuted.has(effectiveKey(i))
+  );
   let focusTitle: string | null = null;
   let focusCount = 99;
   for (const it of essentials) {
