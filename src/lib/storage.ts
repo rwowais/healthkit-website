@@ -177,6 +177,11 @@ const uniq = (xs: string[]): string[] => Array.from(new Set(xs));
 /** Backfill any fields missing from older v3 saves (schema hardening). */
 function normalize(s: AppState): AppState {
   const d = getDefaultState();
+  // Reconcile any pre-existing FUTURE-dated biomarker reading down to today: a
+  // future date sorts as "latest" forever and poisons every band/sparkline/
+  // engine read. addBiomarker clamps NEW entries; this heals old/imported ones
+  // on load (audit 2026-06-09 data-risk finding).
+  const today = getDateString(undefined, getTz(s.settings ?? d.settings));
 
   // Honor an EXPLICIT list even when empty — a user who removed every
   // protocol must keep zero, not have the defaults silently resurrected
@@ -408,7 +413,9 @@ function normalize(s: AppState): AppState {
     dailyLogs: migratedLogs
       .map(ensureLogShape)
       .sort((a, b) => a.date.localeCompare(b.date)),
-    biomarkers: Array.isArray(s.biomarkers) ? s.biomarkers : [],
+    biomarkers: (Array.isArray(s.biomarkers) ? s.biomarkers : []).map((b) =>
+      b?.date && b.date > today ? { ...b, date: today } : b
+    ),
     insights: Array.isArray(s.insights) ? s.insights : [],
     // NOTE: the persisted streak is kept verbatim here (recomputing it in
     // normalize() perturbs cloud-sync state comparison). Display surfaces

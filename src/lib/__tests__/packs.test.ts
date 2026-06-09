@@ -1005,3 +1005,13 @@ describe("explainBehavior — provenance + suppression reasons surface", () => {
     );
   });
 });
+
+describe("safety contraindications (audit 2026-06-09)", () => {
+  it("sauna lists anticoagulants among its contraindications", () => {
+    const sauna = PACKS.flatMap((p) => p.behaviors).find(
+      (b) => b.canonicalKey === "sauna-pm"
+    );
+    expect(sauna).toBeTruthy();
+    expect(sauna!.contraindications ?? []).toContain("anticoagulants");
+  });
+});

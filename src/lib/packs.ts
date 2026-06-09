@@ -803,6 +803,9 @@ export const PACKS: ProtocolPack[] = [
           "cardiac-arrhythmia",
           "pregnant",
           "under-18",
+          // Anticoagulants: bleeding + dehydration interaction (documented in
+          // the comment above but previously omitted here — audit 2026-06-09).
+          "anticoagulants",
         ],
         daysActive: [true, false, true, false, true, true, false],
       }),
