@@ -159,6 +159,27 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
     expect(evening[evening.length - 1].canonicalKey).toBe("zone2");
     expect(evening[0].canonicalKey).not.toBe("zone2");
   });
+
+  it("a customTime OVERRIDES a stale block pin (no 'Afternoon · 9:00 AM')", () => {
+    // Audit 2026-06-09: a 2-tap flow (pin a block, then type a time in another
+    // block) used to persist { block, customTime } together — blockPinned stayed
+    // true so the row filed under the pinned block while showing the custom clock,
+    // producing a header that contradicts the time. customTime must win.
+    const base = getDefaultState();
+    const state: AppState = {
+      ...base,
+      installedPacks: ["longevity-foundation"],
+      settings: { ...base.settings, wakeTime: "07:00", bedtime: "22:30" },
+      behaviorOverrides: {
+        ...base.behaviorOverrides,
+        zone2: { block: "afternoon", customTime: "09:00" },
+      },
+    };
+    const z = zone2(state);
+    expect(z!.customTime).toBe("09:00");
+    expect(z!.block).toBe("morning"); // follows the 9am clock, NOT the stale pin
+    expect(z!.blockPinned).toBe(false);
+  });
 });
 
 describe("inQuietHours — do-not-disturb window (with midnight wrap)", () => {

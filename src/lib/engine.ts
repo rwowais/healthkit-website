@@ -247,7 +247,12 @@ export function compileTimeline(
               : b.customTime),
           recommendedBlock: b.block,
           retimed,
-          blockPinned: !!ov?.block,
+          // A block override is a pin ONLY when there's no explicit customTime.
+          // With a customTime the block must follow the clock (the documented
+          // invariant below) — so a stale `{ block, customTime }` override can't
+          // file the row under a section that contradicts its shown time. This
+          // also self-heals such overrides synced from another device.
+          blockPinned: !!ov?.block && !ov?.customTime,
           sortIndex: ov?.sortIndex,
           fromPacks: [pack.name],
           muted: false,

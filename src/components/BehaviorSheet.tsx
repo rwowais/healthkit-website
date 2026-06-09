@@ -174,7 +174,11 @@ export default function BehaviorSheet({
             style={{ background: "var(--surface-2)" }}
           >
             {BLOCKS.map((b) => {
-              const on = effBlock === b && !ov.customTime;
+              // Light the block the item is filed under. With a customTime the
+              // engine derives item.block from that clock time, so this lights
+              // the block the time falls into (no more "no pill selected while
+              // Today files it somewhere"). Tapping a pill still clears the time.
+              const on = effBlock === b;
               // A hard window forbids blocks outside its range (e.g. morning
               // light can't go to afternoon/evening) — disable those pills.
               const forbidden = allowedBlocks != null && !allowedBlocks.has(b);
@@ -241,7 +245,15 @@ export default function BehaviorSheet({
                 const m = hardWindow
                   ? clampToWindow(parseHM(v), item, settings)
                   : parseHM(v);
-                patch({ customTime: minutesToHM(m) });
+                // Setting an exact time clears any block pin (and stack anchor),
+                // mirroring how the block pills clear customTime. Otherwise a
+                // stale pin + a new time produce a header that contradicts the
+                // clock ("Afternoon · 9:00 AM"): the block must follow the time.
+                patch({
+                  customTime: minutesToHM(m),
+                  block: undefined,
+                  stackAfter: undefined,
+                });
               }}
               className="rounded-[var(--r-sm)] bg-[var(--surface-2)] px-3 py-2 text-[14px] text-[var(--text-1)] outline-none"
             />
