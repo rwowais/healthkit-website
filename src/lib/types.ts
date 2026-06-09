@@ -188,9 +188,11 @@ export interface UserSettings {
    * empties the timeline, and freezes the streak math. For trips,
    * sick days, or any "I need a break" stretch where the user doesn't
    * want to be punished by an empty score or watch their streak die.
-   * On = empty Today + Protocols stay paused; off = everything resumes
-   * with the streak picking up where it left off (no zero-days
-   * inserted while paused).
+   * On = Today is cleared (the engine early-returns an empty timeline) and the
+   * streak is frozen; off = the full system returns with the streak picking up
+   * where it left off (no zero-days inserted while paused). NOTE: this does NOT
+   * touch pausedPacks — packs aren't individually paused, the day is just
+   * cleared, so copy must not claim "packs stay paused".
    */
   vacationMode?: boolean;
   /** ISO; stamped when the user toggled vacation mode on. */

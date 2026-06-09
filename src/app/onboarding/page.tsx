@@ -169,7 +169,6 @@ export default function OnboardingPage() {
   const [experience, setExperience] = useState<"new" | "some" | "deep">(
     "some"
   );
-  const [hasWearable, setHasWearable] = useState(false);
   const [bedtime, setBedtime] = useState("22:30");
   const [wakeTime, setWakeTime] = useState("06:30");
 
@@ -278,7 +277,6 @@ export default function OnboardingPage() {
       if (cs.sleepBaseline) setSleepBaseline(cs.sleepBaseline);
       if (Array.isArray(cs.focusAreas)) setFocus(cs.focusAreas);
       if (cs.experience) setExperience(cs.experience);
-      if (typeof cs.hasWearable === "boolean") setHasWearable(cs.hasWearable);
       if (cs.bedtime) setBedtime(cs.bedtime);
       if (cs.wakeTime) setWakeTime(cs.wakeTime);
     });
@@ -299,7 +297,6 @@ export default function OnboardingPage() {
       sleepBaseline,
       focusAreas: focus,
       experience,
-      hasWearable,
       bedtime,
       wakeTime,
       completedOnboarding: true,
@@ -415,7 +412,7 @@ export default function OnboardingPage() {
                   How&apos;s life feeling lately?
                 </h1>
                 <p className="t-caption mt-2">
-                  Calibrating today&apos;s load to your current bandwidth.
+                  This shapes your starting system.
                 </p>
                 <Choice
                   chips={MOOD}
@@ -435,7 +432,7 @@ export default function OnboardingPage() {
                   How&apos;s your sleep?
                 </h1>
                 <p className="t-caption mt-2">
-                  Sleep-aware adjustments switch on from here.
+                  Helps us pick your starting protocol.
                 </p>
                 <Choice
                   chips={SLEEP}
@@ -490,35 +487,6 @@ export default function OnboardingPage() {
                     setExperience(k as "new" | "some" | "deep")
                   }
                 />
-                <button
-                  onClick={() => setHasWearable((v) => !v)}
-                  role="switch"
-                  aria-checked={hasWearable}
-                  aria-label="I wear an Oura, Whoop or Apple Watch"
-                  className="press tr-fast mt-3 flex w-full items-center justify-between rounded-[var(--r-md)] p-4"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  <span className="text-[14px] font-medium text-[var(--text-1)]">
-                    I wear an Oura / Whoop / Apple Watch
-                  </span>
-                  <span
-                    className="h-6 w-11 rounded-full p-0.5 tr-fast"
-                    style={{
-                      background: hasWearable
-                        ? "var(--vitality)"
-                        : "var(--surface-3)",
-                    }}
-                  >
-                    <span
-                      className="block h-5 w-5 rounded-full bg-white tr"
-                      style={{
-                        transform: hasWearable
-                          ? "translateX(20px)"
-                          : "translateX(0)",
-                      }}
-                    />
-                  </span>
-                </button>
                 <Nav step={step} onBack={goBack} next={() => setStep(6)} />
               </>
             )}

@@ -992,7 +992,7 @@ export default function TodayPage() {
             )}
             <p className="t-caption mt-2 max-w-[280px] leading-relaxed">
               {onVacation
-                ? "Your streak is paused, your data is safe, your packs will resume the moment you're ready."
+                ? "Your day is cleared and your streak is paused — your data is safe, and your full system returns the moment you end the break."
                 : "Install a protocol and Protocolize will assemble an adaptive daily system for you."}
             </p>
             <Link
