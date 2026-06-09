@@ -5,6 +5,8 @@ name: e2e
 # Prod runs on pushes to main + manual dispatch; staging on PRs once set up.
 
 on:
+  schedule:
+    - cron: "0 11 * * *"   # nightly ~11:00 UTC — catch backend/key drift
   pull_request:
   push:
     branches: [main]
