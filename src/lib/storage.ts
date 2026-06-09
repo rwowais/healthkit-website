@@ -1328,7 +1328,21 @@ export function duplicatePack(
     ...state.installedPacks.filter((p) => p !== source.id),
     copy.id,
   ];
-  return { ...state, customPacks, installedPacks };
+  // Carry per-behavior edits across the fork. Official-pack behaviors are
+  // editable in place (overrides keyed by the PLAIN canonicalKey); the fork
+  // re-keys every behavior to `fork:<newId>:<key>`, and the engine looks up
+  // overrides strictly by the (now namespaced) key — so without this an author
+  // who tuned a dose/time BEFORE forking silently lost those edits, and
+  // normalize() then pruned the orphaned plain-keyed override permanently
+  // (sweep 2026-06-09 MEDIUM #270). Copy each source override onto the fork's
+  // new key. The old plain key is left intact (another installed pack may share
+  // it); normalize prunes it only if it's a true orphan.
+  const behaviorOverrides = { ...(state.behaviorOverrides ?? {}) };
+  for (const b of source.behaviors) {
+    const ov = behaviorOverrides[b.canonicalKey];
+    if (ov) behaviorOverrides[`fork:${newId}:${b.canonicalKey}`] = ov;
+  }
+  return { ...state, customPacks, installedPacks, behaviorOverrides };
 }
 
 // ── Biomarkers ────────────────────────────────────────────────────
