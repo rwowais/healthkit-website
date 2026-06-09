@@ -148,4 +148,15 @@ describe("maybeExtendTrial — engagement-gated", () => {
     expect(r.settings.premiumTrialEndsAt).toBe(longExpired);
     expect(r.settings.trialExtendedAt).toBeUndefined();
   });
+
+  it("is one-shot — won't extend twice once trialExtendedAt is set (audit 2026-06-09)", () => {
+    // In-window + low engagement (would otherwise extend), but already extended:
+    // must be left exactly as-is so the trial can't renew indefinitely.
+    const inOneDay = new Date(Date.now() + 86400000).toISOString();
+    const state = withSettings({
+      premiumTrialEndsAt: inOneDay,
+      trialExtendedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+    });
+    expect(maybeExtendTrial(state)).toBe(state);
+  });
 });

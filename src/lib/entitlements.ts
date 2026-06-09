@@ -93,8 +93,13 @@ export function getAccess(state: AppState): Access {
  * paywall someone before they've felt the value.
  */
 export function maybeExtendTrial(state: AppState): AppState {
-  const { tier, premiumTrialEndsAt } = state.settings;
+  const { tier, premiumTrialEndsAt, trialExtendedAt } = state.settings;
   if (tier === "premium" || !premiumTrialEndsAt) return state;
+  // Genuinely one-shot: once we've extended, never extend again. Without this
+  // guard the extension renewed every time an under-engaged user re-entered the
+  // 3-day window (~weekly), indefinitely deferring the paywall — contradicting
+  // this function's "one-shot, idempotent" contract.
+  if (trialExtendedAt) return state;
   const end = new Date(premiumTrialEndsAt).getTime();
   const now = Date.now();
   // Forgiving window: from 3 days before expiry up to a week *after* —

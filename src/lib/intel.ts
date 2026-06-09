@@ -580,7 +580,12 @@ export function suggestions(state: AppState): Suggestion[] {
       if (packEstablished && !doneRecently) {
         const override = state.behaviorOverrides?.[it.canonicalKey];
         const effectiveBlock = override?.block ?? it.block;
-        if (effectiveBlock !== "anytime") {
+        // A strict time-window behavior (morning light, caffeine cutoff) must
+        // NOT be offered "Make it anytime" — an "anytime" override bypasses the
+        // circadian clamp in compileTimeline, un-windowing a behavior whose
+        // timing IS its mechanism. Fall through to the calm "set it aside"
+        // variant instead (it can't be retimed).
+        if (effectiveBlock !== "anytime" && !it.timeWindow?.strict) {
           out.push({
             id: `sug-retime-${it.canonicalKey}`,
             kind: "pause",
