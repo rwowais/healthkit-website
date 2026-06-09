@@ -197,17 +197,38 @@ export default function UpgradePage() {
             </>
           ) : (
             <>
-              {/* Payments not wired yet — don't show a button that just
-                  pops a toast. State the truth and make "continue" primary. */}
-              <div className="w-full rounded-[var(--r-pill)] border border-[var(--hairline-strong)] bg-[var(--surface-2)] py-4 text-center text-[14px] font-semibold text-[var(--text-2)]">
-                Premium is coming soon — you have full access today
-              </div>
-              <button
-                onClick={() => router.push("/today")}
-                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)]"
-              >
-                Continue with full access
-              </button>
+              {/* Payments not wired yet — don't show a button that just pops a
+                  toast. State the TRUTH, and only claim "full access" for users
+                  who actually have it right now (paid or active trial). A
+                  trial-expired free user is demonstrably gated, so telling them
+                  they have full access would be a flat contradiction. */}
+              {access.premium ? (
+                <>
+                  <div className="w-full rounded-[var(--r-pill)] border border-[var(--hairline-strong)] bg-[var(--surface-2)] py-4 text-center text-[14px] font-semibold text-[var(--text-2)]">
+                    Premium is coming soon — you have full access today
+                  </div>
+                  <button
+                    onClick={() => router.push("/today")}
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)]"
+                  >
+                    Continue with full access
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="w-full rounded-[var(--r-pill)] border border-[var(--hairline-strong)] bg-[var(--surface-2)] py-4 text-center text-[14px] font-semibold text-[var(--text-2)]">
+                    {access.trialExpired
+                      ? "Your trial has ended — paid plans are coming soon"
+                      : "Paid plans are coming soon"}
+                  </div>
+                  <button
+                    onClick={() => router.push("/today")}
+                    className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)]"
+                  >
+                    Continue on the free plan
+                  </button>
+                </>
+              )}
             </>
           )}
           <p className="px-2 text-center text-[11px] leading-relaxed text-[var(--text-4)]">

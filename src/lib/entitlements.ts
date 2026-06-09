@@ -18,7 +18,11 @@ import { getCfgNumber } from "./knowledge";
 export const AHA_DAYS = 6;
 export const FREE_PACKS = 3;
 export const FREE_BIOMARKERS = 3;
-export const FREE_INSIGHT_DAYS = 7;
+/** Free-tier insight DELAY in days: free users see full history but lagged this
+ *  many days behind today; Premium is real-time. This is the actual shipped
+ *  gate (insights/page.tsx reads getFreeInsightDays()), so changing it in CMS
+ *  Config genuinely moves the delay — it is not a dead knob. */
+export const FREE_INSIGHT_DAYS = 3;
 
 /** Runtime accessors: the published bundle wins; code default is the fallback. */
 export const getAhaDays = (): number => getCfgNumber("AHA_DAYS", AHA_DAYS);

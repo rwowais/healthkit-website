@@ -376,30 +376,18 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
     expect(a.mode).toBeDefined();
   });
 
-  it("insights free cap — FREE_INSIGHT_DAYS=7 is declared but never enforced", () => {
+  it("insights free delay — getFreeInsightDays() is now load-bearing (audit 2026-06-09)", () => {
     let st = makePriya();
-    // Generate 30+ days of logs. The insights page applies a 3-day lag
-    // for non-premium users, not the FREE_INSIGHT_DAYS=7 cap declared
-    // in entitlements.ts.
     for (let d = 1; d <= 60; d++) {
       st = saveDailyLog(st, simulateDay(st, d, 0.6, 0.2));
     }
     const access = getAccess(st);
     expect(access.premium).toBe(false);
-    // The declared free-insight window is 7 days; the actual
-    // implementation in src/app/insights/page.tsx uses LAG_DAYS=3 as a
-    // delay window. The two never reconcile. This is a soft bug —
-    // declared free cap is never enforced anywhere.
-    const declared = getFreeInsightDays();
-    expect(declared).toBe(7);
-    // No machinery reads FREE_INSIGHT_DAYS at runtime. Document via
-    // expectation that the page's LAG_DAYS constant differs.
-    // (We can't import LAG_DAYS — it's local to the page module —
-    // but we leave a note for the bug list.)
-    expect(
-      declared,
-      `INFO: FREE_INSIGHT_DAYS=${declared} is declared but src/app/insights/page.tsx uses local LAG_DAYS=3 instead; the cap is never enforced anywhere`
-    ).toBe(7);
+    // Reconciled: FREE_INSIGHT_DAYS is the free-tier insight DELAY (days behind
+    // today), it equals the delay the insights page actually applies, and the
+    // accessor is what the page reads — so changing it in CMS Config genuinely
+    // moves the delay. (Was: a dead 7 that no runtime gate consulted.)
+    expect(getFreeInsightDays()).toBe(3);
   });
 
   it("day 365 — adherence holds, score reasonable, mode lands in a healthy band", () => {

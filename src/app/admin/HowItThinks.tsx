@@ -333,7 +333,7 @@ export default function HowItThinks() {
         <div className="mt-1 space-y-1.5">
           {[
             [`${freePacks} protocol packs`, "then premium for the full library"],
-            [`${freeInsightDays}-day insights window`, "premium unlocks full history + the intelligence layer"],
+            [`Insights on a ${freeInsightDays}-day delay`, "premium makes them real-time + unlocks the full intelligence layer"],
             [`${freeBio} biomarkers`, "premium unlocks unlimited + biomarker-aware adaptation"],
           ].map(([a, b]) => (
             <div

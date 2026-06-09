@@ -9,8 +9,8 @@ recovery/adherence signals. Behaviors, biomarkers and a calm intelligence
 layer (keystone, weekly review, suggestions) sit on top.
 
 **Business model:** Freemium with a 14-day reverse trial (engagement-gated
-auto-extend). Free = the full habit loop + 3 protocol packs + 7-day
-insights + 3 biomarkers + local/cloud sync + export. Premium ($8.99/mo or
+auto-extend). Free = the full habit loop + 3 protocol packs + insights on a
+3-day delay + 3 biomarkers + local/cloud sync + export. Premium ($8.99/mo or
 $79.99/yr; $179 lifetime) unlocks the intelligence layer, the complete
 Library, biomarker-aware adaptation, and unlimited history. Stripe is
 env-gated and inert until the owner wires Payment Links. Pricing lives in

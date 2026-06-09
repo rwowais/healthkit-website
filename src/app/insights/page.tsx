@@ -17,7 +17,7 @@ import {
   nextBestAddition,
   behaviorAdherence,
 } from "@/lib/intel";
-import { getAccess } from "@/lib/entitlements";
+import { getAccess, getFreeInsightDays } from "@/lib/entitlements";
 import { UpgradeCTA } from "@/components/PremiumGate";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
 import MoodEnergyTrends from "@/components/MoodEnergyTrends";
@@ -54,12 +54,13 @@ function dateKeyOf(d: Date) {
   )}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const LAG_DAYS = 3;
-
 export default function InsightsPage() {
   const router = useRouter();
   const { state, loading, updateSettings } = useAppState();
   const access = getAccess(state);
+  // Free-tier insight delay (days). Load-bearing config — an operator who
+  // tunes FREE_INSIGHT_DAYS in Engine → Config moves this delay for real.
+  const insightLag = getFreeInsightDays();
 
   // Time-decayed peek: free / post-trial users still get the intelligence
   // — just on a 3-day delay (a real reason to keep showing up, and a
@@ -68,7 +69,7 @@ export default function InsightsPage() {
   const intelState = useMemo(() => {
     if (access.premium) return state;
     const d = new Date();
-    d.setDate(d.getDate() - LAG_DAYS);
+    d.setDate(d.getDate() - insightLag);
     const cutoff = dateKeyOf(d);
     return {
       ...state,
@@ -79,7 +80,7 @@ export default function InsightsPage() {
       // paywall sells as Premium.
       biomarkers: (state.biomarkers ?? []).filter((b) => b.date <= cutoff),
     };
-  }, [access.premium, state]);
+  }, [access.premium, state, insightLag]);
 
   const streak = useMemo(
     () =>
@@ -235,7 +236,7 @@ export default function InsightsPage() {
         {delayed && (
           <UpgradeCTA
             title="You're seeing a delayed view"
-            line="On the free plan, Insights update on a 3-day delay. Premium makes them live — your patterns the moment they form."
+            line={`On the free plan, Insights update on a ${insightLag}-day delay. Premium makes them live — your patterns the moment they form.`}
           />
         )}
 
