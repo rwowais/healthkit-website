@@ -25,30 +25,22 @@ in prod).
 This is the only manual part — the "a human provisions the account / secrets"
 step that the assistant can't do.
 
-0. **Activate the workflow.** The CI file lives at `e2e/ci/e2e.yml` because
-   pushing into `.github/workflows/` needs a token with the `workflow` scope
-   (mine doesn't). Move it into place once:
-   ```bash
-   mkdir -p .github/workflows && git mv e2e/ci/e2e.yml .github/workflows/e2e.yml
-   git commit -m "Activate e2e workflow" && git push
-   ```
-   (Or paste its contents into GitHub → Actions → New workflow.) If you'd
-   rather I do it, run `gh auth refresh -h github.com -s workflow` and tell me
-   — then I can push it to the right place directly.
+The workflow lives at `.github/workflows/e2e.yml`. Current setup:
 
 1. Get each project's keys from the Supabase dashboard
-   (Project → Settings → API): the **Project URL**, the **anon** public key,
-   and the **service_role** secret key.
-2. In GitHub → repo **Settings → Secrets and variables → Actions →
-   New repository secret**, add the **prod** project's three values. (No GitHub
-   "Environments" needed — plain repository secrets are simpler.)
+   (Project → Settings → API Keys): the **Project URL**, the **anon** public
+   key, and the **service_role** secret key.
+2. **Prod** secrets live in the **`Production` GitHub Environment**
+   (Settings → Environments → Production → Environment secrets). The `prod`
+   job declares `environment: Production`, which is what makes them visible:
    - `PROD_SUPABASE_URL`
    - `PROD_SUPABASE_ANON_KEY`
    - `PROD_SUPABASE_SERVICE_ROLE_KEY`
 3. *(Optional, later)* To also test against staging on pull requests, add the
-   staging project's three as `STAGING_SUPABASE_URL`,
-   `STAGING_SUPABASE_ANON_KEY`, `STAGING_SUPABASE_SERVICE_ROLE_KEY`. The staging
-   job auto-skips until these exist.
+   staging project's three as **repository** secrets (Settings → Secrets and
+   variables → Actions): `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`,
+   `STAGING_SUPABASE_SERVICE_ROLE_KEY`. The staging job auto-skips until these
+   exist.
 
 That's it. From then on:
 - **Pushes to `main`** (and manual runs via Actions → e2e → "Run workflow")
