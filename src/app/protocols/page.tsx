@@ -223,11 +223,22 @@ export default function ProtocolsPage() {
   // surface and pause becomes a one-way trip — the row's existing dim/switch
   // styling was dead code because the normal compile dropped them. `timeline`
   // (active only) still drives stats, eased markers, discover, etc.
-  const manageRows = useMemo(
-    () =>
-      state ? compileTimeline(state, 0, undefined, { includeDisabled: true }) : [],
-    [state]
-  );
+  const manageRows = useMemo(() => {
+    if (!state) return [];
+    // Union across ALL weekdays (not just Monday/day-0) so a weekend-only or
+    // any non-Monday behavior is still reachable to edit here — Protocols is
+    // the system editor; every installed behavior must be openable. Dedup by
+    // canonicalKey (block/timing are day-independent, so first-seen wins).
+    const map = new Map<string, TimelineItem>();
+    for (let d = 0; d < 7; d++) {
+      for (const it of compileTimeline(state, d, undefined, {
+        includeDisabled: true,
+      })) {
+        if (!map.has(it.canonicalKey)) map.set(it.canonicalKey, it);
+      }
+    }
+    return [...map.values()];
+  }, [state]);
   // Bind the open editor sheet to the LIVE compiled behavior, not the frozen
   // snapshot from when its row was tapped — otherwise editing block/time in
   // the sheet updates the stored override but the sheet keeps rendering the
@@ -1533,6 +1544,22 @@ export default function ProtocolsPage() {
           detail
             ? !state.behaviorOverrides?.[detail.canonicalKey]?.disabled
             : true
+        }
+        notificationsEnabled={state.settings.notificationsEnabled}
+        // Habit-stacking parity with Today: let a behavior be stacked after any
+        // other timed, non-one-off behavior in the system (audit 2026-06-09 —
+        // this control used to vanish when the sheet opened from Protocols).
+        stackOptions={
+          detail
+            ? manageRows
+                .filter(
+                  (i) =>
+                    i.canonicalKey !== detail.canonicalKey &&
+                    i.block !== "anytime" &&
+                    !i.oneOff
+                )
+                .map((i) => ({ key: i.canonicalKey, title: i.title }))
+            : undefined
         }
       />
     </Shell>

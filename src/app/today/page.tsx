@@ -3064,6 +3064,7 @@ export default function TodayPage() {
       <BehaviorSheet
         item={detailItem}
         settings={state.settings}
+        notificationsEnabled={state.settings.notificationsEnabled}
         override={
           detail ? state.behaviorOverrides?.[detail.canonicalKey] : undefined
         }

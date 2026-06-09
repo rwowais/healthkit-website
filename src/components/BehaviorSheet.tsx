@@ -54,6 +54,7 @@ export default function BehaviorSheet({
   stackOptions,
   blockLabels,
   settings,
+  notificationsEnabled = true,
 }: {
   item: TimelineItem | null;
   override: BehaviorOverride | undefined;
@@ -73,6 +74,10 @@ export default function BehaviorSheet({
   /** Custom day-block display names (settings.blockLabels), so the sheet's
    *  "Order in X" / "Why X?" copy matches the user's renamed sections. */
   blockLabels?: { morning?: string; afternoon?: string; evening?: string; anytime?: string };
+  /** Global notifications switch (settings.notificationsEnabled). When false,
+   *  the per-behavior reminder copy says so instead of promising a notify that
+   *  can never fire. */
+  notificationsEnabled?: boolean;
 }) {
   const [showWhy, setShowWhy] = useState(false);
   if (!item) return null;
@@ -354,22 +359,33 @@ export default function BehaviorSheet({
                   </button>
                 </div>
               ) : (
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => onSnooze("later")}
-                    className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
-                    style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
-                  >
-                    Later today
-                  </button>
-                  <button
-                    onClick={() => onSnooze("tomorrow")}
-                    className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
-                    style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
-                  >
-                    Tomorrow
-                  </button>
-                </div>
+                <>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => onSnooze("later")}
+                      disabled={!!hardWindow}
+                      className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+                    >
+                      Later today
+                    </button>
+                    <button
+                      onClick={() => onSnooze("tomorrow")}
+                      className="press tr-fast flex-1 rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+                      style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+                    >
+                      Tomorrow
+                    </button>
+                  </div>
+                  {hardWindow && (
+                    <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-4)]">
+                      Held in its{" "}
+                      {blockLabel(item.recommendedBlock, blockLabels).toLowerCase()}{" "}
+                      window, so it can&apos;t move to later today — Tomorrow
+                      still works.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -461,7 +477,9 @@ export default function BehaviorSheet({
           <div>
             <Eyebrow>Reminder</Eyebrow>
             <p className="mt-1 text-[12px] text-[var(--text-3)]">
-              Notify me at this behavior&rsquo;s time.
+              {notificationsEnabled
+                ? "Notify me at this behavior’s time."
+                : "Turn on notifications in Profile to use reminders."}
             </p>
           </div>
           <button
