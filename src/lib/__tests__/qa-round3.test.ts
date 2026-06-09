@@ -85,7 +85,7 @@ describe("P0: backfillBuiltinFields preserves safety/scheduling data", () => {
     expect(out.daysActive).toBeDefined();
   });
 
-  it("leaves a non-built-in (custom) behavior untouched", () => {
+  it("a net-new behavior gets no injected safety data but defaults to the most cautious evidence tier (HIGH #2)", () => {
     const custom: BehaviorDef = {
       canonicalKey: "custom:abc:my-thing",
       title: "My thing",
@@ -98,8 +98,34 @@ describe("P0: backfillBuiltinFields preserves safety/scheduling data", () => {
       rationale: "x",
     };
     const out = backfillBuiltinFields(custom);
+    // No code twin → nothing fabricated for safety/scheduling fields…
     expect(out.contraindications).toBeUndefined();
-    expect(out).toEqual(custom);
+    expect(out.daysActive).toBeUndefined();
+    expect(out.timeWindow).toBeUndefined();
+    // …but a net-new row that ships without ANY evidence tier would render
+    // with no hedging, implying unqualified authority — default to exploratory.
+    expect(out.evidenceTier).toBe("exploratory");
+    // Everything else is preserved verbatim.
+    expect({ ...out, evidenceTier: undefined }).toEqual({
+      ...custom,
+      evidenceTier: undefined,
+    });
+  });
+
+  it("an explicitly-authored evidence tier on a net-new behavior is preserved", () => {
+    const custom: BehaviorDef = {
+      canonicalKey: "custom:def:authored",
+      title: "Authored",
+      block: "anytime",
+      anchor: "wake",
+      offsetMin: 0,
+      leverage: 1,
+      kind: "action",
+      icon: "sparkle",
+      rationale: "x",
+      evidenceTier: "established",
+    };
+    expect(backfillBuiltinFields(custom).evidenceTier).toBe("established");
   });
 });
 

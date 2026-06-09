@@ -45,7 +45,18 @@ function builtinAtom(key: string): BehaviorDef | undefined {
  */
 export function backfillBuiltinFields(base: BehaviorDef): BehaviorDef {
   const bi = builtinAtom(base.canonicalKey);
-  if (!bi) return base;
+  if (!bi) {
+    // Net-new behavior (no code twin): the load-time heal in knowledge.ts is
+    // keyed by canonicalKey, so it can't cover this row either — whatever
+    // ships here is what users get, forever (sweep 2026-06-09 HIGH #2). Most
+    // undefined structural metadata is SAFE by omission: no daysActive = every
+    // day; no timeWindow = no hard clamp = anytime; no contraindications =
+    // nothing to suppress. The one genuine honesty gap is the evidence tier —
+    // an un-tiered behavior renders with NO hedging, implying unqualified
+    // authority for content with no curated backing. Default net-new content
+    // to the most cautious tier unless the author set one explicitly.
+    return base.evidenceTier ? base : { ...base, evidenceTier: "exploratory" };
+  }
   const out = { ...base };
   if (bi.contraindications) out.contraindications = bi.contraindications;
   if (bi.daysActive) out.daysActive = bi.daysActive;
