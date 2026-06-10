@@ -492,16 +492,22 @@ export function applySwaps(
       muteReason: `swapped for ${toKey}`,
     };
   });
-  // 2. Inject replacements that aren't already in the timeline.
+  // 2. Inject replacements that aren't already in the timeline. `present`
+  // grows as we inject — `byKey` alone indexes only the ORIGINAL items, so
+  // two same-day swaps targeting the same replacement (swap A→X, then swap
+  // B→X from another workout's chip) injected X twice (audit round 2).
+  const present = new Set(byKey.keys());
   for (const [fromKey, toKey] of Object.entries(swaps)) {
-    if (byKey.has(toKey)) {
-      // Replacement was already in today's timeline — annotate it.
+    if (present.has(toKey)) {
+      // Replacement already on the board (originally, or injected by a
+      // previous swap entry) — annotate it instead of duplicating.
       const idx = next.findIndex((it) => it.canonicalKey === toKey);
       if (idx >= 0) next[idx] = { ...next[idx], swappedFrom: fromKey };
       continue;
     }
     const def = resolveBehaviorByKey(toKey);
     if (!def) continue;
+    present.add(toKey);
     next.push({
       ...def,
       fromPacks: [],
@@ -1479,6 +1485,48 @@ export function applyConflictMutes(
   });
 }
 
+/**
+ * Which of these candidate behaviors would a firm conflict restraint mute on
+ * this day? Used by the workout-swap sheet so it never OFFERS a replacement
+ * the user's own protocol forbids (audit round 2: picking one auto-completed
+ * the swap, then the conflict mute hid the replacement in the collapsed
+ * Resting group — a silent dead-end on the sheet's own recommendation).
+ * Pure simulation: compiles the day's timeline, appends the candidates as
+ * probe items, and runs the SAME applyConflictMutes the renderer uses.
+ */
+export function conflictBlockedKeys(
+  state: AppState,
+  dayIndex: number,
+  candidates: BehaviorDef[]
+): Set<string> {
+  const blocked = new Set<string>();
+  if (candidates.length === 0) return blocked;
+  const compiled = compileTimeline(state, dayIndex);
+  const presentKeys = new Set(compiled.map((it) => it.canonicalKey));
+  const probes: TimelineItem[] = candidates
+    .filter((def) => !presentKeys.has(def.canonicalKey))
+    .map((def) => ({
+      ...def,
+      fromPacks: [],
+      muted: false,
+      recommendedBlock: def.block,
+      retimed: false,
+      blockPinned: false,
+      trustTier: trustTier(def),
+    }));
+  const muted = applyConflictMutes(
+    [...compiled, ...probes],
+    resolvedInteractions()
+  );
+  for (const def of candidates) {
+    const hit = muted.find((it) => it.canonicalKey === def.canonicalKey);
+    if (hit?.muted && hit.muteReason?.startsWith("conflict pair:")) {
+      blocked.add(def.canonicalKey);
+    }
+  }
+  return blocked;
+}
+
 /** A deterministic, stable rank: leverage desc, then block, then key. */
 function stableRank(a: TimelineItem, b: TimelineItem): number {
   return (
@@ -1506,10 +1554,15 @@ function guaranteePerBlock(
   }
   const keepKeys = new Set<string>();
   for (const group of byBlock.values()) {
-    if (group.some((g) => !g.muted)) continue;
+    // A swapped-away original (swappedTo set) is DOOMED: the final
+    // swap-assert pass re-mutes it after this function runs. Counting it as
+    // "alive" here (a mode branch may have un-muted it by leverage) made the
+    // liveness check skip a block that would end up visibly empty, and
+    // resurrecting it would be undone anyway (audit round 2).
+    if (group.some((g) => !g.muted && !g.swappedTo)) continue;
     // Only an ELIGIBLE item may be resurrected; if none qualify the block stays
     // empty (recovery: an only-demoted-training block should go quiet).
-    const top = [...group].filter(eligible).sort(stableRank)[0];
+    const top = [...group].filter((g) => eligible(g) && !g.swappedTo).sort(stableRank)[0];
     if (top) keepKeys.add(top.canonicalKey);
   }
   return keepKeys.size
@@ -1905,7 +1958,13 @@ export function shapeTimeline(
   //     safety conflict-mute applies (muteReason "conflict …") — a real
   //     restraint still wins over a manual swap, but a mere mode trim doesn't.
   shaped = shaped.map((it) => {
-    if (it.swappedTo) return it.muted ? it : { ...it, muted: true };
+    if (it.swappedTo) {
+      // Always restore the swap provenance: a mode branch that re-built
+      // `muted` overwrote the "swapped for …" reason with its own copy
+      // (e.g. "recovery mode: …"), so the Resting caption lost the one
+      // explanation the user actually needs (audit round 2).
+      return { ...it, muted: true, muteReason: `swapped for ${it.swappedTo}` };
+    }
     if (
       it.swappedFrom &&
       it.muted &&

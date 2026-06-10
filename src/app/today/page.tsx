@@ -38,6 +38,7 @@ import {
   masteredKeys,
   freshlyMastered,
   blockIntelligence,
+  conflictBlockedKeys,
   isDone,
   timelineProgress,
   blockLabel,
@@ -3109,9 +3110,18 @@ export default function TodayPage() {
         }
         alternatives={
           swapForKey
-            ? availableWorkoutAlternatives(state).filter(
-                (b) => b.canonicalKey !== swapForKey
-              )
+            ? (() => {
+                // Never OFFER a replacement the user's own protocol forbids
+                // today (e.g. Strength under an active "no intense training"
+                // restraint) — picking it auto-completed the swap and the
+                // conflict mute then hid it in the collapsed Resting group,
+                // a silent dead-end on our own recommendation (audit rd 2).
+                const all = availableWorkoutAlternatives(state).filter(
+                  (b) => b.canonicalKey !== swapForKey
+                );
+                const blocked = conflictBlockedKeys(state, selDayIdx, all);
+                return all.filter((b) => !blocked.has(b.canonicalKey));
+              })()
             : []
         }
         onClose={() => setSwapForKey(null)}

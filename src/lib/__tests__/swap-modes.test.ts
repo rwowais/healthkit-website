@@ -19,10 +19,13 @@ import { describe, it, expect } from "vitest";
 import {
   shapeTimeline,
   applySwaps,
+  conflictBlockedKeys,
   type TimelineItem,
   type AdaptMode,
 } from "@/lib/engine";
-import type { TimeBlock } from "@/lib/types";
+import { availableWorkoutAlternatives } from "@/lib/workouts";
+import { getDefaultState } from "@/lib/storage";
+import type { AppState, TimeBlock } from "@/lib/types";
 
 const item = (key: string, block: TimeBlock, leverage = 3): TimelineItem =>
   ({
@@ -95,5 +98,74 @@ describe("workout swap survives every adaptation mode (HIGH #5/#6)", () => {
         expect(byKey["extended-walk"]?.muted).toBe(false);
       });
     }
+  });
+
+  // Audit round 2 secondary holes — each was probe-proven by the fix-breaker.
+  describe("round-2 holes", () => {
+    it("two same-day swaps to the SAME replacement inject it exactly once", () => {
+      const items = [
+        item("zone2", "afternoon", 3),
+        item("vo2max-intervals", "afternoon", 3),
+      ];
+      const out = applySwaps(items, {
+        swaps: { zone2: "strength", "vo2max-intervals": "strength" },
+      });
+      const strengths = out.filter((i) => i.canonicalKey === "strength");
+      expect(strengths).toHaveLength(1);
+      // Both originals are still marked swapped-away.
+      expect(out.find((i) => i.canonicalKey === "zone2")?.swappedTo).toBe("strength");
+      expect(
+        out.find((i) => i.canonicalKey === "vo2max-intervals")?.swappedTo
+      ).toBe("strength");
+    });
+
+    it("the swapped-away original keeps its 'swapped for …' provenance in every mode", () => {
+      for (const mode of MODES) {
+        const shaped = shapeTimeline(
+          applySwaps(base(), { swaps: { zone2: "strength" } }),
+          mode,
+          {}
+        );
+        const orig = shaped.find((i) => i.canonicalKey === "zone2");
+        expect(orig?.muted).toBe(true);
+        expect(orig?.muteReason).toBe("swapped for strength");
+      }
+    });
+
+    it("guaranteePerBlock does not count a doomed swapped-away original as alive", () => {
+      // Afternoon holds the swapped-away original (lighter un-mutes it by
+      // leverage pre-pass) + another low-leverage item muted by the trim. The
+      // liveness check must see the original as doomed and resurrect the
+      // other item, so the block isn't visibly empty after the final pass.
+      const items = [
+        item("zone2", "afternoon", 3), // will be swapped away → doomed
+        item("fiber-veg", "afternoon", 1), // lighter mutes leverage-1
+      ];
+      // Swap to a MORNING-block replacement so the afternoon loses its live row.
+      const swapped = applySwaps(items, { swaps: { zone2: "morning-sunlight" } });
+      const shaped = shapeTimeline(swapped, "lighter", {});
+      const afternoonLive = shaped.filter(
+        (i) => i.block === "afternoon" && !i.muted
+      );
+      expect(afternoonLive.length).toBeGreaterThanOrEqual(1);
+      expect(afternoonLive.some((i) => i.canonicalKey === "fiber-veg")).toBe(true);
+    });
+
+    it("the swap sheet never offers a restraint-blocked replacement", () => {
+      // Burnout-recovery's "no intense training" restraint firm-conflict-mutes
+      // strength. Offering it as a swap target auto-completed the swap and
+      // then hid the replacement in the collapsed Resting group — a silent
+      // dead-end on the sheet's own recommendation.
+      const state: AppState = {
+        ...getDefaultState(),
+        installedPacks: ["longevity-foundation", "burnout-recovery"],
+      };
+      const candidates = availableWorkoutAlternatives(state);
+      expect(candidates.some((c) => c.canonicalKey === "strength")).toBe(true);
+      const blocked = conflictBlockedKeys(state, 0, candidates);
+      expect(blocked.has("strength")).toBe(true);
+      // A gentle option stays offerable.
+      expect(blocked.has("extended-walk")).toBe(false);
+    });
   });
 });
