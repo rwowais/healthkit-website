@@ -75,7 +75,7 @@ export default function Reminders() {
     // keystone-protected behavior mutes the same way), then one-offs (honoring
     // overrides), snoozes, and stacks (so a stacked follower fires at its
     // rebased time). Without this, reminders pinged hidden/swapped behaviors.
-    const swapped = applySwaps(compileTimeline(state, dayIdx), log);
+    const swapped = applySwaps(compileTimeline(state, dayIdx), log, state.customPacks);
     const shaped = shapeTimeline(swapped, adapt(state).mode, {
       keystoneKey: keystone(state)?.key,
       mastered: masteredKeys(state, today),
@@ -155,7 +155,7 @@ export default function Reminders() {
     // keystone-protected behavior mutes the same way), then one-offs (honoring
     // overrides), snoozes, and stacks (so a stacked follower fires at its
     // rebased time). Without this, reminders pinged hidden/swapped behaviors.
-    const swapped = applySwaps(compileTimeline(state, dayIdx), log);
+    const swapped = applySwaps(compileTimeline(state, dayIdx), log, state.customPacks);
     const shaped = shapeTimeline(swapped, adapt(state).mode, {
       keystoneKey: keystone(state)?.key,
       mastered: masteredKeys(state, today),

@@ -259,10 +259,27 @@ export default function TodayPage() {
   // throwaway minute-tick whose re-render couldn't refresh these useMemos
   // because their deps excluded any time signal.
   const [nowMin, setNowMin] = useState(() => nowMinutesInTz(tz));
+  // The current DAY KEY must be reactive too. It was computed per-render via
+  // dateKeyInTz(tz) inside a memo keyed only on [tz, offset], so the board
+  // NEVER rolled over at midnight while mounted — the normal "PWA left open
+  // overnight, opened next morning" pattern had every tap (check-in,
+  // completions, supplements) silently writing to YESTERDAY's log while the
+  // intelligence layer was already on the new day (audit round 2, HIGH).
+  const [liveDayKey, setLiveDayKey] = useState(() => dateKeyInTz(tz));
   useEffect(() => {
-    setNowMin(nowMinutesInTz(tz)); // resync immediately when the tz changes
-    const id = setInterval(() => setNowMin(nowMinutesInTz(tz)), 60_000);
-    return () => clearInterval(id);
+    const resync = () => {
+      setNowMin(nowMinutesInTz(tz));
+      setLiveDayKey(dateKeyInTz(tz));
+    };
+    resync(); // immediately on tz change
+    const id = setInterval(resync, 60_000);
+    // Timers are throttled/suspended in backgrounded PWAs — resync the moment
+    // the app becomes visible again so the first morning tap lands on today.
+    document.addEventListener("visibilitychange", resync);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", resync);
+    };
   }, [tz]);
   const cb = useMemo(() => currentBlock(settings, nowMin), [settings, nowMin]);
   // Streak shown on Today is recomputed from the logs at render (same as
@@ -277,7 +294,7 @@ export default function TodayPage() {
   // Persist snooze/dismiss so a refresh doesn't resurrect everything the
   // user deliberately cleared (it felt broken, not adaptive). Snooze is
   // scoped to today; dismissed suggestions persist by id.
-  const todayKey = dateKeyInTz(tz);
+  const todayKey = liveDayKey;
   const readLS = (k: string): string[] => {
     if (typeof window === "undefined") return [];
     try {
@@ -529,10 +546,16 @@ export default function TodayPage() {
   const [offset, setOffset] = useState(0);
   const [weekOpen, setWeekOpen] = useState(false);
   const selectedDate = useMemo(
-    () => addDaysToKey(dateKeyInTz(tz), -offset),
-    [tz, offset]
+    () => addDaysToKey(liveDayKey, -offset),
+    [liveDayKey, offset]
   );
   const isToday = offset === 0;
+  // When the calendar day flips under a mounted board (midnight, or a PWA
+  // resumed the next morning), snap the scrubber back to the NEW today so the
+  // user never wakes to yesterday's view labeled "Today".
+  useEffect(() => {
+    setOffset(0);
+  }, [liveDayKey]);
   // Scrubbing off "today" makes the day read-only, but the sticky bulk-action
   // bar + move/swap sheets aren't per-row gated like the inline handles — so
   // their actions could write Snooze / a global override onto a frozen past
@@ -585,7 +608,7 @@ export default function TodayPage() {
     // adaptation pass sees the user's actual intent (e.g. don't
     // mute the replacement during essentials mode just because the
     // original was lev-2).
-    const swapped = applySwaps(items, log);
+    const swapped = applySwaps(items, log, state.customPacks);
     const shaped = shapeTimeline(swapped, isToday ? adaptation.mode : "normal", {
       keystoneKey: ks?.key,
       mastered: masteredKeys(state, selectedDate),
@@ -3012,7 +3035,14 @@ export default function TodayPage() {
           cross-block warning applies), and Clear. */}
       {editMode && selectedKeys.size > 0 && (
         <div
-          className="fixed inset-x-3 bottom-3 z-50 flex items-center gap-2 rounded-[var(--r-xl)] p-3"
+          // Anchored ABOVE the mobile tab bar like every other floating
+          // element (TimezoneSentry/StorageSafetyNet/InstallPrompt use the
+          // same safe-area offset). With plain bottom-3 this bar painted
+          // UNDERNEATH the nav (same z-50, later sibling wins) — buttons
+          // were invisible and a tap where Snooze should be hit the
+          // Protocols nav link instead (audit round 2, HIGH). lg+ has no
+          // bottom nav, so the bar returns to the screen edge there.
+          className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+84px)] z-50 flex items-center gap-2 rounded-[var(--r-xl)] p-3 lg:bottom-3"
           style={{
             background:
               "color-mix(in srgb, var(--readiness) 16%, var(--surface-2))",

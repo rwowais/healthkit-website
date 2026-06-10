@@ -59,4 +59,47 @@ describe("duplicatePack preserves pre-fork per-behavior edits (#270)", () => {
       dose: "personalized",
     });
   });
+
+  it("does NOT copy when another installed pack still supplies the key (round-2 regression)", () => {
+    // strength ships in BOTH longevity-foundation and heart-health. Forking
+    // heart-health must NOT freeze a fork-key copy of the strength override:
+    // the plain key stays live through the merged row (longevity-foundation
+    // still supplies it), and a frozen copy would permanently shadow every
+    // future edit the user makes there.
+    const heartHealth = {
+      id: "heart-health",
+      name: "Heart Health",
+      tagline: "",
+      goal: "recovery",
+      accent: "var(--readiness)",
+      icon: "heart",
+      source: "official",
+      durationLabel: "Ongoing",
+      behaviors: [
+        {
+          canonicalKey: "strength",
+          title: "Strength training",
+          block: "afternoon",
+          anchor: "wake",
+          offsetMin: 360,
+          rationale: "",
+          icon: "dumbbell",
+          leverage: 3,
+          kind: "action",
+        },
+      ],
+    } as unknown as ProtocolPack;
+    const state: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation", "heart-health"],
+      customPacks: [],
+      behaviorOverrides: { strength: { dose: "5x5" } },
+    } as AppState;
+
+    const forked = duplicatePack(state, heartHealth);
+    const newId = forked.customPacks[0].id;
+    // No frozen copy — the live plain override keeps driving the merged row.
+    expect(forked.behaviorOverrides[`fork:${newId}:strength`]).toBeUndefined();
+    expect(forked.behaviorOverrides["strength"]).toEqual({ dose: "5x5" });
+  });
 });

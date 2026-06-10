@@ -32,7 +32,7 @@
  */
 import { activePacks } from "./knowledge";
 import { STANDALONE_ATOMS_REGISTRY } from "./packs";
-import type { AppState, BehaviorDef, DailyLog } from "./types";
+import type { AppState, BehaviorDef, DailyLog, ProtocolPack } from "./types";
 
 /**
  * Curated workout canonicalKeys. The PRIMARY signal is `category: "workout"`,
@@ -74,7 +74,10 @@ export function availableWorkoutAlternatives(
   const installed = new Set(state.installedPacks ?? []);
   const paused = new Set(state.pausedPacks ?? []);
   const seen = new Map<string, BehaviorDef>();
-  for (const p of activePacks()) {
+  // Official catalog packs AND the user's own custom/forked packs — a
+  // fork-only user previously saw none of their own workouts in the swap
+  // sheet because this loop searched only the catalog (audit round 2).
+  for (const p of [...activePacks(), ...(state.customPacks ?? [])]) {
     if (!installed.has(p.id) || paused.has(p.id)) continue;
     for (const b of p.behaviors) {
       if (!isWorkoutBehavior(b)) continue;
@@ -100,8 +103,19 @@ export function availableWorkoutAlternatives(
  * when applying a swap so the replacement renders even if it's
  * normally outside today's daysActive window.
  */
-export function resolveBehaviorByKey(key: string): BehaviorDef | null {
+export function resolveBehaviorByKey(
+  key: string,
+  customPacks?: ProtocolPack[]
+): BehaviorDef | null {
   for (const p of activePacks()) {
+    const hit = p.behaviors.find((b) => b.canonicalKey === key);
+    if (hit) return hit;
+  }
+  // Custom/forked packs live in STATE, not the catalog — without searching
+  // them a fork-namespaced key (`fork:<id>:strength`) can never resolve, so
+  // swapBehavior validation silently no-op'd the entire swap for forked
+  // workouts while the UI fired success feedback (audit round 2, HIGH).
+  for (const p of customPacks ?? []) {
     const hit = p.behaviors.find((b) => b.canonicalKey === key);
     if (hit) return hit;
   }
@@ -124,13 +138,16 @@ export function getSwaps(log?: DailyLog): Record<string, string> {
  * downstream high-stress items (late caffeine, cold plunge after
  * lifts, etc.) — making the swap feel intelligent, not just logged.
  */
-export function easierDayFromSwap(log: DailyLog | undefined): boolean {
+export function easierDayFromSwap(
+  log: DailyLog | undefined,
+  customPacks?: ProtocolPack[]
+): boolean {
   const swaps = log?.swaps;
   if (!swaps) return false;
   const rank: Record<string, number> = { high: 3, moderate: 2, low: 1 };
   for (const [fromKey, toKey] of Object.entries(swaps)) {
-    const from = resolveBehaviorByKey(fromKey);
-    const to = resolveBehaviorByKey(toKey);
+    const from = resolveBehaviorByKey(fromKey, customPacks);
+    const to = resolveBehaviorByKey(toKey, customPacks);
     if (!from || !to) continue;
     const fi = from.intensity ? rank[from.intensity] : 0;
     const ti = to.intensity ? rank[to.intensity] : 0;

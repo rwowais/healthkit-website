@@ -693,7 +693,8 @@ export function computeBehaviorScore(
   const dayLog = state.dailyLogs.find((l) => l.date === date);
   const compiled = applySwaps(
     compileTimeline(state, isoDayIndex(state, date)),
-    dayLog
+    dayLog,
+    state.customPacks
   );
   const shaped = shapeTimeline(
     compiled,
@@ -784,8 +785,11 @@ export function swapBehavior(
   // calling swapBehavior(s, today, "zone2", "nonexistent-key-xyz")
   // would write the swap + auto-complete the phantom key, which
   // leaks into score and mastery downstream.
-  if (!resolveBehaviorByKey(toKey)) return state;
-  if (!resolveBehaviorByKey(fromKey)) return state;
+  // Search the user's custom/forked packs too — a fork-namespaced key never
+  // resolves from the catalog alone, which made the whole swap a silent no-op
+  // for forked workouts (audit round 2, HIGH).
+  if (!resolveBehaviorByKey(toKey, state.customPacks)) return state;
+  if (!resolveBehaviorByKey(fromKey, state.customPacks)) return state;
   const log = getOrCreateLog(state, date);
   const swaps = { ...(log.swaps ?? {}), [fromKey]: toKey };
   const bc = { ...(log.behaviorCompletions ?? {}) };
@@ -1329,13 +1333,26 @@ export function duplicatePack(
   // overrides strictly by the (now namespaced) key — so without this an author
   // who tuned a dose/time BEFORE forking silently lost those edits, and
   // normalize() then pruned the orphaned plain-keyed override permanently
-  // (sweep 2026-06-09 MEDIUM #270). Copy each source override onto the fork's
-  // new key. The old plain key is left intact (another installed pack may share
-  // it); normalize prunes it only if it's a true orphan.
+  // (sweep 2026-06-09 MEDIUM #270).
+  //
+  // ONLY copy when the plain key becomes an ORPHAN (no other installed pack
+  // still supplies it). When another pack shares the key (strength/zone2 ship
+  // in both longevity-foundation and heart-health), the plain override stays
+  // LIVE through the merged row and the user keeps editing it — a frozen
+  // fork-key copy would permanently shadow every future edit on that row
+  // (audit round 2: the regression the first version of this fix introduced).
+  const remaining = new Set(installedPacks.filter((id) => id !== copy.id));
+  const stillSupplied = new Set<string>();
+  for (const p of [...activePacks(), ...state.customPacks]) {
+    if (!remaining.has(p.id)) continue;
+    for (const b of p.behaviors) stillSupplied.add(b.canonicalKey);
+  }
   const behaviorOverrides = { ...(state.behaviorOverrides ?? {}) };
   for (const b of source.behaviors) {
     const ov = behaviorOverrides[b.canonicalKey];
-    if (ov) behaviorOverrides[`fork:${newId}:${b.canonicalKey}`] = ov;
+    if (ov && !stillSupplied.has(b.canonicalKey)) {
+      behaviorOverrides[`fork:${newId}:${b.canonicalKey}`] = ov;
+    }
   }
   return { ...state, customPacks, installedPacks, behaviorOverrides };
 }

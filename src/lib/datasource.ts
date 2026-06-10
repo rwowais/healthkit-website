@@ -733,11 +733,21 @@ class SupabaseDataSource implements DataSource {
       const userId = await getUserId();
       if (!userId) return loadState();
 
-      const { data } = await sb
+      const { data, error } = await sb
         .from(STATE_TABLE)
         .select("state, updated_at")
         .eq("user_id", userId)
         .maybeSingle();
+
+      // CRITICAL: supabase-js does NOT throw on network failure — it resolves
+      // { data: null, error }. Checking only `data` made a transient/offline
+      // SELECT indistinguishable from "no cloud row", so execution fell into
+      // the first-sign-in UPLOAD branch below: one flaky request wholesale-
+      // overwrote the account's (possibly newer) cloud row with this device's
+      // state and cleared the pending-sync dirty flag with nothing actually
+      // verified (audit round 2, probe-proven). Any read error → behave
+      // exactly like offline: serve the local cache, change nothing remote.
+      if (error) return loadState();
 
       lastCloudUpdatedAt = data?.updated_at ?? null;
 
@@ -787,14 +797,19 @@ class SupabaseDataSource implements DataSource {
 
       // First sign-in on this account: lift local data up, don't wipe.
       conflictEvaluated = true;
-      markReconciled(userId); // this device is the source of truth here
       const local = loadState();
       const nowIso = new Date().toISOString();
-      await sb.from(STATE_TABLE).upsert({
+      const { error: upErr } = await sb.from(STATE_TABLE).upsert({
         user_id: userId,
         state: local,
         updated_at: nowIso,
       });
+      // Only mark this device reconciled / clear the dirty flag after a
+      // CONFIRMED write — an errored upsert previously still burned the
+      // first-sign-in conflict gate and dropped the pending-sync protection
+      // with nothing uploaded (audit round 2).
+      if (upErr) return local;
+      markReconciled(userId); // this device is the source of truth here
       // If the head re-read fails, do NOT fall back to the client clock
       // (nowIso): a server-skewed head would then look "ahead" of our
       // client-clock baseline and the next save would mistake our own write for

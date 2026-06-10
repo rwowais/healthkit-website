@@ -470,7 +470,8 @@ export function sortTimeline(
  */
 export function applySwaps(
   items: TimelineItem[],
-  log: { swaps?: Record<string, string> } | undefined
+  log: { swaps?: Record<string, string> } | undefined,
+  customPacks?: ProtocolPack[]
 ): TimelineItem[] {
   const swaps = log?.swaps;
   if (!swaps || Object.keys(swaps).length === 0) return items;
@@ -505,7 +506,7 @@ export function applySwaps(
       if (idx >= 0) next[idx] = { ...next[idx], swappedFrom: fromKey };
       continue;
     }
-    const def = resolveBehaviorByKey(toKey);
+    const def = resolveBehaviorByKey(toKey, customPacks);
     if (!def) continue;
     present.add(toKey);
     next.push({
@@ -954,7 +955,7 @@ export function getSignals(state: AppState): Signals {
   let eveningMissedYesterday = false;
   if (yLog && logHasActivity(yLog)) {
     const yItems = shapeTimeline(
-      applySwaps(compileTimeline(state, isoDayOf(yLog.date, tz)), yLog),
+      applySwaps(compileTimeline(state, isoDayOf(yLog.date, tz)), yLog, state.customPacks),
       "normal",
       { mastered: masteredKeys(state, yLog.date) }
     ).filter((i) => !i.muted && i.block === "evening");
@@ -987,7 +988,7 @@ export function getSignals(state: AppState): Signals {
     bioConcern: bio.text,
     bioRecoveryFlag: bio.recovery,
     readiness,
-    easierDayFromSwap: easierDayFromSwap(tLog),
+    easierDayFromSwap: easierDayFromSwap(tLog, state.customPacks),
     hasHistory,
   };
 }
