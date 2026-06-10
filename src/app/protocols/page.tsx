@@ -214,10 +214,23 @@ export default function ProtocolsPage() {
   const atFreeCap =
     !access.premium && officialInstalledCount >= getFreePacks();
 
-  const timeline = useMemo(
-    () => (state ? compileTimeline(state, 0) : []),
-    [state]
-  );
+  const timeline = useMemo(() => {
+    if (!state) return [];
+    // Vacation: the system is frozen, not gone. The plain compile returns []
+    // during a break (so Today goes quiet), which made this page's stats read
+    // "0 protocols resolved into 0 clear behaviors" and every pack card claim
+    // "contributing 0 behaviors" — alarming for someone deciding whether a
+    // break is safe (sweep 2026-06-09, vacation-mode residual). A management
+    // surface should describe the system that resumes after the break:
+    // compile via the management opt-in and keep "active only" semantics by
+    // dropping genuinely-paused rows.
+    if (state.settings.vacationMode) {
+      return compileTimeline(state, 0, undefined, {
+        includeDisabled: true,
+      }).filter((i) => !i.disabled);
+    }
+    return compileTimeline(state, 0);
+  }, [state]);
   // The management list INCLUDES paused (disabled) behaviors so they render
   // dimmed with a working Resume toggle. Without this they vanish from every
   // surface and pause becomes a one-way trip — the row's existing dim/switch
