@@ -10,7 +10,12 @@
 import { describe, it, expect } from "vitest";
 import { BIOMARKERS, biomarkerDef, isPlausibleBiomarker } from "@/lib/biomarkers";
 import { getSignals } from "@/lib/engine";
-import { getDefaultState, addBiomarker, scrubBiomarkers } from "@/lib/storage";
+import {
+  getDefaultState,
+  addBiomarker,
+  scrubBiomarkers,
+  importState,
+} from "@/lib/storage";
 import type { AppState } from "@/lib/types";
 
 function todayKey() {
@@ -134,22 +139,71 @@ describe("biomarker plausibility floor + load-boundary scrub (sweep 2026-06-09 #
     expect(ok.biomarkers?.some((b) => b.metric === "hrv" && b.value === 42)).toBe(true);
   });
 
-  it("scrubBiomarkers drops implausible readings + dedups (metric,date) at load", () => {
+  it("scrubBiomarkers drops implausible readings but NEVER dedups same-day twins", () => {
     const today = todayKey();
     const cleaned = scrubBiomarkers(
       [
         { id: "1", metric: "hrv", value: 4, date: today }, // low typo → dropped
         { id: "2", metric: "hrv", value: 999, date: today }, // above max → dropped
         { id: "3", metric: "systolic", value: 118, date: today }, // ok
-        { id: "4", metric: "systolic", value: 120, date: today }, // same (metric,date) → last wins
+        { id: "4", metric: "systolic", value: 120, date: today }, // same (metric,date) — BOTH kept
         { id: "5", metric: "weight", value: -5, date: today }, // ≤0 → dropped
       ],
       today
     );
     expect(cleaned.find((b) => b.metric === "hrv")).toBeUndefined();
     expect(cleaned.find((b) => b.metric === "weight")).toBeUndefined();
+    // Audit round 2: a position-based (metric,date) dedup destroyed a GENUINE
+    // reading after a cross-device merge (array position ≠ recency) and the
+    // loss synced cloud-wide. Same-day duplicates are cosmetic; both survive.
     const sys = cleaned.filter((b) => b.metric === "systolic");
-    expect(sys).toHaveLength(1);
-    expect(sys[0].value).toBe(120);
+    expect(sys).toHaveLength(2);
+  });
+
+  it("scrubBiomarkers leaves legacy (def-less) metrics inert, never dropped", () => {
+    const today = todayKey();
+    const cleaned = scrubBiomarkers(
+      [{ id: "L1", metric: "apoB", value: 85, date: today }],
+      today
+    );
+    expect(cleaned).toHaveLength(1);
+  });
+});
+
+describe("future-dated daily logs survive normalize verbatim (audit round 2)", () => {
+  it("normalize keeps a future-dated log — readers guard, data is never mutated", () => {
+    const st = getDefaultState();
+    const future = "2099-01-01";
+    const poisoned = {
+      ...st,
+      dailyLogs: [
+        ...st.dailyLogs,
+        {
+          date: future,
+          completions: [],
+          exerciseEntries: [],
+          supplementEntries: [],
+          sleepCompletions: [],
+          sleepLog: { actualBedtime: null, actualWakeTime: null, sleepQuality: null },
+          nutritionScorecard: { customItems: [], note: "" },
+          energyLevel: null,
+          moodLevel: null,
+          dayNote: "",
+          score: 0,
+          behaviorCompletions: { zone2: true },
+        },
+      ],
+    } as any;
+    // Round-trip through parse/normalize the way every load does.
+    const json = JSON.stringify(poisoned);
+    const back = JSON.parse(json);
+    // normalize is internal; loadState path exercises it — emulate via the
+    // exported importState (parseState → normalize).
+    const normalized = importState(json) ?? back;
+    const kept = (normalized.dailyLogs ?? []).find(
+      (l: { date: string }) => l.date === future
+    );
+    expect(kept).toBeTruthy();
+    expect(kept.behaviorCompletions?.zone2).toBe(true);
   });
 });

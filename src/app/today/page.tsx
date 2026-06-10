@@ -1011,6 +1011,45 @@ export default function TodayPage() {
               {onVacation ? "End break in Profile" : "Discover protocols"}
             </Link>
           </div>
+          {/* Supplements stay loggable during a break. The break surface is
+              the ONLY Today render during vacation, and without this it
+              removed the app's one supplement-logging surface for the whole
+              break (audit round 2) — the exact persona the calm-break fix
+              was meant to help. Framed as optional: no streak/score stakes. */}
+          {onVacation && isToday && hasSupplementsToday && (
+            <div className="flex flex-col gap-3">
+              <p className="t-eyebrow text-[var(--text-3)]">
+                Your supplements — optional during your break
+              </p>
+              {(["morning", "afternoon", "evening", "anytime"] as TimeBlock[]).map(
+                (block) => (
+                  <SupplementBlockCard
+                    key={block}
+                    block={block}
+                    supplements={supplementsForBlock(
+                      state.supplements ?? [],
+                      block,
+                      selDayIdx,
+                      state.settings.safetyFlags ?? {}
+                    )}
+                    completions={log.supplementCompletions ?? {}}
+                    onToggle={(id) => toggleSupplement(selectedDate, id)}
+                    onBulkCheck={() =>
+                      bulkCheckSupplements(
+                        selectedDate,
+                        supplementsForBlock(
+                          state.supplements ?? [],
+                          block,
+                          selDayIdx,
+                          state.settings.safetyFlags ?? {}
+                        ).map((s) => s.id)
+                      )
+                    }
+                  />
+                )
+              )}
+            </div>
+          )}
         </div>
       </Shell>
     );

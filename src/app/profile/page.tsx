@@ -8,7 +8,11 @@ import { useAppState } from "@/hooks/useAppState";
 import { getAccess } from "@/lib/entitlements";
 import { clearAllData, exportState, importState, getDefaultState } from "@/lib/storage";
 import { getTz, dateKeyInTz } from "@/lib/tz";
-import { activeDataSource, mergeStates } from "@/lib/datasource";
+import {
+  activeDataSource,
+  mergeStates,
+  hasMeaningfulData,
+} from "@/lib/datasource";
 import { deleteAccount, supabaseEnabled } from "@/lib/auth";
 import { getUserId } from "@/lib/supabase";
 import { sendTestPush } from "@/lib/push";
@@ -119,16 +123,23 @@ export default function ProfilePage() {
         toast.show("Invalid backup file");
         return;
       }
-      // MERGE the backup into current data — never a wholesale overwrite.
-      // A restore must not erase days/biomarkers/reflections recorded SINCE
-      // the backup was taken (sweep 2026-06-09 HIGH #1). Current is the
-      // more-recent side (wins per-field via recency-aware mergeDailyLog);
-      // the backup contributes any days/entries the current state is missing.
-      // Saving through the active source also lands the union in the cloud.
+      // Two restore shapes (audit round 2):
+      //  • PRISTINE target (fresh install / new device / post-reset — no
+      //    logged days, no meaningful data): the backup IS the user's data.
+      //    Restore it faithfully — merging here clobbered the backup's
+      //    settings (name, sleep window, reminders) with pristine defaults
+      //    and resurrected removed default packs, permanently.
+      //  • LIVE target: MERGE — a restore must not erase days/biomarkers/
+      //    reflections recorded SINCE the backup (sweep 2026-06-09 HIGH #1).
+      //    Current is the more-recent side (per-field recency via
+      //    mergeDailyLog); the backup contributes what's missing.
+      // Saving through the active source also lands the result in the cloud.
       const current = await activeDataSource.load();
-      const merged = mergeStates(current, parsed);
-      await activeDataSource.save(merged);
-      toast.show("Backup merged into your data");
+      const pristine =
+        (current.dailyLogs?.length ?? 0) === 0 && !hasMeaningfulData(current);
+      const next = pristine ? parsed : mergeStates(current, parsed);
+      await activeDataSource.save(next);
+      toast.show(pristine ? "Backup restored" : "Backup merged into your data");
       setTimeout(() => window.location.reload(), 700);
     };
     r.readAsText(file);

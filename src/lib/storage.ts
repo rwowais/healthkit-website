@@ -68,51 +68,39 @@ function getDateString(date?: Date, tz?: string): string {
 }
 
 /**
- * Clamp future-dated daily logs to the user's local today (sweep 2026-06-09
- * HIGH #8). A log dated AFTER today cannot represent a real past day — it is a
- * clock-skew or westward-timezone artifact (e.g. a log written in Asia/Tokyo,
- * then the device tz rewinds to America/Los_Angeles) — and it silently poisons
- * the engine: calculateStreak's head check rejects it → streak collapses to 0,
- * and getSignals' gap loop never reaches a future key → gapDays hits the 366
- * cap → adapt() demotes the day into "rebuild / away 366 days". normalize()
- * already clamps future biomarkers for the same reason; this does the same for
- * logs. A genuine traveler keeps the day (re-keyed to today); if today already
- * has a log, the future phantom is dropped so we never create a duplicate key.
- */
-export function clampFutureLogs(logs: DailyLog[], today: string): DailyLog[] {
-  let hasToday = logs.some((l) => l.date === today);
-  const out: DailyLog[] = [];
-  for (const l of logs) {
-    if (l.date > today) {
-      if (hasToday) continue; // real today entry wins; drop the phantom
-      out.push({ ...l, date: today });
-      hasToday = true;
-    } else {
-      out.push(l);
-    }
-  }
-  return out.sort((a, b) => a.date.localeCompare(b.date));
-}
-
-/**
  * Scrub the biomarker list at the load boundary (sweep 2026-06-09 MEDIUM #284):
- * clamp future dates to today, DROP implausible readings (non-finite / ≤0 /
- * outside [floor, max]), and collapse (metric,date) duplicates last-write-wins.
- * normalize() runs on EVERY load / import / cloud read, but the addBiomarker
- * guard it mirrors does NOT run on those paths — so without this an implausible
- * value from an imported backup or a legacy cloud row survived load and
- * poisoned the metric's band, sparkline scale, forecast and the recovery read.
+ * clamp future dates to today and DROP implausible readings (non-finite / ≤0 /
+ * outside [floor, max]). normalize() runs on EVERY load / import / cloud read,
+ * but the addBiomarker guard it mirrors does NOT run on those paths — so
+ * without this an implausible value from an imported backup or a legacy cloud
+ * row survived load and poisoned the metric's band, sparkline scale, forecast
+ * and the recovery read.
+ *
+ * Deliberately NO (metric,date) dedup here: a dedup keyed by array position
+ * was proven (audit round 2) to silently destroy a GENUINE reading — including
+ * the chronologically newer one after a cross-device merge, where position ≠
+ * recency — and the loss then synced cloud-wide. Same-day duplicates are a
+ * cosmetic non-issue by comparison; charts simply render both points.
+ *
+ * NOTE (audit round 2): daily LOGS are intentionally NOT clamped or dropped
+ * here. A future-dated log from an ahead-timezone device is a REAL day the
+ * user lived — it self-resolves when this device's calendar catches up, and
+ * the engine readers are immune to it in the meantime (calculateStreak ignores
+ * date > today; getSignals' gap walk filters l.date < tKey). An earlier
+ * normalize-time clamp destroyed that day's completions in exactly the
+ * traveler/multi-device case it claimed to protect, while cloud reconcileLogs
+ * re-unioned the row anyway. Readers guard; data is never mutated.
  */
 export function scrubBiomarkers(list: unknown, today: string): BiomarkerEntry[] {
   const arr = Array.isArray(list) ? (list as BiomarkerEntry[]) : [];
-  const byKey = new Map<string, BiomarkerEntry>();
+  const out: BiomarkerEntry[] = [];
   for (const raw of arr) {
     if (!raw || typeof raw !== "object") continue;
     const b = raw.date && raw.date > today ? { ...raw, date: today } : raw;
     if (!isPlausibleBiomarker(b.metric, b.value)) continue;
-    byKey.set(`${b.metric}|${b.date}`, b); // last-write-wins per (metric,date)
+    out.push(b);
   }
-  return [...byKey.values()];
+  return out;
 }
 
 function createEmptySleepLog(): SleepLog {
@@ -463,7 +451,14 @@ function normalize(s: AppState): AppState {
     // so without sorting here, a Supabase load looked "changed" to the
     // fixed-point guard and triggered redundant cross-instance save churn.
     // Sorting makes a round-trip a true fixed point.
-    dailyLogs: clampFutureLogs(migratedLogs.map(ensureLogShape), today),
+    // Canonical date order. Local writes APPEND new days (insertion order)
+    // while the cloud read path sorts by date — without sorting here a
+    // Supabase load looked "changed" to the fixed-point guard and triggered
+    // redundant save churn. Future-dated logs are kept VERBATIM (see the
+    // scrubBiomarkers note above): readers are immune, data is never mutated.
+    dailyLogs: migratedLogs
+      .map(ensureLogShape)
+      .sort((a, b) => a.date.localeCompare(b.date)),
     biomarkers: scrubBiomarkers(s.biomarkers, today),
     insights: Array.isArray(s.insights) ? s.insights : [],
     // NOTE: the persisted streak is kept verbatim here (recomputing it in

@@ -70,4 +70,35 @@ describe("weekly review skips conflict-muted essentials (HIGH #7)", () => {
       expect(review!.continuity.toLowerCase()).not.toContain("strength");
     }
   });
+
+  it("also holds when Strength is scheduled on non-Monday days (heart-health)", () => {
+    // Audit round 2: conflictMutedKeys sampled ONLY day-0 (Monday), so a
+    // behavior whose daysActive excludes Monday (heart-health Strength,
+    // Tue/Thu/Sat) never appeared in the sampled compile — its conflict mute
+    // was invisible to the filter and HIGH #7 reproduced verbatim with zero
+    // user customization. The filter now unions all seven weekdays.
+    const base: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["heart-health", "burnout-recovery"],
+    };
+    const keys = new Set<string>();
+    for (let d = 0; d < 7; d++)
+      for (const it of compileTimeline(base, d)) keys.add(it.canonicalKey);
+    expect(keys.has("strength")).toBe(true); // sanity: combo carries strength
+
+    const completable = [...keys].filter((k) => k !== "strength");
+    const logs: DailyLog[] = [];
+    for (let i = 1; i <= 14; i++) {
+      const bc: Record<string, boolean> = {};
+      for (const k of completable) bc[k] = true;
+      logs.push(log(dk(i), bc, 82));
+    }
+
+    const review = weeklyReview({ ...base, dailyLogs: logs });
+    expect(review).not.toBeNull();
+    expect(review!.focus.toLowerCase()).not.toContain("strength");
+    if (review!.continuity) {
+      expect(review!.continuity.toLowerCase()).not.toContain("strength");
+    }
+  });
 });

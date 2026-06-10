@@ -165,7 +165,13 @@ export default function InsightsPage() {
       state.dailyLogs.filter(
         (l) =>
           l.score > 0 ||
-          Object.values(l.behaviorCompletions ?? {}).some(Boolean)
+          Object.values(l.behaviorCompletions ?? {}).some(Boolean) ||
+          // Live supplement model — a supplement-only adherent's days are
+          // real check-ins; without this the countdown stayed frozen at 0
+          // for them despite perfect daily logging (audit round 2, the
+          // parallel-definition hole left open by the HIGH #9 fix).
+          Object.values(l.supplementCompletions ?? {}).some(Boolean) ||
+          (l.supplementSkips?.length ?? 0) > 0
       ).length,
     [state.dailyLogs]
   );

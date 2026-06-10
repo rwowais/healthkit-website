@@ -266,15 +266,17 @@ export default function ProtocolsPage() {
     [detail, manageRows]
   );
   const adaptation = useMemo(() => adapt(state), [state]);
-  const easedSet = useMemo(
-    () =>
-      new Set(
-        shapeTimeline(timeline, adaptation.mode)
-          .filter((i) => i.muted)
-          .map((i) => i.canonicalKey)
-      ),
-    [timeline, adaptation.mode]
-  );
+  const easedSet = useMemo(() => {
+    // No "eased today (recovery mode)" markers during a break — the system is
+    // frozen, so present-tense adaptation chips on the management list were
+    // incoherent ("you're resting" + "eased today") (audit round 2).
+    if (state?.settings.vacationMode) return new Set<string>();
+    return new Set(
+      shapeTimeline(timeline, adaptation.mode)
+        .filter((i) => i.muted)
+        .map((i) => i.canonicalKey)
+    );
+  }, [state, timeline, adaptation.mode]);
   const sysStats = useMemo(() => {
     const protocols = new Set(timeline.flatMap((i) => i.fromPacks)).size;
     return {

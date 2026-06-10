@@ -174,24 +174,28 @@ export function useAppState() {
         setState(maybeExtendTrial(raw));
       });
     };
-    // Cross-tab sync: the native `storage` event fires ONLY in OTHER tabs
-    // when they write localStorage — exactly the signal missing before, which
-    // let two guest tabs silently last-write-wins each other's check-ins
-    // (sweep 2026-06-09 HIGH #4). Re-reading on it means this tab picks up the
-    // other tab's write before its own next edit, so a later save builds on
-    // the merged truth instead of a stale snapshot. Can't self-loop (the
-    // writing tab never receives its own storage event), and the
-    // pendingSave/saving guard in sync() protects an in-flight local write.
+    // Cross-tab sync — GUEST/LOCAL MODE ONLY. The native `storage` event
+    // fires only in OTHER tabs when they write localStorage — the signal that
+    // was missing when two guest tabs silently last-write-wins'd each other's
+    // check-ins (sweep 2026-06-09 HIGH #4). In local mode this is safe and
+    // cascade-free: LocalDataSource.load() never writes, so a resync can't
+    // re-trigger the event. With the CLOUD source it must stay OFF —
+    // SupabaseDataSource.load() itself writes localStorage (twice, with an
+    // intermediate pre-reconcile string), so each load in one tab fired the
+    // listener in the other, whose cloud re-load wrote again: a self-
+    // sustaining cross-tab Supabase read storm (audit round 2). Signed-in
+    // tabs already converge through the cloud row + focus/visibility resync.
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY || e.key === null) sync();
     };
+    const localOnly = !activeDataSource.isCloud;
     window.addEventListener(STATE_EVENT, sync);
-    window.addEventListener("storage", onStorage);
+    if (localOnly) window.addEventListener("storage", onStorage);
     window.addEventListener("focus", sync);
     document.addEventListener("visibilitychange", sync);
     return () => {
       window.removeEventListener(STATE_EVENT, sync);
-      window.removeEventListener("storage", onStorage);
+      if (localOnly) window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", sync);
       document.removeEventListener("visibilitychange", sync);
     };

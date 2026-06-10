@@ -74,15 +74,24 @@ const _conflictMutedCache = new WeakMap<AppState, Set<string>>();
 function conflictMutedKeys(state: AppState): Set<string> {
   const cached = _conflictMutedCache.get(state);
   if (cached) return cached;
-  const muted = applyConflictMutes(
-    compileTimeline(state, 0),
-    resolvedInteractions()
-  );
   const out = new Set<string>();
-  for (const it of muted) {
-    if (it.muted && it.muteReason?.startsWith("conflict pair:")) {
-      out.add(it.canonicalKey);
-      out.add(effectiveKey(it));
+  // Union across ALL seven weekdays (dayIndex is a weekday index, Mon=0 —
+  // NOT "today"). Sampling only day 0 meant a behavior scheduled Tue/Thu/Sat
+  // (e.g. heart-health Strength) never appeared in Monday's compile, so its
+  // firm conflict mute was invisible here — and the weekly review then told a
+  // burnout-recovery user to "tighten Strength training", reproducing HIGH #7
+  // with zero customization (audit round 2). Mirrors analyticsItems' 7-day
+  // walk; consumers (weeklyReview, suggestions, keystone) are all week-scoped.
+  for (let d = 0; d < 7; d++) {
+    const muted = applyConflictMutes(
+      compileTimeline(state, d),
+      resolvedInteractions()
+    );
+    for (const it of muted) {
+      if (it.muted && it.muteReason?.startsWith("conflict pair:")) {
+        out.add(it.canonicalKey);
+        out.add(effectiveKey(it));
+      }
     }
   }
   _conflictMutedCache.set(state, out);

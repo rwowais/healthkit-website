@@ -179,7 +179,15 @@ function healProtocols(protocols: ProtocolPack[]): ProtocolPack[] {
       const base = idx.get(b.canonicalKey) as
         | Record<string, unknown>
         | undefined;
-      if (!base) return b;
+      if (!base) {
+        // No code twin → the overlay can never fill metadata for this row,
+        // and the publish-time backstop (backfillBuiltinFields) only helps
+        // FUTURE publishes. Users on an already-published bundle (the live
+        // v9 thin keys) would render it with NO evidence hedging, implying
+        // unqualified authority — default the tier to the most cautious at
+        // load too (audit round 2: the publish-time-only hole).
+        return b.evidenceTier ? b : { ...b, evidenceTier: "exploratory" };
+      }
       const out = { ...b } as Record<string, unknown>;
       for (const f of HEAL_FIELDS) {
         if (out[f] === undefined && base[f] !== undefined) out[f] = base[f];

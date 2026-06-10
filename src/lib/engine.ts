@@ -780,6 +780,13 @@ function logHasActivity(l: DailyLog): boolean {
   return (
     l.score > 0 ||
     Object.values(l.behaviorCompletions ?? {}).some(Boolean) ||
+    // Live supplement model — without this a supplement-only user's days
+    // count toward their streak (scoring.hasAnyActivity) but NOT toward the
+    // gap walk here, so getSignals ran gapDays to the cap and adapt() showed
+    // "rebuild / welcome back" to someone with a 3-day streak (audit round 2,
+    // the parallel-definition hole left open by the HIGH #9 fix).
+    Object.values(l.supplementCompletions ?? {}).some(Boolean) ||
+    (l.supplementSkips?.length ?? 0) > 0 ||
     l.energyLevel != null ||
     l.sleepLog?.sleepQuality != null
   );
