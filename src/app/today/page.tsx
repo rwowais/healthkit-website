@@ -309,7 +309,18 @@ export default function TodayPage() {
   const [dismissed, setDismissed] = useState<string[]>(() =>
     readLS("pz:dsm")
   );
+  // When the calendar rolls under a mounted board, RE-READ the new day's
+  // mirror instead of persisting yesterday's state under the new key — the
+  // old write-on-key-change effect copied day-1's snoozes (and check-in ack
+  // below) into day 2's storage, suppressing the check-in card for the whole
+  // next day even after a reload (audit round 2).
+  const snzDayRef = useRef(todayKey);
   useEffect(() => {
+    if (snzDayRef.current !== todayKey) {
+      snzDayRef.current = todayKey;
+      setSnoozed(readLS(`pz:snz:${todayKey}`));
+      return;
+    }
     try {
       localStorage.setItem(
         `pz:snz:${todayKey}`,
@@ -318,6 +329,7 @@ export default function TodayPage() {
     } catch {
       /* non-fatal */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snoozed, todayKey]);
   useEffect(() => {
     try {
@@ -337,12 +349,24 @@ export default function TodayPage() {
       return false;
     }
   });
+  const ciaDayRef = useRef(todayKey);
   useEffect(() => {
+    if (ciaDayRef.current !== todayKey) {
+      // New day under a mounted board → fresh ack state (see snooze mirror).
+      ciaDayRef.current = todayKey;
+      try {
+        setCheckInAcked(localStorage.getItem(`pz:cia:${todayKey}`) === "1");
+      } catch {
+        setCheckInAcked(false);
+      }
+      return;
+    }
     try {
       localStorage.setItem(`pz:cia:${todayKey}`, checkInAcked ? "1" : "0");
     } catch {
       /* non-fatal */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkInAcked, todayKey]);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
   // Edit-mode for the timeline. Off by default so the primary "tap to
@@ -3146,8 +3170,21 @@ export default function TodayPage() {
                 // restraint) — picking it auto-completed the swap and the
                 // conflict mute then hid it in the collapsed Resting group,
                 // a silent dead-end on our own recommendation (audit rd 2).
+                const swappedAway = new Set(Object.keys(log?.swaps ?? {}));
+                const snoozedOut = new Set(
+                  Object.entries(log?.snoozes ?? {})
+                    .filter(([, v]) => v === "tomorrow")
+                    .map(([k]) => k)
+                );
                 const all = availableWorkoutAlternatives(state).filter(
-                  (b) => b.canonicalKey !== swapForKey
+                  (b) =>
+                    b.canonicalKey !== swapForKey &&
+                    // Already swapped away today → picking it would credit a
+                    // muted ghost row; snoozed to tomorrow → applySnoozes
+                    // drops it from the board entirely. Both were dead-end
+                    // recommendations on the sheet's own list (audit rd 2).
+                    !swappedAway.has(b.canonicalKey) &&
+                    !snoozedOut.has(b.canonicalKey)
                 );
                 const blocked = conflictBlockedKeys(state, selDayIdx, all);
                 return all.filter((b) => !blocked.has(b.canonicalKey));

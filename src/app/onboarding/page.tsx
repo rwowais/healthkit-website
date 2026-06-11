@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { loadState } from "@/lib/storage";
+import { loadState, installPack } from "@/lib/storage";
 import { activeDataSource } from "@/lib/datasource";
 import { getUserId, supabaseEnabled } from "@/lib/supabase";
 import { PACKS, packById } from "@/lib/packs";
@@ -289,7 +289,7 @@ export default function OnboardingPage() {
     // Load through the data source (cloud-reconciled + normalized), not the
     // raw local cache — otherwise a re-tune's pack-merge + full-document save
     // could be built on a stale cache and overwrite newer cloud state.
-    const s = await activeDataSource.load();
+    let s = await activeDataSource.load();
     Object.assign(s.settings, {
       name: name.trim(),
       primaryGoal: goal,
@@ -315,11 +315,14 @@ export default function OnboardingPage() {
     });
     // Fresh setup installs exactly the recommended packs; a re-tune ADDS them
     // to whatever the user already has (never drops their custom/added packs).
-    s.installedPacks = redo
-      ? Array.from(
-          new Set([...(s.installedPacks ?? []), ...packs.map((p) => p.id)])
-        )
-      : packs.map((p) => p.id);
+    // The redo path folds through installPack() so the free-tier official-pack
+    // cap applies — the old raw union let a lapsed-trial free user stack up to
+    // six official packs via Profile → Re-run setup (audit round 2).
+    if (redo) {
+      for (const p of packs) s = installPack(s, p.id);
+    } else {
+      s.installedPacks = packs.map((p) => p.id);
+    }
     await activeDataSource.save(s);
     // If they already have a session, never send them back to /auth —
     // that's the loop. Only unauthenticated users who chose "save &

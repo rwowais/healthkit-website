@@ -11,7 +11,13 @@ import {
   availableWorkoutAlternatives,
   resolveBehaviorByKey,
 } from "@/lib/workouts";
-import { getDefaultState, duplicatePack, swapBehavior } from "@/lib/storage";
+import {
+  getDefaultState,
+  duplicatePack,
+  swapBehavior,
+  clearSwap,
+  computeBehaviorScore,
+} from "@/lib/storage";
 import { getTz, dateKeyInTz } from "@/lib/tz";
 import type { AppState, ProtocolPack } from "@/lib/types";
 
@@ -114,5 +120,37 @@ describe("forked/custom workouts in the swap flow (audit round 2, HIGH)", () => 
     const log = after.dailyLogs.find((l) => l.date === today);
     expect(log?.swaps?.[forkKey]).toBe("extended-walk");
     expect(log?.behaviorCompletions?.["extended-walk"]).toBe(true);
+  });
+});
+
+describe("stored day score is computed against the POST-mutation log (audit round 2)", () => {
+  it("swapBehavior as the day's last action stores the same score the board shows", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const today = dateKeyInTz(getTz(st.settings));
+    const after = swapBehavior(st, today, "zone2", "extended-walk");
+    const log = after.dailyLogs.find((l) => l.date === today)!;
+    // Parity invariant: the stored score must equal what scoring the SAVED
+    // state produces — pre-fix it was computed against the pre-swap state
+    // (wrong swaps map, wrong adapt mode) and persisted permanently.
+    expect(log.score).toBe(
+      computeBehaviorScore(after, today, log.behaviorCompletions ?? {})
+    );
+  });
+
+  it("clearSwap as the day's last action stores the same score the board shows", () => {
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+    };
+    const today = dateKeyInTz(getTz(st.settings));
+    const swapped = swapBehavior(st, today, "zone2", "extended-walk");
+    const undone = clearSwap(swapped, today, "zone2");
+    const log = undone.dailyLogs.find((l) => l.date === today)!;
+    expect(log.score).toBe(
+      computeBehaviorScore(undone, today, log.behaviorCompletions ?? {})
+    );
   });
 });

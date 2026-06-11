@@ -804,12 +804,16 @@ export function swapBehavior(
   // replaced. Clear its completion bit so a previously-toggled
   // strength doesn't ghost as "done" while showing as muted.
   delete bc[fromKey];
-  const score = computeBehaviorScore(state, date, bc);
-  const updated: DailyLog = {
+  // Score against the POST-mutation log: computeBehaviorScore derives the
+  // day's swaps (and adapt's easier-day read) from state.dailyLogs, so
+  // scoring the PRE-mutation state stored a stale number whenever the swap
+  // was the day's last action — and "swap then close the app" is the
+  // sheet's canonical flow (audit round 2). Build the draft first, score a
+  // state that contains it, then stamp.
+  const draft: DailyLog = {
     ...log,
     swaps,
     behaviorCompletions: bc,
-    score,
     // Track which keys were auto-completed by THIS swap (so
     // clearSwap can roll back surgically without erasing legit
     // completions). Encoded as a sidecar field on the log.
@@ -818,6 +822,12 @@ export function swapBehavior(
       [fromKey]: replacementWasAlreadyDone ? false : true,
     },
   };
+  const score = computeBehaviorScore(
+    { ...state, dailyLogs: putDayLog(state.dailyLogs, draft) },
+    date,
+    bc
+  );
+  const updated: DailyLog = { ...draft, score };
   const dailyLogs = putDayLog(state.dailyLogs, updated);
   return {
     ...state,
@@ -862,12 +872,13 @@ export function clearSwap(
   }
   const swapAutoCompleted = { ...(log.swapAutoCompleted ?? {}) };
   delete swapAutoCompleted[fromKey];
-  const score = computeBehaviorScore(state, date, bc);
-  const updated: DailyLog = {
+  // Same post-mutation scoring as swapBehavior: the pre-undo state still
+  // contains the swap, so scoring it stored a stale (often inflated) number
+  // when the undo was the day's last action (audit round 2).
+  const draft: DailyLog = {
     ...log,
     swaps: Object.keys(swaps).length > 0 ? swaps : undefined,
     behaviorCompletions: bc,
-    score,
     swapAutoCompleted:
       Object.keys(swapAutoCompleted).length > 0
         ? swapAutoCompleted
@@ -877,6 +888,12 @@ export function clearSwap(
     // later intent (audit round 2).
     updatedAt: new Date().toISOString(),
   };
+  const score = computeBehaviorScore(
+    { ...state, dailyLogs: state.dailyLogs.map((l) => (l.date === date ? draft : l)) },
+    date,
+    bc
+  );
+  const updated: DailyLog = { ...draft, score };
   const dailyLogs = state.dailyLogs.map((l) =>
     l.date === date ? updated : l
   );
