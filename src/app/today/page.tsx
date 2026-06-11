@@ -2600,11 +2600,18 @@ export default function TodayPage() {
                                   );
                                 }}
                                 aria-label={
-                                  done
-                                    ? `${it.title} — done`
-                                    : `Mark ${it.title} done`
+                                  it.muted
+                                    ? `${it.title} — resting today, not part of today's plan`
+                                    : done
+                                      ? `${it.title} — done`
+                                      : `Mark ${it.title} done`
                                 }
                                 aria-pressed={done}
+                                // Muted rows keep the node focusable but
+                                // announce the suppression (aria-disabled)
+                                // instead of promising "Mark done" and
+                                // silently no-op'ing for AT users (audit rd 2).
+                                aria-disabled={editMode || it.muted}
                                 disabled={editMode}
                                 className="press relative z-10 grid min-h-[44px] w-11 shrink-0 place-items-center disabled:opacity-60"
                               >
@@ -2694,7 +2701,16 @@ export default function TodayPage() {
                                   haptic.light();
                                   setDetail(it);
                                 }}
-                                aria-label={`${it.title} — open details and options`}
+                                aria-label={
+                                  editMode
+                                    ? `Select ${it.title}`
+                                    : `${it.title} — open details and options`
+                                }
+                                aria-pressed={
+                                  editMode
+                                    ? selectedKeys.has(it.canonicalKey)
+                                    : undefined
+                                }
                                 className={`min-w-0 flex-1 rounded-[var(--r-md)] text-left tr-fast ${
                                   lev3 && !done
                                     ? "px-4 py-3"

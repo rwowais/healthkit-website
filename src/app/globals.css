@@ -91,8 +91,11 @@
   --text-1: #14161A;
   --text-2: #45494F;
   --text-3: #5F636B;
-  --text-4: #6E727B; /* darkened from #8A8F98 (~2.8:1, failed AA) → ~4.5:1 on
-                        light surfaces, while staying dimmer than --text-3 */
+  --text-4: #63676F; /* darkened again (audit rd 2): #6E727B measured 3.96:1
+                        on --surface-3 and 4.34:1 on --surface-2 — below the
+                        4.5:1 AA minimum for small text. #63676F clears 4.5:1
+                        on every surface incl. surface-3 (#E6E9EE) while
+                        staying visibly dimmer than --text-3 #5F636B */
 
   /* Accents — deepened so they clear WCAG AA (≥4.5:1) as small bold text even
      on the darkest recessed surface (--surface-3, the .well/.row bg), not just

@@ -413,14 +413,29 @@ export function Sheet({
           willChange: dragging ? "transform" : undefined,
         }}
       >
-        {/* Drag handle + title: fixed chrome, outside the scroll area. */}
-        <div className="shrink-0 px-6 pt-6">
+        {/* Drag handle + title: fixed chrome, outside the scroll area. The
+            labeled Close button is the ONLY assistive-tech-reachable
+            dismissal: Escape needs a hardware key, the backdrop div isn't
+            exposed to AT (and aria-modal hides it anyway), and swipe-down is
+            a raw pointer drag outside screen-reader gesture sets — without
+            this, sheets whose children lack a Cancel (BehaviorSheet,
+            SupplementSheet, GlobalSearch, QuickAdd) sealed VoiceOver users
+            inside the focus trap with only state-mutating exits (audit rd 2). */}
+        <div className="relative shrink-0 px-6 pt-6">
           <div
             className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--text-4)] sm:hidden"
             aria-hidden="true"
           />
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="press tap-44 absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]"
+          >
+            <span aria-hidden="true" className="text-[15px] leading-none">✕</span>
+          </button>
           {title && (
-            <h3 className="t-section mb-5 text-[var(--text-1)]">{title}</h3>
+            <h3 className="t-section mb-5 pr-10 text-[var(--text-1)]">{title}</h3>
           )}
         </div>
         {/* The ONLY scroll container. No transform / animation / backdrop
@@ -476,23 +491,24 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
-      {msg && (
-        // Outer wrapper owns the centering (static -translate-x-1/2) so it
-        // survives prefers-reduced-motion, which neutralizes .anim-toast's
-        // transform — previously centering lived in the keyframe, so
-        // reduced-motion users got the toast shoved off the right edge.
-        // role=status + aria-live announces it to screen readers (the
-        // toast is the only channel for storage-full / save-error msgs).
-        <div
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none fixed bottom-28 left-1/2 z-[200] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2"
-        >
+      {/* Outer wrapper owns the centering (static -translate-x-1/2) so it
+          survives prefers-reduced-motion, which neutralizes .anim-toast's
+          transform. The role=status live region is PERMANENTLY mounted and
+          only its children toggle: a live region inserted together with its
+          text is skipped by VoiceOver (and inconsistently announced
+          elsewhere), so screen-reader users never heard the storage-full /
+          save-error warnings the toast is the only channel for (audit rd 2). */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed bottom-28 left-1/2 z-[200] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2"
+      >
+        {msg && (
           <div className="anim-toast glass rounded-[var(--r-pill)] border border-[var(--hairline-strong)] px-5 py-3">
             <p className="text-[13px] font-medium text-[var(--text-1)]">{msg}</p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </ToastContext.Provider>
   );
 }
