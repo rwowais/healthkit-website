@@ -47,6 +47,7 @@ import {
 } from "@/lib/storage";
 import { activeDataSource, STATE_EVENT } from "@/lib/datasource";
 import { STORAGE_KEY } from "@/lib/constants";
+
 import { fetchAndApplyPublished } from "@/lib/cms/publish";
 import { maybeExtendTrial } from "@/lib/entitlements";
 import type {
@@ -54,6 +55,30 @@ import type {
   BehaviorOverride,
   ProtocolPack,
 } from "@/lib/types";
+
+// ── Module-scope single-flight for resync loads (audit round 2) ──────────
+// Every mounted useAppState instance registers its own focus/visibility
+// listeners, so ONE tab refocus fired one load PER INSTANCE (~10 on Today) —
+// with the cloud source each was a full state-doc + logs-table round trip.
+// All concurrent callers share the same in-flight promise; a short floor
+// additionally collapses same-moment listener bursts. The floor is BYPASSED
+// for definite-change signals (forced: a pz:state save event or a cross-tab
+// storage write) so live propagation between sections is never throttled —
+// it only suppresses redundant speculative reloads.
+let inflightLoad: Promise<AppState> | null = null;
+let lastSpeculativeLoadAt = 0;
+const SYNC_FLOOR_MS = 1500;
+function sharedLoad(force: boolean): Promise<AppState | null> {
+  if (inflightLoad) return inflightLoad;
+  if (!force && Date.now() - lastSpeculativeLoadAt < SYNC_FLOOR_MS) {
+    return Promise.resolve(null);
+  }
+  lastSpeculativeLoadAt = Date.now();
+  inflightLoad = activeDataSource.load().finally(() => {
+    inflightLoad = null;
+  });
+  return inflightLoad;
+}
 
 /**
  * Canonical, key-order-independent serialization. The dedupe guard must
@@ -160,13 +185,14 @@ export function useAppState() {
   // so removing or customizing a protocol updates Today immediately.
   useEffect(() => {
     if (loading) return;
-    const sync = () => {
+    const sync = (force: boolean) => {
       // Never clobber an unflushed OR in-flight local write with a
       // resync — the local write wins and a later resync reconciles.
       // Closes both the debounce-window race and the self-clobber where
       // our own save's "changed" event reloads a stale cloud row.
       if (pendingSave.current || saving.current) return;
-      activeDataSource.load().then((raw) => {
+      sharedLoad(force).then((raw) => {
+        if (raw === null) return; // speculative + throttled — nothing changed
         if (pendingSave.current || saving.current) return;
         const j = stableStringify(raw);
         if (j === lastJson.current) return;
@@ -174,6 +200,10 @@ export function useAppState() {
         setState(maybeExtendTrial(raw));
       });
     };
+    // Definite-change signals bypass the floor; refocus/visibility are
+    // speculative and may be collapsed.
+    const syncForced = () => sync(true);
+    const syncSpeculative = () => sync(false);
     // Cross-tab sync — GUEST/LOCAL MODE ONLY. The native `storage` event
     // fires only in OTHER tabs when they write localStorage — the signal that
     // was missing when two guest tabs silently last-write-wins'd each other's
@@ -186,18 +216,18 @@ export function useAppState() {
     // sustaining cross-tab Supabase read storm (audit round 2). Signed-in
     // tabs already converge through the cloud row + focus/visibility resync.
     const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY || e.key === null) sync();
+      if (e.key === STORAGE_KEY || e.key === null) syncForced();
     };
     const localOnly = !activeDataSource.isCloud;
-    window.addEventListener(STATE_EVENT, sync);
+    window.addEventListener(STATE_EVENT, syncForced);
     if (localOnly) window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", sync);
-    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("focus", syncSpeculative);
+    document.addEventListener("visibilitychange", syncSpeculative);
     return () => {
-      window.removeEventListener(STATE_EVENT, sync);
+      window.removeEventListener(STATE_EVENT, syncForced);
       if (localOnly) window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", sync);
-      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("focus", syncSpeculative);
+      document.removeEventListener("visibilitychange", syncSpeculative);
     };
   }, [loading]);
 
