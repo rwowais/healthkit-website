@@ -5,7 +5,7 @@ import {
   isSupplementBehavior,
 } from "./supplements";
 import { calculateStreak } from "./scoring";
-import { isPlausibleBiomarker } from "./biomarkers";
+import { isPlausibleBiomarker, biomarkerDef } from "./biomarkers";
 import type {
   AppState,
   BiomarkerEntry,
@@ -854,7 +854,11 @@ export function clearSwap(
   // leave the completion intact.
   const autoCompleted = log.swapAutoCompleted?.[fromKey] === true;
   if (autoCompleted) {
-    delete bc[toKey];
+    // Explicit false, NOT delete: the recency-aware completions merge treats
+    // a one-sided key as "only the other side has it" and resurrects the
+    // credit from any stale copy. A stamped false defends the undo
+    // (audit round 2).
+    bc[toKey] = false;
   }
   const swapAutoCompleted = { ...(log.swapAutoCompleted ?? {}) };
   delete swapAutoCompleted[fromKey];
@@ -868,6 +872,10 @@ export function clearSwap(
       Object.keys(swapAutoCompleted).length > 0
         ? swapAutoCompleted
         : undefined,
+    // Fresh recency stamp — without it the undone log compared EQUAL to the
+    // pre-undo copy and the swaps merge had no way to know the undo was the
+    // later intent (audit round 2).
+    updatedAt: new Date().toISOString(),
   };
   const dailyLogs = state.dailyLogs.map((l) =>
     l.date === date ? updated : l
@@ -1377,8 +1385,14 @@ export function addBiomarker(
   // above the cap is the case the UI blocks. Enforce it here too so
   // non-UI code paths (cloud sync, import, future API) can't bypass.
   if (!getAccess(state).premium) {
+    // Count only metrics that exist in the CURRENT catalog: orphaned legacy
+    // blood-panel readings (apoB, …) are invisible and undeletable in the UI,
+    // yet they consumed the free cap and could lock a user out of Body trends
+    // entirely (audit round 2).
     const distinctMetrics = new Set(
-      (state.biomarkers ?? []).map((b) => b.metric)
+      (state.biomarkers ?? [])
+        .map((b) => b.metric)
+        .filter((m) => biomarkerDef(m))
     );
     if (
       !distinctMetrics.has(entry.metric) &&

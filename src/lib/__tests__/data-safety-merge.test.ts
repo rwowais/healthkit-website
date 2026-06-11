@@ -105,3 +105,38 @@ describe("first-sign-in conflict gate sees config slices (audit 2026-06-09)", ()
     expect(hasMeaningfulData(added)).toBe(true);
   });
 });
+
+describe("vacationPeriods survive merges (audit round 2)", () => {
+  it("unions both sides' periods; closing a vacation propagates", () => {
+    const cloud = base();
+    cloud.settings.vacationPeriods = [{ start: "2026-02-01", end: "2026-02-07" }];
+    const local = base();
+    local.settings.vacationPeriods = [
+      { start: "2026-05-10", end: "2026-05-12" },
+      { start: "2026-02-01", end: null }, // stale open copy of the Feb break
+    ];
+    const merged = mergeStates(local, cloud);
+    const starts = (merged.settings.vacationPeriods ?? []).map((v) => v.start);
+    expect(starts).toContain("2026-02-01");
+    expect(starts).toContain("2026-05-10");
+    // The CLOSED copy of the colliding period wins (closing must propagate).
+    const feb = (merged.settings.vacationPeriods ?? []).find(
+      (v) => v.start === "2026-02-01"
+    );
+    expect(feb?.end).toBe("2026-02-07");
+    // No open period left → vacationMode off after the merge.
+    expect(merged.settings.vacationMode).toBe(false);
+  });
+
+  it("an open period on either side keeps vacationMode ON through a merge", () => {
+    const cloud = base();
+    cloud.settings.vacationPeriods = [{ start: "2026-06-09", end: null }];
+    cloud.settings.vacationMode = true;
+    const local = base(); // stale device that never saw the vacation
+    const merged = mergeStates(local, cloud);
+    expect(merged.settings.vacationMode).toBe(true);
+    expect(
+      (merged.settings.vacationPeriods ?? []).some((v) => v.end === null)
+    ).toBe(true);
+  });
+});

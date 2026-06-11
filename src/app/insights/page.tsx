@@ -35,7 +35,7 @@ import WhatChangedCard from "@/components/WhatChangedCard";
 import BenchmarksCard from "@/components/BenchmarksCard";
 import GoalsCard from "@/components/GoalsCard";
 import ExperimentsCard from "@/components/ExperimentsCard";
-import { getTz } from "@/lib/tz";
+import { getTz, dateKeyInTz, addDaysToKey } from "@/lib/tz";
 import { compileTimeline, getSignals } from "@/lib/engine";
 import { personalModel, identityReflection } from "@/lib/reflect";
 import { Eyebrow, Skeleton, EmptyState } from "@/components/ui";
@@ -45,13 +45,6 @@ interface Insight {
   icon: IconName;
   accent: string;
   text: string;
-}
-
-function dateKeyOf(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function InsightsPage() {
@@ -68,9 +61,10 @@ export default function InsightsPage() {
   // daily payoff exactly when the habit is most fragile.
   const intelState = useMemo(() => {
     if (access.premium) return state;
-    const d = new Date();
-    d.setDate(d.getDate() - insightLag);
-    const cutoff = dateKeyOf(d);
+    // tz-aware: the device clock drifted the gate to 2 or 4 days for
+    // travelers and disagreed with how the logs themselves are dated
+    // (audit round 2).
+    const cutoff = addDaysToKey(dateKeyInTz(getTz(state.settings)), -insightLag);
     return {
       ...state,
       dailyLogs: (state.dailyLogs ?? []).filter((l) => l.date <= cutoff),

@@ -393,11 +393,26 @@ function mergeDailyLog(
         : newer === "b"
           ? b.score ?? 0
           : Math.max(a.score ?? 0, b.score ?? 0),
-    swaps: { ...(a.swaps ?? {}), ...(b.swaps ?? {}) },
-    swapAutoCompleted: {
-      ...(a.swapAutoCompleted ?? {}),
-      ...(b.swapAutoCompleted ?? {}),
-    },
+    // Swaps are a per-day INTENT map where deletion (undo) matters as much
+    // as insertion — a blind union resurrected an undone swap (and its
+    // auto-completion) from any stale copy (audit round 2). When both logs
+    // carry recency stamps, the newer side's whole map wins; un-stamped
+    // legacy logs keep the union.
+    swaps:
+      newer === null
+        ? { ...(a.swaps ?? {}), ...(b.swaps ?? {}) }
+        : newer === "b"
+          ? b.swaps
+          : a.swaps,
+    swapAutoCompleted:
+      newer === null
+        ? {
+            ...(a.swapAutoCompleted ?? {}),
+            ...(b.swapAutoCompleted ?? {}),
+          }
+        : newer === "b"
+          ? b.swapAutoCompleted
+          : a.swapAutoCompleted,
     snoozes: { ...(a.snoozes ?? {}), ...(b.snoozes ?? {}) },
     oneOffs: [
       ...(a.oneOffs ?? []),
@@ -442,6 +457,24 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
     return [...m.values()];
   };
 
+  // Vacation periods are streak-protective: union by `start`; on a collision
+  // prefer the CLOSED period (closing a vacation on one device must
+  // propagate), else the later end (audit round 2 — the bare settings spread
+  // discarded the other side's entire vacation history).
+  const vpByStart = new Map<string, { start: string; end: string | null }>();
+  for (const v of [
+    ...(cloud.settings.vacationPeriods ?? []),
+    ...(local.settings.vacationPeriods ?? []),
+  ]) {
+    const prev = vpByStart.get(v.start);
+    if (!prev) vpByStart.set(v.start, v);
+    else if (prev.end === null && v.end !== null) vpByStart.set(v.start, v);
+    else if (prev.end !== null && v.end !== null && v.end > prev.end)
+      vpByStart.set(v.start, v);
+  }
+  const mergedVacationPeriods = [...vpByStart.values()].sort((x, y) =>
+    x.start.localeCompare(y.start)
+  );
   return {
     ...cloud,
     settings: {
@@ -483,6 +516,14 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
           ...(local.settings.usedFreezeDates ?? []),
         ]),
       ],
+      // Vacation periods are streak-protective exactly like restDays /
+      // usedFreezeDates, but rode the bare settings spread — so whenever the
+      // local side carried the key at all, the other side's entire vacation
+      // history was discarded and the streak it protected collapsed across
+      // those dates, account-wide (audit round 2). Union by `start`; on a
+      // collision prefer the CLOSED period (closing a vacation on one device
+      // must propagate), else the later end.
+      vacationPeriods: mergedVacationPeriods,
       // Outcome goals + self-experiments: by-id union so neither device's
       // entries are dropped on the first cross-device merge.
       outcomeGoals: mergeById(
@@ -493,6 +534,12 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
         cloud.settings.experiments,
         local.settings.experiments
       ),
+      // vacationMode is derived truth: ON iff the RESOLVED union contains an
+      // open (end === null) period — a vacation toggled on the phone must not
+      // be silently switched off by a merge from a stale laptop, and a stale
+      // open copy that lost its collision to a closed one must not keep the
+      // mode on either.
+      vacationMode: mergedVacationPeriods.some((v) => v.end === null),
     },
     dailyLogs: [...byDate.values()].sort((a, b) =>
       a.date.localeCompare(b.date)

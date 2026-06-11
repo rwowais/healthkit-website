@@ -642,7 +642,12 @@ describe("storage — workout swap (per-day)", () => {
     s = clearSwap(s, today, "strength");
     const log = s.dailyLogs.find((l) => l.date === today)!;
     expect(log.swaps).toBeUndefined();
-    expect(log.behaviorCompletions?.zone2).toBeUndefined();
+    // The replacement's auto-completion is undone as an EXPLICIT false, not a
+    // deletion: a deleted key reads as "only the other side has it" to the
+    // recency-aware completions merge, which resurrected the auto-completion
+    // from any stale copy (audit round 2). The stamped false defends the undo
+    // across merges; it still counts as not-done everywhere.
+    expect(log.behaviorCompletions?.zone2).toBe(false);
     expect(log.behaviorCompletions?.strength).toBeUndefined();
   });
 

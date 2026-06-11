@@ -53,7 +53,12 @@ function engagedDays(state: AppState): number {
       l.score > 0 ||
       l.sleepLog?.sleepQuality != null ||
       l.energyLevel != null ||
-      Object.values(l.behaviorCompletions ?? {}).some(Boolean)
+      Object.values(l.behaviorCompletions ?? {}).some(Boolean) ||
+      // Live supplement model — a perfectly-adherent supplement-only user was
+      // counted as "under-engaged" and silently granted the pity trial extend
+      // (the last of the parallel activity definitions; audit round 2).
+      Object.values(l.supplementCompletions ?? {}).some(Boolean) ||
+      (l.supplementSkips?.length ?? 0) > 0
   ).length;
 }
 

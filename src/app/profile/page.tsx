@@ -1082,6 +1082,10 @@ export default function ProfilePage() {
                       subscriptionStatus: s.subscriptionStatus ?? "trial",
                       trialStartDate: s.trialStartDate,
                       premiumTrialEndsAt: s.premiumTrialEndsAt,
+                      // …and the one-shot auto-extend guard: dropping it made
+                      // the engagement-gated extension deterministically
+                      // re-fire after every reset (audit round 2).
+                      trialExtendedAt: s.trialExtendedAt,
                       // Preserve medical/safety flags — completedOnboarding=true
                       // skips the flow, so dropping them would silently
                       // un-suppress contraindicated behaviors.

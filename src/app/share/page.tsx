@@ -112,7 +112,17 @@ function ShareInner() {
       url ||
       ((text.match(/https?:\/\/\S+/) || [])[0] ?? "") ||
       ((title.match(/https?:\/\/\S+/) || [])[0] ?? "");
-    if (target) window.open(target, "_blank", "noopener,noreferrer");
+    // The `url` share-target param is attacker-controlled (any app/site can
+    // invoke the share target) — without a scheme check, javascript:/data:
+    // URLs reached the click sink (audit round 2). Allow http(s) only.
+    if (!target) return;
+    try {
+      const parsed = new URL(target);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
+    } catch {
+      return;
+    }
+    window.open(target, "_blank", "noopener,noreferrer");
   }
 
   return (
