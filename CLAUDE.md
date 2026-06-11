@@ -346,11 +346,14 @@ accounts, not the codebase:
 2. **Plausible** — sign up at plausible.io (free 30-day trial), add
    `protocolize.com` as a site, then set
    `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=protocolize.com` in Vercel.
-3. **Stripe Payment Links** — in Stripe Dashboard → Payment Links,
-   create three links matching the pricing in `src/lib/billing.ts`,
-   then add as `NEXT_PUBLIC_STRIPE_CHECKOUT_MONTHLY`,
-   `_ANNUAL`, `_LIFETIME` in Vercel.
+3. **Stripe Payment Links — DO NOT WIRE YET.** ⚠️ The checkout redirect
+   works, but there is currently NO fulfillment path: nothing grants
+   `tier="premium"` after a successful payment (audit 2026-06-11,
+   HIGH). Wiring the env vars today would CHARGE customers without
+   delivering Premium. Fulfillment needs a small server piece (e.g. a
+   Supabase edge function receiving Stripe webhooks that stamps the
+   user's row) — ask Claude to build it BEFORE creating the links.
 
-After redeploy, monetization is live, analytics is live, social
-previews resolve, and the legal pages render at the production
-domain.
+After redeploy, analytics is live, social previews resolve, and the
+legal pages render at the production domain. Monetization goes live
+only after the Stripe fulfillment path above ships.
