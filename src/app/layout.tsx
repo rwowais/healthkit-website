@@ -43,7 +43,13 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // "default" (not "black-translucent"): the iOS status bar stays opaque
+    // with theme-appropriate DARK text and the web view begins BELOW it.
+    // black-translucent made the view full-bleed under the notch and forced
+    // WHITE status text — unreadable on the light default theme, with the
+    // app header colliding with the clock/notch. The Shell header also pads
+    // env(safe-area-inset-top) as defense-in-depth.
+    statusBarStyle: "default",
     title: "Protocolize",
     // iOS-specific splash screens. Apple requires exact-pixel PNGs
     // per device size; without these, iOS shows a white flash on

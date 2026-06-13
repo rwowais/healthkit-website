@@ -1561,15 +1561,56 @@ export interface AssembledBundle {
   interactions: Interaction[];
 }
 
-export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
+/**
+ * Discriminated assembly result. The PUBLISH path MUST tell a genuinely
+ * "CMS not seeded yet" state (→ fall back to the built-in catalog, byte-
+ * identical to pre-seed) apart from a transient query failure (→ ABORT; never
+ * ship a wrong or interaction-stripped bundle as a new immutable version with
+ * a success toast). supabase-js never throws on a failed query — it returns
+ * `{ error }` — so every read below inspects `error` and bails to "failed"
+ * instead of swallowing it and continuing with partial data.
+ */
+export type AssembleResult =
+  | { status: "ok"; bundle: AssembledBundle }
+  | { status: "unseeded" }
+  | { status: "failed"; error: string };
+
+/** Strict per-protocol behavior fetch: surfaces a query error so the publish
+ *  path can abort, rather than masking a transient failure as an empty pack. */
+async function getProtocolBehaviorsResult(
+  protocolId: string
+): Promise<{ behaviors: CmsBehavior[]; error?: string }> {
   const sb = getSupabase();
-  if (!sb) return null;
+  if (!sb) return { behaviors: [] };
+  const { data, error } = await sb
+    .from("cms_protocol_behaviors")
+    .select("position, cms_behaviors(*)")
+    .eq("protocol_id", protocolId)
+    .order("position");
+  if (error) return { behaviors: [], error: error.message };
+  const behaviors = (data ?? [])
+    .map((r) => (r as unknown as { cms_behaviors: CmsBehavior }).cms_behaviors)
+    .filter(Boolean);
+  return { behaviors };
+}
+
+export async function assembleBundleFromCMSResult(): Promise<AssembleResult> {
+  const sb = getSupabase();
+  if (!sb) return { status: "unseeded" };
   try {
-    const { data: prot } = await sb
+    // Protocols. A query ERROR is a transient failure (abort the publish);
+    // zero rows is a genuinely-unseeded CMS (fall back to the catalog).
+    // .order("slug"): deterministic order → stable bundle checksum across
+    // re-assembles (Postgres returns rows in arbitrary physical order
+    // otherwise, which defeats the "no changes since last publish" dedupe —
+    // the same hazard the insight-template / interaction queries guard).
+    const { data: prot, error: protErr } = await sb
       .from("cms_protocols")
       .select("*")
-      .neq("status", "archived");
-    if (!prot || prot.length === 0) return null;
+      .neq("status", "archived")
+      .order("slug");
+    if (protErr) return { status: "failed", error: `protocols: ${protErr.message}` };
+    if (!prot || prot.length === 0) return { status: "unseeded" };
     // Fan out the per-protocol behavior fetches in parallel. The serial
     // version (one await per protocol) compounded to O(N × roundtrip) and
     // dominated publish latency once the catalog grew past a handful of
@@ -1577,11 +1618,49 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
     // We preserve catalog order by zipping the resolved behaviors back
     // onto the original protocol rows in the same index.
     const protRows = prot as CmsProtocol[];
-    const behaviorsPerProtocol = await Promise.all(
-      protRows.map((p) => getProtocolBehaviors(p.id))
+    const behaviorResults = await Promise.all(
+      protRows.map((p) => getProtocolBehaviorsResult(p.id))
     );
+    const behErr = behaviorResults.find((r) => r.error);
+    if (behErr?.error) return { status: "failed", error: `behaviors: ${behErr.error}` };
+
+    // Authored evidence / timing copy so admin curation actually reaches
+    // users instead of being silently discarded (the editor advertises
+    // attaching evidence "for any behavior"). CMS row WINS; the built-in
+    // atom is the fallback inside backfillBuiltinFields (its `!out.evidence`
+    // guard already supports this). Fetched once, mapped by canonical key.
+    const { data: evRows, error: evErr } = await sb
+      .from("cms_evidence")
+      .select("target_ref, summary")
+      .eq("target_type", "behavior");
+    if (evErr) return { status: "failed", error: `evidence: ${evErr.message}` };
+    const evidenceByKey = new Map<string, string>();
+    for (const r of (evRows ?? []) as {
+      target_ref: string;
+      summary: string | null;
+    }[]) {
+      if (r.summary) evidenceByKey.set(r.target_ref, r.summary);
+    }
+    const { data: exRows, error: exErr } = await sb
+      .from("cms_explanations")
+      .select("target_ref, kind, text, status")
+      .eq("target_type", "behavior");
+    if (exErr) return { status: "failed", error: `explanations: ${exErr.message}` };
+    const timingByKey = new Map<string, string>();
+    for (const r of (exRows ?? []) as {
+      target_ref: string;
+      kind: string;
+      text: string | null;
+      status: string;
+    }[]) {
+      // Only PUBLISHED timing copy flows to users — drafts stay internal,
+      // matching the hold-back model the rest of the CMS uses.
+      if (r.kind === "timing" && r.text && r.status === "published")
+        timingByKey.set(r.target_ref, r.text);
+    }
+
     const protocols: ProtocolPack[] = protRows.map((p, i) => {
-      const behaviors = behaviorsPerProtocol[i]
+      const behaviors = behaviorResults[i].behaviors
         .filter(isPublishableBehavior)
         .map((b): BehaviorDef => {
           const base: BehaviorDef = {
@@ -1596,6 +1675,12 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
             icon: (b.icon ?? "sparkle") as BehaviorDef["icon"],
             rationale: b.rationale ?? "",
           } as BehaviorDef;
+          // CMS-authored evidence / timing copy wins; backfillBuiltinFields
+          // fills these from the built-in atom only when they're absent.
+          const ev = evidenceByKey.get(b.canonical_key);
+          if (ev) base.evidence = ev;
+          const tr = timingByKey.get(b.canonical_key);
+          if (tr) base.timingReason = tr;
           // Backfill the CMS-non-editable fields from the canonical built-in
           // atom so publishing never strips safety/scheduling/identity data.
           return backfillBuiltinFields(base);
@@ -1618,79 +1703,70 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
     // Objects/arrays would also typecheck as jsonb but are skipped here
     // so the bundle stays a flat dictionary of scalar tunables.
     const config: Record<string, number | string | boolean> = {};
-    try {
-      const { data: cfgRows } = await sb
-        .from("cms_intelligence_config")
-        .select("key, value");
-      for (const row of (cfgRows ?? []) as {
-        key: string;
-        value: unknown;
-      }[]) {
-        const v = row.value;
-        if (
-          typeof v === "number" ||
-          typeof v === "string" ||
-          typeof v === "boolean"
-        )
-          config[row.key] = v;
-      }
-    } catch {
-      /* config is enrichment; assembly continues without it */
+    const { data: cfgRows, error: cfgErr } = await sb
+      .from("cms_intelligence_config")
+      .select("key, value");
+    if (cfgErr) return { status: "failed", error: `config: ${cfgErr.message}` };
+    for (const row of (cfgRows ?? []) as {
+      key: string;
+      value: unknown;
+    }[]) {
+      const v = row.value;
+      if (
+        typeof v === "number" ||
+        typeof v === "string" ||
+        typeof v === "boolean"
+      )
+        config[row.key] = v;
     }
 
     // Insight templates — only "published" status rows flow into the
     // bundle. Drafts stay in the CMS until promoted.
     const insightTemplates: AssembledBundle["insightTemplates"] = [];
-    try {
-      const { data: tplRows } = await sb
-        .from("cms_insight_templates")
-        .select("kind, template, conditions, status")
-        // Deterministic order → stable bundle checksum across re-assembles
-        // (Postgres returns rows in arbitrary physical order otherwise, which
-        // would make identical content checksum differently and defeat the
-        // "no changes since last publish" guard).
-        .order("kind");
-      for (const row of (tplRows ?? []) as {
-        kind: string;
-        template: string;
-        conditions: unknown;
-        status: string;
-      }[]) {
-        if (row.status === "published")
-          insightTemplates.push({
-            kind: row.kind,
-            template: row.template,
-            conditions: row.conditions,
-          });
-      }
-    } catch {
-      /* templates are enrichment; assembly continues without them */
+    const { data: tplRows, error: tplErr } = await sb
+      .from("cms_insight_templates")
+      .select("kind, template, conditions, status")
+      // Deterministic order → stable bundle checksum across re-assembles.
+      .order("kind");
+    if (tplErr) return { status: "failed", error: `templates: ${tplErr.message}` };
+    for (const row of (tplRows ?? []) as {
+      kind: string;
+      template: string;
+      conditions: unknown;
+      status: string;
+    }[]) {
+      if (row.status === "published")
+        insightTemplates.push({
+          kind: row.kind,
+          template: row.template,
+          conditions: row.conditions,
+        });
     }
 
     // Adaptation rules — only "published" rows; drafts/archived held back.
     const adaptationRules: AssembledBundle["adaptationRules"] = [];
-    try {
-      const { data: ruleRows } = await sb
-        .from("cms_adaptation_rules")
-        .select("name, priority, trigger, effect, status")
-        .order("priority");
-      for (const row of (ruleRows ?? []) as {
-        name: string;
-        priority: number;
-        trigger: unknown;
-        effect: unknown;
-        status: string;
-      }[]) {
-        if (row.status === "published")
-          adaptationRules.push({
-            name: row.name,
-            priority: row.priority,
-            trigger: row.trigger,
-            effect: row.effect,
-          });
-      }
-    } catch {
-      /* rules are enrichment; assembly continues without them */
+    const { data: ruleRows, error: ruleErr } = await sb
+      .from("cms_adaptation_rules")
+      .select("name, priority, trigger, effect, status")
+      // Secondary .order("name") so equal-priority rows sort stably (priority
+      // alone left ties in arbitrary physical order → checksum churn).
+      .order("priority")
+      .order("name");
+    if (ruleErr) return { status: "failed", error: `rules: ${ruleErr.message}` };
+    for (const row of (ruleRows ?? []) as {
+      name: string;
+      priority: number;
+      trigger: unknown;
+      effect: unknown;
+      status: string;
+    }[]) {
+      if (row.status === "published")
+        adaptationRules.push({
+          name: row.name,
+          priority: row.priority,
+          trigger: row.trigger,
+          effect: row.effect,
+        });
     }
 
     // Behavior-to-behavior interactions — only "published" rows, and a
@@ -1698,60 +1774,77 @@ export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
     // has stamped source_verified_at. Nothing ships as a claim on an
     // unchecked citation (the analog of ai_unverified for behaviors).
     const interactions: AssembledBundle["interactions"] = [];
-    try {
-      const { data: interactionRows } = await sb
-        .from("cms_interactions")
-        .select(
-          "a_key, b_key, type, severity, gap_hours, bound, condition, direction, nudge, evidence_tier, source, source_verified_at, status"
-        )
-        // Deterministic order → stable bundle checksum (see insight templates
-        // above). Order by the full identity so two rows sharing a
-        // (a_key,b_key,type) triple still sort stably.
-        .order("a_key")
-        .order("b_key")
-        .order("type")
-        .order("direction");
-      for (const row of (interactionRows ?? []) as Array<
-        Record<string, unknown>
-      >) {
-        if (row.status !== "published") continue;
-        if (row.evidence_tier && !row.source_verified_at) continue;
-        interactions.push({
-          aKey: String(row.a_key),
-          bKey: String(row.b_key),
-          type: row.type as Interaction["type"],
-          severity: (row.severity as Interaction["severity"]) ?? "soft",
-          nudge: typeof row.nudge === "string" ? row.nudge : "",
-          ...(row.gap_hours != null
-            ? { gapHours: Number(row.gap_hours) }
-            : {}),
-          ...(row.bound ? { bound: row.bound as Record<string, number> } : {}),
-          ...(row.condition
-            ? { condition: row.condition as Record<string, string> }
-            : {}),
-          ...(row.direction
-            ? { direction: row.direction as Interaction["direction"] }
-            : {}),
-          ...(row.evidence_tier
-            ? {
-                evidenceTier: row.evidence_tier as Interaction["evidenceTier"],
-              }
-            : {}),
-          ...(row.source ? { source: String(row.source) } : {}),
-        });
-      }
-    } catch {
-      /* interactions are enrichment; assembly continues without them */
+    const { data: interactionRows, error: ixErr } = await sb
+      .from("cms_interactions")
+      .select(
+        "a_key, b_key, type, severity, gap_hours, bound, condition, direction, nudge, evidence_tier, source, source_verified_at, status"
+      )
+      // Deterministic order → stable bundle checksum (see insight templates
+      // above). Order by the full identity so two rows sharing a
+      // (a_key,b_key,type) triple still sort stably.
+      .order("a_key")
+      .order("b_key")
+      .order("type")
+      .order("direction");
+    if (ixErr) return { status: "failed", error: `interactions: ${ixErr.message}` };
+    for (const row of (interactionRows ?? []) as Array<
+      Record<string, unknown>
+    >) {
+      if (row.status !== "published") continue;
+      if (row.evidence_tier && !row.source_verified_at) continue;
+      interactions.push({
+        aKey: String(row.a_key),
+        bKey: String(row.b_key),
+        type: row.type as Interaction["type"],
+        severity: (row.severity as Interaction["severity"]) ?? "soft",
+        nudge: typeof row.nudge === "string" ? row.nudge : "",
+        ...(row.gap_hours != null
+          ? { gapHours: Number(row.gap_hours) }
+          : {}),
+        ...(row.bound ? { bound: row.bound as Record<string, number> } : {}),
+        ...(row.condition
+          ? { condition: row.condition as Record<string, string> }
+          : {}),
+        ...(row.direction
+          ? { direction: row.direction as Interaction["direction"] }
+          : {}),
+        ...(row.evidence_tier
+          ? {
+              evidenceTier: row.evidence_tier as Interaction["evidenceTier"],
+            }
+          : {}),
+        ...(row.source ? { source: String(row.source) } : {}),
+      });
     }
 
     return {
-      protocols,
-      config,
-      insightTemplates,
-      adaptationRules,
-      interactions,
+      status: "ok",
+      bundle: {
+        protocols,
+        config,
+        insightTemplates,
+        adaptationRules,
+        interactions,
+      },
     };
-  } catch {
-    return null;
+  } catch (e) {
+    // Unexpected throw (not a normal supabase `{ error }`) — treat as a
+    // failure so publish aborts rather than shipping the catalog fallback.
+    return {
+      status: "failed",
+      error: e instanceof Error ? e.message : "assembly error",
+    };
   }
+}
+
+/**
+ * Back-compat wrapper for PREVIEW-only callers (admin Simulate/diff, staging
+ * tests) that don't persist a bundle: a failed read is indistinguishable from
+ * unseeded here (both → null → catalog preview), which is harmless when
+ * nothing is written. The PUBLISH path uses assembleBundleFromCMSResult so it
+ * can abort on "failed".
+ */
+export async function assembleBundleFromCMS(): Promise<AssembledBundle | null> {
+  const r = await assembleBundleFromCMSResult();
+  return r.status === "ok" ? r.bundle : null;
 }

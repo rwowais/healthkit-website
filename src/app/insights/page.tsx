@@ -423,7 +423,17 @@ export default function InsightsPage() {
             Library to add it. */}
         {rec && (
           <button
-            onClick={() => router.push("/library")}
+            onClick={() =>
+              // The recommendation is a specific BEHAVIOR. Route to the pack that
+              // contains it (Discover lists official packs), or to the custom
+              // builder for a Library-only atom — not a bare pack catalog where
+              // the named behavior isn't an addable row.
+              router.push(
+                rec.fromPacks.some((p) => p && p !== "Library")
+                  ? "/library"
+                  : "/protocols"
+              )
+            }
             className="press tr-fast panel relative w-full overflow-hidden p-6 text-left"
           >
             <span
@@ -451,7 +461,10 @@ export default function InsightsPage() {
                 </p>
               )}
               <div className="mt-4 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--vitality)]">
-                Add it from the Library
+                {(() => {
+                  const p = rec.fromPacks.find((x) => x && x !== "Library");
+                  return p ? `Add the ${p} pack` : "Add it as a custom behavior";
+                })()}
                 <Icon name="chevron" size={13} />
               </div>
             </div>

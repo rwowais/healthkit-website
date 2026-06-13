@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAppState } from "@/hooks/useAppState";
-import { deviceTz, tzLabel, isValidTz } from "@/lib/tz";
+import { deviceTz, tzLabel, isValidTz, dateKeyInTz } from "@/lib/tz";
 
 /**
  * Detects when the user's device timezone disagrees with the
@@ -40,7 +40,16 @@ export default function TimezoneSentry() {
       return;
     }
     const dev = deviceTz();
-    if (dev === stored) return;
+    if (dev === stored) {
+      // Home again (device matches the stored zone). Clear any stale "Not now"
+      // dismiss so a FUTURE trip to a previously-dismissed zone prompts again —
+      // a dismiss is meant to silence the current trip, not permanently mute
+      // re-anchoring every time the traveler revisits that city.
+      try {
+        localStorage.removeItem(DISMISS_KEY);
+      } catch {}
+      return;
+    }
     // Has the user already dismissed this exact device tz?
     let dismissed = "";
     try {
@@ -52,6 +61,20 @@ export default function TimezoneSentry() {
   }, [state?.settings?.timezone]);
 
   if (!show) return null;
+  // Westward move (the new zone's current calendar day is EARLIER than the
+  // stored zone's): accepting the update steps Today's board back a day. Warn
+  // so the user isn't startled when the day appears to rewind — their logged
+  // progress is preserved (readers are immune to a future-dated day) and
+  // reappears when that date comes around.
+  let dayWillRewind = false;
+  try {
+    const stored = state?.settings?.timezone;
+    if (stored && isValidTz(stored) && device) {
+      dayWillRewind = dateKeyInTz(device) < dateKeyInTz(stored);
+    }
+  } catch {
+    dayWillRewind = false;
+  }
   return (
     <div
       className="fixed inset-x-0 z-40 px-4 anim-rise"
@@ -78,6 +101,12 @@ export default function TimezoneSentry() {
             {tzLabel(state?.settings?.timezone ?? "UTC")}
           </strong>. Update to your new timezone?
         </p>
+        {dayWillRewind && (
+          <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-3)]">
+            It&apos;s an earlier date here, so today&apos;s board will step back
+            a day. Anything you already logged stays saved.
+          </p>
+        )}
         <div className="mt-3 flex gap-2">
           <button
             onClick={() => {

@@ -71,6 +71,18 @@ rule that prevents it.
   transformed/animated/backdrop-blurred) rather than guarding one symptom.
   State + logic bugs (stale React state, wrong sort, NaN) ARE preview-
   verifiable — be precise about which kind you're claiming.
+- **When seeding localStorage state for an in-browser check, use a COMPLETE
+  AppState shape — a partial hand-rolled object crashes deep helpers.**
+  Writing `{..., protocols: {}}` directly to `protocolize-v3` made
+  `createEmptyDailyLog` throw `Cannot read properties of undefined (reading
+  'filter')` (it does `protocols.sleep.filter(...)` etc.), surfacing as a
+  scary `<TodayPage>` ErrorBoundary trace that LOOKED like a regression but
+  was pure fixture rot. **Rule:** seed via the app's own
+  `getDefaultState()` shape (sleep/exercise/nutrition/supplements pillar
+  arrays present), or drive onboarding, rather than hand-authoring a thin
+  state object — and when an in-browser error's stack is entirely in code
+  you didn't touch + the full vitest suite & build are green, suspect the
+  fixture before the change.
 - **Verify an agent's finding before editing on it — they over-flag.** A QA
   agent reported "weekday insight uses device tz"; FALSE —
   `new Date("YYYY-MM-DDT00:00:00").getDay()` is tz-invariant for a date

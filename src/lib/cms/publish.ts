@@ -19,7 +19,7 @@ import {
 } from "../knowledge";
 import type { ProtocolPack, Interaction } from "../types";
 import { PACKS } from "../packs";
-import { assembleBundleFromCMS } from "./authoring";
+import { assembleBundleFromCMS, assembleBundleFromCMSResult } from "./authoring";
 import { validateAtom } from "../engine";
 
 const PUB_TABLE = "cms_publications";
@@ -469,6 +469,10 @@ async function latest(): Promise<{
       .from(PUB_TABLE)
       .select("bundle_version, bundle")
       .order("bundle_version", { ascending: false })
+      // created_at tie-break so a legacy duplicate version (minted before the
+      // unique index existed) resolves to the most recent row deterministically
+      // instead of an arbitrary one.
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (!data) return null;
@@ -519,19 +523,33 @@ export async function publishBundle(
   // activeConfig() — so deleting an override actually removes it from
   // the next bundle regardless of what the admin's browser session
   // happens to have applied.
-  const cms = await assembleBundleFromCMS();
-  const bundle: KnowledgeBundle = cms
-    ? {
-        schema: BUNDLE_SCHEMA,
-        version,
-        generatedAt: new Date().toISOString(),
-        protocols: cms.protocols,
-        config: cms.config,
-        insightTemplates: cms.insightTemplates,
-        adaptationRules: cms.adaptationRules,
-        interactions: cms.interactions,
-      }
-    : buildCatalogBundle(version);
+  const cms = await assembleBundleFromCMSResult();
+  // ABORT on a transient read failure. Previously every failure (a network
+  // blip, an RLS hiccup, one enrichment query erroring) collapsed to "null →
+  // unseeded", which published the built-in catalog — or a bundle with its
+  // CMS interactions/rules silently stripped — as a NEW immutable version,
+  // with a success toast, reverting every CMS edit for all users. Only a
+  // genuinely-unseeded CMS (queries succeeded, zero protocol rows) falls back
+  // to the catalog; an errored read mints no version at all.
+  if (cms.status === "failed") {
+    return {
+      ok: false,
+      reason: `Publish aborted — couldn't read the CMS catalog (${cms.error}). No version was created; nothing changed. Retry in a moment.`,
+    };
+  }
+  const bundle: KnowledgeBundle =
+    cms.status === "ok"
+      ? {
+          schema: BUNDLE_SCHEMA,
+          version,
+          generatedAt: new Date().toISOString(),
+          protocols: cms.bundle.protocols,
+          config: cms.bundle.config,
+          insightTemplates: cms.bundle.insightTemplates,
+          adaptationRules: cms.bundle.adaptationRules,
+          interactions: cms.bundle.interactions,
+        }
+      : buildCatalogBundle(version);
   const checksum = bundleChecksum(bundle);
   if (cur && bundleChecksum(cur.bundle) === checksum)
     return {
@@ -563,7 +581,18 @@ export async function publishBundle(
       note: note || null,
       created_by: uid,
     });
-    if (error) return { ok: false, reason: error.message };
+    if (error) {
+      // Unique-violation on bundle_version → someone published between our
+      // latest() read and this insert. Don't silently overwrite or duplicate;
+      // tell the admin to refresh so they re-review the now-current diff.
+      if (error.code === "23505" || /duplicate key|unique/i.test(error.message))
+        return {
+          ok: false,
+          reason:
+            "Someone else just published a new version. Refresh and re-review the diff before publishing again.",
+        };
+      return { ok: false, reason: error.message };
+    }
     await audit(sb, "publish", String(version));
     return { ok: true, version, checksum };
   } catch (e) {

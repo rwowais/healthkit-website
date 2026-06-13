@@ -32,6 +32,9 @@ import {
   deleteBiomarker,
   swapBehavior,
   clearSwap,
+  saveState,
+  captureResetEpoch,
+  resetEpochMoved,
 } from "@/lib/storage";
 import type {
   AppState,
@@ -403,6 +406,62 @@ describe("storage — clearAllData", () => {
     clearAllData();
     expect(localStorage.getItem("protocolize-v3")).toBeNull();
     expect(localStorage.getItem("protocolize-v2")).toBeNull();
+  });
+});
+
+describe("storage — reset-epoch fence (cross-tab resurrection guard)", () => {
+  const RESET_EPOCH_KEY = "protocolize-reset-epoch";
+
+  it("fences a stale tab's save after another tab resets, leaving the wiped state untouched", () => {
+    if (typeof localStorage === "undefined") return;
+    // Avoid jsdom "Not implemented: navigation" noise from the reload the
+    // fence triggers — we only care that the WRITE is suppressed.
+    const reloadSpy = vi.fn();
+    try {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...window.location, reload: reloadSpy },
+      });
+    } catch {
+      /* if location is locked down, the real no-op reload is harmless here */
+    }
+
+    // This tab loads and baselines at the current epoch; a normal save works.
+    captureResetEpoch();
+    expect(resetEpochMoved()).toBe(false);
+    expect(saveState({ ...getDefaultState(), version: 3 } as AppState)).toBe(
+      true
+    );
+
+    // Another tab runs clearAllData → bumps the shared epoch (simulate just
+    // that shared-storage effect, NOT this tab's re-baseline). This tab is now
+    // the stale writer.
+    const cur = parseInt(localStorage.getItem(RESET_EPOCH_KEY) || "0", 10);
+    localStorage.setItem(RESET_EPOCH_KEY, String(cur + 1));
+    localStorage.setItem("protocolize-v3", JSON.stringify({ wiped: true }));
+
+    expect(resetEpochMoved()).toBe(true);
+    // The stale save is refused and does NOT overwrite the freshly-wiped state.
+    expect(saveState({ ...getDefaultState(), version: 3 } as AppState)).toBe(
+      false
+    );
+    expect(localStorage.getItem("protocolize-v3")).toBe(
+      JSON.stringify({ wiped: true })
+    );
+  });
+
+  it("clearAllData bumps the epoch and re-baselines the resetting tab so its own seed save is allowed", () => {
+    if (typeof localStorage === "undefined") return;
+    captureResetEpoch();
+    const before = parseInt(localStorage.getItem(RESET_EPOCH_KEY) || "0", 10);
+    clearAllData();
+    const after = parseInt(localStorage.getItem(RESET_EPOCH_KEY) || "0", 10);
+    expect(after).toBe(before + 1); // tombstone advanced
+    // The tab that performed the reset is re-baselined → its seed save works.
+    expect(resetEpochMoved()).toBe(false);
+    expect(saveState({ ...getDefaultState(), version: 3 } as AppState)).toBe(
+      true
+    );
   });
 });
 

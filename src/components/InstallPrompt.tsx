@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useIsInstalled } from "@/hooks/useIsInstalled";
+import { useSignedIn } from "@/hooks/useSignedIn";
 
 /**
  * Calm, platform-aware install prompt.
@@ -81,6 +82,9 @@ function stampDismiss() {
 
 export default function InstallPrompt() {
   const installState = useIsInstalled();
+  // Closed-app reminders need a signed-in account (a guest's push subscription
+  // is discarded), so we only promise them when signed in.
+  const signedIn = useSignedIn();
   const [platform, setPlatform] = useState<Platform>("other");
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
     null
@@ -182,9 +186,11 @@ export default function InstallPrompt() {
             Get the full Protocolize experience
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-2)]">
-            Adds an icon to your home screen, opens full-screen with no
-            Safari bar, and lets reminders fire even when this page is
-            closed.
+            Adds an icon to your home screen and opens full-screen with no
+            Safari bar
+            {signedIn
+              ? ", and lets reminders fire even when this page is closed."
+              : ". (Sign in to also get reminders when the app is closed.)"}
           </p>
           <ol className="mt-4 space-y-3 text-[13.5px] text-[var(--text-2)]">
             <li className="flex items-start gap-3">
@@ -309,7 +315,9 @@ export default function InstallPrompt() {
             <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-3)]">
               {isDesktop
                 ? "One click — Protocolize opens in its own window, no browser tab needed."
-                : "Adds to your home screen. Reminders work even when the app is closed."}
+                : signedIn
+                  ? "Adds to your home screen. Reminders work even when the app is closed."
+                  : "Adds to your home screen for instant, full-screen access."}
             </p>
           </div>
         </div>

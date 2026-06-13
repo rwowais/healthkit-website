@@ -13,8 +13,12 @@ import { Icon, type IconName } from "@/components/ui/icons";
 const VALUE: { icon: IconName; t: string; s: string }[] = [
   {
     icon: "bulb",
-    t: "The full intelligence layer",
-    s: "Keystone, weekly review, correlations & adaptive suggestions — built from your own data.",
+    // Honesty: keystone / weekly review / adaptive suggestions already render
+    // for free users (live on Today, 3-day-delayed on Insights). What Premium
+    // actually adds is real-time insights + the correlation explorer — so the
+    // pitch names those, not surfaces the free tier already has.
+    t: "Your intelligence, live",
+    s: "Free sees patterns on a 3-day delay — Premium updates them the moment they form and unlocks the correlation explorer.",
   },
   {
     icon: "compass",
@@ -23,8 +27,10 @@ const VALUE: { icon: IconName; t: string; s: string }[] = [
   },
   {
     icon: "pulse",
+    // Only HRV + resting-HR actually drive adaptation (engine BIO_RECOVERY);
+    // weight is a "range" marker the engine never reads, so it's dropped here.
     t: "Biomarker-aware adaptation",
-    s: "Your day flexes around your own recovery signals — the HRV, resting-heart-rate and weight trends you log in Body Trends.",
+    s: "Your day flexes around your own recovery signals — the HRV and resting-heart-rate readings you log in Body Trends.",
   },
   {
     icon: "flame",
@@ -101,7 +107,10 @@ export default function UpgradePage() {
                 {access.trialDaysLeft} day
                 {access.trialDaysLeft === 1 ? "" : "s"}
               </span>{" "}
-              of full intelligence left. Lock it in so nothing resets.
+              of full intelligence left.{" "}
+              {billingConfigured
+                ? "Lock it in so nothing resets."
+                : "Paid plans aren’t switched on yet, so there’s nothing you need to do — you’ll keep full access."}
             </p>
           ) : (
             <p className="mt-3 text-[14px] leading-relaxed text-[var(--text-2)]">
@@ -142,39 +151,44 @@ export default function UpgradePage() {
           ))}
         </div>
 
-        <div className="flex gap-2.5">
-          {plans.map((p) => {
-            const on = plan === p;
-            return (
-              <button
-                key={p}
-                onClick={() => setPlan(p)}
-                className="press tr-fast flex-1 rounded-[var(--r-md)] p-4 text-left"
-                style={{
-                  background: on
-                    ? "color-mix(in srgb, var(--readiness) 12%, var(--surface-2))"
-                    : "var(--surface-2)",
-                  boxShadow: on
-                    ? "inset 0 0 0 1.5px var(--readiness)"
-                    : "none",
-                }}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
-                  {p}
-                </p>
-                <p className="mt-1 text-[18px] font-bold text-[var(--text-1)]">
-                  {PRICING[p].price}
-                  <span className="text-[12px] font-medium text-[var(--text-3)]">
-                    {PRICING[p].per}
-                  </span>
-                </p>
-                <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
-                  {PRICING[p].note}
-                </p>
-              </button>
-            );
-          })}
-        </div>
+        {/* Price selector only when checkout is actually wired. With Stripe
+            inert, showing a $/yr selector a user can't act on (next to the
+            "coming soon — full access today" notice below) reads as broken/bait. */}
+        {billingConfigured && (
+          <div className="flex gap-2.5">
+            {plans.map((p) => {
+              const on = plan === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPlan(p)}
+                  className="press tr-fast flex-1 rounded-[var(--r-md)] p-4 text-left"
+                  style={{
+                    background: on
+                      ? "color-mix(in srgb, var(--readiness) 12%, var(--surface-2))"
+                      : "var(--surface-2)",
+                    boxShadow: on
+                      ? "inset 0 0 0 1.5px var(--readiness)"
+                      : "none",
+                  }}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                    {p}
+                  </p>
+                  <p className="mt-1 text-[18px] font-bold text-[var(--text-1)]">
+                    {PRICING[p].price}
+                    <span className="text-[12px] font-medium text-[var(--text-3)]">
+                      {PRICING[p].per}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+                    {PRICING[p].note}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="space-y-2.5">
           {billingConfigured ? (

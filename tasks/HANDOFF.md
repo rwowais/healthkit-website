@@ -29,8 +29,27 @@ verification expected for UI changes.
 
 ---
 
-## BATCH P — PWA / installed-app (5 items, needs live PWA verification)
+## BATCH P — PWA / installed-app (5 items) — ✅ COMPLETE (2026-06-11)
 Evidence: `tasks/sweep/round2-dimensions.md` #13–#17.
+Shipped all 5. Gates green: tsc clean · vitest 600 passed/18 skipped · next build
+clean (new `/api/push/rotate` route registered). Guest-reminder note (#15)
+verified in-browser (local-only → signedIn=false → note shows, no console errors).
+Items #13/#16/#14/#17 are iOS-standalone / production-SW / push-lifecycle and per
+`lessons.md` CANNOT be reproduced in desktop-Chromium dev preview — they are
+correct-by-construction and need on-device confirmation on the founder's iPhone.
+What changed:
+- #13 ServiceWorker.tsx: `wasControlled` captured before register; reload only on
+  a genuine update, never on first install.
+- #16 layout.tsx statusBarStyle → "default" (readable dark-on-light, content below
+  the bar) + Shell.tsx header `pt-[env(safe-area-inset-top)]` defense-in-depth.
+- #14 sw.js install: parses each precached route's HTML for `/_next/static` assets
+  and caches them into STATIC_CACHE → routes hydrate offline, not a dead skeleton.
+- #15 new `useSignedIn` hook; profile shows honest "closed-app reminders need an
+  account" note when signed out; InstallPrompt copy gates the closed-app claim.
+- #17 sw.js `pushsubscriptionchange` handler re-subscribes (VAPID key stamped into
+  sw.js by stamp-sw.mjs) → new `/api/push/rotate` route (service-role, keyed by
+  old endpoint) updates the row + clears disabled_at. NEEDS the founder's
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `SUPABASE_SERVICE_ROLE_KEY` env to be live.
 
 1. **[MED] iOS installed app: status bar collides with content** (#16) — apple status bar
    is `black-translucent` over the light default theme with no `safe-area-inset-top`
@@ -53,8 +72,41 @@ Evidence: `tasks/sweep/round2-dimensions.md` #13–#17.
    subscription is disabled server-side on the first 410 and reminders die silently until
    the user reopens the app. Fix: handler that re-subscribes + re-registers.
 
-## BATCH C — Admin/CMS publish robustness (6 items, admin-only exposure)
+## BATCH C — Admin/CMS publish robustness — ✅ MOSTLY COMPLETE (2026-06-11)
 Evidence: `tasks/sweep/round2-dimensions-b.md` #5–#10.
+Gates green: tsc clean · vitest 600 passed/18 skipped · next build clean. All
+admin/CMS/Supabase server logic → not preview-verifiable in local-only mode
+(verified by types + suite + build; CI staging tests exercise the assembly).
+- #5 ✅ assembleBundleFromCMS → `assembleBundleFromCMSResult()` discriminated
+  union (ok / unseeded / failed); every query checks `error`; strict
+  per-protocol behaviors fetch. publishBundle ABORTS on "failed" (no version
+  minted) and only falls back to the catalog when genuinely unseeded. Legacy
+  `assembleBundleFromCMS()` kept as a null-returning wrapper for preview callers.
+- #6 ⚠️ code-side done (latest() created_at tie-break; publishBundle catches
+  the 23505 unique-violation → "someone else just published, refresh"). The
+  UNIQUE INDEX is written into `supabase/schema.sql`
+  (`cms_publications_version_key`, idempotent) but NOT applied to prod/staging —
+  **DEFERRED: owner must run the migration** (schema change). Safe on current
+  data (history is already distinct-versioned).
+- #7 ⚠️ honest-copy done (`help.ts` behavior.status no longer implies drafts are
+  held back). The actual gating is **DEFERRED to owner**: prod has 3 LIVE draft
+  supplements (CoQ10 `coq10-ubiquinone-tfgh`, Low-dose melatonin
+  `low-dose-melatonin-paqa`, thin `melatonin-e699`) in PUBLISHED protocols
+  (daily-essentials, better-sleep). Gating behaviors on status==="published"
+  would UN-SHIP them. Belongs with OWNER-GATED CMS cleanup #2 — decide:
+  flip those to published (keep shipping) and/or archive the thin melatonin dupe,
+  THEN gate. The 3 test-1.x drafts are in an archived protocol (already excluded).
+- #8 ✅ Simulate now threads per-source adaptation rules + interactions and runs
+  the conflict-mute pass (adapt() gained an optional {rules} override;
+  resolveInteractionsWith() added). drafts/builtin/live each previewed faithfully.
+- #9 ✅ cms_evidence.summary → BehaviorDef.evidence and published
+  cms_explanations(kind=timing) → timingReason, CMS-wins / built-in-fallback,
+  wired into the assembly. Admin evidence edits now reach users on publish.
+- #10 ✅ cms_protocols `.order("slug")` + adaptation rules secondary `.order("name")`
+  → deterministic array order → stable checksum / working "no changes" dedupe.
+NOTE: #9 + #10 + evidence wiring shift the assembled checksum, so the FIRST
+publish after deploy will show a diff / mint one new version even with no
+content edit — expected and self-correcting (admin reviews the diff).
 
 1. **[MED] Transient query failure during Publish silently ships a wrong bundle** (#5) —
    assembleBundleFromCMS treats every failure as "unseeded" (returns null → publishes the
@@ -81,7 +133,31 @@ Evidence: `tasks/sweep/round2-dimensions-b.md` #5–#10.
 6. **[LOW] cms_protocols fetched with no ORDER BY** (#10) — protocol order nondeterministic,
    destabilizes the order-sensitive checksum and defeats "No changes" dedupe. Add ORDER BY.
 
-## BATCH S — Sync/lifecycle remaining (design-level, be careful)
+## BATCH S — Sync/lifecycle remaining — ✅ DATA-RISK FIXES DONE (2026-06-11)
+Gates green: tsc clean · vitest 602 passed/18 skipped (+2 new epoch tests) ·
+next build clean. Cloud-sync paths aren't locally preview-reproducible (need
+Supabase + two tabs / a genuine first-sign-in conflict) → verified by types +
+unit tests + build. Done:
+- #12 ✅ Reset/Delete-account no longer undone by another live tab. Added a
+  reset-epoch tombstone in `storage.ts` (`protocolize-reset-epoch`, OUTSIDE the
+  pz: namespace so clearAllData's sweep can't wipe it): clearAllData bumps it +
+  re-baselines the resetting tab; `captureResetEpoch()` runs at every load();
+  `saveState` + both datasource `save()`s refuse to persist/push when the epoch
+  has advanced (monotonic `>` compare) and reload onto fresh state. Regression
+  tests in storage.test.ts.
+- Conflict-modal second-load ✅ `load()` now returns local early when
+  `pendingConflict` is set, so a focus/visibility re-load can't silently
+  markReconciled + cloud-win while the user's first-sign-in modal is still open.
+DEFERRED (design-level, genuinely need owner/architecture decisions — NOT
+correctness bugs):
+- Guest two-tab last-write-wins: full closure needs an op-log / BroadcastChannel
+  design. The storage-event resync already covers the common case.
+- Unbounded state-doc growth (round2-b #2, perf): the real fix is Phase 3 of the
+  logs split (window dailyLogs out of the state doc → per-day table authoritative
+  + date-filtered reads). Touches the hot sync path + history authority → wants a
+  deliberate design pass, not a quick patch. ~1.5KB/day; not urgent at current scale.
+
+### Original BATCH S detail (for reference):
 1. **[MED] Reset-all / Delete-account undone by another live tab** (round2-b #12) — the
    other tab's in-memory state + debounced save resurrects wiped data locally and pushes
    it to cloud. Needs a reset-epoch/tombstone (e.g. localStorage `pz:reset-epoch` checked
@@ -96,8 +172,134 @@ Evidence: `tasks/sweep/round2-dimensions-b.md` #5–#10.
    upserted per toggle burst, re-downloaded per load (551KB at 1yr). Needs log windowing/
    archival design (per-day logs table already exists — move history out of the doc).
 
-## BATCH R1 — Round-1 leftover mediums (UX/coherence; evidence in tasks/sweep/report.md)
-Worth doing (line numbers refer to report.md sections):
+## BATCH R1 — Round-1 leftover mediums — 🔧 IN PROGRESS (2026-06-11)
+Gates green: tsc clean · vitest 605 passed/18 skipped (+3 new regression tests) ·
+next build clean. DONE this session (5 bugs):
+- #214 ✅ Mastery weekend-only override now graduates — masteredKeys overlays
+  customPacks + behaviorOverrides daysActive (was catalog-only). Regression test
+  in qa-fixes.test.ts (weekend-only override, perfect adherence → graduates).
+- #137 ✅ "What's sticking" excludes conflict-muted keys (behaviorAdherence now
+  skips conflictMutedKeys) — no more blaming Strength at 0% red while muting it.
+- #144 ✅ Recovery banner only claims work was "set aside" when there's demotable
+  training (new hasDemotableWork() helper); honest copy for the sleep-only
+  persona. baselineAdapt + MODE_DEFAULT_COPY path. 2 regression tests.
+- #291 ✅ Per-behavior Reminder toggle replaced with an honest note for "anytime"
+  behaviors (no time → can't fire); timed behaviors keep the toggle.
+- #263 ✅ "Link it" no longer stores an inconsistent block (block:morning +
+  atom's bed anchor). Atom's curated smart timing flows through; only an explicit
+  typed time overrides. (Chose this over the evidence's "honor the block toggle"
+  fix, which — since the toggle defaults to "morning" — would mis-schedule
+  melatonin/magnesium into the MORNING, breaking the smart-timing promise.)
+- #109 ✅ PWA app-icon badge force-cleared during first-day soft entry (gated on
+  firstDaySoft alongside badgeDisabled) — no red "6" undercutting the calm day-1.
+- #116 ✅ /upgrade trial header + price selector gated on billingConfigured: with
+  Stripe inert, no "Lock it in so nothing resets" urgency and no unbuyable price
+  table next to "coming soon". Verified in-browser (trial + non-trial states).
+- #123 ✅ /upgrade VALUE bullet rewritten ("Your intelligence, live") — stops
+  selling keystone/weekly-review/suggestions (already free) as paywalled.
+- #130 ✅ /upgrade biomarker bullet drops "weight trends" (weight is a range
+  marker the engine never reads); names only HRV + resting-HR.
+- #207 ✅ Rebuild/essentials no longer block "day complete" on the full supplement
+  stack when behaviors drive completion (supplement-only days unchanged). Matches
+  the "few essentials, the rest catches up" promise.
+DONE (2nd R1 batch, 2026-06-11):
+- #200 ✅ Today's Suggestion card suppressed while returning from a gap
+  (activeSuggestions returns [] when sig.hasHistory && sig.gapDays>=2) — no more
+  pause/install nags from 40-day-stale data under the welcome-back banner.
+- #151 ✅ Adaptive banner holds a neutral "Today" read while the check-in is
+  half-filled (one of sleep/energy tapped, not acked) — no "Recovery mode / work
+  set aside" assertion while the card below still asks the other question.
+- #172 ✅ Quiet-hours prefill defaults to the user's sleep window (bedtime/
+  wakeTime) not hardcoded 22:00/07:00; copy no longer says "overnight" (works for
+  night-shift). resolveReminderMinutes already handled wrap windows.
+- #221 = #307 ⚠️ INTERIM done: Reminders Effect 1 only subscribes ALL-days
+  behaviors to the day-blind server (push_subscriptions has no weekday), so a
+  partial-week behavior no longer gets wrong-day background pings (in-tab path
+  still covers it live). FULL fix DEFERRED: add a weekday mask to
+  push_subscriptions + send-due weekday check + re-subscribe at day rollover
+  (DB migration → owner; also background push is owner-setup-gated on VAPID+cron).
+- #186 ✅ TimezoneSentry warns "today's board will step back a day" on a westward
+  move (date compare); logged progress preserved. Did NOT fold/re-key logs
+  (risky mutation; the reader-immune clamp from the prior HIGH already prevents
+  the streak/gap collapse) — per lessons "make readers immune, don't mutate".
+- #242 ✅ already resolved earlier — the vacationMode short-circuit (today/page
+  ~1003) returns the break surface before StreakFreeze/flame/WeeklyGoal render.
+DEFERRED — genuine design-level (schedule-model rework; need owner/design call):
+- #158 wake-anchored "morning" routine files under "Evening" for WRAP schedules
+  (bed<wake across midnight); #165 night-owl custom blockBoundaries structurally
+  impossible for wrap schedules — both need the block/anchor model to understand
+  wrap days, not a point fix. #179 night-shift waking period split at midnight
+  (day-boundary design). Evidence: report.md #158/#165/#179.
+LOWs — IN PROGRESS (report.md lines 428+, ~23 total). DONE (2026-06-11):
+- #442 ✅ already fixed by #116 (price selector hidden when !billingConfigured).
+- #463 ✅ "Nothing needs easing" normal-mode banner no longer cites a long-term
+  biomarker concern as the day's reason (reasons:[] — matches the primed branch).
+- #498 ✅ "Day complete" celebration says "Your full stack, taken." for a
+  supplement-only day instead of the false "Every behavior, done."
+- #505 ✅ Empty-state distinguishes "Nothing scheduled today" (has a real system,
+  e.g. weekend-only) from "blank canvas — install a protocol".
+- #449 ✅ Profile membership CTA reads "See what Premium adds" (not "Restore full
+  intelligence") when billing is inert — no dead-end restore promise.
+- #560 ✅ Duplicate notification fixed: sw.js push handler defers to a visible
+  tab (the in-tab path already fires a named reminder); comment corrected.
+- #574 ✅ Quiet-hours start==end now shows an inline "this window is off" warning
+  (inQuietHours returns false for a zero-length window).
+DEFERRED — #553 biomarker "low is dangerous" band: needs a CLINICAL threshold
+  call, and for this fitness audience a low resting HR is a GOAL (correctly green),
+  so a blanket low-caution would false-alarm. BP-specific lows could be flagged if
+  the owner wants — leaving as a product/clinical decision.
+DONE (2nd LOW batch, 2026-06-11) — gates green: tsc · 607 passed (+2 tests) · build:
+- #428 ✅ "Tomorrow's first focus" now compiles TOMORROW's timeline (selDayIdx+1),
+  not today's — no mislabel for a day-specific morning behavior.
+- #477 ✅ Muted ("Resting today") rows show an honest "no reminder will fire" note
+  instead of a lit toggle (Reminders skips muted items).
+- #484 ✅ Recovery chip capped below "Good"/"High" on a poor-sleep day (poorSleep
+  flag) so it can't read "Good" above a "last night was rough / lighter" banner.
+- #491 ✅ TimezoneSentry clears the "Not now" dismiss on return home, so a future
+  trip to a previously-dismissed city prompts again.
+- #567 ✅ learnedReminderMinutes uses a CIRCULAR median — a midnight-straddling
+  behavior learns ~midnight, not the linear ~noon. Regression test in
+  time-window.test.ts.
+- #595 ✅ Block-label inputs capped (maxLength 18) + truncate on BulkMoveSheet
+  buttons and the Today block header — no overflow on a 320px phone.
+DONE (3rd/final LOW batch, 2026-06-11) — gates green: tsc · 607 passed · build:
+- #456 ✅ biomarkerConcern prefers a recovery marker (HRV/restingHR) in the pick
+  so a co-logged non-recovery Watch marker can't suppress the day's ease.
+- #470 ✅ "Your next habit" names the source pack ("Add the X pack") and routes
+  there; a Library-only atom routes to the custom builder — not a dead pack catalog.
+- #512 ✅ Custom builder now has an "Active days" selector (Mon–Sun, all-off
+  floored) so weekend-only is expressible AT creation. Verified in-browser.
+- #523 ✅ Toggling all active-days off in the BehaviorSheet applies the
+  disabled-heal LIVE (daysActive→undefined, disabled:true) so the row shows as
+  paused instead of vanishing until reload.
+- #530 ✅ saveCustom rewrites `custom:draft:` / `fork:draft:` keys to the real
+  pack id — per-pack isolation no longer rests solely on the random suffix.
+- #546 ✅ BP lock toast explains "blood pressure counts as two metrics" so the
+  free-cap wall has a model.
+- #588 ✅ Edit-mode move-menu got aria-orientation + Arrow/Home/End/Escape key
+  nav (Tab still works) so the role="menu" semantics aren't an empty promise.
+RESOLVED-BY-DESIGN / DEFERRED:
+- #435 — free-gets-intel on Today is INTENTIONAL ("peek-don't-hide", the
+  business model); the overclaim was the COPY, fixed by #123. No code change.
+- #581 — signed-in cross-tab live divergence: DESIGN, same family as the
+  deferred guest two-tab LWW (needs BroadcastChannel/storage-event reconcile).
+- #553 — biomarker "low is dangerous" band: clinical-threshold call; low resting
+  HR is a GOAL for this audience (correctly green). Owner/clinical decision.
+
+═══════════════════════════════════════════════════════════════════════════════
+BACKLOG STATUS @ 2026-06-11: ALL actionable items across BATCH P / C / S / R1
+(mediums + lows) are DONE and gate-verified (tsc clean · vitest 607 passed/18
+skipped · next build clean · key UI verified in-browser). Everything still open
+is DEFERRED-WITH-REASON and needs the OWNER:
+  1. DB migrations: cms_publications unique index (#6); day-aware push_subscriptions
+     schema (#221/#307 — interim shipped).
+  2. CMS content decision: draft-behavior gating + flip/archive the 3 live draft
+     supplements (#7) — fold into the owner-gated CMS cleanup.
+  3. Design-level rework: guest + signed-in cross-tab live reconcile (op-log /
+     BroadcastChannel); unbounded state-doc growth Phase-3 log windowing (#2).
+  4. Clinical call: biomarker low-band thresholds (#553).
+  5. Pre-existing OWNER-GATED (unchanged): Stripe fulfillment; CMS schema columns.
+═══════════════════════════════════════════════════════════════════════════════
 - PWA app-icon badge shows full pending count on day 1 (contradicts soft entry).
 - /upgrade overclaim trio: trial-urgency + dead price selector; "full intelligence layer"
   already free-on-delay; "weight trends" don't drive adaptation. (Copy fixes.)

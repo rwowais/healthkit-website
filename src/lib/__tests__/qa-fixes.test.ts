@@ -8,7 +8,12 @@
 import { describe, it, expect } from "vitest";
 import type { AppState, DailyLog, Interaction } from "@/lib/types";
 import { getDefaultState, toggleBehavior } from "@/lib/storage";
-import { compileTimeline, adapt, effectiveKey } from "@/lib/engine";
+import {
+  compileTimeline,
+  adapt,
+  effectiveKey,
+  masteredKeys,
+} from "@/lib/engine";
 import { suggestions, behaviorStats } from "@/lib/intel";
 import { mergeStates, chooseCloudLoad } from "@/lib/datasource";
 import { buildCatalogBundle, diffBundles } from "@/lib/cms/publish";
@@ -540,6 +545,82 @@ describe("behaviorStats — scheduled-day streak", () => {
     // Streak = 2 (today + two-days-ago); the unscheduled off-day between them
     // is transparent rather than a reset. (Pre-fix this returned 1.)
     expect(behaviorStats(st, "zone2").streak).toBe(2);
+  });
+});
+
+// ── Mastery honors a weekend-only OVERRIDE schedule (R1 #214) ──
+describe("masteredKeys — weekend-only override can graduate", () => {
+  it("graduates an official behavior re-scheduled weekend-only via behaviorOverrides", () => {
+    const tz = getTz(getDefaultState().settings);
+    // Sat/Sun only (Mon=0..Sun=6).
+    const weekendOnly = [false, false, false, false, false, true, true];
+    const logs: DailyLog[] = [];
+    // ~230 days of history: zone2 completed every weekend (its scheduled days),
+    // plus weekday activity so the ≥14-engaged-days gate is satisfied. Weekdays
+    // are NOT scheduled for zone2, so they're transparent to the streak walk.
+    for (let i = 0; i <= 230; i++) {
+      const day = dk(i);
+      const wd = dayIndexOfKeyInTz(tz, day);
+      const isWeekend = wd === 5 || wd === 6;
+      logs.push(mkLog(day, isWeekend ? { zone2: true } : {}, 60));
+    }
+    const st: AppState = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"],
+      behaviorOverrides: {
+        zone2: { daysActive: weekendOnly },
+      } as AppState["behaviorOverrides"],
+      dailyLogs: logs,
+    };
+    // Robust to the deterministic ~1-in-7 weekly spot-check: mastered on at
+    // least one of the next 7 days. Pre-fix (catalog-only daysActive) this was
+    // false on EVERY day — the weekday streak break meant it could never reach
+    // 21 scheduled completions.
+    const masteredSomeDay = [0, 1, 2, 3, 4, 5, 6].some((off) =>
+      masteredKeys(st, dk(off)).has("zone2")
+    );
+    expect(masteredSomeDay).toBe(true);
+  });
+});
+
+// ── Recovery banner only claims work was "set aside" when there is some (R1 #144) ──
+describe("recovery banner honesty", () => {
+  const poorLog = (date: string): DailyLog =>
+    ({
+      date,
+      sleepCompletions: [],
+      exerciseEntries: [],
+      nutritionScorecard: { customItems: [], note: "" },
+      supplementEntries: [],
+      completions: [],
+      sleepLog: { sleepQuality: 1 },
+      energyLevel: 1,
+      moodLevel: null,
+      score: 0,
+      behaviorCompletions: {},
+    }) as unknown as DailyLog;
+
+  it("sleep-only persona in recovery does NOT claim demanding work was set aside", () => {
+    const st = {
+      ...getDefaultState(),
+      installedPacks: ["better-sleep"], // no RECOVERY_DEMOTE behavior
+      dailyLogs: [poorLog(dk(0))],
+    } as AppState;
+    const a = adapt(st);
+    expect(a.mode).toBe("recovery");
+    expect(a.tone).toContain("Nothing here is high-intensity");
+    expect(a.tone).not.toContain("demanding work is set aside");
+  });
+
+  it("a persona WITH demotable training keeps the 'set aside' copy", () => {
+    const st = {
+      ...getDefaultState(),
+      installedPacks: ["longevity-foundation"], // has zone2 (RECOVERY_DEMOTE)
+      dailyLogs: [poorLog(dk(0))],
+    } as AppState;
+    const a = adapt(st);
+    expect(a.mode).toBe("recovery");
+    expect(a.tone).toContain("the demanding work is set aside");
   });
 });
 

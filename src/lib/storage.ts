@@ -549,6 +549,13 @@ export function clearAllData(): void {
       const k = localStorage.key(i);
       if (k && k.startsWith("pz:")) localStorage.removeItem(k);
     }
+    // Bump the reset-epoch tombstone so any OTHER live tab still holding the
+    // pre-reset state reloads (instead of resurrecting it) on its next save.
+    // Re-baseline THIS tab so its own post-reset seed save is allowed through.
+    // (RESET_EPOCH_KEY is outside pz:, so the sweep above left it intact.)
+    const next = readResetEpoch() + 1;
+    localStorage.setItem(RESET_EPOCH_KEY, String(next));
+    loadedEpoch = next;
   } catch {
     /* ignore */
   }
@@ -609,8 +616,58 @@ function guessItemType(item: ProtocolItem): "task" | "reminder" {
 /** Event other components listen to in order to surface save failures. */
 export const SAVE_ERROR_EVENT = "pz:save-error";
 
+// ── Reset-epoch tombstone ─────────────────────────────────────────────
+// A destructive reset / delete-account in ONE tab must not be silently undone
+// by another live tab whose React memory still holds the pre-reset state: that
+// tab's next save would re-persist the wiped data to localStorage (and the
+// cloud dirty-merge would lift it back to the server — a privacy breach for
+// delete-account). The epoch is a monotonically-increasing counter that
+// clearAllData bumps; each tab captures it at load and saveState refuses to
+// write — forcing a reload onto the fresh state — once the stored epoch has
+// advanced past the captured one.
+//
+// The key is deliberately OUTSIDE the pz: namespace so clearAllData's
+// "remove all pz:*" sweep can't wipe the very tombstone it just bumped.
+const RESET_EPOCH_KEY = "protocolize-reset-epoch";
+let loadedEpoch: number | null = null;
+
+function readResetEpoch(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    return parseInt(localStorage.getItem(RESET_EPOCH_KEY) || "0", 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Baseline this tab against the current reset-epoch. Call at every full
+ *  load() so in-memory state and the epoch are in sync afterward. */
+export function captureResetEpoch(): void {
+  loadedEpoch = readResetEpoch();
+}
+
+/** True when another tab/window has reset or deleted the account since this
+ *  tab last loaded — its in-memory state is now a stale resurrection risk and
+ *  must not be persisted or pushed. Uses a forward (>) comparison so an
+ *  externally-cleared localStorage (epoch reads 0) is never mistaken for a
+ *  reset event. */
+export function resetEpochMoved(): boolean {
+  return loadedEpoch !== null && readResetEpoch() > loadedEpoch;
+}
+
 export function saveState(state: AppState): boolean {
   if (typeof window === "undefined") return false;
+  // Reset-epoch fence: another tab wiped data since we loaded → writing this
+  // stale state would resurrect it. Discard the write and reload onto fresh
+  // state. (Cloud callers also check resetEpochMoved() before pushing.)
+  if (resetEpochMoved()) {
+    try {
+      window.location.reload();
+    } catch {
+      /* non-browser / test env — the write is still suppressed below */
+    }
+    return false;
+  }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     return true;

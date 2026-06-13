@@ -43,6 +43,12 @@
 // controllerchange reload in ServiceWorker.tsx fires → users land on the
 // new build automatically. Locally it stays "v10".
 const CACHE_VERSION = "v10";
+
+// VAPID public key for re-subscribing in the background (pushsubscriptionchange
+// handler below). Stamped from NEXT_PUBLIC_VAPID_PUBLIC_KEY at build time by
+// scripts/stamp-sw.mjs; left as the empty placeholder locally and when push
+// isn't configured, in which case background re-subscribe is simply skipped.
+const VAPID_PUBLIC_KEY = "__VAPID_PUBLIC_KEY__";
 const SHELL_CACHE = `pz-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `pz-static-${CACHE_VERSION}`;
 const CURRENT_CACHES = [SHELL_CACHE, STATIC_CACHE];
@@ -61,21 +67,67 @@ const PRECACHE_SHELL = [
   "/manifest.webmanifest",
 ];
 
+// Pull same-origin /_next/static asset URLs (scripts, CSS, preloads) out of a
+// precached HTML document so we can cache them too. Without this the shell is
+// HTML-only: after a deploy purges the previous STATIC_CACHE, an offline
+// launch onto a route the user didn't re-visit online serves fresh HTML whose
+// JS/CSS chunks are gone → a dead, unhydrated (and unstyled) skeleton. The
+// pages are all "use client", so the chunks are what actually renders them.
+function extractStaticAssets(html, baseUrl) {
+  const urls = new Set();
+  // src="..." / href="..." pointing at /_next/static/...
+  const re = /(?:src|href)\s*=\s*["']([^"']*\/_next\/static\/[^"']+)["']/g;
+  let m;
+  while ((m = re.exec(html))) {
+    try {
+      const u = new URL(m[1], baseUrl);
+      if (u.origin === self.location.origin) urls.add(u.pathname + u.search);
+    } catch {
+      /* malformed URL — skip */
+    }
+  }
+  return [...urls];
+}
+
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(
-    caches.open(SHELL_CACHE).then((c) =>
-      // .addAll is atomic — if any URL fails the whole pre-warm fails.
-      // Use individual catches so a missing route doesn't break the
-      // whole install (Next.js dev builds sometimes lag a route).
-      Promise.all(
-        PRECACHE_SHELL.map((url) =>
-          c.add(url).catch(() => {
-            /* missing — fall back to runtime caching */
-          })
-        )
-      )
-    )
+    (async () => {
+      const shell = await caches.open(SHELL_CACHE);
+      const staticCache = await caches.open(STATIC_CACHE);
+      await Promise.all(
+        PRECACHE_SHELL.map(async (url) => {
+          try {
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) return; // missing — fall back to runtime caching
+            await shell.put(url, res.clone());
+            // Parse HTML documents for their hashed static assets and
+            // precache them, so the route fully hydrates offline — not just
+            // its bare HTML. (manifest/offline.html etc. aren't HTML pages
+            // with chunk graphs, so this loop simply finds nothing for them.)
+            const ct = res.headers.get("content-type") || "";
+            if (!ct.includes("text/html")) return;
+            const html = await res.text();
+            const assets = extractStaticAssets(html, res.url || url);
+            await Promise.all(
+              assets.map(async (a) => {
+                // Dedupe across routes — shared chunks are referenced by many
+                // pages; only fetch each hashed asset once.
+                if (await staticCache.match(a)) return;
+                try {
+                  const ar = await fetch(a);
+                  if (ar.ok) await staticCache.put(a, ar.clone());
+                } catch {
+                  /* asset unreachable at install — runtime cache picks it up */
+                }
+              })
+            );
+          } catch {
+            /* route unreachable at install — fall back to runtime caching */
+          }
+        })
+      );
+    })()
   );
 });
 
@@ -174,22 +226,92 @@ async function networkFirst(req, cacheName) {
 // ── Push notifications ────────────────────────────────────────────
 
 self.addEventListener("push", (e) => {
-  let data = {};
-  try {
-    data = e.data ? e.data.json() : {};
-  } catch {
-    data = { title: "Protocolize", body: e.data ? e.data.text() : "" };
-  }
-  const title = data.title || "Protocolize";
-  const opts = {
-    body: data.body || "",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-96.png",
-    tag: data.tag || "pz-reminder",
-    data: { url: data.url || "/today" },
-    renotify: false,
-  };
-  e.waitUntil(self.registration.showNotification(title, opts));
+  e.waitUntil(
+    (async () => {
+      // De-dupe with the in-tab path. When a tab is open AND visible, the
+      // in-tab Reminders effect already fires a NAMED, per-behavior
+      // notification at this minute; the generic server push uses a different
+      // tag ("pz-reminder") so the OS would NOT collapse them — the user would
+      // see two notifications (one specific, one generic). Defer to the in-tab
+      // path whenever a visible client exists.
+      const wins = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      if (wins.some((c) => c.visibilityState === "visible" || c.focused)) return;
+
+      let data = {};
+      try {
+        data = e.data ? e.data.json() : {};
+      } catch {
+        data = { title: "Protocolize", body: e.data ? e.data.text() : "" };
+      }
+      const title = data.title || "Protocolize";
+      await self.registration.showNotification(title, {
+        body: data.body || "",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-96.png",
+        tag: data.tag || "pz-reminder",
+        data: { url: data.url || "/today" },
+        renotify: false,
+      });
+    })()
+  );
+});
+
+// Standard Web Push base64url → Uint8Array for applicationServerKey.
+function urlBase64ToUint8Array(base64) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+// pushsubscriptionchange: the push service rotated/expired this subscription
+// (FCM rotation, iOS PWA expiry). Without this handler the SW can't re-subscribe
+// in the background — the next cron send hits a 410, the server marks the row
+// disabled_at, and reminders stay silently dead until the user reopens the app
+// (the exact user background push exists for). Re-subscribe with the bundled
+// VAPID key and hand the new endpoint to /api/push/rotate, keyed by the old
+// endpoint (the SW has no user token, so the old endpoint is the identity).
+self.addEventListener("pushsubscriptionchange", (e) => {
+  e.waitUntil(
+    (async () => {
+      if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.startsWith("__")) return;
+      const oldEndpoint =
+        (e.oldSubscription && e.oldSubscription.endpoint) || null;
+      try {
+        // Prefer the browser-provided new subscription; otherwise re-subscribe.
+        let sub = e.newSubscription || null;
+        if (!sub) {
+          const existing = await self.registration.pushManager.getSubscription();
+          sub =
+            existing ||
+            (await self.registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                .buffer,
+            }));
+        }
+        if (!sub) return;
+        const j = sub.toJSON();
+        await fetch("/api/push/rotate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            oldEndpoint,
+            endpoint: j.endpoint,
+            p256dh: j.keys && j.keys.p256dh,
+            auth: j.keys && j.keys.auth,
+          }),
+        });
+      } catch {
+        /* best-effort — foreground re-subscribe on next app open is the backstop */
+      }
+    })()
+  );
 });
 
 self.addEventListener("notificationclick", (e) => {

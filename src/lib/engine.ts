@@ -19,7 +19,7 @@ import type {
   UserSettings,
 } from "./types";
 import { activePacks, activeAdaptationRules, activeInteractions } from "./knowledge";
-import { pickMatchingRule, sanitizeEffect } from "./cms/rules";
+import { pickMatchingRule, sanitizeEffect, type AdaptationRule } from "./cms/rules";
 import {
   effectiveMinutes,
   blockForMinutes,
@@ -774,8 +774,17 @@ function biomarkerConcern(state: AppState): {
     }
   }
   if (candidates.length === 0) return { text: null, recovery: false };
-  // Sort by date desc — most-recent Watch wins.
-  candidates.sort((a, b) => b.date.localeCompare(a.date));
+  // Prefer a recovery-relevant marker (HRV / resting HR) when one is in Watch —
+  // it's the only signal that actually EASES the day (bioRecoveryFlag), so it
+  // must win the pick. Otherwise a co-logged non-recovery Watch marker (e.g.
+  // waist, same date) could be selected by tie-order and silently suppress the
+  // ease. Among equals, most-recent wins.
+  candidates.sort((a, b) => {
+    const ra = BIO_RECOVERY.has(a.metric) ? 1 : 0;
+    const rb = BIO_RECOVERY.has(b.metric) ? 1 : 0;
+    if (ra !== rb) return rb - ra;
+    return b.date.localeCompare(a.date);
+  });
   const pick = candidates[0];
   return {
     text: `Recent ${pick.def!.label.toLowerCase()} (${pick.value} ${pick.def!.unit}) is outside its optimal range`,
@@ -1020,7 +1029,10 @@ export const RECOVERY_EASE_BELOW = 45; // recoveryProxy below this → recovery 
 export const PRIMED_AT_OR_ABOVE = 78; // recoveryProxy at/above this → primed
 export const LOW_ADHERENCE_BELOW = 35; // 7-day adherence below this (with ≥3 tracked days) → essentials
 
-function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
+function baselineAdapt(
+  s: ReturnType<typeof getSignals>,
+  state: AppState
+): Adaptation {
   // "Welcome back" requires there to BE a back to welcome to. A user
   // who finished onboarding 2 days ago, never opened the app, and
   // returns on day 3 isn't returning — they're starting. The signal
@@ -1047,7 +1059,13 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
     return {
       mode: "recovery",
       headline: "Recovery mode",
-      tone: "Your recovery is low, so today leans lighter — the demanding work is set aside. Keep anything that still feels right; this is the smart play, not a setback.",
+      // Only claim work was "set aside" if there's actually demotable training
+      // to set aside. For a sleep-only persona (the default recovery user) the
+      // board doesn't change, so an unconditional "demanding work is set aside"
+      // is a visible banner-vs-board contradiction.
+      tone: hasDemotableWork(state)
+        ? "Your recovery is low, so today leans lighter — the demanding work is set aside. Keep anything that still feels right; this is the smart play, not a setback."
+        : "Your recovery is low. Nothing here is high-intensity, so just move gently and protect tonight's sleep — that's the smart play, not a setback.",
       reasons: [
         s.sleepQuality != null && s.sleepQuality <= 2
           ? "Sleep quality was low"
@@ -1128,7 +1146,12 @@ function baselineAdapt(s: ReturnType<typeof getSignals>): Adaptation {
     // (the engine looked for a reason to lighten and found none) and
     // reads as a deliberate call rather than a stock greeting.
     tone: "Nothing needs easing today — your day holds its full shape. Move through it block by block; momentum over perfection.",
-    reasons: s.bioConcern ? [s.bioConcern] : [],
+    // No reason bullet here: surfacing a long-term body concern (e.g. "waist is
+    // outside its optimal range") as the "why behind the read" directly under a
+    // "Nothing needs easing" headline reads as a self-contradiction. A concern
+    // that doesn't reshape today's plan isn't today's reason. (The "primed"
+    // branch already omits it; this aligns "normal" with that.)
+    reasons: [],
   };
 }
 
@@ -1174,10 +1197,17 @@ const MODE_DEFAULT_COPY: Record<
  * published rules the function is byte-identical to the previous
  * pure-hardcoded version.
  */
-export function adapt(state: AppState): Adaptation {
+export function adapt(
+  state: AppState,
+  // opts.rules overrides the session's published rules — used by the admin
+  // Simulate tab to preview a DRAFT bundle's adaptation rules (or the built-in
+  // baseline, via []) without globally applying that bundle. Omitted → the
+  // live published rules, exactly as before.
+  opts?: { rules?: readonly AdaptationRule[] }
+): Adaptation {
   const s = getSignals(state);
-  const baseline = baselineAdapt(s);
-  const rules = activeAdaptationRules();
+  const baseline = baselineAdapt(s, state);
+  const rules = opts?.rules ?? activeAdaptationRules();
   if (rules.length === 0) return baseline;
   const ctx: Record<string, unknown> = {
     gapDays: s.gapDays,
@@ -1197,7 +1227,16 @@ export function adapt(state: AppState): Adaptation {
   // copy so the banner can't contradict the shaped timeline (an eased day
   // labeled "Nothing needs easing"). A rule that doesn't change mode keeps the
   // baseline copy exactly as before.
-  const def = mode !== baseline.mode ? MODE_DEFAULT_COPY[mode] : undefined;
+  let def = mode !== baseline.mode ? MODE_DEFAULT_COPY[mode] : undefined;
+  // A CMS rule that flips the mode to recovery for a user with nothing
+  // demotable gets the same honest copy as the baseline branch — never the
+  // "demanding work is set aside" claim when there's none on the board.
+  if (def && mode === "recovery" && !hasDemotableWork(state)) {
+    def = {
+      ...def,
+      tone: "Today leans lighter. Nothing here is high-intensity, so just move gently and protect tonight's sleep.",
+    };
+  }
   return {
     mode,
     headline: e.headline ?? def?.headline ?? baseline.headline,
@@ -1329,6 +1368,22 @@ export const RECOVERY_PROMOTE = new Set([
 ]);
 
 /**
+ * True when the user's merged timeline actually contains something the recovery
+ * shape pass would demote (a RECOVERY_DEMOTE key). When false, recovery mode
+ * changes nothing on the board, so the banner must NOT claim it "set the
+ * demanding work aside" — there is none (e.g. the default sleep-only persona).
+ * Union across weekdays so a Tue/Thu-only strength behavior still counts.
+ */
+export function hasDemotableWork(state: AppState): boolean {
+  for (let d = 0; d < 7; d++) {
+    for (const it of compileTimeline(state, d)) {
+      if (RECOVERY_DEMOTE.has(effectiveKey(it))) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Explicit cross-behavior conflict map. When a restraint is present
  * and not muted, every paired target is muted — preventing the surface
  * from showing two contradictory instructions side by side.
@@ -1408,8 +1463,21 @@ export const BUILTIN_INTERACTIONS: readonly Interaction[] = CONFLICT_PAIRS.map(
  * CONFLICT_PAIRS.
  */
 export function resolvedInteractions(): Interaction[] {
+  return resolveInteractionsWith(activeInteractions());
+}
+
+/**
+ * Merge a given CMS interaction set over the built-in base (CMS wins on
+ * identity). Same logic resolvedInteractions() uses for the live bundle, but
+ * with an explicit set so the admin Simulate tab can resolve a DRAFT bundle's
+ * interactions (or the pure built-in base, via []) without applying it
+ * globally — so firm conflicts authored in drafts are visible in the preview.
+ */
+export function resolveInteractionsWith(
+  cms: readonly Interaction[]
+): Interaction[] {
   const byKey = new Map<string, Interaction>();
-  for (const i of [...BUILTIN_INTERACTIONS, ...activeInteractions()]) {
+  for (const i of [...BUILTIN_INTERACTIONS, ...cms]) {
     // Identity includes direction + condition so two rules on the same
     // (aKey,bKey,type) but with different gates/directions both survive
     // (matches the publish-diff identity). A built-in conflict has no
@@ -1653,6 +1721,21 @@ export function masteredKeys(
     if (!daysActiveFor.has(b.canonicalKey)) {
       daysActiveFor.set(b.canonicalKey, b.daysActive);
     }
+  }
+  // Custom-pack behaviors carry their own daysActive — atom-library
+  // weekend-only picks live here, not in the catalog.
+  for (const pack of state.customPacks ?? []) {
+    for (const b of pack.behaviors ?? []) {
+      daysActiveFor.set(b.canonicalKey, b.daysActive);
+    }
+  }
+  // behaviorOverrides[k].daysActive WINS, exactly as the compiled timeline
+  // folds it in (engine.ts ~234, `ov?.daysActive ?? b.daysActive`). Without
+  // this, an official behavior re-scheduled weekend-only via the BehaviorSheet
+  // has no catalog daysActive here → isScheduledOn falls back to "every day" →
+  // its streak breaks every weekday and it can NEVER graduate to maintenance.
+  for (const [k, ov] of Object.entries(state.behaviorOverrides ?? {})) {
+    if (ov?.daysActive) daysActiveFor.set(k, ov.daysActive);
   }
   // Day-of-week via the canonical user-tz helper (Mon=0..Sun=6) — NOT
   // new Date(k).getDay(), which uses the device tz and can land on the wrong

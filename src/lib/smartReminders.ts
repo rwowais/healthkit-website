@@ -33,11 +33,33 @@ export function learnedReminderMinutes(
     if (typeof m === "number" && l.behaviorCompletions?.[key]) mins.push(m);
   }
   if (mins.length < SMART_MIN_SAMPLES) return null;
-  mins.sort((a, b) => a - b);
-  const mid = Math.floor(mins.length / 2);
-  return mins.length % 2
-    ? mins[mid]
-    : Math.round((mins[mid - 1] + mins[mid]) / 2);
+  // Circular median over a 24h clock. A pre-bed behavior logged some nights at
+  // 23:50 (=1430) and some at 00:10 (=10) must learn ~midnight, not the linear
+  // median ~noon (720). Find the mean DIRECTION on the clock, unwrap every
+  // sample to its nearest equivalent around that center, take the linear median
+  // of the unwrapped values, then wrap back into [0,1440).
+  const TWO_PI = Math.PI * 2;
+  let sx = 0;
+  let sy = 0;
+  for (const m of mins) {
+    const a = (m / 1440) * TWO_PI;
+    sx += Math.cos(a);
+    sy += Math.sin(a);
+  }
+  const center = ((((Math.atan2(sy, sx) / TWO_PI) * 1440) % 1440) + 1440) % 1440;
+  const unwrapped = mins.map((m) => {
+    let d = m - center;
+    if (d > 720) d -= 1440;
+    else if (d < -720) d += 1440;
+    return center + d;
+  });
+  unwrapped.sort((a, b) => a - b);
+  const mid = Math.floor(unwrapped.length / 2);
+  const med =
+    unwrapped.length % 2
+      ? unwrapped[mid]
+      : (unwrapped[mid - 1] + unwrapped[mid]) / 2;
+  return Math.round(((med % 1440) + 1440) % 1440);
 }
 
 /**

@@ -143,8 +143,15 @@ export default function BiomarkersPage() {
                 key={def.key}
                 onClick={() => {
                   if (locked) {
+                    // Blood pressure is two separate metrics (systolic +
+                    // diastolic) and so consumes two of the free slots — give
+                    // the user that model instead of an opaque "cap reached".
+                    const isBP =
+                      def.key === "systolic" || def.key === "diastolic";
                     toast.show(
-                      `Free plan tracks ${getFreeBiomarkers()} metrics — upgrade to add more`
+                      isBP
+                        ? `Blood pressure counts as two metrics (systolic + diastolic). Free tracks ${getFreeBiomarkers()} — upgrade to add more.`
+                        : `Free plan tracks ${getFreeBiomarkers()} metrics — upgrade to add more`
                     );
                     router.push("/upgrade");
                     return;

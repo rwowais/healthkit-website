@@ -59,8 +59,11 @@ export const HELP: Record<string, HelpEntry> = {
   },
   "behavior.status": {
     summary: "Lifecycle stage of this behavior row.",
+    // Honesty: unlike insight templates / rules / interactions (which require
+    // 'published' to ship), behaviors only hold back 'archived' — a 'draft'
+    // behavior in a published protocol DOES reach users on the next Publish.
     example:
-      "draft = work in progress · published = ready · archived = excluded from publish",
+      "published = ready · draft = also ships (NOT held back) · archived = the only status excluded from publish",
   },
 
   // ── Protocol fields ───────────────────────────────────────────────

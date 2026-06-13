@@ -111,6 +111,10 @@ export default function ProtocolsPage() {
     dose: "",
     rationale: "",
     timingReason: "",
+    // Active weekdays (Mon=0..Sun=6). All-true by default; a non-full mask is
+    // stored as daysActive so a weekend-only behavior is expressible AT
+    // creation, not only via the post-save BehaviorSheet.
+    days: [true, true, true, true, true, true, true] as boolean[],
   });
   // 2B atom-library picker — two modes for the "Add behavior" panel:
   //   "library" (default): search a flat list of curated atoms, pick one,
@@ -334,8 +338,25 @@ export default function ProtocolsPage() {
     const existing = editingId
       ? state.customPacks.find((p) => p.id === editingId)
       : undefined;
+    const packId = editingId ?? `custom-${Date.now()}`;
+    // While building a NEW pack editingId is null, so behaviors were keyed
+    // `custom:draft:…` / `fork:draft:…` (the placeholder packId). Rewrite the
+    // "draft" segment to the real pack id now so per-pack key isolation rests on
+    // the pack id as intended — not solely on the random suffix. (Editing an
+    // existing pack already keys under its real id, so this is a no-op there.)
+    const behaviors = draft.behaviors.map((b) =>
+      /^(custom|fork):draft:/.test(b.canonicalKey)
+        ? {
+            ...b,
+            canonicalKey: b.canonicalKey.replace(
+              /^(custom|fork):draft:/,
+              `$1:${packId}:`
+            ),
+          }
+        : b
+    );
     const pack: ProtocolPack = {
-      id: editingId ?? `custom-${Date.now()}`,
+      id: packId,
       name: draft.name.trim(),
       tagline: draft.tagline.trim() || "Custom protocol",
       goal: existing?.goal ?? "custom",
@@ -343,7 +364,7 @@ export default function ProtocolsPage() {
       icon: existing?.icon ?? "sparkle",
       source: "custom",
       durationLabel: existing?.durationLabel ?? "Custom",
-      behaviors: draft.behaviors,
+      behaviors,
     };
     upsertCustomPack(pack);
     const wasEditing = !!editingId;
@@ -392,6 +413,9 @@ export default function ProtocolsPage() {
           anchor,
           offsetMin,
           customTime,
+          // Only store a mask when it's not all-7 (keeps a normal daily behavior
+          // override-free); engine's day filter treats undefined as every day.
+          daysActive: bDraft.days.every(Boolean) ? undefined : [...bDraft.days],
           dose: bDraft.dose.trim() || undefined,
           rationale: bDraft.rationale.trim() || "Custom behavior.",
           timingReason: bDraft.timingReason.trim() || undefined,
@@ -408,6 +432,7 @@ export default function ProtocolsPage() {
       dose: "",
       rationale: "",
       timingReason: "",
+      days: [true, true, true, true, true, true, true],
     });
   };
 
@@ -434,9 +459,10 @@ export default function ProtocolsPage() {
           // Strip the atom's `fromOfficialPacks` metadata — that's
           // picker UI scaffolding, not part of the BehaviorDef shape.
           fromOfficialPacks: undefined as never,
-          // "Link it" passes the block/time/dose/rationale the user already
-          // typed in the same form, so those aren't silently dropped in favor
-          // of the atom's defaults. Only keys the user actually set are present.
+          // "Link it" passes the dose / rationale / timing the user typed (and
+          // an explicit customTime if any) so those aren't dropped — but block +
+          // anchor stay the atom's curated smart timing. Only keys the user
+          // actually set are present.
           ...(userFields ?? {}),
         } as BehaviorDef,
       ],
@@ -1227,13 +1253,26 @@ export default function ProtocolsPage() {
                     </span>
                     <button
                       onClick={() => {
-                        // Carry over what the user already typed in this form,
-                        // overriding the atom defaults (only set keys present).
-                        const userFields: Partial<BehaviorDef> = {
-                          block: bDraft.block,
-                        };
+                        // Carry over what the user typed (dose/rationale/timing),
+                        // but NOT the block toggle: smart timing (block + anchor)
+                        // is the whole point of linking, and the toggle defaults
+                        // to "morning". Forcing block:bDraft.block while keeping
+                        // the atom's anchor produced an inconsistent stored state
+                        // (block:morning + anchor:bed) that the engine re-derived
+                        // back to the atom's block — so the toggle was a no-op
+                        // anyway, just via a confusing mismatch. Worse, honoring a
+                        // defaulted "morning" would schedule an evening atom
+                        // (melatonin, magnesium) in the MORNING. So the atom's
+                        // curated timing flows through; only an EXPLICIT typed
+                        // time overrides it (engine re-derives the block from it).
+                        const userFields: Partial<BehaviorDef> = {};
                         if (bDraft.block !== "anytime" && bDraft.time)
                           userFields.customTime = bDraft.time;
+                        // Carry the active-days mask the author set at creation
+                        // (only when not all-7), so a linked atom can be
+                        // weekend-only too.
+                        if (!bDraft.days.every(Boolean))
+                          userFields.daysActive = [...bDraft.days];
                         if (bDraft.dose.trim())
                           userFields.dose = bDraft.dose.trim();
                         if (bDraft.rationale.trim())
@@ -1248,6 +1287,7 @@ export default function ProtocolsPage() {
                           dose: "",
                           rationale: "",
                           timingReason: "",
+                          days: [true, true, true, true, true, true, true],
                         });
                       }}
                       className="press tr-fast shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold"
@@ -1280,6 +1320,55 @@ export default function ProtocolsPage() {
                       {bl}
                     </button>
                   ))}
+                </div>
+                {/* Active days — expressible AT creation so a weekend-only
+                    behavior doesn't require a hidden post-save editor step. */}
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-4)]">
+                    Active days
+                  </p>
+                  <div className="flex gap-1">
+                    {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => {
+                      const on = bDraft.days[i];
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          aria-pressed={on}
+                          aria-label={
+                            [
+                              "Monday",
+                              "Tuesday",
+                              "Wednesday",
+                              "Thursday",
+                              "Friday",
+                              "Saturday",
+                              "Sunday",
+                            ][i]
+                          }
+                          onClick={() =>
+                            setBDraft((b) => {
+                              const next = [...b.days];
+                              next[i] = !next[i];
+                              // Never let all days go off (that would create an
+                              // already-paused behavior); keep at least one on.
+                              if (next.every((x) => !x)) return b;
+                              return { ...b, days: next };
+                            })
+                          }
+                          className="tr-fast h-9 flex-1 rounded-[7px] text-[12px] font-bold"
+                          style={{
+                            background: on
+                              ? "var(--readiness)"
+                              : "var(--surface-3)",
+                            color: on ? "var(--bg)" : "var(--text-4)",
+                          }}
+                        >
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 {/* Exact time (optional) — sets the behavior's clock slot
                     so it sorts to the right place on Today. Hidden for

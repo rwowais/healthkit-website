@@ -168,7 +168,7 @@ export function evalTrigger(
  * insertion order (stable). Returns null if none match.
  */
 export function pickMatchingRule(
-  rules: AdaptationRule[],
+  rules: readonly AdaptationRule[],
   ctx: Record<string, unknown>
 ): AdaptationRule | null {
   if (!Array.isArray(rules) || rules.length === 0) return null;

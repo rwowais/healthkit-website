@@ -474,7 +474,16 @@ export default function BehaviorSheet({
                   onClick={() => {
                     const next = [...days];
                     next[i] = !next[i];
-                    patch({ daysActive: next });
+                    // Mirror normalize's heal on the LIVE edit: all-false days
+                    // means "paused every day", but the timeline filter would
+                    // just DROP the row with no indication (looks like data
+                    // loss until reload). Convert to an explicit disabled
+                    // override so it shows as a dimmed 'paused' row immediately.
+                    if (next.every((d) => d === false)) {
+                      patch({ daysActive: undefined, disabled: true });
+                    } else {
+                      patch({ daysActive: next });
+                    }
                   }}
                   className="press tr-fast h-11 flex-1 rounded-[var(--r-sm)] text-[13px] font-bold"
                   style={{
@@ -489,38 +498,64 @@ export default function BehaviorSheet({
           </div>
         </div>
 
-        {/* Per-behavior reminder toggle */}
-        <div className="flex items-center justify-between gap-3">
+        {/* Per-behavior reminder toggle — only meaningful for a TIMED behavior.
+            An "anytime" behavior has no clock time, so effectiveMinutes()
+            returns null and BOTH reminder paths (in-tab + server) skip it.
+            Showing a green ON switch with "Notify me at this behavior's time"
+            would be a guaranteed no-op, so for anytime we show an honest note
+            instead (mirroring how the nudge controls above hide for anytime). */}
+        {item.muteReason ? (
+          // Resting today (conflict-muted / graduated). Reminders.tsx skips
+          // muted items, so a lit "Notify me" switch would contradict the
+          // "Currently resting" framing shown above and never fire.
           <div>
             <Eyebrow>Reminder</Eyebrow>
             <p className="mt-1 text-[12px] text-[var(--text-3)]">
-              {notificationsEnabled
-                ? "Notify me at this behavior’s time."
-                : "Turn on notifications in Profile to use reminders."}
+              Resting today — no reminder will fire. It returns when the day
+              calls for it.
             </p>
           </div>
-          <button
-            role="switch"
-            aria-checked={!ov.reminderOff}
-            aria-label="Reminder"
-            onClick={() =>
-              patch({ reminderOff: ov.reminderOff ? undefined : true })
-            }
-            className="tap-44 tr-fast h-7 w-12 shrink-0 rounded-full p-1"
-            style={{
-              background: !ov.reminderOff ? color : "var(--surface-3)",
-            }}
-          >
-            <div
-              className="tr-fast h-5 w-5 rounded-full bg-white"
+        ) : item.block === "anytime" ? (
+          <div>
+            <Eyebrow>Reminder</Eyebrow>
+            <p className="mt-1 text-[12px] text-[var(--text-3)]">
+              This behavior has no set time, so it won’t send a reminder. Give
+              it a specific time above to enable one.
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Eyebrow>Reminder</Eyebrow>
+              <p className="mt-1 text-[12px] text-[var(--text-3)]">
+                {notificationsEnabled
+                  ? "Notify me at this behavior’s time."
+                  : "Turn on notifications in Profile to use reminders."}
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={!ov.reminderOff}
+              aria-label="Reminder"
+              onClick={() =>
+                patch({ reminderOff: ov.reminderOff ? undefined : true })
+              }
+              className="tap-44 tr-fast h-7 w-12 shrink-0 rounded-full p-1"
               style={{
-                transform: !ov.reminderOff
-                  ? "translateX(20px)"
-                  : "translateX(0)",
+                background: !ov.reminderOff ? color : "var(--surface-3)",
               }}
-            />
-          </button>
-        </div>
+            >
+              <div
+                className="tr-fast h-5 w-5 rounded-full bg-white"
+                style={{
+                  transform: !ov.reminderOff
+                    ? "translateX(20px)"
+                    : "translateX(0)",
+                }}
+              />
+            </button>
+          </div>
+        )}
 
         {/* Personal note */}
         <div>

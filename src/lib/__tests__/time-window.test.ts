@@ -8,7 +8,12 @@ import {
 } from "@/lib/time";
 import { compileTimeline } from "@/lib/engine";
 import { getDefaultState } from "@/lib/storage";
-import { resolveReminderMinutes } from "@/lib/smartReminders";
+import {
+  resolveReminderMinutes,
+  learnedReminderMinutes,
+} from "@/lib/smartReminders";
+import type { AppState, DailyLog } from "@/lib/types";
+import { getTz, dateKeyInTz, addDaysToKey } from "@/lib/tz";
 
 const settings = { wakeTime: "07:00", bedtime: "22:30" };
 // morning light: anchor wake, allowed within 0–120 min of waking (7:00–9:00)
@@ -172,5 +177,35 @@ describe("resolveReminderMinutes — clamp to window + quiet-hours fallback (aud
 
   it("no quiet hours → learned time passes through", () => {
     expect(resolveReminderMinutes(600, 540, free, settings)).toBe(600);
+  });
+});
+
+describe("learnedReminderMinutes — circular median across midnight (R1 #567)", () => {
+  const base = getDefaultState();
+  const tz = getTz(base.settings);
+  const today = dateKeyInTz(tz);
+  const st = (mins: number[]): AppState =>
+    ({
+      ...base,
+      settings: { ...base.settings, smartReminders: true },
+      dailyLogs: mins.map((m, i) => ({
+        date: addDaysToKey(today, -(i + 1)),
+        behaviorCompletions: { wind: true },
+        behaviorCompletionMinutes: { wind: m },
+      })) as unknown as DailyLog[],
+    }) as AppState;
+
+  it("learns ~midnight for times straddling 00:00 (not the linear ~noon)", () => {
+    // 23:5x and 00:0x — linear median ≈ 717 (noon), the bug. Circular ≈ midnight.
+    const r = learnedReminderMinutes(st([1430, 1425, 1438, 5, 10, 2]), "wind");
+    expect(r).not.toBeNull();
+    expect(r! <= 30 || r! >= 1410).toBe(true); // within 30 min of midnight
+    expect(r! > 600 && r! < 840).toBe(false); // definitively NOT ~noon
+  });
+
+  it("still learns the cluster time for a normal morning behavior", () => {
+    const r = learnedReminderMinutes(st([540, 545, 535, 550, 542]), "wind");
+    expect(r).not.toBeNull();
+    expect(Math.abs(r! - 542)).toBeLessThanOrEqual(10);
   });
 });

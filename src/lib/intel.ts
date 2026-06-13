@@ -1162,10 +1162,17 @@ export function behaviorAdherence(
   // The user's behaviors as they actually appear on the timeline (merged by
   // canonicalKey, supplements already excluded by compileTimeline). Union all
   // 7 weekdays so an N×/week behavior is captured on its off-days too.
+  // Exclude conflict-muted keys: a behavior the engine itself suppresses every
+  // day ('Resting today', e.g. Strength under a no-intense restraint) can never
+  // be completed, so it must not surface here as a 0%-adherence gap painted in
+  // alert-red — the app would be blaming the user for a behavior it disables.
+  // Same guard suggestions() / the keystone nudge already apply.
+  const muted = conflictMutedKeys(state);
   const items = new Map<string, { title: string; daysActive?: boolean[] }>();
   for (let di = 0; di < 7; di++) {
     for (const it of compileTimeline(state, di)) {
       if (!isActionable(it)) continue; // guardrails/reminders aren't "kept"
+      if (muted.has(it.canonicalKey) || muted.has(effectiveKey(it))) continue;
       if (!items.has(it.canonicalKey))
         items.set(it.canonicalKey, {
           title: it.title,

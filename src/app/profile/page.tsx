@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
+import { useSignedIn } from "@/hooks/useSignedIn";
 import { getAccess } from "@/lib/entitlements";
+import { billingConfigured } from "@/lib/billing";
 import { clearAllData, exportState, importState, getDefaultState } from "@/lib/storage";
 import { getTz, dateKeyInTz } from "@/lib/tz";
 import {
@@ -55,6 +57,7 @@ export default function ProfilePage() {
   const { state, loading, updateSettings, setVacationMode } = useAppState();
   const router = useRouter();
   const access = getAccess(state);
+  const signedIn = useSignedIn();
   const toast = useToast();
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
@@ -283,6 +286,11 @@ export default function ProfilePage() {
                     type="text"
                     value={s.blockLabels?.[key] ?? ""}
                     placeholder={`Name (default: ${label})`}
+                    // Cap like the name field (maxLength 40). These labels flow
+                    // into a 2-col move-sheet grid and the Today header next to
+                    // the "NOW" pill; an uncapped long word overflows the button
+                    // chrome and can force horizontal scroll on a 320px phone.
+                    maxLength={18}
                     onChange={(e) =>
                       updateSettings({
                         blockLabels: {
@@ -578,6 +586,23 @@ export default function ProfilePage() {
             those times — quiet hours apply. iOS Safari requires installing to
             the home screen first.
           </p>
+          {/* Honesty: closed-app (background) reminders are only stored
+              server-side for a signed-in account — a guest's push subscription
+              is discarded. In-app reminders still work for everyone. Shown only
+              once the toggle is on and we know the user is signed out. */}
+          {s.notificationsEnabled && signedIn === false && (
+            <p className="t-caption mt-2 leading-relaxed text-[var(--warm)]">
+              In-app reminders are on. To also get nudges when the app is{" "}
+              <em>closed</em>, you need an account —{" "}
+              <Link
+                href="/auth"
+                className="underline underline-offset-2 hover:text-[var(--text-1)]"
+              >
+                sign in to enable them
+              </Link>
+              .
+            </p>
+          )}
           {s.notificationsEnabled && (
             <div className="mt-3">
               <Row label="Quiet hours">
@@ -591,7 +616,11 @@ export default function ProfilePage() {
                         quietHours: e.target.value
                           ? {
                               start: e.target.value,
-                              end: s.quietHours?.end || "07:00",
+                              // Default the other end to the user's sleep window
+                              // (wake time), not a hardcoded 07:00 — a night-shift
+                              // user (wake 18:00) would otherwise silence their
+                              // working hours and leave their real sleep unguarded.
+                              end: s.quietHours?.end || s.wakeTime || "07:00",
                             }
                           : undefined,
                       })
@@ -607,7 +636,7 @@ export default function ProfilePage() {
                       updateSettings({
                         quietHours: e.target.value
                           ? {
-                              start: s.quietHours?.start || "22:00",
+                              start: s.quietHours?.start || s.bedtime || "22:00",
                               end: e.target.value,
                             }
                           : undefined,
@@ -618,9 +647,17 @@ export default function ProfilePage() {
                 </div>
               </Row>
               <p className="t-caption mt-1 leading-relaxed">
-                No reminders fire between these times — a wind-down window so
-                nothing buzzes overnight. Clear a field to turn it off.
+                No reminders fire between these times — set them to your sleep
+                window so nothing wakes you (overnight for most; your daytime
+                rest if you work nights). Clear a field to turn it off.
               </p>
+              {!!s.quietHours?.start &&
+                s.quietHours.start === s.quietHours.end && (
+                  <p className="t-caption mt-1 leading-relaxed text-[var(--alert)]">
+                    Start and end are the same, so this window is off — reminders
+                    still fire. Set different times to silence a range.
+                  </p>
+                )}
               <div className="mt-3">
                 <Row label="Smart timing">
                   <button
@@ -827,7 +864,11 @@ export default function ProfilePage() {
                 className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[var(--bg)]"
               >
                 {access.trialExpired
-                  ? "Restore full intelligence"
+                  ? billingConfigured
+                    ? "Restore full intelligence"
+                    : // Payments inert → /upgrade can't restore anything; don't
+                      // promise a one-tap restore that dead-ends at "coming soon".
+                      "See what Premium adds"
                   : "Explore Premium"}
               </button>
             </>

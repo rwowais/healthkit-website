@@ -390,6 +390,15 @@ create table if not exists public.cms_publications (
   created_at timestamptz not null default now()
 );
 
+-- Monotonic, immutable versions: two admins (or two tabs) publishing
+-- concurrently must not both mint the same bundle_version with different
+-- content. Without this, latest()/rollback/checksum-readback all key on a
+-- non-unique version and silently pick or skip arbitrarily. publishBundle
+-- catches the unique-violation and asks the second admin to refresh + re-review.
+-- Idempotent; safe on existing data (current history is already distinct-versioned).
+create unique index if not exists cms_publications_version_key
+  on public.cms_publications (bundle_version);
+
 -- RLS: admin-gated for every authoring/governance table; updated_at
 -- trigger where the column exists.
 do $cms$

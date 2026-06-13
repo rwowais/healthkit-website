@@ -761,24 +761,7 @@ export default function TodayPage() {
     [timeline, log]
   );
 
-  // App icon badge: number of behaviors still to do today. Only set
-  // for *today* (past/future scrubber views don't represent
-  // actionable now-work). Cleared on day-complete so the user sees
-  // a clean icon as their reward, not a "0" sitting there. Honors
-  // settings.disableAppBadge — when the user opts out, we force-clear
-  // the badge on every render so a stale number from a previous
-  // session doesn't linger. The helper is no-op on platforms that
-  // don't support the API.
   const badgeDisabled = state.settings.disableAppBadge === true;
-  useEffect(() => {
-    if (badgeDisabled) {
-      setBadge(0);
-      return;
-    }
-    if (!isToday) return;
-    const remaining = Math.max(0, prog.total - prog.done);
-    setBadge(remaining);
-  }, [isToday, prog.done, prog.total, badgeDisabled]);
   const ksItem = useMemo(
     () =>
       ks ? timeline.find((i) => i.canonicalKey === ks.key) ?? null : null,
@@ -826,12 +809,38 @@ export default function TodayPage() {
     }
     return { done, total };
   }, [log, state.supplements, state.settings.safetyFlags, selDayIdx]);
+  // Rebuild / essentials trim behaviors to "a few essentials" and promise "the
+  // rest will catch back up on its own". Honor that for supplements too: when
+  // behaviors drive completion in an eased mode, the full pill stack becomes
+  // optional rather than blocking "day complete" — otherwise the banner says
+  // light while the checklist still demands the entire regimen. Supplement-ONLY
+  // days are unchanged (the stack is the only thing there, so it must be
+  // handled — relaxing it would "complete" the day with nothing done).
+  const easedMode =
+    isToday && (adaptation.mode === "rebuild" || adaptation.mode === "essentials");
   const dayComplete =
     isToday &&
-    // Behaviors drive completion when present; otherwise a supplement-only day
-    // completes once every scheduled supplement is handled.
-    (prog.total > 0 ? prog.done === prog.total : suppProgToday.total > 0) &&
-    allSuppHandledToday;
+    (prog.total > 0
+      ? prog.done === prog.total && (easedMode || allSuppHandledToday)
+      : suppProgToday.total > 0 && allSuppHandledToday);
+
+  // While the user is actively filling today's check-in (one of sleep/energy
+  // tapped but not both, card not yet acked), hold the adaptive banner at a
+  // neutral read: getSignals derives recoveryProxy from a SINGLE signal, so one
+  // tap makes adapt() jump to recovery/primed — asserting a finished "we eased
+  // your day" decision while the card right below still asks the other question.
+  const checkInComplete =
+    log.sleepLog?.sleepQuality != null && log.energyLevel != null;
+  const deferRead =
+    isToday &&
+    !checkInAcked &&
+    !checkInComplete &&
+    (log.sleepLog?.sleepQuality != null || log.energyLevel != null);
+  // baselineAdapt forces a "lighter / last night was rough" read when sleep
+  // quality is poor (<=2), regardless of recoveryProxy. The Recovery chip
+  // buckets purely on the proxy, so a 60–77 proxy would read "Good" right above
+  // that banner. Cap the chip below "Good" on a poor-sleep day so the two agree.
+  const poorSleep = sig.sleepQuality != null && sig.sleepQuality <= 2;
 
   /**
    * First-day soft entry: if the user finished onboarding mid-day, the
@@ -863,18 +872,42 @@ export default function TodayPage() {
     });
   }, [isToday, state.settings.trialStartDate, prog.done, timeline, settings, tz, nowMin]);
 
+  // App icon badge: number of behaviors still to do today. Only set for *today*
+  // (past/future scrubber views don't represent actionable now-work). Cleared
+  // on day-complete so the user sees a clean icon as their reward, not a "0".
+  // Honors settings.disableAppBadge. ALSO force-cleared during first-day soft
+  // entry: every on-screen pressure surface (progress bar, Up Next, check-in)
+  // is suppressed for a mid-day day-1 user, so a red "6" on the home-screen
+  // icon — the most salient nudge of all — would reintroduce exactly the
+  // "you're already behind" pressure firstDaySoft exists to remove. The helper
+  // is a no-op on platforms without the Badging API.
+  useEffect(() => {
+    if (badgeDisabled || firstDaySoft) {
+      setBadge(0);
+      return;
+    }
+    if (!isToday) return;
+    const remaining = Math.max(0, prog.total - prog.done);
+    setBadge(remaining);
+  }, [isToday, prog.done, prog.total, badgeDisabled, firstDaySoft]);
+
   /** The most-leveraged morning behavior — what tomorrow "kicks off with". */
   const tomorrowFirstFocus = useMemo(() => {
     if (!firstDaySoft) return null;
-    const morningCandidates = timeline.filter(
+    // Compile TOMORROW's timeline (selDayIdx is today's weekday, Mon=0), not
+    // today's — the card is literally "Tomorrow's first focus", so a top-leverage
+    // morning behavior scheduled today-but-not-tomorrow (a daysActive mask) must
+    // not be presented as tomorrow's kickoff.
+    const tl = compileTimeline(state, (selDayIdx + 1) % 7);
+    const morningCandidates = tl.filter(
       (it) => !it.muted && it.block === "morning"
     );
     if (morningCandidates.length === 0)
-      return timeline.find((it) => !it.muted) ?? null;
+      return tl.find((it) => !it.muted) ?? null;
     return [...morningCandidates].sort(
       (a, b) => b.leverage - a.leverage
     )[0];
-  }, [firstDaySoft, timeline]);
+  }, [firstDaySoft, state, selDayIdx]);
 
   // Partial close: in the evening, a user who moved *some* things should
   // be met with acknowledgement, not the same anxious "Up next" pressure.
@@ -938,8 +971,17 @@ export default function TodayPage() {
   }, [timeline, log, settings, snoozed, cb, overnight, nowMin]);
 
   const activeSuggestions = useMemo<Suggestion[]>(
-    () => suggestions(state).filter((s) => !dismissed.includes(s.id)),
-    [state, dismissed]
+    () =>
+      // Suppress while returning from a gap. suggestions() reads the most-recent
+      // scored/sleep-rated days of all time (chronic-skip + sleep-trend), so for
+      // a long-gap returner those "recent" days are all pre-gap — it would nag
+      // "set this behavior aside" / "install Better Sleep" from 40-day-stale
+      // data, directly under the rebuild banner's "I've trimmed today… as you
+      // re-engage". Insights got the same returner guard; Today's card hadn't.
+      sig.hasHistory && sig.gapDays >= 2
+        ? []
+        : suggestions(state).filter((s) => !dismissed.includes(s.id)),
+    [state, dismissed, sig.hasHistory, sig.gapDays]
   );
 
   // Saved-tz day, derived from selectedDate (the same key the scrubber +
@@ -990,12 +1032,23 @@ export default function TodayPage() {
   // burns a real token) and the "every behavior done" celebration all fired —
   // directly contradicting the "timeline goes quiet / streak is paused"
   // promise (sweep 2026-06-09 MEDIUM, vacation-mode #242/#249/#256).
+  // Distinguish "no system at all" (needs onboarding) from "has a real system,
+  // just nothing scheduled today" — e.g. a deliberately weekend-only custom pack
+  // seen on a weekday. Only computed in the empty case (the 7-day compile is
+  // skipped on a normal day). Without this, a weekend-only user is told to
+  // "install a protocol" every weekday despite already having one.
+  const hasSystemOtherDays =
+    !state.settings.vacationMode &&
+    timeline.length === 0 &&
+    !hasSupplementsToday &&
+    [0, 1, 2, 3, 4, 5, 6].some((d) => compileTimeline(state, d).length > 0);
   if (
     state.settings.vacationMode ||
     (timeline.length === 0 && !hasSupplementsToday)
   ) {
-    // Two empty-state cases: vacation mode on (intentional break), or
-    // no packs installed (needs onboarding nudge). Different copy + CTA.
+    // Three empty-state cases: vacation (intentional break), a real system with
+    // nothing scheduled today (rest day off the weekly cadence), or no packs
+    // installed (needs onboarding nudge). Different copy + CTA per case.
     const onVacation = !!state.settings.vacationMode;
     // How many days the current break has run (inclusive), from the open
     // vacation period's start — a gentle "Day N" so a long rest still feels
@@ -1040,7 +1093,11 @@ export default function TodayPage() {
               <Icon name={onVacation ? "moon" : "compass"} size={24} />
             </span>
             <p className="t-section text-[var(--text-1)]">
-              {onVacation ? "You're on a break" : "Your day is a blank canvas"}
+              {onVacation
+                ? "You're on a break"
+                : hasSystemOtherDays
+                ? "Nothing scheduled today"
+                : "Your day is a blank canvas"}
             </p>
             {onVacation && breakDay > 0 && (
               <p className="t-eyebrow mt-1.5 text-[var(--warm)]">
@@ -1050,13 +1107,25 @@ export default function TodayPage() {
             <p className="t-caption mt-2 max-w-[280px] leading-relaxed">
               {onVacation
                 ? "Your day is cleared and your streak is paused — your data is safe, and your full system returns the moment you end the break."
+                : hasSystemOtherDays
+                ? "Your system just doesn't run today — enjoy the day off. It'll be back on its next scheduled day."
                 : "Install a protocol and Protocolize will assemble an adaptive daily system for you."}
             </p>
             <Link
-              href={onVacation ? "/profile#break" : "/protocols#discover"}
+              href={
+                onVacation
+                  ? "/profile#break"
+                  : hasSystemOtherDays
+                  ? "/protocols"
+                  : "/protocols#discover"
+              }
               className="press tr-fast mt-6 rounded-[var(--r-pill)] bg-[var(--text-1)] px-6 py-3 text-[14px] font-semibold text-[var(--bg)]"
             >
-              {onVacation ? "End break in Profile" : "Discover protocols"}
+              {onVacation
+                ? "End break in Profile"
+                : hasSystemOtherDays
+                ? "View your system"
+                : "Discover protocols"}
             </Link>
           </div>
           {/* Supplements stay loggable during a break. The break surface is
@@ -1328,8 +1397,11 @@ export default function TodayPage() {
                 {state.settings.name ? `, ${state.settings.name}` : ""}
               </h2>
               <p className="t-body mt-2.5 max-w-[300px] leading-relaxed">
-                Every behavior, done. This is the quiet, compounding work
-                that actually changes a healthspan. Rest well.
+                {prog.total > 0
+                  ? "Every behavior, done. "
+                  : "Your full stack, taken. "}
+                This is the quiet, compounding work that actually changes a
+                healthspan. Rest well.
               </p>
             </div>
           </motion.div>
@@ -1406,11 +1478,15 @@ export default function TodayPage() {
                       ? `, ${state.settings.name.trim()}`
                       : ""
                   }.`
+                : deferRead
+                ? "Today"
                 : adaptation.headline}
             </h2>
             <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
               {firstDaySoft
                 ? "You're joining mid-day — that's fine. Tomorrow's the natural start. For today, do whatever fits; nothing's expected of you yet."
+                : deferRead
+                ? "Finishing your check-in — your day's read updates once you've rated both sleep and energy."
                 : adaptation.tone}
             </p>
 
@@ -1425,9 +1501,9 @@ export default function TodayPage() {
                   v:
                     sig.recoveryProxy == null
                       ? "Building"
-                      : sig.recoveryProxy >= 78
+                      : sig.recoveryProxy >= 78 && !poorSleep
                       ? "High"
-                      : sig.recoveryProxy >= 60
+                      : sig.recoveryProxy >= 60 && !poorSleep
                       ? "Good"
                       : sig.recoveryProxy >= 45
                       ? "Moderate"
@@ -1438,7 +1514,7 @@ export default function TodayPage() {
                   c:
                     sig.recoveryProxy == null
                       ? "var(--text-3)"
-                      : sig.recoveryProxy >= 78
+                      : sig.recoveryProxy >= 78 && !poorSleep
                       ? "var(--vitality)"
                       : sig.recoveryProxy >= 45
                       ? "var(--readiness)"
@@ -2268,11 +2344,13 @@ export default function TodayPage() {
                   onClick={() =>
                     setOpenBlocks((o) => ({ ...o, [block]: !o[block] }))
                   }
-                  className="mb-3 flex w-full items-center justify-between px-1"
+                  className="mb-3 flex w-full items-center justify-between gap-2 px-1"
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
                     <Eyebrow color={isCurrent ? accent : undefined}>
-                      {blockLabel(block, settings.blockLabels)}
+                      <span className="block max-w-[60vw] truncate">
+                        {blockLabel(block, settings.blockLabels)}
+                      </span>
                     </Eyebrow>
                     {isCurrent && (
                       <span
@@ -2476,6 +2554,41 @@ export default function TodayPage() {
                                   {moveMenuKey === it.canonicalKey && (
                                     <div
                                       role="menu"
+                                      aria-orientation="vertical"
+                                      // role="menu" implies a keyboard model;
+                                      // wire Arrow/Home/End across the enabled
+                                      // items (Tab still works as before) so the
+                                      // "menu" announcement isn't an empty promise.
+                                      onKeyDown={(e) => {
+                                        const items = Array.from(
+                                          e.currentTarget.querySelectorAll<HTMLButtonElement>(
+                                            '[role="menuitem"]:not([disabled])'
+                                          )
+                                        );
+                                        if (items.length === 0) return;
+                                        const cur = items.indexOf(
+                                          document.activeElement as HTMLButtonElement
+                                        );
+                                        let next = -1;
+                                        if (e.key === "ArrowDown")
+                                          next = cur < 0 ? 0 : (cur + 1) % items.length;
+                                        else if (e.key === "ArrowUp")
+                                          next =
+                                            cur < 0
+                                              ? items.length - 1
+                                              : (cur - 1 + items.length) % items.length;
+                                        else if (e.key === "Home") next = 0;
+                                        else if (e.key === "End")
+                                          next = items.length - 1;
+                                        else if (e.key === "Escape") {
+                                          setMoveMenuKey(null);
+                                          return;
+                                        }
+                                        if (next >= 0) {
+                                          e.preventDefault();
+                                          items[next].focus();
+                                        }
+                                      }}
                                       onClick={(e) => e.stopPropagation()}
                                       onPointerDown={(e) =>
                                         e.stopPropagation()

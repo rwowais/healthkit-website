@@ -21,7 +21,14 @@ import {
 } from "@/lib/cms/introspect";
 import { getCfgNumber } from "@/lib/knowledge";
 import { getDefaultState } from "@/lib/storage";
-import { adapt, compileTimeline, shapeTimeline } from "@/lib/engine";
+import {
+  adapt,
+  compileTimeline,
+  shapeTimeline,
+  applyConflictMutes,
+  resolvedInteractions,
+  resolveInteractionsWith,
+} from "@/lib/engine";
 import { bundleChecksum } from "@/lib/knowledge";
 import {
   buildCatalogBundle,
@@ -85,6 +92,7 @@ import {
   type ConfigOverrideRow,
   type InsightTemplateRow,
   type RecTemplateRow,
+  type AssembledBundle,
 } from "@/lib/cms/authoring";
 import {
   generateBehaviorDraft,
@@ -381,6 +389,14 @@ function AdminHomeInner() {
   const [simPacks, setSimPacks] = useState<ProtocolPack[]>(() =>
     activePacks()
   );
+  // The draft bundle's adaptation rules + interactions, so Simulate previews
+  // what PUBLISHING the drafts would do — not the protocols shaped by
+  // yesterday's live rules with no conflict-muting. Null unless simSrc is
+  // "drafts" (live/builtin resolve their rules/interactions directly).
+  const [simDraft, setSimDraft] = useState<{
+    rules: AssembledBundle["adaptationRules"];
+    interactions: AssembledBundle["interactions"];
+  } | null>(null);
   // Resolve simulation packs from the selected source. Built-in is the
   // frozen `PACKS` constant; drafts comes from the CMS authoring tables;
   // live is whatever the runtime is currently serving (built-in unless
@@ -389,15 +405,31 @@ function AdminHomeInner() {
     let alive = true;
     (async () => {
       if (simSrc === "builtin") {
-        if (alive) setSimPacks(PACKS);
+        if (alive) {
+          setSimPacks(PACKS);
+          setSimDraft(null);
+        }
         return;
       }
       if (simSrc === "live") {
-        if (alive) setSimPacks(activePacks());
+        if (alive) {
+          setSimPacks(activePacks());
+          setSimDraft(null);
+        }
         return;
       }
       const drafts = await assembleBundleFromCMS();
-      if (alive) setSimPacks(drafts?.protocols ?? PACKS);
+      if (alive) {
+        setSimPacks(drafts?.protocols ?? PACKS);
+        setSimDraft(
+          drafts
+            ? {
+                rules: drafts.adaptationRules,
+                interactions: drafts.interactions,
+              }
+            : null
+        );
+      }
     })();
     return () => {
       alive = false;
@@ -951,14 +983,35 @@ function AdminHomeInner() {
       installedPacks: sel,
       dailyLogs: logs,
     };
-    const a = adapt(state);
-    const shaped = shapeTimeline(
+    // Per-source adaptation rules + conflict interactions so the preview
+    // reflects what PUBLISHING that source would do — not draft protocols
+    // shaped by the live bundle's rules with conflict-muting skipped entirely.
+    //  - drafts:  the assembled draft bundle's rules + interactions
+    //  - builtin: no CMS rules ([]) + only the built-in interaction base
+    //  - live:    the session's published rules (adapt default) + resolved live
+    const simRules =
+      simSrc === "drafts"
+        ? simDraft?.rules ?? []
+        : simSrc === "builtin"
+          ? []
+          : undefined; // live → adapt() reads the applied published rules
+    const simInteractions =
+      simSrc === "drafts"
+        ? resolveInteractionsWith(simDraft?.interactions ?? [])
+        : simSrc === "builtin"
+          ? resolveInteractionsWith([])
+          : resolvedInteractions();
+    const a = adapt(state, simRules ? { rules: simRules } : undefined);
+    let shaped = shapeTimeline(
       compileTimeline(state, 0, simPacks),
       a.mode,
       {}
     );
+    // Run the same firm-conflict mute pass the runtime applies, so a conflict
+    // interaction authored in drafts (or built-in) actually shows as muted.
+    shaped = applyConflictMutes(shaped, simInteractions);
     return { mode: a.mode, headline: a.headline, tone: a.tone, shaped };
-  }, [sel, sleepQ, energy, gap, simPacks]);
+  }, [sel, sleepQ, energy, gap, simPacks, simSrc, simDraft]);
 
   if (gate === "checking")
     return (

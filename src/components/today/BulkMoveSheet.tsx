@@ -44,7 +44,7 @@ export default function BulkMoveSheet({
           <button
             key={b}
             onClick={() => onSelectBlock(b)}
-            className="press tr-fast rounded-[var(--r-md)] py-3 text-[13.5px] font-semibold"
+            className="press tr-fast truncate rounded-[var(--r-md)] px-2 py-3 text-[13.5px] font-semibold"
             style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
           >
             {blockLabel(b, blockLabels)}

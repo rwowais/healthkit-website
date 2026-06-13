@@ -38,8 +38,11 @@ import {
  * /api/push/send-due then sends reminders at the user's local times
  * even with the tab closed.
  *
- * Both can fire on the same minute on rare occasion; the service
- * worker dedupes via `tag` (renotify:false).
+ * Both could fire on the same minute, and they use different tags (per-behavior
+ * in-tab vs the generic "pz-reminder" push) so the OS won't collapse them. The
+ * service worker de-dupes instead by VISIBILITY: its push handler skips showing
+ * the generic notification whenever a visible client exists, deferring to this
+ * named in-tab path.
  */
 export default function Reminders() {
   const { state, loading } = useAppState();
@@ -95,6 +98,14 @@ export default function Reminders() {
       // Per-behavior opt-out — match the in-tab path so a silenced behavior
       // isn't pushed from the server with the tab closed.
       if (state.behaviorOverrides?.[it.canonicalKey]?.reminderOff) continue;
+      // Day-of-week interim: push_subscriptions stores a FLAT list of clock
+      // times with no weekday, and the cron fires whenever the minute matches —
+      // every day. A partial-week behavior subscribed on (say) Saturday would
+      // then ping Mon–Fri too. Until the schema carries a weekday mask, only
+      // subscribe behaviors active EVERY day to the server; partial-week ones
+      // rely on the in-tab path (Effect 2), which recompiles per weekday and so
+      // never fires on an off day. (See HANDOFF — day-aware push schema deferred.)
+      if (it.daysActive && !it.daysActive.every(Boolean)) continue;
       const sched = effectiveMinutes(it, state.settings);
       if (sched == null) continue;
       // Smart timing: fire at the learned typical completion time when there's

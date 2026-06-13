@@ -7,7 +7,13 @@
  * screen or hook changes required.
  */
 import type { AppState, DailyLog } from "./types";
-import { loadState, saveState, SAVE_ERROR_EVENT } from "./storage";
+import {
+  loadState,
+  saveState,
+  SAVE_ERROR_EVENT,
+  captureResetEpoch,
+  resetEpochMoved,
+} from "./storage";
 import { DEFAULT_INSTALLED } from "./packs";
 import {
   markSaveStarted,
@@ -41,9 +47,22 @@ class LocalDataSource implements DataSource {
   readonly kind = "local" as const;
   readonly isCloud = false;
   async load(): Promise<AppState> {
+    captureResetEpoch();
     return loadState();
   }
   async save(state: AppState): Promise<void> {
+    // Reset-epoch fence: a wipe in another tab since we loaded → reload onto
+    // fresh state rather than re-persisting this stale copy.
+    if (resetEpochMoved()) {
+      if (typeof window !== "undefined") {
+        try {
+          window.location.reload();
+        } catch {
+          /* test env */
+        }
+      }
+      return;
+    }
     saveState(state);
     // Notify other live hook instances (e.g. Today while Protocols saves)
     // so the app reacts immediately to protocol changes.
@@ -774,11 +793,20 @@ class SupabaseDataSource implements DataSource {
 
   async load(): Promise<AppState> {
     bindAuthReset();
+    captureResetEpoch();
     const sb = getSupabase();
     if (!sb) return loadState();
     try {
       const userId = await getUserId();
       if (!userId) return loadState();
+
+      // A first-sign-in conflict is already awaiting the user's choice in the
+      // modal. A re-entrant load (focus / visibility / state event) must NOT
+      // re-evaluate it: conflictEvaluated is already true, so it would fall
+      // through to markReconciled + cloud-wins and silently discard the local
+      // data the user is still deciding about. Hold local until resolveConflict
+      // (or auth reset) clears pendingConflict.
+      if (pendingConflict) return loadState();
 
       const { data, error } = await sb
         .from(STATE_TABLE)
@@ -872,6 +900,21 @@ class SupabaseDataSource implements DataSource {
   }
 
   async save(state: AppState): Promise<void> {
+    // Reset-epoch fence: a reset / delete-account ran in another tab since we
+    // loaded. Persisting OR pushing this stale in-memory state would resurrect
+    // the wiped data locally and in the cloud row. Discard it and reload onto
+    // the fresh state — checked BEFORE saveState/markPendingSync/upsert so no
+    // resurrection write or dirty flag is left behind.
+    if (resetEpochMoved()) {
+      if (typeof window !== "undefined") {
+        try {
+          window.location.reload();
+        } catch {
+          /* test env */
+        }
+      }
+      return;
+    }
     saveState(state); // offline-first cache
     // Mark local ahead of cloud until a push confirms. Persisted so a reload
     // before the push still knows to merge rather than be clobbered.

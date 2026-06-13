@@ -59,7 +59,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <ToastProvider>
       <Reminders />
       <div className="min-h-screen">
-        <header className="glass sticky top-0 z-50 border-b border-[var(--hairline)]">
+        {/* pt-[env(safe-area-inset-top)]: in an installed iOS PWA the glass
+            header fills the notch/status-bar strip instead of the app row
+            colliding with it. Resolves to 0 on devices without a top inset. */}
+        <header className="glass sticky top-0 z-50 border-b border-[var(--hairline)] pt-[env(safe-area-inset-top)]">
           <div className="mx-auto flex h-16 max-w-[600px] items-center justify-between px-6">
             <div className="flex items-center gap-2.5">
               <Link href="/today" className="flex items-center gap-2.5">
