@@ -10,6 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { BIOMARKERS, biomarkerDef, isPlausibleBiomarker } from "@/lib/biomarkers";
 import { getSignals } from "@/lib/engine";
+import { BIOMARKERS_ENABLED } from "@/lib/flags";
 import {
   getDefaultState,
   addBiomarker,
@@ -71,7 +72,7 @@ describe("biomarker reduction — body-only catalog", () => {
     expect(sig.bioRecoveryFlag).toBe(false);
   });
 
-  it("HRV in the Watch band still drives the recovery signal for premium", () => {
+  it("HRV in the Watch band drives the recovery signal (when biomarkers are enabled)", () => {
     let st = addBiomarker(premium(), {
       metric: "ldlC", // stale blood marker present alongside…
       value: 160,
@@ -83,8 +84,15 @@ describe("biomarker reduction — body-only catalog", () => {
       date: todayKey(),
     });
     const sig = getSignals(st);
-    expect(sig.bioConcern).not.toBeNull();
-    expect(sig.bioRecoveryFlag).toBe(true);
+    if (BIOMARKERS_ENABLED) {
+      expect(sig.bioConcern).not.toBeNull();
+      expect(sig.bioRecoveryFlag).toBe(true);
+    } else {
+      // Feature gated off (current state): the engine is biomarker-blind, so no
+      // biomarker-derived signal surfaces even with a Watch-band HRV logged.
+      expect(sig.bioConcern).toBeNull();
+      expect(sig.bioRecoveryFlag).toBe(false);
+    }
   });
 });
 

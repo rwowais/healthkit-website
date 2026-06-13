@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BIOMARKERS_ENABLED } from "@/lib/flags";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { getAccess, getFreeBiomarkers } from "@/lib/entitlements";
@@ -38,6 +39,13 @@ export default function BiomarkersPage() {
   const [open, setOpen] = useState<BiomarkerDef | null>(null);
   const [val, setVal] = useState("");
   const [date, setDate] = useState(today);
+
+  // Biomarkers are hidden for now — this route isn't linked anywhere, but a
+  // bookmark / old deep link could still hit it, so send those visitors back
+  // to Profile instead of revealing the gated feature.
+  useEffect(() => {
+    if (!BIOMARKERS_ENABLED) router.replace("/profile");
+  }, [router]);
 
   const byMetric = useMemo(() => {
     const m: Record<string, BiomarkerEntry[]> = {};
@@ -102,6 +110,7 @@ export default function BiomarkersPage() {
     toast.show(`${open.label} logged`);
   };
 
+  if (!BIOMARKERS_ENABLED) return null; // redirecting (see effect above)
   if (loading) {
     return (
       <Shell>

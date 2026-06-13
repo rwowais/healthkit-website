@@ -8,6 +8,7 @@ import { useAppState } from "@/hooks/useAppState";
 import { useSignedIn } from "@/hooks/useSignedIn";
 import { getAccess } from "@/lib/entitlements";
 import { billingConfigured } from "@/lib/billing";
+import { BIOMARKERS_ENABLED } from "@/lib/flags";
 import { clearAllData, exportState, importState, getDefaultState } from "@/lib/storage";
 import { getTz, dateKeyInTz } from "@/lib/tz";
 import {
@@ -179,7 +180,8 @@ export default function ProfilePage() {
           )}
         </Card>
 
-        {/* Body trends entry */}
+        {/* Body trends entry — hidden while the biomarkers feature is off */}
+        {BIOMARKERS_ENABLED && (
         <Link href="/biomarkers">
           <Card className="press flex items-center gap-4">
             <span
@@ -208,6 +210,7 @@ export default function ProfilePage() {
             />
           </Card>
         </Link>
+        )}
 
         {/* Appearance — theme preference (stored per-device, not synced). */}
         <Card>

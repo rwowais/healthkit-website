@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import { activePacks, activeAdaptationRules, activeInteractions } from "./knowledge";
 import { pickMatchingRule, sanitizeEffect, type AdaptationRule } from "./cms/rules";
+import { BIOMARKERS_ENABLED } from "./flags";
 import {
   effectiveMinutes,
   blockForMinutes,
@@ -748,6 +749,9 @@ function biomarkerConcern(state: AppState): {
   text: string | null;
   recovery: boolean;
 } {
+  // Biomarkers hidden → the engine stays biomarker-blind, so no biomarker-
+  // derived banner/ease can surface (even for a user with pre-existing data).
+  if (!BIOMARKERS_ENABLED) return { text: null, recovery: false };
   const bms = state.biomarkers ?? [];
   if (bms.length === 0) return { text: null, recovery: false };
   // 30-day cutoff in the user's tz — was previously device-clock,

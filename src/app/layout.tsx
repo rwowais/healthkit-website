@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   ),
   title: "Protocolize — Longevity Intelligence",
   description:
-    "Your adaptive daily protocol. Track behaviors, biomarkers, and the calm intelligence layer that shapes your longevity routine.",
+    "Your adaptive daily protocol. Track behaviors and the calm intelligence layer that shapes your longevity routine.",
   applicationName: "Protocolize",
   // OG + Twitter cards so shared links render as a branded preview
   // (logo + title + line) instead of a barren URL. Image is the

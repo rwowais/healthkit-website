@@ -8,6 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BIOMARKERS_ENABLED } from "@/lib/flags";
 import { activePacks } from "@/lib/knowledge";
 import { listBehaviorAtoms } from "@/lib/packs";
 import { Sheet, Eyebrow } from "@/components/ui";
@@ -30,6 +31,12 @@ const PAGES: Hit[] = [
   { kind: "Go to", title: "Take a break", sub: "Pause everything", route: "/profile#break", icon: "moon" },
   { kind: "Go to", title: "Profile & settings", route: "/profile", icon: "user" },
 ];
+
+// "Body trends" (biomarkers) is gated off for now — drop it from search so it
+// isn't a reachable entry point. Flip BIOMARKERS_ENABLED to restore it.
+const VISIBLE_PAGES: Hit[] = BIOMARKERS_ENABLED
+  ? PAGES
+  : PAGES.filter((p) => p.route !== "/biomarkers");
 
 export default function GlobalSearch({
   open,
@@ -71,12 +78,12 @@ export default function GlobalSearch({
         icon: (a.icon as IconName) ?? "check",
       });
     }
-    return [...PAGES, ...packs, ...behaviors];
+    return [...VISIBLE_PAGES, ...packs, ...behaviors];
   }, []);
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase();
-    if (!query) return PAGES;
+    if (!query) return VISIBLE_PAGES;
     return index.filter(
       (h) =>
         h.title.toLowerCase().includes(query) ||

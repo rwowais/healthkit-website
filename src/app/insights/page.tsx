@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { BIOMARKERS_ENABLED } from "@/lib/flags";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
@@ -114,23 +115,25 @@ export default function InsightsPage() {
       out.push({ icon: "bulb", accent: "var(--readiness)", text: d });
     }
 
-    // Biomarker attention (calm, not alarming)
-    const latestByMetric = new Map<string, number>();
-    for (const b of [...intelState.biomarkers].sort((a, c) =>
-      a.date.localeCompare(c.date)
-    ))
-      latestByMetric.set(b.metric, b.value);
-    for (const [metric, value] of latestByMetric) {
-      const def = biomarkerDef(metric);
-      if (!def || def.direction === "range") continue;
-      const band = biomarkerBand(def, value);
-      if (band.label === "Watch") {
-        out.push({
-          icon: "pulse",
-          accent: "var(--recovery)",
-          text: `${def.label} is worth a closer look (${value} ${def.unit}). ${def.why}`,
-        });
-        break;
+    // Biomarker attention (calm, not alarming) — gated while biomarkers are hidden.
+    if (BIOMARKERS_ENABLED) {
+      const latestByMetric = new Map<string, number>();
+      for (const b of [...intelState.biomarkers].sort((a, c) =>
+        a.date.localeCompare(c.date)
+      ))
+        latestByMetric.set(b.metric, b.value);
+      for (const [metric, value] of latestByMetric) {
+        const def = biomarkerDef(metric);
+        if (!def || def.direction === "range") continue;
+        const band = biomarkerBand(def, value);
+        if (band.label === "Watch") {
+          out.push({
+            icon: "pulse",
+            accent: "var(--recovery)",
+            text: `${def.label} is worth a closer look (${value} ${def.unit}). ${def.why}`,
+          });
+          break;
+        }
       }
     }
 
@@ -481,8 +484,9 @@ export default function InsightsPage() {
         <BehaviorReportCard rows={adherence} />
         <PillarDeepDives state={intelState} />
         {/* Where your body metrics are heading — confident linear trend
-            projection (renders only with a real, well-fit trend). */}
-        <ForecastCard state={intelState} />
+            projection (renders only with a real, well-fit trend). Gated while
+            the biomarkers feature is hidden. */}
+        {BIOMARKERS_ENABLED && <ForecastCard state={intelState} />}
         <CorrelationExplorer
           logs={access.premium ? state.dailyLogs : intelState.dailyLogs}
           premium={access.premium}
@@ -668,13 +672,11 @@ export default function InsightsPage() {
             {!access.premium && (
               <UpgradeCTA
                 title="Insights is a Premium feature"
-                line="Once you have a week of data, Premium shows your patterns the moment they form — live, biomarker-aware, with weekly review and identity reflection."
+                line="Once you have a week of data, Premium shows your patterns the moment they form — live, with weekly review and identity reflection."
               />
             )}
-            {/* Cross-link to Body Trends so users discover the body-marker
-                surface from the same intelligence-y page. It has no
-                nav-bar tab; without this card, returning users have to
-                dig through Profile to find it. */}
+            {/* Cross-link to Body Trends — gated off while biomarkers are hidden. */}
+            {BIOMARKERS_ENABLED && (
             <button
               onClick={() => router.push("/biomarkers")}
               className="press tr-fast panel flex w-full items-center gap-3 p-4 text-left"
@@ -704,6 +706,7 @@ export default function InsightsPage() {
                 className="shrink-0 text-[var(--text-4)]"
               />
             </button>
+            )}
           </>
         ) : (
           insights.length > 0 && (

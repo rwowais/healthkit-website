@@ -9,6 +9,7 @@ import { getAccess } from "@/lib/entitlements";
 import { startCheckout, PRICING, billingConfigured, type Plan } from "@/lib/billing";
 import { Eyebrow, Skeleton, useToast } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
+import { BIOMARKERS_ENABLED } from "@/lib/flags";
 
 const VALUE: { icon: IconName; t: string; s: string }[] = [
   {
@@ -121,7 +122,10 @@ export default function UpgradePage() {
         </motion.div>
 
         <div className="flex flex-col gap-3">
-          {VALUE.map((v, i) => (
+          {(BIOMARKERS_ENABLED
+            ? VALUE
+            : VALUE.filter((v) => v.t !== "Biomarker-aware adaptation")
+          ).map((v, i) => (
             <motion.div
               key={v.t}
               initial={{ opacity: 0, y: 10 }}

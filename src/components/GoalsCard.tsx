@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import type { AppState, OutcomeGoal, UserSettings } from "@/lib/types";
 import { goalProgress, newId } from "@/lib/goals";
 import { BIOMARKERS, biomarkerDef } from "@/lib/biomarkers";
+import { BIOMARKERS_ENABLED } from "@/lib/flags";
 import { MiniRing } from "@/components/ui/Ring";
 import { Eyebrow, Sheet, Button, Segmented, useToast } from "@/components/ui";
 import { Icon } from "@/components/ui/icons";
@@ -30,13 +31,23 @@ export default function GoalsCard({
     () => state.settings.outcomeGoals ?? [],
     [state.settings.outcomeGoals]
   );
+  // While biomarkers are hidden, drop biomarker-kind goals from DISPLAY only.
+  // `goals` stays intact for add/remove so a stored biomarker goal isn't lost —
+  // it reappears when the feature is re-enabled.
+  const visibleGoals = useMemo(
+    () =>
+      BIOMARKERS_ENABLED ? goals : goals.filter((g) => g.kind !== "biomarker"),
+    [goals]
+  );
   const progresses = useMemo(
-    () => goals.map((g) => goalProgress(state, g)),
-    [goals, state]
+    () => visibleGoals.map((g) => goalProgress(state, g)),
+    [visibleGoals, state]
   );
 
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<Kind>("biomarker");
+  const [kind, setKind] = useState<Kind>(
+    BIOMARKERS_ENABLED ? "biomarker" : "streak"
+  );
   const [metric, setMetric] = useState("restingHR");
   const [target, setTarget] = useState("");
 
@@ -57,7 +68,7 @@ export default function GoalsCard({
     (kind !== "streak" || targetNum >= 2);
 
   const reset = () => {
-    setKind("biomarker");
+    setKind(BIOMARKERS_ENABLED ? "biomarker" : "streak");
     setMetric("restingHR");
     setTarget("");
   };
@@ -98,7 +109,7 @@ export default function GoalsCard({
     <div>
       <div className="flex items-center justify-between">
         <Eyebrow color="var(--vitality)">Goals</Eyebrow>
-        {goals.length > 0 && (
+        {visibleGoals.length > 0 && (
           <button
             onClick={() => setOpen(true)}
             className="press tr-fast text-[12px] font-semibold text-[var(--text-3)]"
@@ -108,7 +119,7 @@ export default function GoalsCard({
         )}
       </div>
 
-      {goals.length === 0 ? (
+      {visibleGoals.length === 0 ? (
         <button
           onClick={() => setOpen(true)}
           className="press tr-fast panel mt-3 flex w-full items-center gap-3 p-4 text-left"
@@ -127,8 +138,9 @@ export default function GoalsCard({
               Set a target to steer toward
             </span>
             <span className="mt-0.5 block text-[12px] text-[var(--text-3)]">
-              A body metric, a streak, or weekly active days — and watch the
-              progress fill.
+              {BIOMARKERS_ENABLED
+                ? "A body metric, a streak, or weekly active days — and watch the progress fill."
+                : "A streak or weekly active days — and watch the progress fill."}
             </span>
           </span>
           <Icon name="chevron" size={13} className="shrink-0 text-[var(--text-4)]" />
@@ -177,9 +189,11 @@ export default function GoalsCard({
         <div className="flex flex-col gap-4">
           <Segmented<Kind>
             options={[
-              { value: "biomarker", label: "Body metric" },
-              { value: "streak", label: "Streak" },
-              { value: "weeklyActive", label: "Weekly" },
+              ...(BIOMARKERS_ENABLED
+                ? [{ value: "biomarker" as Kind, label: "Body metric" }]
+                : []),
+              { value: "streak" as Kind, label: "Streak" },
+              { value: "weeklyActive" as Kind, label: "Weekly" },
             ]}
             value={kind}
             onChange={(k) => {
