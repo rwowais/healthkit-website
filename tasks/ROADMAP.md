@@ -20,14 +20,10 @@ lives in `tasks/HANDOFF.md`; gotchas in `tasks/lessons.md`._
 Published bundle v10 (6 protocols, test content gone) via /admin after a full
 live cloud smoke test (signup→sync→admin→publish all verified against prod).
 Admins: rwowais@gmail.com + the QA account (rwowais+pzqa@gmail.com).
-The live bundle (v9) still serves a test protocol alongside the 6 real ones. It's
-already archived in the source data, so removing it is a single **"Publish" click
-in `/admin`** — but the re-publish MUST go through the app's pipeline (can't be
-faked in SQL). Blocker: no CMS admin is configured yet (that table is empty).
-_Me: set up admin + prep. You: one click (or I guide)._
 
-**B. Rotate the exposed GitHub token.**
-It sits in plaintext in the repo's git remote URL and was exposed in-session.
+**B. ~~Rotate the exposed GitHub token~~ ✅ DONE 2026-06-13.**
+Old plaintext token removed from git config; new fine-grained PAT lives in the
+macOS keychain only.
 _You: rotate it (I'll guide) + I move the repo to a credential helper._
 
 **C. On-device iPhone check.**
