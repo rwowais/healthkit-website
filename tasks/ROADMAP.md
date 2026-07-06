@@ -3,6 +3,13 @@ _Last updated 2026-06-13. Forward-looking priority view. Full per-item evidence
 lives in `tasks/HANDOFF.md`; gotchas in `tasks/lessons.md`._
 
 ## ✅ Done recently (so we don't redo it)
+- **Full user lifecycle LIVE-VERIFIED against prod (2026-07-05):** sign-up →
+  email-confirm → sign-in → guest-data lift → live sync (doc + per-day logs) →
+  offline re-upload → **Reset all data** (logs/biomarkers/packs wiped; name +
+  trial carried by design) → **Delete account** (auth user + state + logs +
+  admin row all cascade-deleted in DB; local device wiped + signed out).
+  delete_my_account RPC + all FK cascades inspected and correct. No need to
+  re-test unless auth/reset/delete code or schema changes.
 - **Entire audited bug backlog** — Batches P (PWA), C (CMS publish), S (sync),
   R1 (mediums + lows), ~45 fixes — shipped and deployed.
 - **DB migration #1** — `cms_publications` unique version index — applied to
