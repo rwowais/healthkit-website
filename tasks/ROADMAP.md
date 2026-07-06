@@ -16,7 +16,10 @@ lives in `tasks/HANDOFF.md`; gotchas in `tasks/lessons.md`._
 ---
 
 ## 🔴 NOW — visible to users / security
-**A. Remove "Test Protocol 1" from the live Library.**
+**A. ~~Remove "Test Protocol 1" from the live Library~~ ✅ DONE 2026-07-05.**
+Published bundle v10 (6 protocols, test content gone) via /admin after a full
+live cloud smoke test (signup→sync→admin→publish all verified against prod).
+Admins: rwowais@gmail.com + the QA account (rwowais+pzqa@gmail.com).
 The live bundle (v9) still serves a test protocol alongside the 6 real ones. It's
 already archived in the source data, so removing it is a single **"Publish" click
 in `/admin`** — but the re-publish MUST go through the app's pipeline (can't be

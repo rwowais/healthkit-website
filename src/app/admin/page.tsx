@@ -468,12 +468,16 @@ function AdminHomeInner() {
   // reviewing a major migration needs to see *everything* about to ship.
   const [diffShowAll, setDiffShowAll] = useState(false);
   const diffAlive = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Re-arm on every mount. React StrictMode (dev) mounts → cleans up →
+    // remounts; a cleanup-only effect left this ref permanently false after
+    // the remount, so every setDiff was skipped and the Publish tab showed
+    // "Loading diff…" forever (dev-only symptom, but correct for any remount).
+    diffAlive.current = true;
+    return () => {
       diffAlive.current = false;
-    },
-    []
-  );
+    };
+  }, []);
   const refreshDiff = async () => {
     setDiffBusy(true);
     try {
@@ -482,7 +486,10 @@ function AdminHomeInner() {
         previewNextBundle(),
       ]);
       if (diffAlive.current) setDiff(diffBundles(prev, next));
-    } catch {
+    } catch (e) {
+      // Surface the failure — a silently-null diff renders as an eternal
+      // "Loading diff…", which hides real assembly/diff bugs.
+      console.error("[admin] diff failed", e);
       if (diffAlive.current) setDiff(null);
     } finally {
       if (diffAlive.current) setDiffBusy(false);
