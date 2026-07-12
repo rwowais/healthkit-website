@@ -44,7 +44,6 @@ import {
   timelineProgress,
   blockLabel,
   leverageTag,
-  upNextMessage,
   getSignals,
   type TimelineItem,
   type LeverageTag,
@@ -59,8 +58,6 @@ import {
   fmtClock,
   behaviorStats,
   suggestions,
-  upNextRank,
-  compareUpNext,
   isActionable,
   keystone,
   weeklyReview,
@@ -126,16 +123,6 @@ function progressionPhrase(
   return cb === "evening" ? "Winding down" : "Momentum building";
 }
 
-/** Human relative time vs now (minutes). */
-function relTime(t: number | null, now: number): string {
-  if (t == null) return "Anytime";
-  const d = t - now;
-  if (d <= -90) return "Earlier — still worth it";
-  if (d <= 10) return "Now";
-  if (d < 60) return `In ${d} min`;
-  const h = Math.round(d / 60);
-  return `In ~${h}h`;
-}
 
 function greeting(cb: string, overnight: boolean) {
   // Driven from the SAME wake-anchored source as the block header so the
@@ -304,34 +291,14 @@ export default function TodayPage() {
       return [];
     }
   };
-  const [snoozed, setSnoozed] = useState<string[]>(() =>
-    readLS(`pz:snz:${todayKey}`)
-  );
   const [dismissed, setDismissed] = useState<string[]>(() =>
     readLS("pz:dsm")
   );
   // When the calendar rolls under a mounted board, RE-READ the new day's
   // mirror instead of persisting yesterday's state under the new key — the
-  // old write-on-key-change effect copied day-1's snoozes (and check-in ack
-  // below) into day 2's storage, suppressing the check-in card for the whole
+  // old write-on-key-change effect copied day-1's check-in ack
+  // into day 2's storage, suppressing the check-in card for the whole
   // next day even after a reload (audit round 2).
-  const snzDayRef = useRef(todayKey);
-  useEffect(() => {
-    if (snzDayRef.current !== todayKey) {
-      snzDayRef.current = todayKey;
-      setSnoozed(readLS(`pz:snz:${todayKey}`));
-      return;
-    }
-    try {
-      localStorage.setItem(
-        `pz:snz:${todayKey}`,
-        JSON.stringify(snoozed)
-      );
-    } catch {
-      /* non-fatal */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snoozed, todayKey]);
   useEffect(() => {
     try {
       localStorage.setItem("pz:dsm", JSON.stringify(dismissed));
@@ -922,54 +889,6 @@ export default function TodayPage() {
     prog.total > 0 &&
     prog.done > 0;
 
-  const upNext = useMemo(() => {
-    // Past bedtime (overnight): the day is done — never promote an action.
-    // The calm rest card renders instead of an Up Next hero.
-    if (overnight) return null;
-    // Don't promote a behavior as the "next action" once its window is well
-    // past — e.g. morning sunlight at 8pm, or a noon workout still surfaced
-    // at 9pm. Two guards, both of which keep the item in the timeline and
-    // only stop it being the Up Next HERO:
-    //   (1) block-behind: drop a timed item 2+ blocks behind the current one;
-    //   (2) clock-stale: drop anything overdue by more than STALE_MIN, so a
-    //       9-hours-past workout can never be the "do this next" card.
-    const blockOrder: Record<string, number> = {
-      morning: 0,
-      afternoon: 1,
-      evening: 2,
-    };
-    const cbIdx = blockOrder[cb] ?? 0;
-    const windowGone = (b: string) =>
-      b in blockOrder && blockOrder[b] <= cbIdx - 2;
-    const now = nowMin;
-    const STALE_MIN = 90; // overdue by more than this → its window has passed
-    // Wake-relative so a bed-anchored item that resolves past midnight (e.g. a
-    // 1:00am wind-down) isn't read as ~23h overdue while the user is still in
-    // the prior evening — rebase both onto [wake, wake+1440).
-    const [wh, wm] = (settings.wakeTime || "7:00").split(":").map(Number);
-    const wakeM = (wh || 0) * 60 + (wm || 0);
-    const rel = (x: number) => (x < wakeM ? x + 1440 : x);
-    const tooStale = (i: TimelineItem) => {
-      const m = effectiveMinutes(i, settings);
-      return m != null && rel(now) - rel(m) > STALE_MIN;
-    };
-    const candidates = timeline.filter(
-      (i) =>
-        !i.muted &&
-        !isDone(log, i.canonicalKey) &&
-        !snoozed.includes(i.canonicalKey) &&
-        // Guardrail / "avoid" / reminder behaviors (e.g. caffeine cutoff)
-        // are constraints you hold, not actions you tap to do next — they
-        // stay in the timeline but never become the Up Next hero.
-        isActionable(i) &&
-        !windowGone(i.block) &&
-        !tooStale(i)
-    );
-    if (candidates.length === 0) return null;
-    return [...candidates].sort((a, b) =>
-      compareUpNext(upNextRank(a, settings, now), upNextRank(b, settings, now))
-    )[0];
-  }, [timeline, log, settings, snoozed, cb, overnight, nowMin]);
 
   const activeSuggestions = useMemo<Suggestion[]>(
     () =>
@@ -1561,7 +1480,11 @@ export default function TodayPage() {
               ))}
             </div>
 
-            {!firstDaySoft && (
+            {/* Progress bars + phrase appear once the day has actual progress —
+                an untouched morning renders a slimmer summary so the checklist
+                below is reachable without scrolling (pre-launch simplification). */}
+            {!firstDaySoft &&
+              (prog.done > 0 || suppProgToday.done > 0) && (
               <div className="mt-5">
                 {prog.essentials > 0 && (
                   <div className="mb-2.5 flex items-center gap-1.5">
@@ -1655,6 +1578,23 @@ export default function TodayPage() {
                 )}
               </div>
             )}
+            {/* Trial status lives in the summary's footer (was its own banner
+                row) — one less card between the user and the checklist. */}
+            {!showTrialExtension && access.inTrial && (
+              <div className="relative mt-4 flex items-center justify-between gap-3 border-t border-[var(--hairline)] pt-3">
+                <span className="text-[12px] text-[var(--text-3)]">
+                  Premium trial — {access.trialDaysLeft}{" "}
+                  {access.trialDaysLeft === 1 ? "day" : "days"} of full
+                  intelligence left.
+                </span>
+                <button
+                  onClick={() => router.push("/upgrade")}
+                  className="press tr-fast shrink-0 text-[12px] font-semibold text-[var(--vitality)]"
+                >
+                  Details
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
         )}
@@ -1663,29 +1603,6 @@ export default function TodayPage() {
             auto-extend was silent until now; surfacing it once makes the
             kindness *felt* (not just unmonetized). Dismissing stamps the
             local ack so it never reappears for this same extension. */}
-        {isToday && !showTrialExtension && access.inTrial && (
-          <div
-            className="flex items-center justify-between gap-3 rounded-[var(--r-md)] px-4 py-2.5"
-            style={{
-              background:
-                "color-mix(in srgb, var(--vitality) 8%, var(--surface-1))",
-              border: "1px solid var(--hairline)",
-            }}
-          >
-            <span className="text-[12.5px] text-[var(--text-2)]">
-              Premium trial — {access.trialDaysLeft}{" "}
-              {access.trialDaysLeft === 1 ? "day" : "days"} of full intelligence
-              left.
-            </span>
-            <button
-              onClick={() => router.push("/upgrade")}
-              className="press tr-fast shrink-0 text-[12px] font-semibold text-[var(--vitality)]"
-            >
-              Details
-            </button>
-          </div>
-        )}
-
         {isToday && showTrialExtension && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -1971,9 +1888,8 @@ export default function TodayPage() {
           </div>
         )}
 
-        {/* Overnight (past bedtime, pre-wake): a calm rest state instead of
-            promoting an action — the expired evening block is no longer "NOW"
-            and Up Next is suppressed (upNext is null here). */}
+        {/* Overnight (past bedtime, pre-wake): a calm rest state — the
+            expired evening block is no longer "NOW". */}
         {!firstDaySoft && overnight && !dayComplete && (
           <div
             className="mb-4 rounded-[var(--r-xl)] p-5"
@@ -1995,136 +1911,6 @@ export default function TodayPage() {
         )}
 
         {/* Up next — the single intelligent focus */}
-        {!firstDaySoft && isToday && !dayComplete && !partialClose && upNext && (
-          <div>
-            <div className="mb-3 flex items-center justify-between px-1">
-              <Eyebrow color="var(--text-3)">Up next</Eyebrow>
-              <span
-                className="rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide"
-                style={{
-                  background: `color-mix(in srgb, ${accent} 16%, var(--surface-2))`,
-                  color: accent,
-                }}
-              >
-                {relTime(
-                  effectiveMinutes(upNext, settings),
-                  nowMinutesInTz(tz)
-                ).toUpperCase()}
-              </span>
-            </div>
-            <motion.div
-              key={upNext.canonicalKey}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="relative overflow-hidden rounded-[var(--r-xl)] p-5"
-              style={{
-                background: `linear-gradient(155deg, color-mix(in srgb, ${accent} 14%, var(--surface-1)), var(--surface-1) 70%)`,
-                boxShadow: "var(--shadow-soft)",
-              }}
-            >
-              <span
-                className="ambient"
-                style={{
-                  background: `radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, ${accent} 20%, transparent), transparent 60%)`,
-                }}
-              />
-              <button
-                onClick={() => {
-                  haptic.medium();
-                  toggleBehavior(selectedDate, upNext.canonicalKey);
-                }}
-                className="press relative flex w-full items-center gap-4 text-left"
-              >
-                <span
-                  className="chip h-16 w-16 shrink-0"
-                  style={{
-                    background: `color-mix(in srgb, ${accent} 24%, var(--surface-3))`,
-                    color: accent,
-                  }}
-                >
-                  <Icon
-                    name={upNext.icon as IconName}
-                    size={28}
-                    stroke={1.7}
-                  />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {(() => {
-                      const isK = !!ks && upNext.canonicalKey === ks.key;
-                      const tg = leverageTag(upNext, adaptation.mode, {
-                        isKeystone: isK,
-                        streak: behaviorStats(state, upNext.canonicalKey)
-                          .streak,
-                      });
-                      const c = TONE_COLOR[tg.tone];
-                      return (
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide"
-                          style={{
-                            background: `color-mix(in srgb, ${c} 18%, var(--surface-3))`,
-                            color: c,
-                          }}
-                        >
-                          {tg.text.toUpperCase()}
-                        </span>
-                      );
-                    })()}
-                    <span className="text-[11px] text-[var(--text-3)]">
-                      {upNext.fromPacks[0]}
-                      {upNext.fromPacks.length > 1 &&
-                        ` +${upNext.fromPacks.length - 1}`}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-[19px] font-bold leading-tight text-[var(--text-1)]">
-                    {upNext.title}
-                  </p>
-                  {upNext.dose && (
-                    <p className="mt-1 text-[13px] text-[var(--text-2)]">
-                      {upNext.dose}
-                    </p>
-                  )}
-                </div>
-                <Check on={false} color={accent} />
-              </button>
-              <p className="relative mt-4 text-[13.5px] leading-relaxed text-[var(--text-2)]">
-                {upNextMessage(upNext, {
-                  mode: adaptation.mode,
-                  minutesToStart:
-                    effectiveMinutes(upNext, settings) != null
-                      ? (effectiveMinutes(upNext, settings) as number) -
-                        nowMinutesInTz(tz)
-                      : null,
-                  isKeystone: !!ks && upNext.canonicalKey === ks.key,
-                })}
-              </p>
-              <div className="relative mt-4 flex items-center justify-between">
-                <span className="text-[11px] font-medium text-[var(--text-4)]">
-                  {liveStreak >= 2 && prog.done === 0
-                    ? `Keep your ${liveStreak}-day streak alive`
-                    : prog.done > 0
-                    ? `${prog.done} done — keep the thread going`
-                    : "First one sets the tone"}
-                </span>
-                <button
-                  onClick={() =>
-                    setSnoozed((s) =>
-                      s.includes(upNext.canonicalKey)
-                        ? s
-                        : [...s, upNext.canonicalKey]
-                    )
-                  }
-                  className="press flex min-h-[44px] items-center rounded-full px-4 py-2.5 text-[12px] font-semibold text-[var(--text-3)]"
-                  style={{ background: "var(--surface-2)" }}
-                  title="Stop suggesting this as your next step (it stays in your timeline below)"
-                >
-                  Not now
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
 
         {/* Adaptive suggestion — calm, dismissible */}
         {isToday &&

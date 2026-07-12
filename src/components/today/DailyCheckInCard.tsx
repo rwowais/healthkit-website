@@ -77,57 +77,63 @@ export default function DailyCheckInCard({
     );
   }
 
-  // ── Prompts: the two-tap check-in ──
+  // ── Prompts: the two-tap check-in — compact two-row layout so the
+  // checklist below stays reachable without scrolling. Each row: a fixed
+  // label on the left, three tappable pills filling the rest.
   return (
-    <div className="card anim-rise p-5">
+    <div className="card anim-rise p-4">
       <Eyebrow>Morning check-in</Eyebrow>
-      <p className="t-caption mt-1.5">
-        Two taps — so today can meet you where you are.
-      </p>
-      <p className="mt-4 mb-2 text-[13px] font-medium text-[var(--text-2)]">
-        How did you sleep?
-      </p>
-      <div className="flex gap-2">
-        {[
-          { l: "Poor", q: 2 },
-          { l: "OK", q: 3 },
-          { l: "Great", q: 5 },
-        ].map((o) => (
-          <button
-            key={o.l}
-            onClick={() => onSleep(o.q)}
-            className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
-            style={{
-              background: sleepQ === o.q ? "var(--sleep)" : "var(--surface-2)",
-              color: sleepQ === o.q ? "var(--bg)" : "var(--text-3)",
-            }}
-          >
-            {o.l}
-          </button>
-        ))}
+      <div className="mt-3 flex items-center gap-3">
+        <span className="w-14 shrink-0 text-[12.5px] font-medium text-[var(--text-3)]">
+          Sleep
+        </span>
+        <div className="flex flex-1 gap-1.5">
+          {[
+            { l: "Poor", q: 2 },
+            { l: "OK", q: 3 },
+            { l: "Great", q: 5 },
+          ].map((o) => (
+            <button
+              key={o.l}
+              onClick={() => onSleep(o.q)}
+              aria-pressed={sleepQ === o.q}
+              className="press tr-fast min-h-[40px] flex-1 rounded-[var(--r-sm)] py-2 text-[12.5px] font-semibold"
+              style={{
+                background:
+                  sleepQ === o.q ? "var(--sleep)" : "var(--surface-2)",
+                color: sleepQ === o.q ? "var(--bg)" : "var(--text-3)",
+              }}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="mt-4 mb-2 text-[13px] font-medium text-[var(--text-2)]">
-        Energy right now?
-      </p>
-      <div className="flex gap-2">
-        {[
-          { l: "Low", e: 2 },
-          { l: "Steady", e: 3 },
-          { l: "High", e: 5 },
-        ].map((o) => (
-          <button
-            key={o.l}
-            onClick={() => onEnergy(o.e)}
-            className="press tr-fast flex-1 rounded-[var(--r-sm)] py-3 text-[13px] font-semibold"
-            style={{
-              background:
-                energy === o.e ? "var(--readiness)" : "var(--surface-2)",
-              color: energy === o.e ? "var(--bg)" : "var(--text-3)",
-            }}
-          >
-            {o.l}
-          </button>
-        ))}
+      <div className="mt-2 flex items-center gap-3">
+        <span className="w-14 shrink-0 text-[12.5px] font-medium text-[var(--text-3)]">
+          Energy
+        </span>
+        <div className="flex flex-1 gap-1.5">
+          {[
+            { l: "Low", e: 2 },
+            { l: "Steady", e: 3 },
+            { l: "High", e: 5 },
+          ].map((o) => (
+            <button
+              key={o.l}
+              onClick={() => onEnergy(o.e)}
+              aria-pressed={energy === o.e}
+              className="press tr-fast min-h-[40px] flex-1 rounded-[var(--r-sm)] py-2 text-[12.5px] font-semibold"
+              style={{
+                background:
+                  energy === o.e ? "var(--readiness)" : "var(--surface-2)",
+                color: energy === o.e ? "var(--bg)" : "var(--text-3)",
+              }}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
