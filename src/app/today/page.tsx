@@ -17,6 +17,7 @@ import WeekAhead from "@/components/today/WeekAhead";
 import MorningBriefing from "@/components/today/MorningBriefing";
 import MilestoneMoment from "@/components/today/MilestoneMoment";
 import WeeklyGoal from "@/components/today/WeeklyGoal";
+import { WEEKLY_GOAL_ENABLED } from "@/lib/flags";
 import QuickAdd from "@/components/today/QuickAdd";
 import StreakFreeze from "@/components/today/StreakFreeze";
 import QuickLog from "@/components/today/QuickLog";
@@ -1319,7 +1320,7 @@ export default function TodayPage() {
         )}
 
         {/* Weekly active-days goal ring (only when a goal is set). */}
-        {isToday && <WeeklyGoal state={state} />}
+        {WEEKLY_GOAL_ENABLED && isToday && <WeeklyGoal state={state} />}
 
         {/* Planned rest day — streak-protected, timeline still available. */}
         {isToday && (state.settings.restDays ?? []).includes(selectedDate) && (

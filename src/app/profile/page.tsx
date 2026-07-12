@@ -8,7 +8,12 @@ import { useAppState } from "@/hooks/useAppState";
 import { useSignedIn } from "@/hooks/useSignedIn";
 import { getAccess } from "@/lib/entitlements";
 import { billingConfigured } from "@/lib/billing";
-import { BIOMARKERS_ENABLED } from "@/lib/flags";
+import {
+  BIOMARKERS_ENABLED,
+  DAY_BLOCKS_ENABLED,
+  WEEKLY_GOAL_ENABLED,
+  INTEGRATIONS_ENABLED,
+} from "@/lib/flags";
 import { clearAllData, exportState, importState, getDefaultState } from "@/lib/storage";
 import { getTz, dateKeyInTz } from "@/lib/tz";
 import {
@@ -61,6 +66,10 @@ export default function ProfilePage() {
   const signedIn = useSignedIn();
   const toast = useToast();
   const [confirmReset, setConfirmReset] = useState(false);
+  // Personal factors is collapsed by default (pre-launch simplification) but
+  // NOT removed: it's the ONLY input for the engine's safety gating
+  // (onboarding doesn't collect these), so it must stay reachable.
+  const [showFactors, setShowFactors] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -266,7 +275,9 @@ export default function ProfilePage() {
         {/* Day blocks — rename and re-time the day's sections. Lets a shift
             worker or night owl reshape their day (e.g. Dawn / Midday /
             Wind-down, with custom start times) so behaviors file where they
-            belong. Renaming is display-only; the block model is unchanged. */}
+            belong. Renaming is display-only; the block model is unchanged.
+            Hidden pre-launch (DAY_BLOCKS_ENABLED) — power-user surface. */}
+        {DAY_BLOCKS_ENABLED && (
         <Card>
           <Eyebrow>Day blocks</Eyebrow>
           <p className="t-caption mt-2">
@@ -344,9 +355,11 @@ export default function ProfilePage() {
             defaults apply.
           </p>
         </Card>
+        )}
 
         {/* Weekly goal — an active-days target; a calm ring on Today
-            tracks progress over the trailing 7 days. */}
+            tracks progress over the trailing 7 days. Hidden pre-launch. */}
+        {WEEKLY_GOAL_ENABLED && (
         <Card>
           <Eyebrow>Weekly goal</Eyebrow>
           <p className="t-caption mt-2">
@@ -372,8 +385,11 @@ export default function ProfilePage() {
             })}
           </div>
         </Card>
+        )}
 
-        {/* Integrations */}
+        {/* Integrations — everything is "Soon"; hidden until at least one
+            wearable sync is real (don't advertise vaporware pre-launch). */}
+        {INTEGRATIONS_ENABLED && (
         <Card>
           <Eyebrow>Integrations</Eyebrow>
           <p className="t-caption mt-2">
@@ -400,6 +416,7 @@ export default function ProfilePage() {
             ))}
           </div>
         </Card>
+        )}
 
         {/* Taking a break — vacation mode. One toggle pauses every
             pack, clears Today, and freezes the streak. The user can
@@ -747,12 +764,34 @@ export default function ProfilePage() {
             the timeline immediately on the next compile. No alarms,
             no popups; the affected behaviors just don't appear. */}
         <Card>
-          <Eyebrow>Personal factors</Eyebrow>
-          <p className="t-caption mt-1 mb-3 leading-relaxed">
-            We use these to quietly leave out behaviors that aren&apos;t
-            right for your situation. We never share or display these
-            elsewhere.
-          </p>
+          <button
+            onClick={() => setShowFactors((v) => !v)}
+            aria-expanded={showFactors}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span>
+              <Eyebrow>Health &amp; safety factors</Eyebrow>
+              <span className="t-caption mt-1 block leading-relaxed">
+                {(() => {
+                  const n = Object.values(
+                    (s.safetyFlags as Record<string, boolean>) ?? {}
+                  ).filter(Boolean).length;
+                  return n > 0
+                    ? `${n} set — we quietly leave out behaviors that aren't right for you.`
+                    : "Optional — tell us about conditions or medications and we'll quietly leave out behaviors that aren't right for you.";
+                })()}
+              </span>
+            </span>
+            <Icon
+              name="chevron"
+              size={16}
+              className={`tr-fast shrink-0 text-[var(--text-3)] ${
+                showFactors ? "rotate-90" : ""
+              }`}
+            />
+          </button>
+          {showFactors && (
+          <div className="mt-3">
           {(
             [
               { key: "pregnant", label: "Pregnant" },
@@ -825,6 +864,8 @@ export default function ProfilePage() {
               </div>
             );
           })}
+          </div>
+          )}
         </Card>
 
         {/* Membership */}

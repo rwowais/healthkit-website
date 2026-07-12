@@ -19,3 +19,14 @@
  *   • The /upgrade "Biomarker-aware adaptation" value prop
  */
 export const BIOMARKERS_ENABLED = false;
+
+/**
+ * Pre-launch simplification (2026-07-12, founder call): hide power-user /
+ * not-yet-real Profile sections. All reversible — flip to `true` to restore.
+ */
+// "Day blocks" rename/re-time editor (power-user; night-shift escape hatch).
+export const DAY_BLOCKS_ENABLED = false;
+// "Weekly goal" active-days target + its ring on Today.
+export const WEEKLY_GOAL_ENABLED = false;
+// Wearable integrations list — everything is "Soon"; don't advertise vaporware.
+export const INTEGRATIONS_ENABLED = false;
