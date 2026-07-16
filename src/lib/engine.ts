@@ -30,6 +30,8 @@ import {
   isWithinWindow,
   minutesToHM,
   windowBlocks,
+  resolveTimeWindow,
+  fmtClock,
 } from "./time";
 import { biomarkerDef, biomarkerBand } from "./biomarkers";
 import { getTz, dateKeyInTz, dayIndexOfKeyInTz, addDaysToKey } from "./tz";
@@ -1466,15 +1468,79 @@ export const TRAINING_KEYS = new Set(CONFLICT_PAIRS.map((p) => p.target));
  * two can never drift. This is the always-present fallback; any
  * CMS-published interactions (activeInteractions()) layer on top.
  */
-export const BUILTIN_INTERACTIONS: readonly Interaction[] = CONFLICT_PAIRS.map(
-  (p) => ({
+/**
+ * Built-in ADVISORY interactions — science-backed relationships that inform
+ * but never mute or move anything (advisory-first ontology, founder call
+ * 2026-07-12). timing/ordering rules are evaluated by evaluatePlacements()
+ * and surface ONLY when the user's actual placement violates them; synergy
+ * rules surface as presence notes via blockIntelligence. Keys must exist in
+ * the catalog (packs.test's dangling-ref guard covers this set too).
+ */
+export const ADVISORY_INTERACTIONS: readonly Interaction[] = [
+  {
+    aKey: "strength",
+    bKey: "cold-plunge-am",
+    type: "timing",
+    severity: "soft",
+    gapHours: 6,
+    direction: "a_to_b",
+    nudge:
+      "Cold within ~6h after lifting can blunt strength adaptations — plunge before training, or leave a longer gap.",
+  },
+  {
+    aKey: "strength",
+    bKey: "zone2",
+    type: "ordering",
+    severity: "soft",
+    nudge:
+      "Zone 2 is scheduled before strength — lifting first (then easy aerobic) preserves lift quality.",
+  },
+  {
+    aKey: "caffeine-cap-dose",
+    bKey: "zinc",
+    type: "timing",
+    severity: "soft",
+    gapHours: 2,
+    direction: "mutual",
+    nudge:
+      "Zinc absorbs poorly within ~2h of coffee or tea — separate it from your caffeine.",
+  },
+  {
+    aKey: "caffeine-cap-dose",
+    bKey: "l-theanine",
+    type: "synergy",
+    severity: "soft",
+    nudge:
+      "L-theanine pairs well with your caffeine dose — smooths the edge without blunting focus.",
+  },
+  {
+    aKey: "nmn",
+    bKey: "tmg",
+    type: "synergy",
+    severity: "soft",
+    nudge:
+      "NMN + TMG — TMG replenishes the methyl groups NAD+ recycling consumes.",
+  },
+  {
+    aKey: "nr",
+    bKey: "tmg",
+    type: "synergy",
+    severity: "soft",
+    nudge:
+      "NR + TMG — TMG replenishes the methyl groups NAD+ recycling consumes.",
+  },
+];
+
+export const BUILTIN_INTERACTIONS: readonly Interaction[] = [
+  ...CONFLICT_PAIRS.map((p) => ({
     aKey: p.restraint,
     bKey: p.target,
     type: "conflict" as const,
     severity: "firm" as const,
     nudge: "",
-  })
-);
+  })),
+  ...ADVISORY_INTERACTIONS,
+];
 
 /**
  * The active interaction set: built-in pairs unioned with any CMS-published
@@ -2125,9 +2191,111 @@ export function timelineProgress(
  * two intelligence banners on the same block.
  */
 export type BlockNote = {
-  kind: "density" | "training" | "combo";
+  kind: "density" | "training" | "combo" | "placement";
   text: string;
 };
+
+// ── Advisory placement evaluator (ontology engine, 2026-07-12) ────────
+// Users arrange Today however they want; this PURE, read-only pass looks at
+// the finished day and describes what fights a dependency or recommended
+// window. It never mutes, moves, or blocks — worst case it's ignorable.
+
+export type PlacementNote = {
+  kind: "placement";
+  /** Block whose section should show the note. */
+  block: TimeBlock;
+  /** canonicalKeys involved (1 for window drift, 2 for pair rules). */
+  keys: string[];
+  text: string;
+};
+
+export function evaluatePlacements(
+  items: TimelineItem[],
+  interactions: readonly Interaction[],
+  settings: UserSettings,
+  dayIndex: number
+): PlacementNote[] {
+  const active = items.filter(
+    (i) => !i.muted && (!i.daysActive || i.daysActive[dayIndex])
+  );
+  const notes: PlacementNote[] = [];
+
+  // 1. Soft-window drift — compileTimeline stamps `timingOff` when a
+  //    SOFT-window behavior's resolved time falls outside its window.
+  for (const it of active) {
+    if (!it.timingOff || !it.timeWindow || it.timeWindow.strict) continue;
+    const w = resolveTimeWindow(it, settings);
+    if (!w) continue;
+    notes.push({
+      kind: "placement",
+      block: it.block,
+      keys: [it.canonicalKey],
+      text: `“${it.title}” is set outside its usual window (${fmtClock(
+        w.lo
+      )}–${fmtClock(w.hi)}) — it tends to work best inside it.`,
+    });
+  }
+
+  // 2. Pair rules — timing (gapHours) + ordering, evaluated against the
+  //    times the user actually chose. effectiveKey so atom-library-derived
+  //    customs participate. Rules carrying a `condition` are SKIPPED: there
+  //    is no runtime context to evaluate the gate against yet, and a wrong
+  //    warning is worse than none (see tasks/ONTOLOGY.md).
+  const byKey = new Map<string, TimelineItem>();
+  for (const it of active) {
+    const k = effectiveKey(it);
+    if (!byKey.has(k)) byKey.set(k, it);
+  }
+  for (const ix of interactions) {
+    if (ix.type !== "timing" && ix.type !== "ordering") continue;
+    if (ix.condition && Object.keys(ix.condition).length > 0) continue;
+    const a = byKey.get(ix.aKey);
+    const b = byKey.get(ix.bKey);
+    if (!a || !b) continue;
+    const tA = effectiveMinutes(a, settings);
+    const tB = effectiveMinutes(b, settings);
+    if (tA == null || tB == null) continue;
+
+    if (ix.type === "ordering") {
+      // Contract: aKey should come BEFORE bKey. Note only on violation.
+      if (tB < tA) {
+        notes.push({
+          kind: "placement",
+          block: b.block,
+          keys: [a.canonicalKey, b.canonicalKey],
+          text:
+            ix.nudge?.trim() ||
+            `“${a.title}” works best before “${b.title}” — consider swapping their order.`,
+        });
+      }
+      continue;
+    }
+
+    // timing: keep at least gapHours apart. direction "a_to_b" = only bKey
+    // FOLLOWING aKey too closely is the problem (e.g. cold after lifting);
+    // "mutual" = too close in either order.
+    const gap = (ix.gapHours ?? 0) * 60;
+    if (gap <= 0) continue;
+    const mutual = ix.direction === "mutual";
+    const tooClose = mutual
+      ? Math.abs(tA - tB) < gap
+      : tB >= tA && tB - tA < gap;
+    if (tooClose) {
+      const later = tB >= tA ? b : a;
+      notes.push({
+        kind: "placement",
+        block: later.block,
+        keys: [a.canonicalKey, b.canonicalKey],
+        text:
+          ix.nudge?.trim() ||
+          `“${a.title}” and “${b.title}” are ${Math.abs(
+            tA - tB
+          )} min apart — ${ix.gapHours}h+ between them works better.`,
+      });
+    }
+  }
+  return notes;
+}
 
 const TRAINING_KEY_SET = new Set([
   "strength",
@@ -2145,10 +2313,26 @@ const COLD_KEYS = new Set(["cold-plunge-am", "contrast-shower"]);
 export function blockIntelligence(
   allItems: TimelineItem[],
   block: TimeBlock,
-  dayIndex: number
+  dayIndex: number,
+  // When provided, the advisory placement evaluator runs first — a violated
+  // dependency/window beats a generic note. Optional for back-compat.
+  settings?: UserSettings
 ): BlockNote | null {
   const inBlock = allItems.filter((i) => i.block === block && !i.muted);
   if (inBlock.length === 0) return null;
+
+  // 0. Placement advisories — the user put something where it fights a
+  //    recommended window or dependency. One note per block (anti-nag).
+  if (settings) {
+    const placement = evaluatePlacements(
+      allItems,
+      resolvedInteractions(),
+      settings,
+      dayIndex
+    ).find((n) => n.block === block);
+    if (placement)
+      return { kind: "placement", text: placement.text };
+  }
 
   // Day-aware filter: skip behaviors whose daysActive excludes today,
   // so a 3×/wk strength behavior doesn't trigger a "Zone 2 + strength
@@ -2191,22 +2375,11 @@ export function blockIntelligence(
       text: `Two training stimuli today (${names}). Pick one to push, take the other lighter.`,
     };
   }
-  // Zone 2 + strength same day: NOT a contradiction (Attia-style
-  // protocols schedule both), but worth flagging so the user sequences
-  // them (strength first, Zone 2 after — or different times of day).
-  const z2s = trainingToday.filter(
-    (i) => effectiveKey(i) === "zone2" || effectiveKey(i) === "strength"
-  );
-  if (
-    trainingToday.some((i) => effectiveKey(i) === "zone2") &&
-    trainingToday.some((i) => effectiveKey(i) === "strength") &&
-    block === earliestBlockOf(z2s)
-  ) {
-    return {
-      kind: "training",
-      text: "Zone 2 and strength on the same day — lift first, then easy aerobic. Or split across blocks.",
-    };
-  }
+  // Zone 2 + strength same-day sequencing is now a data-driven ordering rule
+  // (ADVISORY_INTERACTIONS → evaluatePlacements): the note appears only when
+  // the order is actually violated, and disappears once the user fixes it —
+  // instead of the old always-on nag. (The catalog default was also fixed to
+  // schedule strength first, so a stock install starts violation-free.)
 
   // 2. Cold + sauna same day — pairing benefit, just acknowledge it.
   const hasColdToday = allDayItems.some((i) =>
@@ -2233,6 +2406,13 @@ export function blockIntelligence(
     const inThisBlock = new Set(today.map((i) => effectiveKey(i)));
     for (const ix of resolvedInteractions()) {
       if (ix.type === "conflict" && ix.severity === "firm") continue;
+      // timing/ordering are VIOLATION-aware now — evaluatePlacements owns
+      // them (step 0), so a respected gap/order stays silent instead of
+      // showing an always-on nudge whenever both behaviors merely coexist.
+      if (ix.type === "timing" || ix.type === "ordering") continue;
+      // A conditional rule can't be evaluated yet (no runtime gate context);
+      // a wrong note is worse than none — stay quiet.
+      if (ix.condition && Object.keys(ix.condition).length > 0) continue;
       if (!ix.nudge || !ix.nudge.trim()) continue;
       if (!presentToday.has(ix.aKey) || !presentToday.has(ix.bKey)) continue;
       if (!inThisBlock.has(ix.aKey) && !inThisBlock.has(ix.bKey)) continue;

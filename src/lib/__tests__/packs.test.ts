@@ -398,22 +398,32 @@ describe("safety-flag suppression — atoms with contraindications hide from the
 });
 
 describe("blockIntelligence — calm per-block notes", () => {
-  it("fires the same-day Zone 2 + strength note when both are installed", () => {
+  it("Zone 2 + strength: stock order (strength first) is note-free; a violated order fires the placement note", () => {
     let st = getDefaultState();
     st = {
       ...st,
       installedPacks: ["longevity-foundation"],
-      // Pin wake so Zone 2 (wake+5h = 12:00) and strength (wake+6h = 13:00)
-      // both clock-derive into the afternoon block, where the note fires.
       settings: { ...st.settings, wakeTime: "07:00", bedtime: "22:30" },
     };
+    // Stock catalog now schedules strength (wake+5h) BEFORE zone2 (wake+6h),
+    // so the ordering advisory stays quiet on a fresh install (Monday: both
+    // scheduled, both afternoon).
     const tl = compileTimeline(st, 0);
-    // Monday (dayIndex 0): Longevity Foundation's strength runs
-    // Mon/Wed/Fri, zone2 daily. Both clock-derive to afternoon today.
-    const note = blockIntelligence(tl, "afternoon", 0);
+    const quiet = blockIntelligence(tl, "afternoon", 0, st.settings);
+    expect(quiet?.text ?? "").not.toMatch(/before strength|lift(ing)? first/i);
+    // User drags zone2 BEFORE the lift → violation-aware ordering note.
+    const moved = {
+      ...st,
+      behaviorOverrides: {
+        ...(st.behaviorOverrides ?? {}),
+        zone2: { customTime: "09:30" },
+      } as AppState["behaviorOverrides"],
+    };
+    const tl2 = compileTimeline(moved, 0);
+    const note = blockIntelligence(tl2, "morning", 0, st.settings);
     expect(note).toBeTruthy();
-    expect(note!.kind).toBe("training");
-    expect(note!.text).toMatch(/Zone 2|lift first|strength/i);
+    expect(note!.kind).toBe("placement");
+    expect(note!.text).toMatch(/lifting first|before strength/i);
   });
 
   it("returns null on a sparse block with no training stack", () => {

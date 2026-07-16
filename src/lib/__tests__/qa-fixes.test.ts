@@ -309,7 +309,10 @@ describe("move to a block re-derives the displayed time", () => {
     const item = compileTimeline(stWith({}), 0).find(
       (i) => i.canonicalKey === "strength"
     )!;
-    expect(item.block).toBe("afternoon"); // unchanged
+    // Catalog order swap (2026-07-12): strength bakes at wake+5h = 11:30 for
+    // this fixture's wake, which clock-files under MORNING. Still "unchanged"
+    // — no override, block derived purely from the baked time.
+    expect(item.block).toBe("morning");
   });
 });
 

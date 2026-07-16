@@ -2175,7 +2175,12 @@ export default function TodayPage() {
                 {!collapsed &&
                   isToday &&
                   (() => {
-                    const note = blockIntelligence(timeline, block, selDayIdx);
+                    const note = blockIntelligence(
+                      timeline,
+                      block,
+                      selDayIdx,
+                      settings
+                    );
                     if (!note) return null;
                     return (
                       <p

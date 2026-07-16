@@ -74,6 +74,9 @@ const MAGNESIUM_PM = B({
   block: "evening",
   anchor: "bed",
   offsetMin: -45,
+  // Soft window: the evening run-up to bed. Advisory only — a 9am placement
+  // gets a calm note, never a block.
+  timeWindow: { min: -180, max: 0 },
   dose: "200–400 mg glycinate / threonate",
   rationale: "Supports parasympathetic tone and sleep depth.",
   evidence:
@@ -335,6 +338,8 @@ const STRATEGIC_MELATONIN = B({
   block: "evening",
   anchor: "bed",
   offsetMin: -50,
+  // Soft window: melatonin's phase-shift effect depends on proximity to bed.
+  timeWindow: { min: -120, max: 0 },
   dose: "0.3–0.5 mg (low dose)",
   rationale:
     "A small dose helps shift sleep timing; large doses don't help more and disrupt next-morning alertness.",
@@ -430,11 +435,14 @@ export const PACKS: ProtocolPack[] = [
       B({
         canonicalKey: "zone2",
         timingReason:
-          "Mid-day fits sustained aerobic work without competing with strength or sleep.",
+          "Early afternoon, after strength — easy aerobic slots cleanly behind the lift without blunting it.",
         title: "Zone 2 movement",
         block: "afternoon",
         anchor: "wake",
-        offsetMin: 300,
+        // wake+360 (was +300): stock order is now strength FIRST, zone2 after,
+        // matching the built-in ordering advisory (lift quality drops after
+        // long cardio). Users' own overrides are untouched.
+        offsetMin: 360,
         dose: "20–45 min easy aerobic",
         rationale:
           "Builds mitochondrial density and aerobic base — a top predictor of lifespan.",
@@ -452,7 +460,8 @@ export const PACKS: ProtocolPack[] = [
         title: "Strength training",
         block: "afternoon",
         anchor: "wake",
-        offsetMin: 360,
+        // wake+300 (was +360): see zone2 note — strength leads the stock order.
+        offsetMin: 300,
         dose: "3×/week, compound lifts",
         rationale:
           "Muscle and strength are *associated with* lower risk across nearly every cause of late-life decline. Causal direction is debated; both directions probably hold.",
@@ -738,6 +747,8 @@ export const PACKS: ProtocolPack[] = [
         block: "morning",
         anchor: "wake",
         offsetMin: 30,
+        // Soft window: daytime — late cold spikes alertness into wind-down.
+        timeWindow: { min: 0, max: 600 },
         dose: "1–3 min, ~10–15°C",
         rationale:
           "Cold exposure raises norepinephrine and dopamine for hours; observational data suggests stress-resilience benefits. Acute hemodynamic stress is significant — not appropriate with cardiac arrhythmia, severe hypertension, pregnancy, or Raynaud's.",
@@ -785,6 +796,8 @@ export const PACKS: ProtocolPack[] = [
         block: "evening",
         anchor: "bed",
         offsetMin: -210,
+        // Soft window: finish ≥1h before bed so core temp can fall for sleep.
+        timeWindow: { min: -330, max: -60 },
         dose: "15–25 min, 80–90°C, 2–4×/wk",
         rationale:
           "Regular sauna is *associated with* lower cardiovascular and all-cause mortality in observational cohorts — that's a correlation, not a proven cause. The mechanistic case (heat shock, HRV) is plausible.",
@@ -1240,6 +1253,7 @@ export const PACKS: ProtocolPack[] = [
         block: "morning",
         anchor: "wake",
         offsetMin: 30,
+        timeWindow: { min: 0, max: 600 },
         dose: "60s cold at end of shower OR 1–3 min plunge",
         rationale:
           "Brief cold raises norepinephrine and alertness for hours.",
@@ -1695,6 +1709,7 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     block: "evening",
     anchor: "bed",
     offsetMin: -120,
+    timeWindow: { min: -240, max: 0 },
     dose: "300–600 mg",
     rationale:
       "Adaptogen with replicated cortisol-lowering effects in stressed populations.",
@@ -1969,6 +1984,7 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     block: "evening",
     anchor: "bed",
     offsetMin: -45,
+    timeWindow: { min: -180, max: 0 },
     dose: "3 g",
     rationale:
       "Lowers core body temperature, improves subjective sleep quality, supports collagen synthesis.",
@@ -2200,6 +2216,7 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     block: "evening",
     anchor: "bed",
     offsetMin: -45,
+    timeWindow: { min: -180, max: 0 },
     dose: "50 mg",
     rationale:
       "Chamomile-derived flavonoid; mild sedative via GABA-A receptor; non-habit-forming.",
@@ -2215,6 +2232,7 @@ const STANDALONE_ATOMS: BehaviorDef[] = [
     block: "evening",
     anchor: "bed",
     offsetMin: -60,
+    timeWindow: { min: -180, max: 0 },
     dose: "2 g myo-inositol",
     rationale:
       "Supports insulin signaling, mood, and is well-studied for PCOS and anxiety.",

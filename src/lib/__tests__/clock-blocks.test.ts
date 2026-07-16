@@ -78,13 +78,15 @@ describe("currentBlock — clock-based, independent of wake time", () => {
   });
 });
 
-describe("compileTimeline — behaviors are filed by their clock time (the Zone 2 fix)", () => {
+describe("compileTimeline — behaviors are filed by their clock time (clock filing; probe = strength @ wake+5h after the 2026-07-12 order swap)", () => {
   function zone2(state: AppState) {
-    // dayIndex 0 = Monday; Zone 2 has no daysActive restriction.
-    return compileTimeline(state, 0).find((i) => i.canonicalKey === "zone2");
+    // Probe = STRENGTH (wake+5h since the catalog order swap; zone2 is now
+    // wake+6h). dayIndex 0 = Monday — strength runs Mon/Wed/Fri, so it IS
+    // scheduled. The helper keeps its old name to minimize churn below.
+    return compileTimeline(state, 0).find((i) => i.canonicalKey === "strength");
   }
 
-  it("early riser: Zone 2 (wake 6:30 + 5h = 11:30am) sits under MORNING", () => {
+  it("early riser: strength (wake 6:30 + 5h = 11:30am) sits under MORNING", () => {
     const base = getDefaultState();
     const state: AppState = {
       ...base,
@@ -98,7 +100,7 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
     expect(z!.recommendedBlock).toBe("afternoon");
   });
 
-  it("normal riser: Zone 2 (wake 8:00 + 5h = 1:00pm) sits under AFTERNOON", () => {
+  it("normal riser: strength (wake 8:00 + 5h = 1:00pm) sits under AFTERNOON", () => {
     const base = getDefaultState();
     const state: AppState = {
       ...base,
@@ -116,7 +118,7 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
       settings: { ...base.settings, wakeTime: "06:30", bedtime: "22:30" },
       // User dragged Zone 2 to the evening section — their choice wins even
       // though its time (11:30am) is clock-morning.
-      behaviorOverrides: { ...base.behaviorOverrides, zone2: { block: "evening" } },
+      behaviorOverrides: { ...base.behaviorOverrides, strength: { block: "evening" } },
     };
     expect(zone2(state)!.block).toBe("evening");
   });
@@ -130,7 +132,7 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
       ...base,
       installedPacks: ["longevity-foundation"],
       settings: { ...base.settings, wakeTime: "06:30", bedtime: "22:30" },
-      behaviorOverrides: { ...base.behaviorOverrides, zone2: { block: "afternoon" } },
+      behaviorOverrides: { ...base.behaviorOverrides, strength: { block: "afternoon" } },
     };
     const z = zone2(state);
     expect(z!.block).toBe("afternoon"); // pinned, not re-derived to morning
@@ -144,10 +146,10 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
       installedPacks: ["longevity-foundation"],
       settings: { ...base.settings, wakeTime: "07:00", bedtime: "22:30" },
       // Zone 2 retimed to 1:00am — a custom TIME, not a block pin.
-      behaviorOverrides: { ...base.behaviorOverrides, zone2: { customTime: "01:00" } },
+      behaviorOverrides: { ...base.behaviorOverrides, strength: { customTime: "01:00" } },
     };
     const tl = compileTimeline(state, 0);
-    const z = tl.find((i) => i.canonicalKey === "zone2");
+    const z = tl.find((i) => i.canonicalKey === "strength");
     // Block follows the custom clock time (1am = evening wind-down tail),
     // NOT pinned to its catalog block.
     expect(z!.block).toBe("evening");
@@ -156,8 +158,8 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
     // not the first (raw-clock sort would wrongly float 60min to the top).
     const evening = tl.filter((i) => i.block === "evening");
     expect(evening.length).toBeGreaterThan(1);
-    expect(evening[evening.length - 1].canonicalKey).toBe("zone2");
-    expect(evening[0].canonicalKey).not.toBe("zone2");
+    expect(evening[evening.length - 1].canonicalKey).toBe("strength");
+    expect(evening[0].canonicalKey).not.toBe("strength");
   });
 
   it("a customTime OVERRIDES a stale block pin (no 'Afternoon · 9:00 AM')", () => {
@@ -172,7 +174,7 @@ describe("compileTimeline — behaviors are filed by their clock time (the Zone 
       settings: { ...base.settings, wakeTime: "07:00", bedtime: "22:30" },
       behaviorOverrides: {
         ...base.behaviorOverrides,
-        zone2: { block: "afternoon", customTime: "09:00" },
+        strength: { block: "afternoon", customTime: "09:00" },
       },
     };
     const z = zone2(state);

@@ -25,6 +25,7 @@ import {
 import {
   CONFLICT_PAIRS,
   BUILTIN_INTERACTIONS,
+  ADVISORY_INTERACTIONS,
   resolvedInteractions,
   applyConflictMutes,
   compileTimeline,
@@ -278,9 +279,20 @@ describe("data-driven conflict seam (interactions)", () => {
   });
 
   it("resolvedInteractions() with no published bundle equals the built-in set", () => {
-    // No bundle is published in this test file → only the built-in pairs.
+    // No bundle is published in this test file → only the built-in set:
+    // firm CONFLICT_PAIRS + soft ADVISORY_INTERACTIONS (ontology, 2026-07-12).
     expect(resolvedInteractions()).toEqual([...BUILTIN_INTERACTIONS]);
-    expect(BUILTIN_INTERACTIONS.length).toBe(CONFLICT_PAIRS.length);
+    expect(BUILTIN_INTERACTIONS.length).toBe(
+      CONFLICT_PAIRS.length + ADVISORY_INTERACTIONS.length
+    );
+    // Every firm entry still maps 1:1 to a CONFLICT_PAIR; every advisory
+    // entry is soft (the advisory layer can never mute).
+    expect(
+      BUILTIN_INTERACTIONS.filter((i) => i.severity === "firm").length
+    ).toBe(CONFLICT_PAIRS.length);
+    expect(
+      BUILTIN_INTERACTIONS.filter((i) => i.severity === "soft")
+    ).toEqual([...ADVISORY_INTERACTIONS]);
   });
 
   it("a data-authored (non-built-in) firm conflict fires; a soft one does not", () => {
