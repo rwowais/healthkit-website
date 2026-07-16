@@ -102,3 +102,15 @@ rule that prevents it.
   the chain exit 0. **Rule:** in chained gates commands, run vitest unpiped or
   write its full output to a file; check the summary from the file. If the
   flake recurs with names visible, pin them.
+  **ROOT-CAUSED 2026-07-12:** the flake was the 365-day persona sims running
+  just under vitest's 5s default timeout — a thermally-throttled machine made
+  them 5-10× slower so they timed out en masse (stash A/B proved the
+  pre-change tree was equally slow, i.e. code-independent). Fixed structurally:
+  vitest.config.ts `testTimeout: 120_000`. If persona tests fail now it's an
+  ASSERTION, not wall-clock — treat as real.
+- **Don't chain doc-editing python heredocs with `git commit` in one Bash
+  call.** A script that asserts on a text anchor exits non-zero, but
+  newline-separated commands after it STILL run — twice a commit/push shipped
+  WITHOUT the doc edit the script was supposed to make. **Rule:** make doc
+  edits with the Edit tool (fails loudly on a bad anchor) and commit in a
+  separate call after confirming the edit landed.

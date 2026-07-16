@@ -1,8 +1,36 @@
 # Behavior/Protocol Ontology — Analysis & Strengthening Plan
 _Written 2026-07-12 from a very-thorough code audit (file:line evidence for every
-claim lives in the audit transcript; key cites repeated here). Status: analysis
-DONE · applyStacks window-bypass bug FIXED · phases below awaiting founder
-go-ahead._
+claim lives in the audit transcript; key cites repeated here)._
+
+**STATUS UPDATE 2026-07-12 — ADVISORY-FIRST v1 BUILT + SHIPPED.** The founder
+chose flexibility + gentle intelligence over enforcement. What shipped:
+- `evaluatePlacements()` (engine.ts) — pure, read-only evaluator surfacing calm
+  placement notes: soft-window drift, violated `gapHours` timing
+  (direction-aware), violated ordering. One note per block via
+  blockIntelligence step 0; BehaviorSheet's timingOff caption now live.
+- `ADVISORY_INTERACTIONS` — 6 built-in soft rules: cold ≤6h post-strength,
+  strength-before-zone2 ordering, zinc×caffeine 2h, theanine×caffeine synergy,
+  NMN×TMG + NR×TMG synergies. `gapHours`/`direction` finally evaluated.
+- 9 soft recommended windows: melatonin, magnesium, glycine, apigenin,
+  inositol, ashwagandha, sauna-pm, cold-plunge ×2.
+- Stock catalog order fixed (strength wake+5h before zone2 wake+6h); the old
+  always-on "lift first" nag became a violation-aware note that disappears
+  when the order is right.
+- Rules carrying `condition` are SKIPPED everywhere (no runtime gate context —
+  a wrong warning is worse than none). Nothing new mutes/moves/blocks; the
+  hard layer is unchanged (safety flags, 4 strict windows, 9 restraint pairs).
+
+NOTE: live CMS bundle v10 still carries the OLD zone2/strength offsets — the
+next admin Publish (v11) picks up the fixed defaults; until then
+longevity-foundation users may see the (accurate) ordering note.
+
+STILL OPEN (next passes): Phase C completion-honesty confirm ·
+interaction-aware move-picker warnings at decision time · publish-gate
+validation of gap/direction/condition on CMS rows.
+
+_The original analysis + enforcement-lever inventory below is kept for
+reference; the "Strengthening plan" phases were superseded by the
+advisory-first design above._
 
 ## TL;DR for the founder
 The app *talks* about behavior relationships far more than it *enforces* them.
