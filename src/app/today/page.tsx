@@ -2212,7 +2212,7 @@ export default function TodayPage() {
                           style={{
                             left: 19,
                             background:
-                              "linear-gradient(180deg, transparent, rgba(255,255,255,0.05) 12%, rgba(255,255,255,0.05) 88%, transparent)",
+                              "linear-gradient(180deg, transparent, var(--hairline) 12%, var(--hairline) 88%, transparent)",
                           }}
                         />
                         <motion.span

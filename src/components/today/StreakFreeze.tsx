@@ -7,7 +7,7 @@
  * offers when there's a real streak at risk (≥3), today isn't already active,
  * and a token is available. Flips to a quiet confirmation once spent.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { AppState, DailyLog } from "@/lib/types";
 import { freezeStatus, hasAnyActivity } from "@/lib/scoring";
 import { Icon } from "@/components/ui/icons";
@@ -28,6 +28,10 @@ export default function StreakFreeze({
   const fz = useMemo(() => freezeStatus(state), [state]);
   const frozen = (state.settings.usedFreezeDates ?? []).includes(dateKey);
   const todayActive = !!log && hasAnyActivity(log);
+  // Guard against a double-tap spending two freeze tokens before the state
+  // update flips this card to its "protected" view. Once true it stays true;
+  // the frozen transition (or a remount on navigation) supersedes it.
+  const [spent, setSpent] = useState(false);
 
   if (frozen) {
     return (
@@ -79,11 +83,16 @@ export default function StreakFreeze({
         </div>
       </div>
       <button
-        onClick={() => onUse(dateKey)}
-        className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold"
+        onClick={() => {
+          if (spent) return;
+          setSpent(true);
+          onUse(dateKey);
+        }}
+        disabled={spent}
+        className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] py-2.5 text-[13px] font-semibold disabled:opacity-60"
         style={{ background: "var(--sleep)", color: "var(--bg)" }}
       >
-        Freeze today
+        {spent ? "Freezing…" : "Freeze today"}
       </button>
     </div>
   );

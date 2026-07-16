@@ -102,6 +102,23 @@ export function markSaveSuccess() {
   emit();
 }
 
+/**
+ * Set by SupabaseDataSource when a save is DEFERRED, not completed — the
+ * optimistic-concurrency guard found the cloud ahead, so this write is
+ * intentionally skipped and the local edit stays pending for the next load
+ * to merge and push. Balances the in-flight counter (so the indicator can't
+ * wedge on "syncing" forever after a normal multi-device guard-skip) while
+ * keeping `pending` truthful. NOT an error — errorStreak is untouched.
+ */
+export function markSaveDeferred() {
+  state = {
+    ...state,
+    inFlight: Math.max(0, state.inFlight - 1),
+    pending: true,
+  };
+  emit();
+}
+
 /** Set by SupabaseDataSource when a save fails. */
 export function markSaveError() {
   state = {

@@ -18,6 +18,7 @@ import { DEFAULT_INSTALLED } from "./packs";
 import {
   markSaveStarted,
   markSaveSuccess,
+  markSaveDeferred,
   markSaveError,
   setRetryHandler,
 } from "./sync";
@@ -942,6 +943,11 @@ class SupabaseDataSource implements DataSource {
         // first-sign-in path lifts it up wholesale later. Nothing pending.
         clearPendingSync();
         markSaveSuccess();
+        // Notify sibling useAppState instances in this tab so cross-component
+        // live updates work for guests too (LocalDataSource always dispatches;
+        // this branch must match it, else a Quick-Add doesn't reach the board
+        // until refocus). Safe — no cloud row for a pre-write read to race.
+        notify();
         return;
       }
 
@@ -958,7 +964,12 @@ class SupabaseDataSource implements DataSource {
         lastCloudUpdatedAt &&
         head.updated_at > lastCloudUpdatedAt
       ) {
-        // Another device is ahead — let other tabs resync to it.
+        // Another device is ahead — let other tabs resync to it. This write is
+        // DEFERRED (the local edit stays pending via markPendingSync above for
+        // the next load to merge/push), so balance the in-flight counter that
+        // markSaveStarted() incremented — without it the sync indicator wedges
+        // on "Syncing…" forever after this (normal multi-device) guard-skip.
+        markSaveDeferred();
         notify();
         return;
       }
@@ -1023,14 +1034,19 @@ class SupabaseDataSource implements DataSource {
       if (error) throw error;
       lastCloudUpdatedAt = null;
       clearPendingSync(); // cloud row gone; nothing local to push up
-      // Also clear the per-day rows (best effort; ignore if absent).
+      // Also clear the per-day rows. supabase-js reports failures via `error`
+      // (it does NOT throw), so a swallowed try/catch here let a FAILED delete
+      // report success — then reconcileLogs unions the surviving rows back on
+      // the next load and the "permanently cleared" history resurrects. Read
+      // the error and fail the whole clear on a real failure; a missing table
+      // (42P01, older deployments) is genuinely nothing to clear.
       this.lastDays.clear();
-      try {
-        await sb.from(LOGS_TABLE).delete().eq("user_id", userId);
-      } catch {
-        /* table may not exist yet — nothing to clear */
-      }
-      return true; // cloud row confirmed removed
+      const { error: logsErr } = await sb
+        .from(LOGS_TABLE)
+        .delete()
+        .eq("user_id", userId);
+      if (logsErr && logsErr.code !== "42P01") throw logsErr;
+      return true; // cloud row + per-day rows confirmed removed
     } catch {
       if (typeof window !== "undefined") {
         window.dispatchEvent(

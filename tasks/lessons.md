@@ -114,3 +114,12 @@ rule that prevents it.
   WITHOUT the doc edit the script was supposed to make. **Rule:** make doc
   edits with the Edit tool (fails loudly on a bad anchor) and commit in a
   separate call after confirming the edit landed.
+- **`vitest run …; echo "exit: $?"` (esp. as a BACKGROUND command) reports the
+  ECHO's exit code, not vitest's** — so a run with 3 failing tests notified
+  "exit code 0". Repeated 2026-07-16 after already writing the pipe-masking
+  rule above. **Rule:** to get vitest's real status, run it as the LAST command
+  with nothing chained after it (`… && ./node_modules/.bin/vitest run <files>`),
+  or capture `rc=$?` on its own line and print `$rc` — never `; echo "$?"`
+  tacked on. And always write full output to a file so failure NAMES survive;
+  a persona failure showing a 120s+ duration + "Test timed out" is wall-clock
+  (re-run the file in isolation to confirm), not a real assertion.

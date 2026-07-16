@@ -72,6 +72,7 @@ export default function ProfilePage() {
   const [showFactors, setShowFactors] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [theme, setTheme] = useState<ThemePref>("light");
@@ -1048,9 +1049,9 @@ export default function ProfilePage() {
         title="Delete your account?"
       >
         <p className="t-body mb-3 text-[var(--text-2)]">
-          This deletes your account row, all your protocol data,
-          biomarkers, logs, and sign-in. It happens immediately and
-          cannot be reversed.
+          This deletes your account row, all your protocols, tracking
+          history, and sign-in. It happens immediately and cannot be
+          reversed.
         </p>
         <p className="t-body mb-4 text-[var(--text-2)]">
           If you want a copy of your data first, cancel and use Export.
@@ -1107,9 +1108,8 @@ export default function ProfilePage() {
         title="Reset all data?"
       >
         <p className="t-body mb-6">
-          This permanently clears your protocols, tracking, biomarkers, and
-          streaks on this device. Consider exporting first. This cannot be
-          undone.
+          This permanently clears your protocols, tracking, and streaks on
+          this device. Consider exporting first. This cannot be undone.
         </p>
         <div className="flex gap-3">
           <Button variant="ghost" full onClick={() => setConfirmReset(false)}>
@@ -1117,7 +1117,12 @@ export default function ProfilePage() {
           </Button>
           <Button
             full
+            disabled={resetting}
             onClick={async () => {
+              // In-flight guard: this runs three awaits over the most
+              // destructive action in the app; a double-tap must not re-enter it.
+              if (resetting) return;
+              setResetting(true);
               // Reset all data, but if the user is signed in we
               // preserve their identity: pre-seed a fresh local
               // state that already has completedOnboarding=true and
@@ -1135,6 +1140,7 @@ export default function ProfilePage() {
                 toast.show(
                   "Couldn't clear your cloud data — check your connection and try again."
                 );
+                setResetting(false);
                 setConfirmReset(false);
                 return;
               }
@@ -1193,7 +1199,7 @@ export default function ProfilePage() {
             }}
             className="!bg-[var(--alert)] !text-[var(--bg)]"
           >
-            Reset
+            {resetting ? "Resetting…" : "Reset"}
           </Button>
         </div>
       </Sheet>

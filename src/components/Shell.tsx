@@ -161,7 +161,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   />
                   <span
                     className="text-[10px] font-medium tracking-tight"
-                    style={{ opacity: active ? 1 : 0.7 }}
                   >
                     {n.label}
                   </span>
