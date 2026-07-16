@@ -68,7 +68,9 @@ function Choice({
   multi?: boolean;
 }) {
   return (
-    <div className="mt-8 space-y-2.5">
+    // role=group so a screen reader announces these as one related set; the
+    // per-button aria-pressed exposes selected state (was color-only — F4).
+    <div className="mt-8 space-y-2.5" role="group">
       {chips.map((c) => {
         const on = multi
           ? (value as string[]).includes(c.key)
@@ -77,6 +79,7 @@ function Choice({
           <button
             key={c.key}
             onClick={() => onPick(c.key)}
+            aria-pressed={on}
             className="press tr-fast flex w-full items-center gap-4 rounded-[var(--r-md)] p-4 text-left"
             style={{
               background: on

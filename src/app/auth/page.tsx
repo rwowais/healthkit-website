@@ -169,12 +169,22 @@ function AuthInner() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-3">
+              // A real <form> so Enter submits in every mode (magic/forgot too)
+              // and the fields are a proper accessible group. Non-submit
+              // buttons are type="button" so they don't trigger submit.
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submit();
+                }}
+              >
                 {(mode === "signin" || mode === "signup") && (
                   <>
                     {/* Apple is visually primary — calmest, most familiar,
                         and the gesture that best fits a personal system. */}
                     <button
+                      type="button"
                       onClick={() => oauth("apple")}
                       disabled={!supabaseEnabled}
                       className="press tr-fast flex w-full items-center justify-center gap-2 rounded-[var(--r-md)] bg-[var(--text-1)] py-3.5 text-[15px] font-semibold text-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-40"
@@ -183,6 +193,7 @@ function AuthInner() {
                       Continue with Apple
                     </button>
                     <button
+                      type="button"
                       onClick={() => oauth("google")}
                       disabled={!supabaseEnabled}
                       className="press tr-fast flex w-full items-center justify-center gap-2 rounded-[var(--r-md)] border border-[var(--hairline-strong)] py-3.5 text-[14px] font-semibold text-[var(--text-1)] disabled:cursor-not-allowed disabled:opacity-40"
@@ -205,34 +216,67 @@ function AuthInner() {
                 <input
                   type="email"
                   inputMode="email"
+                  autoComplete="email"
+                  aria-label="Email address"
                   autoFocus
                   data-testid="auth-email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@email.com"
+                  aria-invalid={!!err}
+                  aria-describedby={err ? "auth-error" : undefined}
                   className={input}
                 />
                 {(mode === "signin" || mode === "signup") && (
                   <input
                     type="password"
+                    autoComplete={
+                      mode === "signup" ? "new-password" : "current-password"
+                    }
+                    aria-label="Password"
                     data-testid="auth-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
-                    onKeyDown={(e) => e.key === "Enter" && submit()}
+                    aria-invalid={!!err}
+                    aria-describedby={
+                      [
+                        mode === "signup" ? "auth-pw-hint" : null,
+                        err ? "auth-error" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || undefined
+                    }
                     className={input}
                   />
                 )}
+                {mode === "signup" && (
+                  <p
+                    id="auth-pw-hint"
+                    className="px-1 text-[12px] text-[var(--text-3)]"
+                  >
+                    At least 8 characters.
+                  </p>
+                )}
 
                 {err && (
-                  <p className="px-1 text-[13px] text-[var(--alert)]">
+                  <p
+                    id="auth-error"
+                    role="alert"
+                    className="px-1 text-[13px] text-[var(--alert)]"
+                  >
                     {err}
                   </p>
                 )}
 
                 <button
-                  onClick={submit}
-                  disabled={busy || !email.trim()}
+                  type="submit"
+                  disabled={
+                    busy ||
+                    !email.trim() ||
+                    ((mode === "signin" || mode === "signup") && !password)
+                  }
+                  aria-busy={busy}
                   data-testid="auth-submit"
                   className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)] disabled:opacity-40"
                 >
@@ -251,12 +295,14 @@ function AuthInner() {
                   {mode === "signin" && (
                     <>
                       <button
+                        type="button"
                         onClick={() => setMode("magic")}
                         className="press font-medium text-[var(--readiness)]"
                       >
                         Email me a link instead
                       </button>
                       <button
+                        type="button"
                         onClick={() => setMode("forgot")}
                         className="press font-medium text-[var(--text-3)]"
                       >
@@ -266,6 +312,7 @@ function AuthInner() {
                   )}
                   {mode === "magic" && (
                     <button
+                      type="button"
                       onClick={() => setMode("signin")}
                       className="press font-medium text-[var(--text-3)]"
                     >
@@ -274,6 +321,7 @@ function AuthInner() {
                   )}
                   {mode === "forgot" && (
                     <button
+                      type="button"
                       onClick={() => setMode("signin")}
                       className="press font-medium text-[var(--text-3)]"
                     >
@@ -281,7 +329,7 @@ function AuthInner() {
                     </button>
                   )}
                 </div>
-              </div>
+              </form>
             )}
           </motion.div>
         </AnimatePresence>

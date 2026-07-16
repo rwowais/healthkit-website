@@ -6,15 +6,17 @@
  * subscription, the SW re-subscribes and calls this route — but the SW has no
  * Supabase user token, so the row is matched by its OLD endpoint (an
  * unguessable push-service URL that already acts as a bearer secret). The
- * matched row's endpoint/keys are updated in place and `disabled_at` cleared,
- * so reminders survive rotation without waiting for the user to reopen the app.
+ * matched row's endpoint/keys are updated in place so reminders survive
+ * rotation without waiting for the user to reopen the app.
  *
  * Body: { oldEndpoint, endpoint, p256dh, auth }
  *
  * Uses the service role because there is no caller identity to drive RLS; the
- * old endpoint is the only credential. If the old subscription was never stored
- * (oldEndpoint missing/unknown) the request is a no-op success — the foreground
- * re-subscribe on next app open is the backstop.
+ * old endpoint is the only credential. Hardening (SEC-2): the new endpoint must
+ * be on the SAME push service (origin) as the old, `disabled_at` is never
+ * cleared here, and the response is uniform (no existence oracle). If the old
+ * subscription was never stored (oldEndpoint missing/unknown) the request is a
+ * no-op success — the foreground re-subscribe on next app open is the backstop.
  */
 import { createClient } from "@supabase/supabase-js";
 
@@ -54,26 +56,49 @@ export async function POST(req: Request) {
   // No prior endpoint to match — nothing to rotate. Treat as a no-op so the
   // SW doesn't retry; the next foreground subscribe will (re)create the row.
   if (!body.oldEndpoint) {
-    return json({ ok: true, rotated: false });
+    return json({ ok: true });
+  }
+
+  // HARDENING (audit SEC-2, 2026-07-16): this route is unauthenticated —
+  // knowledge of a victim's push endpoint is the only "credential". Without
+  // the constraint below, an attacker who learns that endpoint could redirect
+  // the victim's reminders to an ATTACKER-controlled endpoint + keys. A genuine
+  // `pushsubscriptionchange` re-subscribe always stays on the SAME push service
+  // (fcm.googleapis.com / web.push.apple.com / *.mozilla.com), so require the
+  // new endpoint's origin to equal the old one's. Reject cross-origin rotations.
+  let sameService = false;
+  try {
+    const oldOrigin = new URL(body.oldEndpoint).origin;
+    const newUrl = new URL(body.endpoint);
+    sameService = newUrl.protocol === "https:" && newUrl.origin === oldOrigin;
+  } catch {
+    sameService = false;
+  }
+  if (!sameService) {
+    return json({ ok: false, reason: "Endpoint origin mismatch." }, 400);
   }
 
   const sb = createClient(SB_URL, SB_SERVICE, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data, error } = await sb
+  // Update endpoint + keys in place. Deliberately do NOT clear `disabled_at`:
+  // an unauthenticated call must not silently re-enable a subscription the
+  // server disabled (e.g. after a 410). Re-enabling happens through the
+  // authenticated foreground subscribe on next app open.
+  const { error } = await sb
     .from("push_subscriptions")
     .update({
       endpoint: body.endpoint,
       p256dh: body.p256dh,
       auth: body.auth,
-      disabled_at: null,
     })
-    .eq("endpoint", body.oldEndpoint)
-    .select("id");
+    .eq("endpoint", body.oldEndpoint);
   if (error) {
     console.error("[push:rotate] update failed", error);
-    return json({ ok: false, reason: error.message }, 500);
+    return json({ ok: false, reason: "Rotation failed." }, 500);
   }
-  return json({ ok: true, rotated: (data?.length ?? 0) > 0 });
+  // Uniform response — do NOT leak whether a row matched (would make this an
+  // existence oracle for arbitrary push endpoints).
+  return json({ ok: true });
 }
