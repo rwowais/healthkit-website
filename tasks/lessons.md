@@ -94,3 +94,11 @@ rule that prevents it.
   vitamin-d3 + creatine from Browse (I'd told the founder they stayed — wrong).
   **Rule:** when deleting content, grep what reads it downstream (derived/
   dedup-by-key catalogs) and confirm nothing else sourced exclusively from it.
+- **Piping vitest through `tail`/`grep` in a gates chain destroys failure
+  evidence AND masks the exit code.** The known rare under-load flake recurred
+  (2026-07-12: 2 tests failed in a background run, clean on immediate re-run,
+  zero code change) and the names were unrecoverable because the command was
+  `vitest run | tail -5` — the failure block was discarded and the pipe made
+  the chain exit 0. **Rule:** in chained gates commands, run vitest unpiped or
+  write its full output to a file; check the summary from the file. If the
+  flake recurs with names visible, pin them.
