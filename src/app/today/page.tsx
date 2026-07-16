@@ -622,7 +622,8 @@ export default function TodayPage() {
         settings
       ),
       state.behaviorOverrides,
-      log.snoozes
+      log.snoozes,
+      settings
     );
   }, [state, adaptation.mode, selDayIdx, isToday, ks, selectedDate, log]);
 

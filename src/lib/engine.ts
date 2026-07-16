@@ -649,7 +649,11 @@ export function applySnoozes(
 export function applyStacks(
   items: TimelineItem[],
   overrides: Record<string, BehaviorOverride> | undefined,
-  snoozes?: Record<string, "later" | "tomorrow">
+  snoozes?: Record<string, "later" | "tomorrow">,
+  // Needed to verify a rebased follower stays inside its own STRICT
+  // timeWindow (see guard below). Optional for back-compat; without it,
+  // strict-window followers conservatively keep their own placement.
+  settings?: UserSettings
 ): TimelineItem[] {
   if (!overrides || items.length === 0) return items;
   // Clone so adopting an anchor's block doesn't mutate the caller's items.
@@ -667,6 +671,19 @@ export function applyStacks(
     const anchor =
       byCanon.get(target) ?? clones.find((c) => effectiveKey(c) === target);
     if (!anchor || anchor.canonicalKey === it.canonicalKey) continue;
+    // GUARDRAIL: never rebase a strict-window follower OUTSIDE its own hard
+    // window. applyStacks runs AFTER compileTimeline's window clamp, so
+    // without this check it was the one normal user action that could defeat
+    // the app's only hard timing guardrail (e.g. wind-down stacked after a
+    // morning anchor would land at ~8am despite its bed-anchored window).
+    // With settings we check precisely (a legal in-window rebase still
+    // works); without them we conservatively leave the follower in place.
+    if (it.timeWindow?.strict) {
+      if (!settings) continue;
+      const anchorMin = effectiveMinutes(anchor, settings);
+      if (anchorMin == null || !isWithinWindow(anchorMin, it, settings))
+        continue;
+    }
     // File with the anchor AND inherit its clock time, so the follower reads
     // as "right after X": same block, same effective time (effectiveMinutes
     // reads customTime/anchor/offsetMin, NOT block). Without rebasing the

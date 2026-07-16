@@ -90,7 +90,8 @@ export default function Reminders() {
         state.settings
       ),
       state.behaviorOverrides,
-      log.snoozes
+      log.snoozes,
+      state.settings
     );
     const times: string[] = [];
     for (const it of items) {
@@ -178,7 +179,8 @@ export default function Reminders() {
         state.settings
       ),
       state.behaviorOverrides,
-      log.snoozes
+      log.snoozes,
+      state.settings
     );
     // tz-aware: deltas use the same wall-clock basis as the target so an
     // in-tab reminder fires at the right local time (and doesn't drift ~60min

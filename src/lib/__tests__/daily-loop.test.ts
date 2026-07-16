@@ -100,6 +100,61 @@ describe("applyStacks", () => {
     expect(applyStacks(items, undefined)).toBe(items);
     expect(applyStacks(items, {})).toBe(items);
   });
+
+  // ── Strict-window guardrail (ontology audit 2026-07-12): stacking runs
+  // AFTER compileTimeline's hard-window clamp, so an unchecked rebase was the
+  // one normal user action that could park e.g. wind-down at 8am. ──
+  describe("strict-window follower", () => {
+    const settings = {
+      ...getDefaultState().settings,
+      wakeTime: "07:00",
+      bedtime: "22:30",
+    };
+    const windDown = (): TimelineItem => ({
+      ...ti("wind", "evening", "Wind-down"),
+      anchor: "bed",
+      offsetMin: -30,
+      timeWindow: { min: -240, max: 0, strict: true }, // 18:30–22:30
+    });
+
+    it("does NOT rebase outside its own hard window (morning anchor)", () => {
+      const out = applyStacks(
+        [ti("a", "morning", "Sunlight"), windDown()],
+        { wind: { stackAfter: "a" } },
+        undefined,
+        settings
+      );
+      const w = out.find((i) => i.canonicalKey === "wind")!;
+      expect(w.block).toBe("evening"); // kept its own placement
+      expect(w.stackedAfter).toBeUndefined();
+    });
+
+    it("still rebases when the anchor sits INSIDE the window (evening anchor)", () => {
+      const anchor = {
+        ...ti("dim", "evening", "Dim lights"),
+        anchor: "bed" as const,
+        offsetMin: -120, // 20:30 — inside wind-down's 18:30–22:30 window
+      };
+      const out = applyStacks(
+        [anchor, windDown()],
+        { wind: { stackAfter: "dim" } },
+        undefined,
+        settings
+      );
+      const w = out.find((i) => i.canonicalKey === "wind")!;
+      expect(w.stackedAfter).toBe("Dim lights");
+      expect(w.offsetMin).toBe(-120);
+    });
+
+    it("conservatively keeps placement when settings are unavailable", () => {
+      const out = applyStacks([ti("a", "morning", "Sunlight"), windDown()], {
+        wind: { stackAfter: "a" },
+      });
+      const w = out.find((i) => i.canonicalKey === "wind")!;
+      expect(w.block).toBe("evening");
+      expect(w.stackedAfter).toBeUndefined();
+    });
+  });
 });
 
 describe("freezeStatus", () => {
