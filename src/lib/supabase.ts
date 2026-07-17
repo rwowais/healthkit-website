@@ -12,6 +12,7 @@ import {
   createClient,
   type SupabaseClient,
 } from "@supabase/supabase-js";
+import { makeFetchWithTimeout } from "./fetchWithTimeout";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -29,6 +30,10 @@ export function getSupabase(): SupabaseClient | null {
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
+      // Bound every request so a stalled connection can't hang load()
+      // forever (REL-9). A timed-out read surfaces as an error, which
+      // load()/save() already treat as offline → serve the local cache.
+      global: { fetch: makeFetchWithTimeout() },
     });
   }
   return client;
