@@ -42,6 +42,69 @@ export interface Access {
 }
 
 /**
+ * Server-authoritative paid entitlement (audit SEC-1, 2026-07-16). Sourced from
+ * the `protocolize_entitlements` table, whose ONLY writer is a service-role call
+ * (the Stripe webhook / a manual admin grant) — a user cannot write it. This is
+ * what makes `paid` un-forgeable: a hand-edited local `settings.tier` no longer
+ * buys premium, because in cloud mode getAccess() reads THIS instead.
+ */
+export interface Entitlement {
+  paidTier: "free" | "premium";
+  status:
+    | "none"
+    | "trialing"
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "expired";
+  plan?: "monthly" | "annual" | "lifetime" | null;
+  currentPeriodEnd?: string | null;
+  /** ISO stamp of when this was fetched/synthesized (for staleness/debug). */
+  syncedAt: string;
+}
+
+// The entitlement is DELIBERATELY kept out of AppState (and therefore out of the
+// synced protocolize-v3 blob / protocolize_state row) so it can never round-trip
+// as user-writable data. It lives here as a module value, hydrated from a
+// dedicated cache key, and is (re)set on every cloud load() from the server row.
+const ENTITLEMENT_CACHE_KEY = "pz:entitlement";
+let runtimeEntitlement: Entitlement | null = null;
+
+/**
+ * Set the current server-authoritative entitlement (called by the cloud
+ * datasource after reading the entitlements table; pass null to clear). In
+ * cloud mode this is always set — to the real row, or a synthesized `free`
+ * when the signed-in user (or a guest) has no row. In local-only mode it is
+ * never set, so getAccess() falls back to settings.tier (no monetization).
+ */
+export function setEntitlement(e: Entitlement | null): void {
+  runtimeEntitlement = e;
+  if (typeof window === "undefined") return;
+  try {
+    if (e) localStorage.setItem(ENTITLEMENT_CACHE_KEY, JSON.stringify(e));
+    else localStorage.removeItem(ENTITLEMENT_CACHE_KEY);
+  } catch {
+    /* quota / unavailable — the in-memory value still governs this session */
+  }
+}
+
+/** The current entitlement: the live value, else the last-cached one (offline). */
+export function getEntitlement(): Entitlement | null {
+  if (runtimeEntitlement) return runtimeEntitlement;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ENTITLEMENT_CACHE_KEY);
+    if (raw) {
+      runtimeEntitlement = JSON.parse(raw) as Entitlement;
+      return runtimeEntitlement;
+    }
+  } catch {
+    /* corrupt cache — treat as absent */
+  }
+  return null;
+}
+
+/**
  * "Engaged" days, not just scored days: a check-in (sleep/energy) or any
  * behavior completion counts. Scoring alone (`score > 0`) under-counts a
  * user who shows up and reflects but completes nothing — they've still
@@ -63,7 +126,15 @@ function engagedDays(state: AppState): number {
 }
 
 export function getAccess(state: AppState): Access {
-  const paid = state.settings.tier === "premium";
+  // SEC-1: `paid` is server-authoritative when we have an entitlement (cloud
+  // mode). A forged local settings.tier is ignored there — only the entitlements
+  // table (webhook/manual grant) can set premium. Local-only mode (no cloud,
+  // no monetization) still trusts settings.tier. Trial is unchanged: it's
+  // time-boxed and self-limiting, so it stays client-side.
+  const ent = getEntitlement();
+  const paid = ent
+    ? ent.paidTier === "premium"
+    : state.settings.tier === "premium";
   const endIso = state.settings.premiumTrialEndsAt;
   const now = Date.now();
   let inTrial = false;

@@ -45,6 +45,9 @@ export const STATE_TABLE = "protocolize_state";
 /** Per-day log rows (config stays in STATE_TABLE). */
 export const LOGS_TABLE = "protocolize_logs";
 
+/** Server-authoritative paid entitlement (SEC-1). Service-role write only. */
+export const ENTITLEMENTS_TABLE = "protocolize_entitlements";
+
 /**
  * Cached user id. `getSession()` is local (no network) so re-checking
  * when we don't have an id is cheap. CRITICAL: we only memoize a *known*

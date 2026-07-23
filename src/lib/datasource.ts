@@ -28,8 +28,10 @@ import {
   supabaseEnabled,
   STATE_TABLE,
   LOGS_TABLE,
+  ENTITLEMENTS_TABLE,
   getUserId,
 } from "./supabase";
+import { setEntitlement, type Entitlement } from "./entitlements";
 
 export interface DataSource {
   readonly kind: "local" | "supabase";
@@ -187,6 +189,10 @@ function bindAuthReset() {
       conflictEvaluated = false;
       pendingConflict = null;
       lastCloudUpdatedAt = null;
+      // SEC-1: drop the previous user's paid entitlement on any auth switch /
+      // sign-out so it can't linger onto a guest or a different account. The
+      // following load() re-syncs it for whoever is now signed in.
+      setEntitlement(null);
       // NOTE: deliberately do NOT clear the pending-sync flag here. This fires
       // on the initial null→uid transition for the SAME user on every page
       // load — clearing it would defeat the persisted flag before load() can
@@ -792,6 +798,36 @@ class SupabaseDataSource implements DataSource {
     }
   }
 
+  // SEC-1: pull the server-authoritative entitlement and hand it to
+  // entitlements.setEntitlement(). In cloud mode this ALWAYS sets a value (the
+  // real row, or a synthesized 'free' for a signed-in user / guest with no
+  // row) so getAccess() stops trusting the user-writable settings.tier. A live
+  // read failure is left alone → the last-cached entitlement governs (offline).
+  private async syncEntitlement(
+    sb: NonNullable<ReturnType<typeof getSupabase>>,
+    userId: string | null
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    if (!userId) {
+      // Guest in cloud mode — never paid (premium comes from a row).
+      setEntitlement({ paidTier: "free", status: "none", syncedAt: now });
+      return;
+    }
+    const { data, error } = await sb
+      .from(ENTITLEMENTS_TABLE)
+      .select("paid_tier, status, plan, current_period_end")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return; // offline / transient → keep the last-cached entitlement
+    setEntitlement({
+      paidTier: data?.paid_tier === "premium" ? "premium" : "free",
+      status: (data?.status as Entitlement["status"]) ?? "none",
+      plan: (data?.plan as Entitlement["plan"]) ?? null,
+      currentPeriodEnd: (data?.current_period_end as string | null) ?? null,
+      syncedAt: now,
+    });
+  }
+
   async load(): Promise<AppState> {
     bindAuthReset();
     captureResetEpoch();
@@ -799,6 +835,9 @@ class SupabaseDataSource implements DataSource {
     if (!sb) return loadState();
     try {
       const userId = await getUserId();
+      // Refresh the paid entitlement before any early return, so every load
+      // path (guest, conflict-hold, cloud-wins) reflects the server's truth.
+      await this.syncEntitlement(sb, userId);
       if (!userId) return loadState();
 
       // A first-sign-in conflict is already awaiting the user's choice in the

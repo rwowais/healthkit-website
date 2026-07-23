@@ -59,6 +59,33 @@ create trigger trg_touch_protocolize_logs
   before update on public.protocolize_logs
   for each row execute function public.touch_protocolize_state();
 
+-- ── Server-authoritative paid entitlement (SEC-1) ─────────────────────
+-- The ONLY writer is a service-role call (the Stripe webhook / a manual admin
+-- grant): users can READ their own row but have NO write policy, so a forged
+-- local settings.tier can no longer buy premium. Additive; empty until Stripe
+-- is wired, so behavior is unchanged (everyone stays on trial/free). Account
+-- deletion cascades this row via the auth.users FK.
+create table if not exists public.protocolize_entitlements (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  paid_tier text not null default 'free' check (paid_tier in ('free','premium')),
+  status text not null default 'none'
+    check (status in ('none','trialing','active','past_due','canceled','expired')),
+  plan text check (plan in ('monthly','annual','lifetime')),
+  current_period_end timestamptz,       -- null for lifetime / non-paying
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  source text,                          -- 'stripe' | 'manual'
+  updated_at timestamptz not null default now()
+);
+
+alter table public.protocolize_entitlements enable row level security;
+
+-- READ own row only. No insert/update/delete policy on purpose: anon and
+-- authenticated cannot write this table at all; only the service_role may.
+drop policy if exists "own entitlement read" on public.protocolize_entitlements;
+create policy "own entitlement read" on public.protocolize_entitlements
+  for select using ((select auth.uid()) = user_id);
+
 -- ════════════════════════════════════════════════════════════════════
 -- Protocol Intelligence CMS (internal authoring layer)
 -- Additive & idempotent. The live app keeps running on its built-in
