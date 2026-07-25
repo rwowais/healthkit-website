@@ -120,6 +120,11 @@ rule that prevents it.
   kind, including SQL, docs-adjacent code, and files the app never imports.
   Non-app code that must not be type-checked by the app config belongs in
   tsconfig `exclude` (done: `supabase/functions`).
+- **Long commit messages belong in a file, not in `git commit -m "..."`.** A
+  message containing `"<kind>:<id>"` broke zsh quoting (`unmatched "`) and the
+  whole commit+push chain failed. **Rule:** for any multi-paragraph message —
+  especially one quoting code, generics, or redirection characters — write it
+  to a scratchpad file and use `git commit -F <file>`.
 - **A "shared state" fix is only real if functional updates resolve against the
   SHARED value.** Two React instances each holding their own copy lose writes
   not because of the copies, but because `setState(prev => …)` receives the
