@@ -131,3 +131,88 @@ thing once, in the DB where it counts, and clean up test data after._
 - If you want a **fast pass**, we can run Phases 1–2, 5, 6 (the revenue-critical
   core) first and defer 3/4/7/9 to a second sitting.
 - I'll adapt persona seeds from the audit personas already encoded in the repo.
+
+---
+
+# RUN 1 — 2026-07-24 (partial: unauthenticated scope)
+
+Against production at commit `26ba2a4`. **22 checks executed, 22 PASS, 3 new
+findings.** The account-driven majority of the plan is BLOCKED — see below.
+
+## Why this run is partial
+The plan's driver is the Playwright harness, which provisions throwaway users
+with `SUPABASE_SERVICE_ROLE_KEY`. That key is not in `.env.local` and the e2e
+README names it as the one manual provisioning step. Without it the live suite
+can't run, and since the app is account-gated, every authenticated phase is
+gated behind it too. (I can't substitute by signing up or signing in by hand —
+creating accounts and entering credentials are outside what I do.)
+
+## PASS — API trust boundaries (prod, unauthenticated)
+| # | Check | Evidence |
+|---|---|---|
+| S1 | `push/rotate` rejects a cross-origin endpoint swap | `HTTP 400 {"reason":"Endpoint origin mismatch."}` — SEC-2 fix live-verified |
+| S2 | `push/rotate` returns a uniform body (no existence oracle) | `HTTP 200 {"ok":true}`, no `rotated` field |
+| S3 | `push/subscribe` refuses an unauthenticated call | `HTTP 401 "Sign in required."` |
+| S4 | `push/send-due` refuses without the cron secret | `HTTP 401 "Unauthorized."` |
+
+## PASS — Auth wall (plan #6, #26-adjacent)
+| # | Check | Evidence |
+|---|---|---|
+| W1 | Signed-out `/today` → `/auth` | landed `/auth`, no session key in localStorage |
+| W2 | Signed-out `/insights` → `/auth` | landed `/auth` |
+| W3 | Legal pages stay public | `/terms` + `/privacy` render signed-out |
+
+## PASS — Public surface & copy (plan #1, #50, #51)
+| # | Check | Evidence |
+|---|---|---|
+| P1 | Landing renders with h1 + CTA | h1 "Your daily routine — adapted to how you actually feel today." |
+| P2 | Zero console errors on cold load | console error list empty |
+| P3 | `/terms` renders | h1 "Terms of Service", Version 1, 611 words |
+| P4 | `/privacy` renders | h1 "Privacy Policy", 567 words |
+| P5 | No "biomarker" / "Body Trends" leak on public copy | both regexes false |
+| P6 | No lorem / placeholder / TODO / test copy | all regexes false |
+
+## PASS — Theme & contrast (plan #49) — WCAG AA computed live
+| Theme | text-1 | text-2 | text-3 | text-4 |
+|---|---|---|---|---|
+| Dark (on `--bg`) | 18.26 | 8.57 | 6.39 | **5.42** (on surface-1) |
+| Light (on `--bg`) | 16.90 | 8.45 | 5.62 | **5.68** (on surface-1) |
+
+All ≥ 4.5:1. Confirms the A11Y-1 token fix in production (was ~3.9 dark).
+
+## PASS — PWA surfaces (plan #42/#43 partial)
+`/offline.html` 200 (title "Protocolize · Offline") · `/sw.js` 200 ·
+`/manifest.webmanifest` 200.
+
+## PASS — Data-layer integrity (plan #24-adjacent, #34)
+RLS enabled on **every** public table (0 without) · exactly 1 CMS admin ·
+0 leftover `e2e-pw-` users · entitlements table holds 1 premium row (the owner
+grandfather), so the paywall gate is inert-but-correct pre-Stripe.
+
+## PASS — Automated backstop (plan #52, partial)
+vitest **647 passed / 18 skipped** · `tsc --noEmit` clean · `next build` clean.
+Playwright (16 specs) NOT run — blocked on the service-role key.
+
+## NEW FINDINGS
+1. **[Low-Med · Security] No clickjacking / MIME / referrer headers.** Only
+   `strict-transport-security` is set (Vercel default). Missing
+   `X-Frame-Options` (or CSP `frame-ancestors`), `X-Content-Type-Options:
+   nosniff`, and `Referrer-Policy`. The app has destructive account actions
+   behind a session, so framing protection is worth having. Fix: a `headers()`
+   block in `next.config`. Not launch-blocking, but cheap.
+2. **[Needs owner decision] Three prod accounts that are neither yours nor the
+   demo:** `gbushee+healthkit@`, `idahabibi@` (signed in across several days),
+   `ava.habibi@`. These look like real early testers, so I did NOT touch them.
+   Confirm whether they stay; the dossier's "0 real users" was wrong and is
+   corrected.
+3. **[Low · A11y] `/terms` has no `<main>` landmark** — consistent with the
+   already-logged audit finding F13 (auxiliary pages lack landmarks). Open.
+
+## BLOCKED — needs you
+- **Playwright e2e + every authenticated phase (1–4, most of 5–7):** add
+  `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` (from Supabase → Settings → API)
+  and I can run the whole suite unattended; it only ever deletes `e2e-pw-`
+  accounts, so it is safe against prod.
+- **Build-stamp check:** only rendered on `/profile` and `/admin`, both
+  authenticated.
+- **Phase 8 #41 — iOS install on your iPhone:** genuinely un-automatable.
