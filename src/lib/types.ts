@@ -804,6 +804,19 @@ export interface AppState {
   insights: Insight[];
   currentStreak: number;
 
+  /**
+   * Deletion tombstones (audit REL-9, 2026-07-24): `"<kind>:<id>"` → epoch ms.
+   *
+   * The dirty-path merge unions collections, so without a record of INTENT a
+   * pack, biomarker or supplement deleted on one device was simply "missing"
+   * there and got resurrected from another device's stale copy — then pushed
+   * back up, making the undo permanent account-wide. A tombstone says "this was
+   * deliberately removed at T", so the merge can drop it instead of reviving it.
+   * Re-adding the same id clears its tombstone. Pruned after TOMBSTONE_TTL_MS
+   * so the map can't grow without bound.
+   */
+  deletions?: Record<string, number>;
+
   // Protocol OS
   installedPacks: string[];
   /** Installed but temporarily paused (reversible, non-destructive). */

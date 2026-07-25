@@ -46,6 +46,7 @@ import {
   setPackPaused as setPackPausedFn,
 } from "@/lib/storage";
 import { activeDataSource, STATE_EVENT } from "@/lib/datasource";
+import { getShared, subscribeShared, applyUpdate } from "@/lib/appStore";
 import { STORAGE_KEY } from "@/lib/constants";
 
 import { fetchAndApplyPublished } from "@/lib/cms/publish";
@@ -103,9 +104,33 @@ function stableStringify(v: unknown): string {
 }
 
 export function useAppState() {
-  const [state, setState] = useState<AppState>(getDefaultState);
+  // REL-3: all instances in a tab share one state object (see lib/appStore).
+  // Seeding from it means an instance mounting later — a sheet, a dialog —
+  // starts on the tab's current state rather than on defaults.
+  const [state, setLocal] = useState<AppState>(
+    () => getShared() ?? getDefaultState()
+  );
   const [loading, setLoading] = useState(true);
   const lastJson = useRef<string>("");
+
+  // Mirror shared → this instance's React state.
+  useEffect(() => {
+    const unsub = subscribeShared(setLocal);
+    // Adopt anything published between render and this effect.
+    const now = getShared();
+    if (now) setLocal(now);
+    return unsub;
+  }, []);
+
+  // setState-compatible wrapper. The critical part: a functional update
+  // resolves against the SHARED latest state, not this instance's possibly
+  // stale copy — that is what closes the lost-update window.
+  const setState = useCallback(
+    (updater: AppState | ((prev: AppState) => AppState)) => {
+      applyUpdate(updater, getDefaultState);
+    },
+    []
+  );
 
   useEffect(() => {
     let alive = true;

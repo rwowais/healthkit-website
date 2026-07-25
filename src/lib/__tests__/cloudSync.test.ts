@@ -55,9 +55,16 @@ const fake = vi.hoisted(() => {
       this.filters.push([col, val]);
       return this;
     }
+    inFilters: [string, unknown[]][] = [];
+    in(col: string, vals: unknown[]) {
+      this.inFilters.push([col, vals]);
+      return this;
+    }
     private rows() {
-      return [...tbl(this.table).values()].filter((r) =>
-        this.filters.every(([c, v]) => r[c] === v)
+      return [...tbl(this.table).values()].filter(
+        (r) =>
+          this.filters.every(([c, v]) => r[c] === v) &&
+          this.inFilters.every(([c, vs]) => vs.includes(r[c]))
       );
     }
     async maybeSingle() {
@@ -184,6 +191,14 @@ const fake = vi.hoisted(() => {
         user_id: userId,
         state: st,
         updated_at,
+      });
+    },
+    seedLog(userId: string, logDate: string) {
+      tbl("protocolize_logs").set(`${userId}::${logDate}`, {
+        user_id: userId,
+        log_date: logDate,
+        log: { date: logDate },
+        updated_at: "2026-05-19T00:00:00.000Z",
       });
     },
     stateRow(userId: string) {
@@ -488,6 +503,41 @@ describe("write path — serialize + compare-and-swap (REL-4 / REL-5)", () => {
 
     // The newer document wins, never the older one.
     expect(fake.stateRow("u1")!.state.dailyLogs).toHaveLength(2);
+  });
+
+  it("REL-7: 'keep this device's data' drops the account's cloud-only days", async () => {
+    fake.setSession({ user: { id: "u1" } });
+    const { ds } = await fresh();
+    // The account has three days in the per-day table…
+    fake.seedLog("u1", "2026-05-18");
+    fake.seedLog("u1", "2026-05-19");
+    fake.seedLog("u1", "2026-05-20");
+
+    // …but the device the user chose to keep only knows about one of them.
+    const chosen = makeState({
+      dailyLogs: [
+        {
+          date: "2026-05-19",
+          behaviorCompletions: {},
+          score: 10,
+          sleepLog: {},
+          exerciseEntries: [],
+          supplementEntries: [],
+          sleepCompletions: [],
+          completions: [],
+          nutritionScorecard: { customItems: [], note: "" },
+        },
+      ],
+    });
+    await (
+      ds.activeDataSource as unknown as {
+        dropCloudDaysNotIn: (s: typeof chosen) => Promise<void>;
+      }
+    ).dropCloudDaysNotIn(chosen);
+
+    // Only the kept day survives — the discarded ones can't be unioned back
+    // by reconcileLogs on the next load.
+    expect(fake.logRows("u1").map((r) => r.log_date)).toEqual(["2026-05-19"]);
   });
 
   it("writes through when the account has no cloud row yet (insert path)", async () => {

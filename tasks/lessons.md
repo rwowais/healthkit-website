@@ -120,6 +120,19 @@ rule that prevents it.
   kind, including SQL, docs-adjacent code, and files the app never imports.
   Non-app code that must not be type-checked by the app config belongs in
   tsconfig `exclude` (done: `supabase/functions`).
+- **A "shared state" fix is only real if functional updates resolve against the
+  SHARED value.** Two React instances each holding their own copy lose writes
+  not because of the copies, but because `setState(prev => …)` receives the
+  *instance's* `prev`. Publishing to a shared object without also rebasing the
+  updater changes nothing. The fix is one line of intent —
+  `applyUpdate(u) → u(currentShared)` — and it's the whole fix (REL-3).
+  **Rule:** when consolidating duplicated state, follow the *read* path of the
+  updater, not just the write path.
+- **When a test proves a fix, also write the test that proves the BUG.** For
+  both REL-3 and REL-9 I added a case reproducing the old behaviour (stale
+  snapshot wins / union resurrects the deleted item). Without it, a filter that
+  silently never matches, or a store that quietly isn't shared, passes just as
+  green as a working one. Cheap, and it makes the guard falsifiable.
 - **To serialize async work, chain the CALL, not the running promise.**
   `const run = doWork(); chain = chain.then(() => run)` serializes NOTHING —
   `doWork()` is invoked immediately and the chain just waits on something

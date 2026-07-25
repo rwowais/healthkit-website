@@ -1283,11 +1283,54 @@ export function updateSupplement(
  * surface the past data again — that's intentional. If you genuinely
  * want a clean slate, use the "reset data" flow in Profile.
  */
+// ── Deletion tombstones (audit REL-9) ─────────────────────────────────
+// See AppState.deletions. A tombstone records that a removal was INTENTIONAL,
+// so the dirty-path merge can tell "deleted here" from "missing because my copy
+// is older" and stop resurrecting it from the other device.
+
+/** Tombstones older than this are pruned — long enough for any real device to
+ *  have synced, short enough that the map stays small. */
+export const TOMBSTONE_TTL_MS = 90 * 86_400_000;
+
+/** Namespaced tombstone key for a deletable item. */
+export function deletionKey(
+  kind: "pack" | "custom" | "bio" | "supp",
+  id: string
+): string {
+  return `${kind}:${id}`;
+}
+
+/** Record an intentional deletion. */
+export function withTombstone(
+  state: AppState,
+  kind: "pack" | "custom" | "bio" | "supp",
+  id: string,
+  now: number = Date.now()
+): Record<string, number> {
+  return { ...(state.deletions ?? {}), [deletionKey(kind, id)]: now };
+}
+
+/** Clear a tombstone — the item was deliberately re-added. */
+export function withoutTombstone(
+  state: AppState,
+  kind: "pack" | "custom" | "bio" | "supp",
+  id: string
+): Record<string, number> | undefined {
+  const d = state.deletions;
+  if (!d) return undefined;
+  const key = deletionKey(kind, id);
+  if (!(key in d)) return d;
+  const next = { ...d };
+  delete next[key];
+  return next;
+}
+
 export function removeSupplement(state: AppState, id: string): AppState {
   const list = state.supplements ?? [];
   return {
     ...state,
     supplements: list.filter((s) => s.id !== id),
+    deletions: withTombstone(state, "supp", id),
   };
 }
 
@@ -1313,7 +1356,13 @@ export function installPack(state: AppState, id: string): AppState {
       if (officialInstalled >= getFreePacks()) return state;
     }
   }
-  return { ...state, installedPacks: [...state.installedPacks, id] };
+  return {
+    ...state,
+    installedPacks: [...state.installedPacks, id],
+    // Re-installing is an explicit intent that overrides an earlier removal —
+    // clear the tombstone so the merge stops filtering this pack out.
+    deletions: withoutTombstone(state, "pack", id),
+  };
 }
 
 export function uninstallPack(state: AppState, id: string): AppState {
@@ -1322,6 +1371,7 @@ export function uninstallPack(state: AppState, id: string): AppState {
     installedPacks: state.installedPacks.filter((p) => p !== id),
     // Clear any stale pause flag so reinstalling later doesn't come back paused.
     pausedPacks: (state.pausedPacks ?? []).filter((p) => p !== id),
+    deletions: withTombstone(state, "pack", id),
   };
 }
 
@@ -1347,7 +1397,17 @@ export function upsertCustomPack(
   const installedPacks = state.installedPacks.includes(pack.id)
     ? state.installedPacks
     : [...state.installedPacks, pack.id];
-  return { ...state, customPacks, installedPacks };
+  // Re-creating a custom pack with a previously-deleted id clears BOTH its
+  // tombstones (definition + installed membership).
+  let deletions = withoutTombstone(state, "custom", pack.id);
+  if (deletions) {
+    const k = deletionKey("pack", pack.id);
+    if (k in deletions) {
+      deletions = { ...deletions };
+      delete deletions[k];
+    }
+  }
+  return { ...state, customPacks, installedPacks, deletions };
 }
 
 export function deleteCustomPack(state: AppState, id: string): AppState {
@@ -1356,6 +1416,11 @@ export function deleteCustomPack(state: AppState, id: string): AppState {
     customPacks: state.customPacks.filter((p) => p.id !== id),
     installedPacks: state.installedPacks.filter((p) => p !== id),
     pausedPacks: (state.pausedPacks ?? []).filter((p) => p !== id),
+    // Two tombstones: the pack definition AND its installed-list membership.
+    deletions: {
+      ...withTombstone(state, "custom", id),
+      [deletionKey("pack", id)]: Date.now(),
+    },
   };
 }
 
@@ -1496,6 +1561,7 @@ export function deleteBiomarker(state: AppState, id: string): AppState {
   return {
     ...state,
     biomarkers: state.biomarkers.filter((b) => b.id !== id),
+    deletions: withTombstone(state, "bio", id),
   };
 }
 

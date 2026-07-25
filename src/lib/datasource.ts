@@ -13,6 +13,8 @@ import {
   SAVE_ERROR_EVENT,
   captureResetEpoch,
   resetEpochMoved,
+  deletionKey,
+  TOMBSTONE_TTL_MS,
 } from "./storage";
 import { DEFAULT_INSTALLED } from "./packs";
 import {
@@ -471,6 +473,22 @@ function mergeDailyLog(
 }
 
 export function mergeStates(local: AppState, cloud: AppState): AppState {
+  // REL-9: union both sides' deletion tombstones, keeping the LATEST stamp per
+  // key, and drop ones past their TTL so the map stays bounded. A key present
+  // here means some device intentionally removed that item, which outranks
+  // another device's stale copy that still contains it.
+  const mergedDeletions: Record<string, number> = {};
+  const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+  for (const src of [cloud.deletions, local.deletions]) {
+    for (const [k, t] of Object.entries(src ?? {})) {
+      if (typeof t !== "number" || t < cutoff) continue;
+      if (!(k in mergedDeletions) || t > mergedDeletions[k]) {
+        mergedDeletions[k] = t;
+      }
+    }
+  }
+  const tomb = new Set(Object.keys(mergedDeletions));
+
   const byDate = new Map<string, AppState["dailyLogs"][number]>();
   // cloud first, then local — so the local (more-recent-intent) side is `b`.
   for (const l of [...(cloud.dailyLogs ?? []), ...(local.dailyLogs ?? [])]) {
@@ -588,16 +606,26 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
     dailyLogs: [...byDate.values()].sort((a, b) =>
       a.date.localeCompare(b.date)
     ),
-    biomarkers: [...bm.values()],
-    customPacks: [...customById.values()],
+    // REL-9: the unions below would otherwise RESURRECT anything deleted on one
+    // device from the other's stale copy — and then push it back up, making the
+    // undo permanent account-wide. `tomb` is the union of both sides'
+    // tombstones, so an intentional deletion outranks a stale copy that still
+    // has the item. Re-adding clears the tombstone, so a genuine re-add wins.
+    deletions: mergedDeletions,
+    biomarkers: [...bm.values()].filter(
+      (b) => !tomb.has(deletionKey("bio", b.id))
+    ),
+    customPacks: [...customById.values()].filter(
+      (p) => !tomb.has(deletionKey("custom", p.id))
+    ),
     installedPacks: uniq([
       ...(cloud.installedPacks ?? []),
       ...(local.installedPacks ?? []),
-    ]),
+    ]).filter((id) => !tomb.has(deletionKey("pack", id))),
     pausedPacks: uniq([
       ...(cloud.pausedPacks ?? []),
       ...(local.pausedPacks ?? []),
-    ]),
+    ]).filter((id) => !tomb.has(deletionKey("pack", id))),
     behaviorOverrides: {
       ...(cloud.behaviorOverrides ?? {}),
       ...(local.behaviorOverrides ?? {}),
@@ -610,7 +638,9 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
     //  • supplements: by-id union, local wins on collision (like biomarkers).
     //  • supplementMeta / protocols: shallow-merge with local winning per key.
     //  • insights: derived/recomputed → prefer the local (more-recent-intent) set.
-    supplements: mergeById(cloud.supplements, local.supplements),
+    supplements: mergeById(cloud.supplements, local.supplements).filter(
+      (s) => !tomb.has(deletionKey("supp", s.id))
+    ),
     supplementMeta: { ...cloud.supplementMeta, ...local.supplementMeta },
     protocols: { ...cloud.protocols, ...local.protocols },
     insights: local.insights ?? cloud.insights,
@@ -652,6 +682,12 @@ export async function resolveConflict(
       : choice === "local"
       ? pc.local
       : mergeStates(pc.local, pc.cloud);
+  // REL-7: "keep this device's data" must also discard the account's cloud-only
+  // per-day rows, or the next load unions them back and the choice is undone.
+  // Runs BEFORE the save so the write-cache is already pruned.
+  if (choice === "local" && activeDataSource.kind === "supabase") {
+    await (activeDataSource as SupabaseDataSource).dropCloudDaysNotIn(chosen);
+  }
   await activeDataSource.save(chosen);
 }
 
@@ -702,6 +738,50 @@ class SupabaseDataSource implements DataSource {
    * table without clobbering newer rows. Returns the base state
    * unchanged if the table isn't available.
    */
+  /**
+   * REL-7 (audit 2026-07-24): drop per-day rows the user just chose to discard.
+   *
+   * reconcileLogs() unions the log table into dailyLogs on EVERY load — a
+   * deliberate never-lose-a-day rule. But when a sync conflict is resolved with
+   * "keep this device's data", the discarded account's cloud-only days survived
+   * in that table and were unioned straight back on the next load (which the
+   * post-resolve reload triggers immediately), then synced back up. The explicit
+   * choice was silently downgraded to a merge. Removing the rows the chosen
+   * state doesn't contain makes "keep mine" mean what it says.
+   *
+   * Best effort: the document-level choice has already been applied, so a
+   * failure here leaves days to reappear rather than losing anything.
+   */
+  async dropCloudDaysNotIn(chosen: AppState): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) return;
+    try {
+      const userId = await getUserId();
+      if (!userId) return;
+      const keep = new Set((chosen.dailyLogs ?? []).map((l) => l.date));
+      const { data, error } = await sb
+        .from(LOGS_TABLE)
+        .select("log_date")
+        .eq("user_id", userId);
+      if (error || !data) return;
+      const drop = (data as { log_date: string }[])
+        .map((r) => r.log_date)
+        .filter((d) => !keep.has(d));
+      if (drop.length === 0) return;
+      const { error: delErr } = await sb
+        .from(LOGS_TABLE)
+        .delete()
+        .eq("user_id", userId)
+        .in("log_date", drop);
+      if (delErr) return;
+      // Forget them in the write-cache too, so a day later re-created with the
+      // same date is recognised as changed and re-uploaded.
+      for (const d of drop) this.lastDays.delete(d);
+    } catch {
+      /* best effort — see doc comment */
+    }
+  }
+
   private async reconcileLogs(
     sb: NonNullable<ReturnType<typeof getSupabase>>,
     userId: string,
