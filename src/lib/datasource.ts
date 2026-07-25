@@ -108,6 +108,24 @@ let pendingCloudState: AppState | null = null;
 /** True once the retry handler has been registered (idempotent guard). */
 let retryHandlerRegistered = false;
 
+/**
+ * Cloud-write serialization (audit REL-4, 2026-07-16).
+ *
+ * Nothing used to stop two saves being in flight at once: on a slow link the
+ * debounce could flush save(v2) while save(v1) was still travelling, both would
+ * pass the concurrency check, and the two upserts could land OUT OF ORDER —
+ * leaving the cloud row holding v1 while local held v2. Because v2's save had
+ * already reported success and cleared the dirty flag, the next clean load was
+ * cloud-wins and silently REVERTED the user's newer edits.
+ *
+ * Every cloud write now queues on this chain, so at most one is in flight and
+ * they land in the order they were made. `queuedSeq` additionally lets a save
+ * that was superseded while waiting skip its upload entirely — the newer state
+ * is a strict superset, so writing the older one first would be pure waste.
+ */
+let cloudChain: Promise<void> = Promise.resolve();
+let queuedSeq = 0;
+
 function reconKey(uid: string) {
   return `pz:recon:${uid}`;
 }
@@ -891,7 +909,13 @@ class SupabaseDataSource implements DataSource {
         // Established on this account/device — never prompt again here.
         markReconciled(userId);
         const dirty = hasPendingSync();
-        if (typeof window !== "undefined") {
+        // REL-8: honour the reset-epoch tombstone here too. This raw write is
+        // the one storage path that bypassed the fence in saveState(): a load
+        // already in flight when another tab ran reset / delete-account would
+        // land the pre-wipe cloud payload straight back into storage, and for
+        // delete-account (now signed out) the "deleted" data persisted on the
+        // device. Discard the payload instead — the wipe wins.
+        if (typeof window !== "undefined" && !resetEpochMoved()) {
           // dirty → local-preferring merge (un-pushed non-log edits survive);
           // clean → cloud-wins (cross-device deletions still propagate). See
           // chooseCloudLoad (pure + unit-tested). Logs reconcile separately.
@@ -974,6 +998,33 @@ class SupabaseDataSource implements DataSource {
       notify();
       return;
     }
+    // REL-4: queue the cloud half so concurrent saves can't interleave or land
+    // out of order. The local cache above is already written synchronously, so
+    // the UI never waits on this.
+    const mySeq = ++queuedSeq;
+    // Chain the CALL, not an already-running promise: invoking pushToCloud here
+    // and merely appending the result would start every save immediately and
+    // serialize nothing. Deferring the invocation into .then() is what makes
+    // one write finish (and re-baseline) before the next begins.
+    const run = cloudChain.then(() => this.pushToCloud(state, mySeq, notify));
+    // Keep the chain alive if a link rejects — pushToCloud handles its own
+    // errors, but an unhandled rejection here would stall every later save.
+    cloudChain = run.catch(() => {});
+    return run;
+  }
+
+  /** The serialized cloud half of save(). One of these runs at a time. */
+  private async pushToCloud(
+    state: AppState,
+    seq: number,
+    notify: () => void
+  ): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) return;
+    // Superseded while queued: a newer save carries strictly newer data, so
+    // writing this older document first would be wasted work at best and an
+    // out-of-order write at worst. The newer save owns the flags.
+    if (seq !== queuedSeq) return;
     markSaveStarted();
     try {
       const userId = await getUserId();
@@ -990,47 +1041,68 @@ class SupabaseDataSource implements DataSource {
         return;
       }
 
-      // Optimistic-concurrency guard: if another device wrote since we
-      // last loaded, don't blindly clobber the whole document — pull the
-      // newer copy and let the app resync instead of silently losing it.
-      const { data: head } = await sb
-        .from(STATE_TABLE)
-        .select("updated_at")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (
-        head?.updated_at &&
-        lastCloudUpdatedAt &&
-        head.updated_at > lastCloudUpdatedAt
-      ) {
-        // Another device is ahead — let other tabs resync to it. This write is
-        // DEFERRED (the local edit stays pending via markPendingSync above for
-        // the next load to merge/push), so balance the in-flight counter that
-        // markSaveStarted() incremented — without it the sync indicator wedges
-        // on "Syncing…" forever after this (normal multi-device) guard-skip.
-        markSaveDeferred();
-        notify();
-        return;
+      // Establish the row version this write is based on. Normally that's the
+      // baseline stamped by our last load/save; only when we have none do we
+      // pay for a head read.
+      let baseline = lastCloudUpdatedAt;
+      if (!baseline) {
+        const { data: head, error: headErr } = await sb
+          .from(STATE_TABLE)
+          .select("updated_at")
+          .eq("user_id", userId)
+          .maybeSingle();
+        // REL-5: the error was previously ignored, so a transiently failed head
+        // read silently bypassed the concurrency guard and blind-wrote the whole
+        // document. Treat it like offline instead.
+        if (headErr) throw headErr;
+        baseline = head?.updated_at ?? null;
       }
 
-      const nowIso = new Date().toISOString();
-      const { error } = await sb.from(STATE_TABLE).upsert({
-        user_id: userId,
-        state,
-        updated_at: nowIso,
-      });
-      if (error) throw error;
+      if (baseline) {
+        // REL-5: compare-and-swap, not check-then-act. The old code read
+        // updated_at and then upserted unconditionally — two devices saving
+        // inside that round-trip window both passed the check and the second
+        // replaced the first's whole document, silently losing its settings.
+        // Matching updated_at in the WHERE makes the guard atomic: if the row
+        // moved under us we write nothing and defer. (`updated_at` is rewritten
+        // by a BEFORE UPDATE trigger, so the server clock stays authoritative;
+        // timestamptz survives the text round-trip exactly, verified in prod.)
+        const { data: rows, error } = await sb
+          .from(STATE_TABLE)
+          .update({ state })
+          .eq("user_id", userId)
+          .eq("updated_at", baseline)
+          .select("user_id");
+        if (error) throw error;
+        if (!rows || rows.length === 0) {
+          // Someone else wrote first. Local stays dirty (markPendingSync above)
+          // so the next load merges and pushes it — nothing is lost.
+          markSaveDeferred();
+          notify();
+          return;
+        }
+      } else {
+        // No row yet — first write for this account. Insert rather than upsert
+        // so a concurrent first-write surfaces as a duplicate-key conflict we
+        // can defer on, instead of clobbering whatever landed first.
+        const { error } = await sb
+          .from(STATE_TABLE)
+          .insert({ user_id: userId, state });
+        if (error) {
+          if ((error as { code?: string }).code === "23505") {
+            markSaveDeferred();
+            notify();
+            return;
+          }
+          throw error;
+        }
+      }
       // CRITICAL: the DB trigger rewrites updated_at with the *server*
-      // clock. Baseline the concurrency guard off that server value, not
-      // our client clock — otherwise any client/server skew makes the
-      // next save mistake our own write for a remote one and silently
-      // drop it (every change after the first is lost).
-      // If the head re-read fails, do NOT fall back to the client clock
-      // (nowIso): a server-skewed head would then look "ahead" of our
-      // client-clock baseline and the next save would mistake our own write for
-      // a remote one and drop it — the exact skew this baseline exists to avoid.
-      // Null disables the concurrency guard for one cycle (it requires a truthy
-      // baseline), so the next save re-reads and re-baselines off the server.
+      // clock, so re-read it rather than assuming what we wrote. Baselining off
+      // a client clock would let any skew make the next save mistake our own
+      // write for a remote one and drop it (every change after the first lost).
+      // If this re-read fails we store null, which disables the compare-and-swap
+      // for one cycle — the next save re-reads and re-baselines off the server.
       lastCloudUpdatedAt = await this.readStateUpdatedAt(sb, userId);
 
       // Dual-write the changed day(s) to the per-day table. Best effort:
@@ -1041,9 +1113,14 @@ class SupabaseDataSource implements DataSource {
       // Notify other tabs ONLY after the cloud copy is durable, so a
       // resync never reads a pre-write row.
       notify();
-      // Cloud copy matches local — clear the retry queue + the dirty flag.
-      pendingCloudState = null;
-      clearPendingSync();
+      // Cloud copy matches local — clear the retry queue + the dirty flag, but
+      // ONLY if no newer save is waiting behind us. An older write completing
+      // while a newer edit is still queued must not mark local "clean": a reload
+      // in that window would take the cloud-wins path and revert the newer edit.
+      if (seq === queuedSeq) {
+        pendingCloudState = null;
+        clearPendingSync();
+      }
       markSaveSuccess();
     } catch {
       // Local cache still holds; tell the user the cloud copy is behind

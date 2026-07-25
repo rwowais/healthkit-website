@@ -30,10 +30,21 @@ const fake = vi.hoisted(() => {
 
   class Builder {
     op: "select" | "delete" = "select";
+    // Pending write (update/insert). Kept separate from `op` so a `.select()`
+    // chained AFTER a write reads as a RETURNING clause, not a read.
+    writeOp: null | { kind: "update" | "insert"; payload: Row } = null;
     filters: [string, unknown][] = [];
     constructor(public table: string) {}
-    select() {
-      this.op = "select";
+    select(_cols?: string) {
+      if (!this.writeOp) this.op = "select";
+      return this;
+    }
+    update(payload: Row) {
+      this.writeOp = { kind: "update", payload };
+      return this;
+    }
+    insert(payload: Row) {
+      this.writeOp = { kind: "insert", payload };
       return this;
     }
     delete() {
@@ -79,13 +90,59 @@ const fake = vi.hoisted(() => {
       state.lastUpsertAt.set(this.table, Date.now());
       return { data: null, error: null };
     }
-    // thenable: awaiting the builder runs select-list / delete
+    // thenable: awaiting the builder runs the pending write, or select / delete
     then(
-      resolve: (v: { data: Row[] | null; error: null }) => void,
+      resolve: (v: {
+        data: Row[] | null;
+        error: null | { code: string; message: string };
+      }) => void,
       reject?: (e: unknown) => void
     ) {
       wait()
         .then(() => {
+          // Conditional UPDATE — the compare-and-swap the real save() relies on.
+          // Only rows matching every filter (including updated_at) are touched,
+          // and the affected rows come back so a 0-row result is detectable.
+          if (this.writeOp?.kind === "update") {
+            const affected = this.rows();
+            for (const r of affected) {
+              Object.assign(r, this.writeOp.payload);
+              // Mimic the `before update` trigger: the SERVER stamps
+              // updated_at, skewed ahead of the client clock.
+              if (this.table === "protocolize_state") {
+                r.updated_at = new Date(
+                  Date.now() + state.serverSkewMs
+                ).toISOString();
+              }
+            }
+            // Record write time like upsert/insert do, so durability-ordering
+            // assertions still see the CAS path land.
+            if (affected.length) state.lastUpsertAt.set(this.table, Date.now());
+            return {
+              data: affected.map((r) => ({ ...r })) as Row[],
+              error: null,
+            };
+          }
+          // INSERT — a duplicate primary key surfaces as 23505 so the caller
+          // can defer instead of clobbering a concurrent first write.
+          if (this.writeOp?.kind === "insert") {
+            const row = { ...this.writeOp.payload };
+            const key = String(row.user_id);
+            if (tbl(this.table).has(key)) {
+              return {
+                data: null,
+                error: { code: "23505", message: "duplicate key" },
+              };
+            }
+            if (this.table === "protocolize_state" && !row.updated_at) {
+              row.updated_at = new Date(
+                Date.now() + state.serverSkewMs
+              ).toISOString();
+            }
+            tbl(this.table).set(key, row);
+            state.lastUpsertAt.set(this.table, Date.now());
+            return { data: [row] as Row[], error: null };
+          }
           if (this.op === "delete") {
             for (const r of this.rows()) {
               for (const [k, m] of tbl(this.table))
@@ -360,5 +417,89 @@ describe("cloud sync — regression class", () => {
     expect(row.state.settings?.name).toBe("second");
     const back = await ds.activeDataSource.load();
     expect(back.currentStreak).toBe(7);
+  });
+});
+
+/**
+ * Write-path hardening from the 2026-07-16 audit.
+ *
+ * REL-5: the guard used to READ updated_at and then upsert unconditionally.
+ * Two devices saving inside that round-trip window both passed the read, and
+ * the second replaced the first's whole document — the first having already
+ * reported success and cleared its dirty flag, so its next clean load silently
+ * reverted its own edits. The write is now a compare-and-swap.
+ *
+ * REL-4: nothing serialized successive saves, so on a slow link they could land
+ * out of order and leave the cloud holding the OLDER document.
+ */
+describe("write path — serialize + compare-and-swap (REL-4 / REL-5)", () => {
+  it("REL-5: a write from another device is deferred, never clobbered", async () => {
+    fake.setSession({ user: { id: "u1" } });
+    fake.seedState("u1", makeState(), "2026-05-19T00:00:00.000Z");
+    const { ds } = await fresh();
+    await ds.activeDataSource.load(); // baselines on the seeded version
+
+    // Another device writes AFTER our load — the row moves under us.
+    fake.seedState(
+      "u1",
+      makeState({ settings: { name: "from-device-B", tier: "free" } }),
+      "2026-05-20T00:00:00.000Z"
+    );
+
+    await ds.activeDataSource.save(
+      makeState({ settings: { name: "from-device-A", tier: "free" } })
+    );
+
+    // B's document survives intact — A's save detected the conflict and stood
+    // down rather than overwriting it.
+    expect(fake.stateRow("u1")!.state.settings?.name).toBe("from-device-B");
+    // ...and A's edit is NOT lost: local stays dirty so the next load merges
+    // and pushes it.
+    expect(localStorage.getItem("pz:pending-sync")).toBe("1");
+  });
+
+  it("REL-4: rapid saves serialize — the cloud ends on the newest document", async () => {
+    fake.setSession({ user: { id: "u1" } });
+    fake.seedState("u1", makeState(), "2026-05-19T00:00:00.000Z");
+    fake.state.latencyMs = 30; // slow link: the out-of-order window
+    const { ds } = await fresh();
+    await ds.activeDataSource.load();
+
+    const day = (date: string) => ({
+      date,
+      behaviorCompletions: {},
+      score: 10,
+      sleepLog: {},
+      exerciseEntries: [],
+      supplementEntries: [],
+      sleepCompletions: [],
+      completions: [],
+      nutritionScorecard: { customItems: [], note: "" },
+    });
+
+    // Fire both without awaiting the first — the pre-fix code could land these
+    // in either order.
+    await Promise.all([
+      ds.activeDataSource.save(makeState({ dailyLogs: [day("2026-05-19")] })),
+      ds.activeDataSource.save(
+        makeState({ dailyLogs: [day("2026-05-19"), day("2026-05-20")] })
+      ),
+    ]);
+
+    // The newer document wins, never the older one.
+    expect(fake.stateRow("u1")!.state.dailyLogs).toHaveLength(2);
+  });
+
+  it("writes through when the account has no cloud row yet (insert path)", async () => {
+    fake.setSession({ user: { id: "u3" } });
+    const { ds } = await fresh();
+
+    await ds.activeDataSource.save(makeState({ currentStreak: 4 }));
+
+    const row = fake.stateRow("u3");
+    expect(row).toBeTruthy();
+    expect(
+      (row!.state as unknown as { currentStreak: number }).currentStreak
+    ).toBe(4);
   });
 });

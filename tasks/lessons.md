@@ -108,6 +108,28 @@ rule that prevents it.
   pre-change tree was equally slow, i.e. code-independent). Fixed structurally:
   vitest.config.ts `testTimeout: 120_000`. If persona tests fail now it's an
   ASSERTION, not wall-clock — treat as real.
+- **REPEATED 2026-07-24 — a file added AFTER the last gate run ships unchecked.**
+  The `tsc --noEmit` / vitest / build gates for the SEC-1 batch all ran BEFORE
+  `supabase/functions/stripe-webhook/index.ts` was written, so a Deno edge
+  function (URL imports, `Deno.*` globals) landed in a repo whose tsconfig
+  `include` is `**/*.ts`. `next build` stayed green because Next only compiles
+  `src/`, so nothing caught it until the next batch's type-check went red with
+  8 errors in a file I hadn't touched. The rule to re-run tsc after the FINAL
+  edit was already in this file — I broke it by treating "docs + a non-app
+  file" as gate-exempt. **Rule:** the gate runs after the LAST write of any
+  kind, including SQL, docs-adjacent code, and files the app never imports.
+  Non-app code that must not be type-checked by the app config belongs in
+  tsconfig `exclude` (done: `supabase/functions`).
+- **To serialize async work, chain the CALL, not the running promise.**
+  `const run = doWork(); chain = chain.then(() => run)` serializes NOTHING —
+  `doWork()` is invoked immediately and the chain just waits on something
+  already in flight. It must be `const run = chain.then(() => doWork())` so the
+  invocation itself is deferred. Burned on the REL-4 cloud-save queue: the
+  first version left both saves racing, and because they then raced the
+  compare-and-swap, the OLDER document won — the exact bug being fixed. The new
+  regression test caught it. **Rule:** when adding a queue, write the test that
+  fires two operations without awaiting the first; a queue that isn't really a
+  queue passes every single-operation test.
 - **Don't chain doc-editing python heredocs with `git commit` in one Bash
   call.** A script that asserts on a text anchor exits non-zero, but
   newline-separated commands after it STILL run — twice a commit/push shipped
