@@ -200,11 +200,13 @@ Playwright (16 specs) NOT run — blocked on the service-role key.
    nosniff`, and `Referrer-Policy`. The app has destructive account actions
    behind a session, so framing protection is worth having. Fix: a `headers()`
    block in `next.config`. Not launch-blocking, but cheap.
-2. **[Needs owner decision] Three prod accounts that are neither yours nor the
-   demo:** `gbushee+healthkit@`, `idahabibi@` (signed in across several days),
-   `ava.habibi@`. These look like real early testers, so I did NOT touch them.
-   Confirm whether they stay; the dossier's "0 real users" was wrong and is
-   corrected.
+2. **[RESOLVED 2026-07-24 — KEEP]** Three prod accounts that are neither yours
+   nor the demo: `gbushee+healthkit@`, `idahabibi@`, `ava.habibi@`. **Confirmed
+   by the owner as friends testing the app — these stay.** Treat their rows as
+   real user data: never delete them in cleanup, seeding, or test teardown.
+   (The Playwright teardown is already safe — it matches only the `e2e-pw-`
+   prefix.) Only `rwowais+demo@` is disposable. Correcting the record: the app
+   does have real users, just a small invited circle.
 3. **[Low · A11y] `/terms` has no `<main>` landmark** — consistent with the
    already-logged audit finding F13 (auxiliary pages lack landmarks). Open.
 
