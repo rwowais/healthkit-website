@@ -38,6 +38,8 @@ import {
   getAccess,
   getFreeBiomarkers,
   getFreePacks,
+  getFreeSupplements,
+  capsEnforced,
 } from "@/lib/entitlements";
 import { getVacationDates } from "@/lib/storage";
 import { dateKeyInTz, getTz } from "@/lib/tz";
@@ -314,10 +316,16 @@ const inv_swaps_reference_real_behaviors: Invariant = {
 
 /**
  * Free-tier caps must hold AT THE STORAGE LAYER. The library
- * functions (installPack, addBiomarker) are the source of truth;
- * any UI gating is defense in depth. A free user state should
- * never have more than FREE_PACKS official packs or more than
- * FREE_BIOMARKERS distinct biomarker metrics.
+ * functions (installPack, addSupplement, addBiomarker) are the source
+ * of truth; any UI gating is defense in depth.
+ *
+ * REWRITTEN 2026-08-16 (lock-don't-delete decision): the cap governs
+ * ACTIVE items, not installed ones. A user who installed 8 packs during
+ * the trial deliberately KEEPS them at expiry — the extras must be
+ * PAUSED (pausedPacks / supplement.paused), never removed. So the
+ * invariant is: for a free user, active official packs ≤ cap and active
+ * supplements ≤ cap — but only once payments are live (capsEnforced()),
+ * because pre-Stripe everyone is grandfathered by design.
  */
 const inv_free_tier_caps_held: Invariant = {
   name: "free-tier caps never exceeded in stored state",
@@ -325,15 +333,25 @@ const inv_free_tier_caps_held: Invariant = {
     const errors: string[] = [];
     const access = getAccess(state);
     if (access.premium) return errors;
+    if (!capsEnforced()) return errors; // grandfathered until payments live
     const officialIds = new Set(
       PACKS.filter((p) => p.source === "official").map((p) => p.id)
     );
-    const installedOfficial = state.installedPacks.filter((id) =>
-      officialIds.has(id)
+    const paused = new Set(state.pausedPacks ?? []);
+    const activeOfficial = state.installedPacks.filter(
+      (id) => officialIds.has(id) && !paused.has(id)
     ).length;
-    if (installedOfficial > getFreePacks()) {
+    if (activeOfficial > getFreePacks()) {
       errors.push(
-        `free user has ${installedOfficial} official packs installed; cap is ${getFreePacks()}`
+        `free user has ${activeOfficial} ACTIVE official packs; cap is ${getFreePacks()}`
+      );
+    }
+    const activeSupps = (state.supplements ?? []).filter(
+      (s) => !s.paused
+    ).length;
+    if (activeSupps > getFreeSupplements()) {
+      errors.push(
+        `free user has ${activeSupps} ACTIVE supplements; cap is ${getFreeSupplements()}`
       );
     }
     const distinctMetrics = new Set(

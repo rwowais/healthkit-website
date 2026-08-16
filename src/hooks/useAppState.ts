@@ -35,6 +35,7 @@ import {
   addSupplement as addSupplementFn,
   updateSupplement as updateSupplementFn,
   removeSupplement as removeSupplementFn,
+  setSupplementPaused as setSupplementPausedFn,
   setVacationMode as setVacationModeFn,
   useStreakFreeze as useStreakFreezeFn,
   installPack as installPackFn,
@@ -56,6 +57,7 @@ import { STORAGE_KEY } from "@/lib/constants";
 
 import { fetchAndApplyPublished } from "@/lib/cms/publish";
 import { maybeExtendTrial } from "@/lib/entitlements";
+import { enforceFreeCaps } from "@/lib/storage";
 import type {
   BiomarkerEntry,
   BehaviorOverride,
@@ -151,7 +153,7 @@ export function useAppState() {
       .then(() => activeDataSource.load())
       .then((raw) => {
         if (!alive) return;
-        const loaded = maybeExtendTrial(raw);
+        const loaded = enforceFreeCaps(maybeExtendTrial(raw));
         // Canonical baseline off the *pre-extension* state: if a trial
         // extension was applied, state ≠ baseline → exactly one save fires
         // and the extension persists; if not, a round-trip is a fixed
@@ -245,7 +247,7 @@ export function useAppState() {
         const j = stableStringify(raw);
         if (j === lastJson.current) return;
         lastJson.current = j;
-        setState(maybeExtendTrial(raw));
+        setState(enforceFreeCaps(maybeExtendTrial(raw)));
       });
     };
     // Definite-change signals bypass the floor; refocus/visibility are
@@ -407,6 +409,9 @@ export function useAppState() {
   const removeSupplement = useCallback((id: string) => {
     setState((prev) => removeSupplementFn(prev, id));
   }, []);
+  const setSupplementPaused = useCallback((id: string, paused: boolean) => {
+    setState((prev) => setSupplementPausedFn(prev, id, paused));
+  }, []);
   const setVacationMode = useCallback((on: boolean) => {
     setState((prev) => setVacationModeFn(prev, on));
   }, []);
@@ -476,7 +481,7 @@ export function useAppState() {
   const refresh = useCallback(async () => {
     try {
       const raw = await activeDataSource.load();
-      const loaded = maybeExtendTrial(raw);
+      const loaded = enforceFreeCaps(maybeExtendTrial(raw));
       lastJson.current = stableStringify(raw);
       setState(loaded);
     } catch {
@@ -509,6 +514,7 @@ export function useAppState() {
     addSupplement,
     updateSupplement,
     removeSupplement,
+    setSupplementPaused,
     // Vacation
     setVacationMode,
     useStreakFreeze,

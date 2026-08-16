@@ -307,6 +307,11 @@ export function supplementsForBlock(
   flags?: Partial<Record<SafetyFlag, boolean>>
 ): Supplement[] {
   return all
+    // Free-cap pause (2026-08-16): a paused supplement is out of the day —
+    // filtered at this single choke point so Today's cards, progress/score,
+    // day-complete and reminders all agree. The Supplements page lists
+    // paused rows separately (locked, with data intact).
+    .filter((s) => !s.paused)
     .filter((s) => s.block === block)
     .filter((s) => !s.daysActive || s.daysActive[dayIndex])
     .filter((s) => !isSupplementContraindicated(s, flags))

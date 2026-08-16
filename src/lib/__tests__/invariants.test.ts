@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { getDefaultState, setVacationMode, swapBehavior } from "@/lib/storage";
 import { checkInvariants, ALL_INVARIANTS } from "./invariants";
+import { __setCapsEnforced } from "@/lib/entitlements";
 import type { AppState } from "@/lib/types";
 
 describe("invariant suite — sanity on known states", () => {
@@ -48,9 +49,11 @@ describe("invariant suite — sanity on known states", () => {
   });
 
   it("a state crafted to BREAK an invariant surfaces it", () => {
-    // Build a free-tier state with 4 official packs installed —
-    // this should violate inv_free_tier_caps_held when we go around
-    // the storage gate (we mutate state directly).
+    // Build a free-tier state with 4 ACTIVE official packs — this violates
+    // inv_free_tier_caps_held when we go around the storage gate. The
+    // invariant is deliberately vacuous until payments are live
+    // (grandfathering), so force enforcement on for this check.
+    __setCapsEnforced(true);
     const s: AppState = {
       ...getDefaultState(),
       installedPacks: [
@@ -61,6 +64,7 @@ describe("invariant suite — sanity on known states", () => {
       ],
     };
     const violations = checkInvariants(s);
+    __setCapsEnforced(null);
     expect(
       violations.some((v) =>
         /free-tier caps never exceeded/.test(v)

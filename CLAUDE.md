@@ -9,10 +9,16 @@ recovery/adherence signals. Behaviors, biomarkers and a calm intelligence
 layer (keystone, weekly review, suggestions) sit on top.
 
 **Business model:** Freemium with a 14-day reverse trial (engagement-gated
-auto-extend). Free = the full habit loop + 3 protocol packs + insights on a
-3-day delay + 3 biomarkers + local/cloud sync + export. Premium ($8.99/mo or
+auto-extend). Free = the full habit loop + 2 ACTIVE protocol packs + 3 ACTIVE
+supplements + insights on a 3-day delay + 3 biomarkers + full history +
+local/cloud sync + export. Lock-don't-delete (2026-08-16): at trial expiry,
+over-cap packs/supplements PAUSE (data intact, instant restore on upgrade) —
+and cap enforcement only activates once Stripe payments are live
+(entitlements.capsEnforced), so pre-launch users stay grandfathered. Premium ($8.99/mo or
 $79.99/yr; $179 lifetime) unlocks the intelligence layer, the complete
-Library, biomarker-aware adaptation, and unlimited history. Stripe is
+Library, the full supplement stack, the custom builder, and biomarker-aware
+adaptation. (Do NOT advertise "unlimited history" — free keeps full history;
+that claim was cut 2026-08-16 as a benefit with no implementation.) Stripe is
 env-gated and inert until the owner wires Payment Links. Pricing lives in
 `src/lib/billing.ts` (`PRICING`).
 

@@ -284,6 +284,14 @@ export interface Supplement {
    * sorting — supplements are bundle-and-do.
    */
   timing?: string;
+  /**
+   * Free-cap pause (2026-08-16): when the trial ends over the free
+   * supplement cap (and payments are live), the extras flip to
+   * paused — data intact, take/skip disabled, restored exactly by
+   * upgrading or by swapping which ones are active. Never set for
+   * premium users; absent = active.
+   */
+  paused?: boolean;
   /** Optional brand or product name. */
   brand?: string;
   /** Optional user notes (e.g. "out of stock at Costco"). */

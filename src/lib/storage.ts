@@ -28,6 +28,8 @@ import {
   getAccess,
   getFreeBiomarkers,
   getFreePacks,
+  getFreeSupplements,
+  capsEnforced,
 } from "./entitlements";
 import { resolveBehaviorByKey } from "./workouts";
 import { activePacks } from "./knowledge";
@@ -1154,6 +1156,9 @@ export function toggleSupplement(
   date: string,
   id: string
 ): AppState {
+  // A paused (over-free-cap) supplement can't be taken/skipped — the pause is
+  // the paywall. No-op here so every entry point honors it uniformly.
+  if ((state.supplements ?? []).find((s) => s.id === id)?.paused) return state;
   const log = getOrCreateLog(state, date);
   const sc = { ...(log.supplementCompletions ?? {}) };
   sc[id] = !sc[id];
@@ -1280,6 +1285,17 @@ export function addSupplement(
 ): AppState {
   const list = state.supplements ?? [];
   if (list.some((s) => s.id === supp.id)) return state;
+  // Free-tier cap (2026-08-16): once payments are live, a free user can hold
+  // at most getFreeSupplements() ACTIVE supplements. Gate at the storage layer
+  // (like installPack) so no UI or sync path can bypass it. During the trial
+  // premium=true, so trial users add freely.
+  if (
+    capsEnforced() &&
+    !getAccess(state).premium &&
+    list.filter((s) => !s.paused).length >= getFreeSupplements()
+  ) {
+    return state;
+  }
   return { ...state, supplements: [...list, supp] };
 }
 
@@ -1411,6 +1427,14 @@ export function upsertCustomPack(
   pack: ProtocolPack
 ): AppState {
   const exists = state.customPacks.some((p) => p.id === pack.id);
+  // Builder gate (2026-08-16): EDITING an existing custom pack is part of the
+  // Premium builder, closing the loose end where only the create/fork entry
+  // points were (UI-)gated. Deliberately scoped to edits: CREATION here stays
+  // open because the share flow imports a friend's pack through this same
+  // function — blocking a free recipient from accepting a share would kill
+  // the growth loop, and custom packs are uncapped by design. The pack keeps
+  // RUNNING either way; only reshaping it needs Premium.
+  if (exists && capsEnforced() && !getAccess(state).premium) return state;
   const customPacks = exists
     ? state.customPacks.map((p) => (p.id === pack.id ? pack : p))
     : [...state.customPacks, pack];
@@ -1445,12 +1469,122 @@ export function deleteCustomPack(state: AppState, id: string): AppState {
 }
 
 /** Reversibly pause / resume an installed pack (non-destructive). */
+/**
+ * Free-cap enforcement — "lock, don't delete" (founder call, 2026-08-16).
+ *
+ * When the trial ends over the free caps AND payments are live, the extras
+ * flip to PAUSED rather than being removed: official packs beyond the cap move
+ * into pausedPacks, supplements beyond theirs get paused:true. Data is never
+ * touched; upgrading (premium) makes this a no-op and the user (or the
+ * restore path) unpauses. Order keeps the FIRST-listed items active — the
+ * chooser UI lets the user swap via setPackPaused / supplement pause toggles.
+ *
+ * Pure + idempotent: returns the same reference when nothing needs pausing,
+ * so the useAppState fixed-point guard sees no phantom change. Invoked from
+ * the load path beside maybeExtendTrial.
+ */
+export function enforceFreeCaps(state: AppState): AppState {
+  if (!capsEnforced()) return state;
+  if (getAccess(state).premium) return state;
+
+  let next = state;
+
+  // Official packs beyond the cap → pausedPacks (custom packs never count).
+  const catalog = activePacks();
+  const isOfficial = (pid: string) =>
+    catalog.find((p) => p.id === pid)?.source === "official";
+  const paused = new Set(state.pausedPacks ?? []);
+  const activeOfficial = state.installedPacks.filter(
+    (pid) => isOfficial(pid) && !paused.has(pid)
+  );
+  const packCap = getFreePacks();
+  if (activeOfficial.length > packCap) {
+    const toPause = activeOfficial.slice(packCap);
+    next = {
+      ...next,
+      pausedPacks: [...(next.pausedPacks ?? []), ...toPause],
+    };
+  }
+
+  // Supplements beyond the cap → paused: true.
+  const supps = next.supplements ?? [];
+  const activeSupps = supps.filter((s) => !s.paused);
+  const suppCap = getFreeSupplements();
+  if (activeSupps.length > suppCap) {
+    const keep = new Set(activeSupps.slice(0, suppCap).map((s) => s.id));
+    next = {
+      ...next,
+      supplements: supps.map((s) =>
+        s.paused || keep.has(s.id) ? s : { ...s, paused: true }
+      ),
+    };
+  }
+
+  return next;
+}
+
+/**
+ * Swap which supplements are active under the free cap. Pausing is always
+ * allowed; unpausing is capped exactly like packs (see setPackPaused).
+ */
+export function setSupplementPaused(
+  state: AppState,
+  id: string,
+  paused: boolean
+): AppState {
+  const supps = state.supplements ?? [];
+  const target = supps.find((s) => s.id === id);
+  if (!target || Boolean(target.paused) === paused) return state;
+  if (!paused && capsEnforced() && !getAccess(state).premium) {
+    const active = supps.filter((s) => !s.paused).length;
+    if (active >= getFreeSupplements()) return state;
+  }
+  return {
+    ...state,
+    supplements: supps.map((s) =>
+      s.id === id ? { ...s, paused: paused ? true : undefined } : s
+    ),
+  };
+}
+
+/**
+ * Premium restore — clear every free-cap pause in one move (the "upgrading
+ * restores them exactly" promise from Terms). Only touches supplement pause
+ * flags; pack unpausing is the user's call since pausedPacks pre-dates this
+ * feature and may hold deliberate pauses.
+ */
+export function clearSupplementPauses(state: AppState): AppState {
+  const supps = state.supplements ?? [];
+  if (!supps.some((s) => s.paused)) return state;
+  return {
+    ...state,
+    supplements: supps.map((s) =>
+      s.paused ? { ...s, paused: undefined } : s
+    ),
+  };
+}
+
 export function setPackPaused(
   state: AppState,
   id: string,
   paused: boolean
 ): AppState {
   const cur = state.pausedPacks ?? [];
+  // Unpause guard (2026-08-16): with payments live, a free user's ACTIVE
+  // official packs are capped — pausing is always allowed (it's how they
+  // choose their active set), but unpausing must not exceed the cap, or the
+  // pause-based enforcement would be a one-way door with a side exit.
+  if (!paused && capsEnforced() && !getAccess(state).premium) {
+    const catalog = activePacks();
+    const isOfficial = (pid: string) =>
+      catalog.find((p) => p.id === pid)?.source === "official";
+    if (isOfficial(id)) {
+      const activeOfficial = state.installedPacks.filter(
+        (pid) => isOfficial(pid) && !cur.includes(pid)
+      ).length;
+      if (activeOfficial >= getFreePacks()) return state;
+    }
+  }
   const pausedPacks = paused
     ? cur.includes(id)
       ? cur

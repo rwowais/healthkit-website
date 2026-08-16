@@ -16,8 +16,16 @@ import { getCfgNumber } from "./knowledge";
  * Publish that overrides any of these takes effect without redeploying.
  */
 export const AHA_DAYS = 6;
-export const FREE_PACKS = 3;
+/** Free-tier cap on ACTIVE official packs. Dropped 3 → 2 (founder call,
+ *  2026-08-16): most users run 1–2 packs, and the default starter system is
+ *  exactly 2 — so 2 keeps the out-of-box experience valid while making the
+ *  full library a real reason to upgrade. CMS-overridable via FREE_PACKS. */
+export const FREE_PACKS = 2;
 export const FREE_BIOMARKERS = 3;
+/** Free-tier cap on ACTIVE supplements (founder call, 2026-08-16): the
+ *  supplement tracker is the daily-felt premium surface — casual 2-3-item
+ *  users stay free; heavy-stack users (the buyers) need Premium. */
+export const FREE_SUPPLEMENTS = 3;
 /** Free-tier insight DELAY in days: free users see full history but lagged this
  *  many days behind today; Premium is real-time. This is the actual shipped
  *  gate (insights/page.tsx reads getFreeInsightDays()), so changing it in CMS
@@ -32,6 +40,29 @@ export const getFreeBiomarkers = (): number =>
   getCfgNumber("FREE_BIOMARKERS", FREE_BIOMARKERS);
 export const getFreeInsightDays = (): number =>
   getCfgNumber("FREE_INSIGHT_DAYS", FREE_INSIGHT_DAYS);
+export const getFreeSupplements = (): number =>
+  getCfgNumber("FREE_SUPPLEMENTS", FREE_SUPPLEMENTS);
+
+// ── Enforcement switch (founder call, 2026-08-16) ──────────────────────
+// Free-tier caps get TEETH only once payments are actually purchasable.
+// Rationale: enforcing "upgrade to reactivate" while /upgrade says "paid
+// plans are coming soon" is pressure with no release valve — it would pause
+// the friend-testers' packs behind an unbuyable wall. Keyed off the same
+// Stripe env vars as billing.billingConfigured, but read LAZILY so tests can
+// exercise both worlds without module-reload gymnastics.
+let capsEnforcedOverride: boolean | null = null;
+export function capsEnforced(): boolean {
+  if (capsEnforcedOverride !== null) return capsEnforcedOverride;
+  return Boolean(
+    process.env.NEXT_PUBLIC_STRIPE_CHECKOUT_ANNUAL ||
+      process.env.NEXT_PUBLIC_STRIPE_CHECKOUT_MONTHLY ||
+      process.env.NEXT_PUBLIC_STRIPE_CHECKOUT_LIFETIME
+  );
+}
+/** Test seam — force enforcement on/off; null returns to env-derived. */
+export function __setCapsEnforced(v: boolean | null): void {
+  capsEnforcedOverride = v;
+}
 
 // ── Clock high-water mark (audit 2026-08-16 bug 6.1) ───────────────────
 // getAccess used the raw device clock, so rolling it back resurrected an

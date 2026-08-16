@@ -250,23 +250,26 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
     );
   });
 
-  it("pack free cap — installPack silently allows 4th official pack", () => {
+  it("pack free cap — installPack rejects an official pack past the cap", () => {
     let st = makePriya();
     // She has 1 official pack installed already (longevity-foundation).
     expect(st.installedPacks).toEqual(["longevity-foundation"]);
-    // Day 90 — install deep-focus (4th pack, but she only has 1 — SUCCEEDS).
-    st = installPack(st, "deep-focus");
-    expect(st.installedPacks).toContain("deep-focus");
-    // Day 100 — install blood-sugar. Now at 3 packs (at cap).
-    st = installPack(st, "blood-sugar");
+    // Install official packs one at a time until she reaches the free cap
+    // (cap-relative so a tuned FREE_PACKS doesn't churn this test — it was
+    // hardcoded to the old cap of 3; the cap is 2 as of 2026-08-16).
+    const candidates = ["deep-focus", "blood-sugar", "better-sleep"];
+    for (const pid of candidates.slice(0, getFreePacks() - 1)) {
+      st = installPack(st, pid);
+      expect(st.installedPacks).toContain(pid);
+    }
     const officialIds = new Set(
       PACKS.filter((p) => p.source === "official").map((p) => p.id)
     );
     const officialInstalled = st.installedPacks.filter((id) =>
       officialIds.has(id)
     ).length;
-    expect(officialInstalled).toBe(3);
-    // Day 110 — try to install a 4th pack. Free cap = 3.
+    expect(officialInstalled).toBe(getFreePacks());
+    // Try to install one MORE past the cap — must be rejected.
     const before = st.installedPacks.length;
     st = installPack(st, "cognitive-performance");
     const afterCount = st.installedPacks.filter((id) => officialIds.has(id))
@@ -280,7 +283,7 @@ describe("persona: Priya the careful — 365-day free-tier stress test", () => {
     ).toBe(true);
     expect(
       st.installedPacks.length,
-      "BUG: 4th pack install was silently accepted at lib layer"
+      "BUG: over-cap pack install was silently accepted at lib layer"
     ).toBe(before);
   });
 
