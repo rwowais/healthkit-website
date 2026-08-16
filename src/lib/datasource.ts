@@ -554,6 +554,19 @@ export function mergeStates(local: AppState, cloud: AppState): AppState {
         cloud.settings.premiumTrialEndsAt,
         local.settings.premiumTrialEndsAt
       ),
+      // One-shot guard: if EITHER device saw the trial extension, it happened.
+      // Before this, trialExtendedAt rode the bare `...local.settings` spread
+      // — the guard only survived because JSON drops absent keys, and a merge
+      // path could erase it while laterIso kept the extended end date,
+      // re-arming the "one-shot" extension (audit 2026-08-16 bug 6.9). Keep
+      // the EARLIEST stamp: that's when the one extension actually fired.
+      trialExtendedAt:
+        cloud.settings.trialExtendedAt && local.settings.trialExtendedAt
+          ? new Date(cloud.settings.trialExtendedAt) <
+            new Date(local.settings.trialExtendedAt)
+            ? cloud.settings.trialExtendedAt
+            : local.settings.trialExtendedAt
+          : cloud.settings.trialExtendedAt ?? local.settings.trialExtendedAt,
       // Append-only sets — union across devices so a rest day planned on one
       // device isn't lost, and a milestone already celebrated on either
       // device never re-fires after the merge.

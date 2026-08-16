@@ -1669,7 +1669,10 @@ export default function TodayPage() {
             auto-extend was silent until now; surfacing it once makes the
             kindness *felt* (not just unmonetized). Dismissing stamps the
             local ack so it never reappears for this same extension. */}
-        {isToday && showTrialExtension && (
+        {/* !access.paid: a paying customer must never be told their "trial"
+            was extended (their tier lives in the server entitlements table,
+            not settings.tier — audit 2026-08-16 bug 3.5). */}
+        {isToday && showTrialExtension && !access.paid && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

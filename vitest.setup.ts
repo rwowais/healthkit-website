@@ -74,3 +74,13 @@ try {
 } catch {
   /* no .env.local — staging smoke just skips */
 }
+
+// ── Entitlement clock-guard isolation ─────────────────────────────────
+// entitlements.effectiveNow() is a monotonic anti-tamper clock with
+// module-level memory. Tests that use fake timers set in the past would
+// otherwise inherit a high-water mark from an earlier test and misread
+// trials as expired. Reset it before every test; production keeps full
+// monotonicity within a session.
+import { beforeEach } from "vitest";
+import { __resetClockGuard } from "@/lib/entitlements";
+beforeEach(() => __resetClockGuard());

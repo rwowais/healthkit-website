@@ -95,7 +95,9 @@ export interface UserSettings {
   bedtime: string; // HH:MM 24h
   wakeTime: string; // HH:MM 24h
   timezone: string;
-  subscriptionStatus: "trial" | "active" | "expired" | "cancelled";
+  // (subscriptionStatus removed 2026-08-16: write-only field, stuck at
+  // "trial" forever — anything reading it would have been wrong. Paid status
+  // lives in the server entitlements table; trial in premiumTrialEndsAt.)
   trialStartDate: string;
   notificationsEnabled: boolean;
   /** Optional do-not-disturb window for reminders, "HH:MM" 24h. A reminder

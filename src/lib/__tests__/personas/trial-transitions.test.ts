@@ -36,6 +36,7 @@ import {
   AHA_DAYS,
   getAccess,
   maybeExtendTrial,
+  __resetClockGuard,
 } from "@/lib/entitlements";
 import { adapt, getSignals } from "@/lib/engine";
 import { PACKS } from "@/lib/packs";
@@ -50,6 +51,11 @@ const T0 = new Date(T0_ISO).getTime();
 function setNow(dayNum: number): void {
   // dayNum=1 → T0, dayNum=2 → T0+1 day, etc.
   vi.setSystemTime(new Date(T0 + (dayNum - 1) * 86_400_000));
+  // These personas teleport BACKWARD between scenarios (and T0 itself is in
+  // the past relative to the real clock). Production's anti-tamper monotonic
+  // clock (entitlements.effectiveNow) correctly refuses that, so every
+  // deliberate time-set here also resets the observed high-water mark.
+  __resetClockGuard();
 }
 
 function dayKey(dayNum: number): string {

@@ -1170,7 +1170,6 @@ export default function ProfilePage() {
                       // reset (retention) — without tier + premiumTrialEndsAt,
                       // getAccess would read them as expired-free immediately.
                       tier: s.tier,
-                      subscriptionStatus: s.subscriptionStatus ?? "trial",
                       trialStartDate: s.trialStartDate,
                       premiumTrialEndsAt: s.premiumTrialEndsAt,
                       // …and the one-shot auto-extend guard: dropping it made
@@ -1186,6 +1185,19 @@ export default function ProfilePage() {
                     },
                   };
                   await activeDataSource.save(seed);
+                  // clearAllData() swept pz:trial-ext-ack while this seed
+                  // preserves trialExtendedAt — without re-stamping the ack,
+                  // the "We extended your trial a week" card re-fires after a
+                  // reset, announcing an extension that isn't happening
+                  // (audit 2026-08-16 bug 3.8).
+                  if (s.trialExtendedAt) {
+                    try {
+                      localStorage.setItem(
+                        "pz:trial-ext-ack",
+                        s.trialExtendedAt
+                      );
+                    } catch {}
+                  }
                 } catch {}
               }
               setConfirmReset(false);

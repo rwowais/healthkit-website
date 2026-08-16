@@ -91,7 +91,6 @@ export function onboardedState() {
       // Match the CI runner's clock (UTC) so the app's "you've moved
       // timezones?" travel prompt never fires and overlays the UI.
       timezone: "UTC",
-      subscriptionStatus: "trial",
       trialStartDate: new Date(now).toISOString(),
       premiumTrialEndsAt: new Date(now + 14 * 86_400_000).toISOString(),
       notificationsEnabled: false,

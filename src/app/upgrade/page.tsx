@@ -34,9 +34,13 @@ const VALUE: { icon: IconName; t: string; s: string }[] = [
     s: "Your day flexes around your own recovery signals — the HRV and resting-heart-rate readings you log in Body Trends.",
   },
   {
-    icon: "flame",
-    t: "Unlimited history & trends",
-    s: "Every day you track compounds into a clearer picture of you.",
+    icon: "pill",
+    // Replaced "Unlimited history & trends" (2026-08-16): that benefit had no
+    // implementation — free users already keep full history — so selling it
+    // was a broken promise. The supplement stack is the real, daily-felt
+    // premium surface (free tracks up to 3; see entitlements.FREE_SUPPLEMENTS).
+    t: "Your full supplement stack",
+    s: "Track every supplement with doses, timing intelligence, and inventory that warns you before you run out.",
   },
 ];
 

@@ -127,7 +127,6 @@ export function buildPersona(kind: PersonaKind): AppState {
       completedOnboarding: true,
       disclaimerAcknowledged: true,
       tier: "free",
-      subscriptionStatus: "trial",
       premiumTrialEndsAt: trialEnds,
     },
     installedPacks: ["longevity-foundation"],
@@ -178,7 +177,6 @@ export function buildPersona(kind: PersonaKind): AppState {
   // power
   s.installedPacks = ["longevity-foundation", "better-sleep", "deep-focus"];
   s.settings.tier = "premium";
-  s.settings.subscriptionStatus = "active";
   s.settings.weeklyGoal = 6;
   s.dailyLogs = range(0, 59, true);
   // Clean, monotonic trends so the dev persona exercises the forecast card:

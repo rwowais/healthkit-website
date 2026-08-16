@@ -26,7 +26,7 @@ export default function TermsPage() {
         <p className="t-eyebrow">Legal</p>
         <h1 className="t-title mt-2 mb-2">Terms of Service</h1>
         <p className="text-[12px] text-[var(--text-3)] mb-8">
-          Version {LEGAL_VERSION} · Last updated April 2026
+          Version {LEGAL_VERSION} · Last updated August 2026
         </p>
 
         <div className="space-y-7 text-[15px] leading-relaxed text-[var(--text-2)]">
@@ -102,13 +102,19 @@ export default function TermsPage() {
           <Section title="Subscriptions and billing">
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
-                Free tier includes the full habit loop, three protocol
-                packs, three biomarkers, and 7 days of insights.
+                Free tier includes the full daily habit loop, two active
+                protocol packs, tracking for up to three supplements, your
+                full history and streaks, and insights on a 3-day delay.
               </li>
               <li>
-                Premium unlocks the full intelligence layer, the
-                complete library, biomarker-aware adaptation, and
-                unlimited history.
+                Premium unlocks the complete protocol library, your full
+                supplement stack, real-time insights and correlations, the
+                custom protocol builder, and biomarker-aware adaptation.
+              </li>
+              <li>
+                If your trial ends with more packs or supplements than the
+                free tier includes, the extras pause — nothing is deleted,
+                and upgrading restores them exactly as they were.
               </li>
               <li>
                 Billing is monthly, annually, or lifetime. You can

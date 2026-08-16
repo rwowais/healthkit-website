@@ -1003,9 +1003,12 @@ export default function ProtocolsPage() {
                         color: "var(--text-2)",
                       }}
                     >
-                      You have {getFreePacks()} of {getFreePacks()} free
-                      protocols installed. Premium unlocks unlimited — or
-                      remove one in your installed list to swap.
+                      {officialInstalledCount > getFreePacks()
+                        ? // Over-cap (installed during the trial): those packs
+                          // keep working — the cap only limits ADDING. Saying
+                          // "3 of 3" to a user looking at 8 packs read as false.
+                          `You have ${officialInstalledCount} protocols installed — they all keep working. The free plan adds up to ${getFreePacks()}, so adding another takes Premium (or remove one to swap).`
+                        : `You have ${officialInstalledCount} of ${getFreePacks()} free protocols installed. Premium unlocks unlimited — or remove one in your installed list to swap.`}
                     </p>
                   )}
                   <Button

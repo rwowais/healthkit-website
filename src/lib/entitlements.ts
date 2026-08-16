@@ -33,6 +33,50 @@ export const getFreeBiomarkers = (): number =>
 export const getFreeInsightDays = (): number =>
   getCfgNumber("FREE_INSIGHT_DAYS", FREE_INSIGHT_DAYS);
 
+// ── Clock high-water mark (audit 2026-08-16 bug 6.1) ───────────────────
+// getAccess used the raw device clock, so rolling it back resurrected an
+// expired trial indefinitely. Entitlement time is now monotonic: we remember
+// the latest timestamp ever observed and never trust a clock behind it.
+// Trade-off (accepted): a device whose clock was accidentally FUTURE-wrong and
+// then corrected will see its trial end early — conservative, recoverable, and
+// far rarer than deliberate rollback. Persisted so a reload doesn't forget;
+// throttled so render-path getAccess calls don't hammer localStorage.
+const HWM_KEY = "pz:hwm";
+let hwmMem = 0;
+let hwmPersistedAt = 0;
+function effectiveNow(): number {
+  const now = Date.now();
+  if (hwmMem === 0 && typeof window !== "undefined") {
+    try {
+      hwmMem = Number(localStorage.getItem(HWM_KEY)) || 0;
+    } catch {
+      /* unavailable — in-memory monotonicity still holds this session */
+    }
+  }
+  if (now > hwmMem) {
+    hwmMem = now;
+    if (typeof window !== "undefined" && now - hwmPersistedAt > 60_000) {
+      hwmPersistedAt = now;
+      try {
+        localStorage.setItem(HWM_KEY, String(now));
+      } catch {}
+    }
+  }
+  return Math.max(now, hwmMem);
+}
+
+/** Test seam — forget the observed high-water mark (memory AND persisted,
+ *  else effectiveNow just re-hydrates the old mark from localStorage). */
+export function __resetClockGuard(): void {
+  hwmMem = 0;
+  hwmPersistedAt = 0;
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(HWM_KEY);
+    } catch {}
+  }
+}
+
 export interface Access {
   premium: boolean; // full access (paid OR active trial)
   paid: boolean; // actually subscribed
@@ -136,7 +180,7 @@ export function getAccess(state: AppState): Access {
     ? ent.paidTier === "premium"
     : state.settings.tier === "premium";
   const endIso = state.settings.premiumTrialEndsAt;
-  const now = Date.now();
+  const now = effectiveNow(); // monotonic — a rolled-back clock can't resurrect a trial
   let inTrial = false;
   let trialDaysLeft = 0;
   let trialExpired = false;
@@ -169,15 +213,19 @@ export function getAccess(state: AppState): Access {
  * paywall someone before they've felt the value.
  */
 export function maybeExtendTrial(state: AppState): AppState {
-  const { tier, premiumTrialEndsAt, trialExtendedAt } = state.settings;
-  if (tier === "premium" || !premiumTrialEndsAt) return state;
+  const { premiumTrialEndsAt, trialExtendedAt } = state.settings;
+  // Guard on getAccess().paid, NOT settings.tier: once Stripe lands, payment
+  // stamps the server entitlements table while settings.tier stays "free" —
+  // guarding on tier alone would "extend the trial" of a paying customer and
+  // show them the extension card (audit 2026-08-16, bug 3.5).
+  if (getAccess(state).paid || !premiumTrialEndsAt) return state;
   // Genuinely one-shot: once we've extended, never extend again. Without this
   // guard the extension renewed every time an under-engaged user re-entered the
   // 3-day window (~weekly), indefinitely deferring the paywall — contradicting
   // this function's "one-shot, idempotent" contract.
   if (trialExtendedAt) return state;
   const end = new Date(premiumTrialEndsAt).getTime();
-  const now = Date.now();
+  const now = effectiveNow(); // same monotonic clock as getAccess
   // Forgiving window: from 3 days before expiry up to a week *after* —
   // a returning user who hasn't had their aha still gets a fair runway
   // rather than a hard paywall the moment they come back.

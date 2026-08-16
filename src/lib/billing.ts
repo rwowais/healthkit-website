@@ -27,10 +27,13 @@ export function planLink(plan: Plan): string | undefined {
 export function startCheckout(plan: Plan): { ok: boolean; reason?: string } {
   const url = LINKS[plan];
   if (!url) {
+    // NOTE: currently unreachable from the UI (the upgrade page only renders
+    // the checkout button when billingConfigured) — kept as the honest guard
+    // for any future caller. Copy must not claim "trial access": the caller
+    // may be a trial-expired user.
     return {
       ok: false,
-      reason:
-        "Payments aren't switched on yet — you're on the free plan with full trial access. Nothing to do.",
+      reason: "Payments aren't switched on yet — nothing to do here.",
     };
   }
   if (typeof window !== "undefined") window.location.href = url;

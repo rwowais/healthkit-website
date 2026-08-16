@@ -43,9 +43,10 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
  * materially — the app will then re-prompt accepted users to confirm
  * the new docs (minor copy fixes don't justify a bump).
  */
-export const LEGAL_VERSION = 1;
+export const LEGAL_VERSION = 2;
 
-export const TRIAL_DURATION_DAYS = 7;
+// (TRIAL_DURATION_DAYS removed 2026-08-16: dead code that said 7 while the
+// shipped trial is 14 days — stamped in onboarding/page.tsx finish().)
 
 export const SCORE_WEIGHTS = {
   completionBase: 80,
