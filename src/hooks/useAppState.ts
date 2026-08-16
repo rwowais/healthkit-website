@@ -46,7 +46,12 @@ import {
   setPackPaused as setPackPausedFn,
 } from "@/lib/storage";
 import { activeDataSource, STATE_EVENT } from "@/lib/datasource";
-import { getShared, subscribeShared, applyUpdate } from "@/lib/appStore";
+import {
+  getShared,
+  subscribeShared,
+  applyUpdate,
+  publishIfUnchanged,
+} from "@/lib/appStore";
 import { STORAGE_KEY } from "@/lib/constants";
 
 import { fetchAndApplyPublished } from "@/lib/cms/publish";
@@ -134,6 +139,10 @@ export function useAppState() {
 
   useEffect(() => {
     let alive = true;
+    // Snapshot the shared value BEFORE the async work: if anything publishes
+    // while we're loading — most importantly a user edit — this load carries
+    // pre-edit data and must not overwrite it (see publishIfUnchanged).
+    const before = getShared();
     // Hybrid CMS refresh: adopt the newest published bundle (if any)
     // before state loads, so the timeline/merge/score serve it. Inert
     // when offline / Supabase off / nothing published — built-in stands.
@@ -143,14 +152,22 @@ export function useAppState() {
       .then((raw) => {
         if (!alive) return;
         const loaded = maybeExtendTrial(raw);
-      // Canonical baseline off the *pre-extension* state: if a trial
-      // extension was applied, state ≠ baseline → exactly one save fires
-      // and the extension persists; if not, a round-trip is a fixed
-      // point and there is no save/load churn.
-      lastJson.current = stableStringify(raw);
-      setState(loaded);
-      setLoading(false);
-    });
+        // Canonical baseline off the *pre-extension* state: if a trial
+        // extension was applied, state ≠ baseline → exactly one save fires
+        // and the extension persists; if not, a round-trip is a fixed
+        // point and there is no save/load churn.
+        lastJson.current = stableStringify(raw);
+        if (!publishIfUnchanged(before, loaded)) {
+          // Someone edited (or another instance already seeded) while we
+          // loaded — adopt what's live rather than reverting it.
+          const live = getShared();
+          if (live) {
+            lastJson.current = stableStringify(live);
+            setLocal(live);
+          }
+        }
+        setLoading(false);
+      });
     return () => {
       alive = false;
     };
@@ -216,9 +233,15 @@ export function useAppState() {
       // Closes both the debounce-window race and the self-clobber where
       // our own save's "changed" event reloads a stale cloud row.
       if (pendingSave.current || saving.current) return;
+      // Same hazard as the initial load: this resync's data predates anything
+      // published while it was in flight. The pendingSave/saving refs below
+      // are per-INSTANCE, so they don't see an edit made through a sibling
+      // instance — the shared snapshot does.
+      const before = getShared();
       sharedLoad(force).then((raw) => {
         if (raw === null) return; // speculative + throttled — nothing changed
         if (pendingSave.current || saving.current) return;
+        if (getShared() !== before) return; // something changed under us
         const j = stableStringify(raw);
         if (j === lastJson.current) return;
         lastJson.current = j;

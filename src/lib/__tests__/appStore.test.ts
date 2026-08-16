@@ -16,6 +16,7 @@ import {
   setShared,
   subscribeShared,
   applyUpdate,
+  publishIfUnchanged,
   resetShared,
 } from "@/lib/appStore";
 import { getDefaultState } from "@/lib/storage";
@@ -74,6 +75,44 @@ describe("appStore — lost-update protection (REL-3)", () => {
     expect(getShared()).toBeNull();
     applyUpdate((prev) => withStreak(prev, 5), base);
     expect(getShared()!.currentStreak).toBe(5);
+  });
+
+  // Regression: shipped 2026-07-24, caught by the e2e persistence + sync specs.
+  // Consolidating onto one shared object meant an in-flight load() — started
+  // before the user touched anything — republished its PRE-EDIT snapshot to
+  // every instance at once when it resolved. The toggle flipped on screen, then
+  // the stale document was what got saved: the completion never reached
+  // localStorage or the cloud, and the dirty flag was cleared so the app
+  // believed it had saved. Async publishes must compare-and-swap.
+  describe("publishIfUnchanged — async publishes can't clobber an edit", () => {
+    it("refuses to publish when something changed during the async work", () => {
+      setShared(base());
+      const before = getShared(); // what a load() captured when it started
+
+      // …user toggles something while the load is still in flight
+      applyUpdate((prev) => withStreak(prev, 9), base);
+
+      // …then the stale load resolves and tries to publish its old snapshot
+      const published = publishIfUnchanged(before, withName(base(), "stale"));
+
+      expect(published).toBe(false);
+      expect(getShared()!.currentStreak).toBe(9); // the edit survived
+      expect(getShared()!.settings.name).not.toBe("stale");
+    });
+
+    it("publishes normally when nothing changed underneath", () => {
+      setShared(base());
+      const before = getShared();
+      const published = publishIfUnchanged(before, withStreak(base(), 4));
+      expect(published).toBe(true);
+      expect(getShared()!.currentStreak).toBe(4);
+    });
+
+    it("seeds an empty store (the normal first-load case)", () => {
+      expect(getShared()).toBeNull();
+      expect(publishIfUnchanged(null, withStreak(base(), 2))).toBe(true);
+      expect(getShared()!.currentStreak).toBe(2);
+    });
   });
 
   it("notifies every subscriber, and stops after unsubscribe", () => {

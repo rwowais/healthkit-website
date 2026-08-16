@@ -59,6 +59,31 @@ export function applyUpdate(
   return next;
 }
 
+/**
+ * Compare-and-swap publish, for values that were computed from an OLDER
+ * snapshot — i.e. anything asynchronous: the initial load, a refocus resync.
+ *
+ * Why it exists: a load started before the user touched anything resolves
+ * AFTER they did, carrying pre-edit data. Publishing it unconditionally
+ * overwrites the edit for every instance at once — the user sees the toggle
+ * flip, then the stale document is what actually gets saved, and the change is
+ * silently gone (caught by the e2e persistence + sync specs, 2026-07-24).
+ *
+ * Callers capture `getShared()` before starting the async work and pass it as
+ * `expected`. If anything published in the meantime, this is a no-op and the
+ * caller should adopt the current value instead of forcing its own.
+ *
+ * Returns true if the value was published.
+ */
+export function publishIfUnchanged(
+  expected: AppState | null,
+  next: AppState
+): boolean {
+  if (current !== expected) return false;
+  setShared(next);
+  return true;
+}
+
 /** Test seam — drop the shared value and all subscribers. */
 export function resetShared(): void {
   current = null;
