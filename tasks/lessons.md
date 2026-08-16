@@ -125,6 +125,32 @@ rule that prevents it.
   whole commit+push chain failed. **Rule:** for any multi-paragraph message —
   especially one quoting code, generics, or redirection characters — write it
   to a scratchpad file and use `git commit -F <file>`.
+- **I shipped a data-loss regression to prod with all gates green (2026-07-24).**
+  647 unit tests, tsc and build were all clean, and I declared the sync track
+  "closed". The e2e suite's FIRST run found it: completing a behavior didn't
+  persist. Cause — consolidating every `useAppState` instance onto one shared
+  object removed an *accidental* protection. A load() that started before the
+  user's tap resolved after it, still carrying the pre-edit snapshot; publishing
+  that to the shared store wiped the edit for every instance at once. Under the
+  old per-instance design the same late load only clobbered its own private
+  copy, so the instance the user was touching kept the edit.
+  **Three rules:**
+  1. **Consolidating duplicated state also consolidates the blast radius of
+     every stale write.** Before merging N copies into one, enumerate everything
+     that writes asynchronously (initial load, resync, retry) and ask what each
+     does when it lands late. Guards that were per-instance (`pendingSave`,
+     `saving`) become blind the moment siblings share state.
+  2. **Any async producer of shared state must compare-and-swap** — snapshot
+     before the await, publish only if unchanged. Exactly the same rule as the
+     REL-5 cloud write. "Don't check-then-act" applies to in-memory state too.
+  3. **Unit tests cannot catch this class**; only a real browser with real
+     timing can. For any change to state/sync/persistence, the e2e suite is
+     part of the gate, not an optional extra. `npm test` being green is not
+     evidence that a save reaches storage.
+  Debugging note that worked: rather than guessing, a throwaway spec that
+  clicked once then dumped (UI state, localStorage, pz:pending-sync, the DB row)
+  localized it in one run — the flag said "saved" while both stores lacked the
+  data, which pointed straight at a stale overwrite rather than a failed write.
 - **A "shared state" fix is only real if functional updates resolve against the
   SHARED value.** Two React instances each holding their own copy lose writes
   not because of the copies, but because `setState(prev => …)` receives the

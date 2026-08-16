@@ -210,6 +210,59 @@ Playwright (16 specs) NOT run — blocked on the service-role key.
 3. **[Low · A11y] `/terms` has no `<main>` landmark** — consistent with the
    already-logged audit finding F13 (auxiliary pages lack landmarks). Open.
 
+---
+
+# RUN 2 — 2026-07-24 (live e2e, after the owner supplied the service-role key)
+
+**Result: 26/26 e2e PASS, 647/647 unit PASS — but only after fixing a real
+regression the suite caught on its first run.**
+
+## The find (this is why the plan existed)
+`persistence.spec` and `sync.spec` both failed: completing a behavior did not
+survive a reload or reach a second device. Deterministic, not flaky, and the
+aria-labels the specs wait on matched the code exactly — so not a stale test.
+
+A throwaway probe (click once, then dump UI state + localStorage +
+`pz:pending-sync` + the DB row) localized it in a single run:
+
+| Signal | Before fix | After fix |
+|---|---|---|
+| UI flips to done | true | true |
+| localStorage has completion | **false** | true |
+| cloud row has completion | **false** | true |
+| `pz:pending-sync` | cleared (claims saved) | correct |
+
+So a stale document was overwriting the fresh one while the app reported
+success. Root cause: the REL-3 shared store. A `load()` begun before the user's
+tap resolved after it and republished its pre-edit snapshot to every instance
+at once. The old per-instance design masked this — a late load only clobbered
+its own copy. Fixed by making async publishes compare-and-swap
+(`publishIfUnchanged`), applied to both the initial load and the refocus
+resync. Shipped as `be66103`; +3 unit tests pin it.
+
+**This regression was live in production** between `ca45c3c` and `be66103`.
+
+## Coverage confirmed by the passing suite
+Auth wall · signup funnel + onboarding activating the 14-day trial · a
+completed behavior persisting across reload · cross-device sync · guest-data
+merge on first sign-in · cross-user RLS isolation · account deletion · logout ·
+error handling · a11y pass · mobile + desktop visual tour of every screen.
+
+## Housekeeping
+Teardown left **0** `e2e-pw-` users. The 5 remaining accounts are exactly the
+three friend testers, the owner, and the demo — untouched, as intended.
+
+Also fixed: `playwright.config.ts` now loads `.env.local` itself (verified with
+those vars stripped from the shell), so the README's "add the key and run" is
+true — previously the harness aborted despite the key being in the file.
+
+## STILL OPEN after Run 2
+- Phase 8 #41 — **iOS install on your iPhone** (un-automatable).
+- Build-stamp check (renders only on authenticated `/profile` + `/admin`).
+- Phases 3/4/7 UI depth (custom builder, insights with seeded history, admin
+  publish flow) — the e2e suite covers the critical paths but not every case.
+- Finding #1 from Run 1: security headers still unset.
+
 ## BLOCKED — needs you
 - **Playwright e2e + every authenticated phase (1–4, most of 5–7):** add
   `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` (from Supabase → Settings → API)

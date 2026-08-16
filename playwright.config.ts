@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 
 /**
  * Full-stack live E2E. Builds + serves the real app, pointed at a real
@@ -12,6 +14,25 @@ import { defineConfig, devices } from "@playwright/test";
  * Required env (supplied by CI secrets — see e2e/README.md):
  *   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
  */
+
+// Locally, read those from .env.local so a run "just works" after adding the
+// key there — which is what e2e/README.md tells you to do. Playwright does NOT
+// load .env files itself, and e2e/lib/supa.ts reads process.env directly, so
+// without this the harness aborts with "requires …" even though the key is
+// sitting in the file. Parsed by hand to avoid a dotenv dependency; real env
+// vars (CI secrets) always win.
+(() => {
+  const file = path.join(__dirname, ".env.local");
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (!m) continue;
+    const key = m[1];
+    if (process.env[key]) continue; // don't override the real environment
+    process.env[key] = m[2].replace(/^["']|["']$/g, "");
+  }
+})();
+
 const PORT = process.env.E2E_PORT || "3100";
 const baseURL = process.env.E2E_BASE_URL || `http://localhost:${PORT}`;
 
