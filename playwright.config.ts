@@ -55,6 +55,14 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
     video: "retain-on-failure",
+    // Pin the BROWSER clock to UTC so the suite behaves the same on a
+    // developer's laptop as on the UTC CI runner. The seeded fixtures declare
+    // `timezone: "UTC"`; on a machine in any other zone the app correctly
+    // raises its "looks like you've moved timezones?" prompt, which overlays
+    // the auth form — guest-merge (the one spec that seeds local state BEFORE
+    // /auth renders) then never gets a stable Sign-in button to click, and
+    // fails with a confusing 3-minute timeout rather than an assertion.
+    timezoneId: "UTC",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

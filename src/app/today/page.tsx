@@ -306,10 +306,13 @@ export default function TodayPage() {
       /* non-fatal */
     }
   }, [dismissed]);
-  // Per-day dismissal of the check-in "read" — so the card morphs into its
-  // advisory read after both taps, then recedes once acknowledged (mirrors
-  // the snooze pattern; resets each day).
-  const [checkInAcked, setCheckInAcked] = useState<boolean>(() => {
+  // Per-day acknowledgement of the day's read. The Operating Summary is the
+  // single place that narrates the day; once you've read it (or started
+  // logging) it collapses to a one-line strip so the checklist — the thing you
+  // actually came to do — sits near the top on every return visit. Resets each
+  // day, mirroring the snooze pattern. (Storage key kept as `pz:cia:` so
+  // existing devices don't re-expand once on upgrade.)
+  const [readAcked, setReadAcked] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     try {
       return localStorage.getItem(`pz:cia:${todayKey}`) === "1";
@@ -323,19 +326,22 @@ export default function TodayPage() {
       // New day under a mounted board → fresh ack state (see snooze mirror).
       ciaDayRef.current = todayKey;
       try {
-        setCheckInAcked(localStorage.getItem(`pz:cia:${todayKey}`) === "1");
+        setReadAcked(localStorage.getItem(`pz:cia:${todayKey}`) === "1");
       } catch {
-        setCheckInAcked(false);
+        setReadAcked(false);
       }
       return;
     }
     try {
-      localStorage.setItem(`pz:cia:${todayKey}`, checkInAcked ? "1" : "0");
+      localStorage.setItem(`pz:cia:${todayKey}`, readAcked ? "1" : "0");
     } catch {
       /* non-fatal */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkInAcked, todayKey]);
+  }, [readAcked, todayKey]);
+  // null = follow the automatic rule (see summaryExpanded); true/false = the
+  // user explicitly opened or closed it this session.
+  const [summaryOpen, setSummaryOpen] = useState<boolean | null>(null);
   const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
   // Edit-mode for the timeline. Off by default so the primary "tap to
   // complete" affordance stays uncontaminated; flipping it on reveals
@@ -802,7 +808,7 @@ export default function TodayPage() {
     log.sleepLog?.sleepQuality != null && log.energyLevel != null;
   const deferRead =
     isToday &&
-    !checkInAcked &&
+    !readAcked &&
     !checkInComplete &&
     (log.sleepLog?.sleepQuality != null || log.energyLevel != null);
   // baselineAdapt forces a "lighter / last night was rough" read when sleep
@@ -1095,6 +1101,64 @@ export default function TodayPage() {
 
   const accent = MODE_ACCENT[adaptation.mode];
 
+  // The day's signal chips — hoisted so the expanded summary and its collapsed
+  // one-line form render exactly the same read (no second source of truth).
+  const summaryChips = [
+    {
+      k: "Recovery",
+      // "High" is reserved for the same cutoff the engine calls "Primed" (78)
+      // so the chip can't say High on a day the engine declined to call
+      // primed; 60–77 reads "Good".
+      v:
+        sig.recoveryProxy == null
+          ? "Building"
+          : sig.recoveryProxy >= 78 && !poorSleep
+          ? "High"
+          : sig.recoveryProxy >= 60 && !poorSleep
+          ? "Good"
+          : sig.recoveryProxy >= 45
+          ? "Moderate"
+          : "Easing",
+      // Never flash a red deficit on the exact day the engine is choosing to
+      // protect the user — low recovery reads as a calm "Easing".
+      c:
+        sig.recoveryProxy == null
+          ? "var(--text-3)"
+          : sig.recoveryProxy >= 78 && !poorSleep
+          ? "var(--vitality)"
+          : sig.recoveryProxy >= 45
+          ? "var(--readiness)"
+          : "var(--recovery)",
+    },
+    {
+      k: "Sleep",
+      v:
+        sig.sleepQuality == null
+          ? "—"
+          : sig.sleepQuality >= 4
+          ? "Strong"
+          : sig.sleepQuality === 3
+          ? "Steady"
+          : "Light",
+      c: "var(--sleep)",
+    },
+    {
+      k: "Focus",
+      // Don't name a keystone the app is muting today — that contradicts
+      // itself on one screen.
+      v: ksItem && !ksItem.muted ? ksItem.title : "Consistency",
+      c: "var(--warm)",
+    },
+  ];
+
+  // The summary is expanded on first look and collapses once it has been
+  // acknowledged or the day has real progress — by then it is narration the
+  // user has already read, sitting between them and the checklist. A manual
+  // toggle wins for the rest of the session.
+  const summaryExpanded =
+    summaryOpen ??
+    !(readAcked || prog.done > 0 || suppProgToday.done > 0);
+
   return (
     <Shell>
       <div
@@ -1204,13 +1268,6 @@ export default function TodayPage() {
               </span>
             )}
           </div>
-          <button
-            onClick={() => setWeekOpen(true)}
-            className="press tap-44 mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--readiness)]"
-          >
-            The week ahead
-            <Icon name="chevron" size={12} />
-          </button>
         </div>
 
         {/* Milestone moment — rare, celebratory; only on the day a mark is
@@ -1371,7 +1428,54 @@ export default function TodayPage() {
             keystone() are computed from current state with no selectedDate
             dependency, so showing them over a scrubbed past day mixed today's
             "Recovery mode / Easing" read with yesterday's timeline. */}
-        {!dayComplete && isToday && (
+        {/* Collapsed read — the same headline + chips in one tappable row.
+            Shown once the day's read has been acknowledged or the user has
+            started logging: by then the narrative has done its job and the
+            checklist is what they came back for. Tapping re-expands. */}
+        {!dayComplete && isToday && !summaryExpanded && (
+          <button
+            onClick={() => setSummaryOpen(true)}
+            aria-expanded={false}
+            className="press tr-fast panel flex w-full items-center gap-3 px-4 py-3 text-left"
+          >
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: accent }}
+            />
+            <span className="truncate text-[13.5px] font-semibold text-[var(--text-1)]">
+              {deferRead ? "Today" : adaptation.headline}
+            </span>
+            <span className="ml-auto flex shrink-0 items-center gap-2">
+              {summaryChips.slice(0, 2).map((chip, i) => (
+                <span
+                  key={chip.k}
+                  // Keep one signal visible even on a narrow phone — the strip
+                  // should still say something, not just be a stub.
+                  className={
+                    i === 0
+                      ? "flex items-center gap-1.5"
+                      : "hidden items-center gap-1.5 sm:flex"
+                  }
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: chip.c }}
+                  />
+                  <span className="max-w-[92px] truncate text-[12px] font-semibold text-[var(--text-2)]">
+                    {chip.v}
+                  </span>
+                </span>
+              ))}
+              <Icon
+                name="chevron"
+                size={13}
+                className="rotate-90 text-[var(--text-3)]"
+              />
+            </span>
+          </button>
+        )}
+
+        {!dayComplete && isToday && summaryExpanded && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1413,55 +1517,8 @@ export default function TodayPage() {
 
             {/* Signal chips — the system's read on you */}
             <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                {
-                  k: "Recovery",
-                  // "High" is reserved for the same cutoff the engine calls
-                  // "Primed" (78) so the chip can't say High on a day the
-                  // engine declined to call primed; 60–77 reads "Good".
-                  v:
-                    sig.recoveryProxy == null
-                      ? "Building"
-                      : sig.recoveryProxy >= 78 && !poorSleep
-                      ? "High"
-                      : sig.recoveryProxy >= 60 && !poorSleep
-                      ? "Good"
-                      : sig.recoveryProxy >= 45
-                      ? "Moderate"
-                      : "Easing",
-                  // Never flash a red deficit on the exact day the engine
-                  // is choosing to protect the user — low recovery reads
-                  // as a calm "Easing" in the recovery hue, not an alert.
-                  c:
-                    sig.recoveryProxy == null
-                      ? "var(--text-3)"
-                      : sig.recoveryProxy >= 78 && !poorSleep
-                      ? "var(--vitality)"
-                      : sig.recoveryProxy >= 45
-                      ? "var(--readiness)"
-                      : "var(--recovery)",
-                },
-                {
-                  k: "Sleep",
-                  v:
-                    sig.sleepQuality == null
-                      ? "—"
-                      : sig.sleepQuality >= 4
-                      ? "Strong"
-                      : sig.sleepQuality === 3
-                      ? "Steady"
-                      : "Light",
-                  c: "var(--sleep)",
-                },
-                {
-                  k: "Focus",
-                  // Don't name a keystone the app is muting today (e.g. strength
-                  // suppressed by a no-intense conflict shows "Resting today" in
-                  // the list below) — that contradicts itself on one screen.
-                  v: ksItem && !ksItem.muted ? ksItem.title : "Consistency",
-                  c: "var(--warm)",
-                },
-              ].map((chip) => (
+              {summaryChips.map((chip) => (
+
                 <span
                   key={chip.k}
                   className="flex items-center gap-1.5 rounded-[var(--r-pill)] px-3 py-1.5"
@@ -1528,56 +1585,64 @@ export default function TodayPage() {
                 </div>
               </div>
             )}
+            {/* The reasons now sit behind a tap. Shown inline, the first one
+                restated what the headline and tone had already said — on a
+                welcome-back day the card opened with the same fact three
+                times ("It's been over a week…", then "You were away 8 days —
+                easing back in"). The *why* is one tap away for the audience
+                that wants to dissect it; it just no longer competes with the
+                checklist for the first screen. */}
             {adaptation.reasons.length > 0 && (
               <div className="mt-4">
-                {/* Top reason shown inline — not hidden behind a tap.
-                    This audience wants the *why* behind the read visible
-                    (e.g. Attia publicly dissects why his recovery number
-                    is what it is). The expander holds any remaining ones. */}
-                <p className="flex items-start gap-2 text-[12.5px] leading-relaxed text-[var(--text-2)]">
-                  <span
-                    className="mt-[7px] h-1 w-1 shrink-0 rounded-full"
-                    style={{ background: accent }}
+                <button
+                  onClick={() => setShowWhy((v) => !v)}
+                  aria-expanded={showWhy}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-3)]"
+                >
+                  <Icon name="info" size={12} />
+                  Why today reads this way
+                  <Icon
+                    name="chevron"
+                    size={12}
+                    className={showWhy ? "rotate-90" : ""}
                   />
-                  <span>{adaptation.reasons[0]}</span>
-                </p>
-                {adaptation.reasons.length > 1 && (
-                  <>
-                    <button
-                      onClick={() => setShowWhy((v) => !v)}
-                      className="mt-2.5 flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-3)]"
-                    >
-                      <Icon name="info" size={12} />
-                      More on today
-                      <Icon
-                        name="chevron"
-                        size={12}
-                        className={showWhy ? "rotate-90" : ""}
-                      />
-                    </button>
-                    {showWhy && (
-                      <motion.ul
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="mt-2.5 space-y-1.5 overflow-hidden"
+                </button>
+                {showWhy && (
+                  <motion.ul
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="mt-2.5 space-y-1.5 overflow-hidden"
+                  >
+                    {adaptation.reasons.map((r) => (
+                      <li
+                        key={r}
+                        className="flex items-start gap-2 text-[12.5px] leading-relaxed text-[var(--text-2)]"
                       >
-                        {adaptation.reasons.slice(1).map((r) => (
-                          <li
-                            key={r}
-                            className="flex items-center gap-2 text-[12.5px] text-[var(--text-2)]"
-                          >
-                            <span
-                              className="h-1 w-1 rounded-full"
-                              style={{ background: accent }}
-                            />
-                            {r}
-                          </li>
-                        ))}
-                      </motion.ul>
-                    )}
-                  </>
+                        <span
+                          className="mt-[7px] h-1 w-1 shrink-0 rounded-full"
+                          style={{ background: accent }}
+                        />
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </motion.ul>
                 )}
               </div>
+            )}
+
+            {/* Acknowledge → collapse to the one-line strip for the rest of
+                the day. Mirrors the "Got it" the old duplicate read carried,
+                so the gesture is familiar. */}
+            {!firstDaySoft && (
+              <button
+                onClick={() => {
+                  setReadAcked(true);
+                  setSummaryOpen(false);
+                }}
+                className="press tap-44 tr-fast mt-3 inline-flex items-center text-[13px] font-semibold text-[var(--text-3)]"
+              >
+                Got it
+              </button>
             )}
             {/* Trial status lives in the summary's footer (was its own banner
                 row) — one less card between the user and the checklist. */}
@@ -1726,45 +1791,19 @@ export default function TodayPage() {
           </motion.div>
         )}
 
-        {/* Daily check-in — feeds the adaptive engine */}
-        {isToday && !firstDaySoft && !checkInAcked && (
+        {/* Daily check-in — feeds the adaptive engine. Renders ONLY while
+            there are taps left to collect: once both sleep and energy are in,
+            the card used to morph into a "today's read" that restated the
+            Operating Summary almost verbatim (both are keyed to the same
+            adapt mode), so the user read the same sentence twice before
+            reaching anything actionable. The summary is now the single voice
+            for the day's read. */}
+        {isToday && !firstDaySoft && !checkInComplete && (
           <DailyCheckInCard
             sleepQ={sleepQ}
             energy={energy}
-            mode={adaptation.mode}
             onSleep={(q) => updateSleepLog(selectedDate, { sleepQuality: q })}
             onEnergy={(e) => updateRatings(selectedDate, { energy: e })}
-            onAck={() => setCheckInAcked(true)}
-          />
-        )}
-
-        {/* Natural-language quick log — type one line to fill the check-in.
-            Collapsed by default. Hidden once the day's closed (nothing left
-            to log; keeps the "day complete" moment calm). */}
-        {isToday && !dayComplete && (
-          <QuickLog
-            onApply={(v) => {
-              if (v.sleepQuality != null || v.sleepDurationMinutes != null) {
-                updateSleepLog(selectedDate, {
-                  ...(v.sleepQuality != null
-                    ? { sleepQuality: v.sleepQuality }
-                    : {}),
-                  ...(v.sleepDurationMinutes != null
-                    ? { sleepDurationMinutes: v.sleepDurationMinutes }
-                    : {}),
-                });
-              }
-              // Merge, don't clobber: if the user already wrote a reflection
-              // today, append the quick-log line instead of overwriting it.
-              const prev = (log.dayNote ?? "").trim();
-              const note =
-                prev && !prev.includes(v.note) ? `${prev}\n${v.note}` : v.note;
-              updateRatings(selectedDate, {
-                ...(v.energy != null ? { energy: v.energy } : {}),
-                ...(v.mood != null ? { mood: v.mood } : {}),
-                note,
-              });
-            }}
           />
         )}
 
@@ -2969,6 +3008,45 @@ export default function TodayPage() {
               prompt={reflectionPrompt(selectedDate)}
             />
           )}
+
+        {/* Secondary tools live BELOW the flow. Both are discovery//utility
+            rather than part of the daily loop, and sitting above the list they
+            pushed the first checkbox off-screen. Quick Log stays collapsed;
+            the week view is a sheet. */}
+        {isToday && !dayComplete && (
+          <QuickLog
+            onApply={(v) => {
+              if (v.sleepQuality != null || v.sleepDurationMinutes != null) {
+                updateSleepLog(selectedDate, {
+                  ...(v.sleepQuality != null
+                    ? { sleepQuality: v.sleepQuality }
+                    : {}),
+                  ...(v.sleepDurationMinutes != null
+                    ? { sleepDurationMinutes: v.sleepDurationMinutes }
+                    : {}),
+                });
+              }
+              // Merge, don't clobber: if the user already wrote a reflection
+              // today, append the quick-log line instead of overwriting it.
+              const prev = (log.dayNote ?? "").trim();
+              const note =
+                prev && !prev.includes(v.note) ? `${prev}\n${v.note}` : v.note;
+              updateRatings(selectedDate, {
+                ...(v.energy != null ? { energy: v.energy } : {}),
+                ...(v.mood != null ? { mood: v.mood } : {}),
+                note,
+              });
+            }}
+          />
+        )}
+
+        <button
+          onClick={() => setWeekOpen(true)}
+          className="press tap-44 inline-flex items-center gap-1.5 self-start text-[12px] font-semibold text-[var(--readiness)]"
+        >
+          The week ahead
+          <Icon name="chevron" size={12} />
+        </button>
       </div>
 
       {/* Bulk-action bar — appears only when a multi-select has any
