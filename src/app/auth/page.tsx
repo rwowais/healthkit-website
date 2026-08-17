@@ -291,6 +291,33 @@ function AuthInner() {
                     : "Sign in"}
                 </button>
 
+                {/* Clickwrap at account creation. The recorded stamp lands at
+                    onboarding's final step (lib/legal.ts) — this line makes
+                    the agreement visible at the earlier consent moment too. */}
+                {mode === "signup" && (
+                  <p className="pt-1 text-center text-[11.5px] leading-relaxed text-[var(--text-3)]">
+                    By creating an account you agree to our{" "}
+                    <a
+                      href="/terms"
+                      target="_blank"
+                      rel="noopener"
+                      className="underline"
+                    >
+                      Terms of Service
+                    </a>{" "}
+                    and{" "}
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener"
+                      className="underline"
+                    >
+                      Privacy Policy
+                    </a>
+                    .
+                  </p>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 text-[13px]">
                   {mode === "signin" && (
                     <>

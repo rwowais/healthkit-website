@@ -330,12 +330,19 @@ onboarding guard handles new vs returning).
 - ✅ Email/password + magic link + password reset; OAuth built, disabled
   until providers configured.
 - ✅ Freemium gating + reverse-trial engine.
-- ✅ Legal pages — `/terms` and `/privacy` shipped, LEGAL_VERSION-stamped.
-  ⚠️ There is NO acceptance banner: `settings.legalAcceptedVersion` /
-  `legalAcceptedAt` exist in types.ts but nothing reads or writes them, so a
-  LEGAL_VERSION bump currently re-prompts nobody. Terms changed materially on
-  2026-08-16 (free tier + pause promise) and the version is now 2 — build the
-  re-accept flow before real users sign up, or drop the fields.
+- ✅ Legal pages + acceptance flow (2026-08-17, LEGAL_VERSION 3).
+  Acceptance is RECORDED: onboarding's final CTA carries the clickwrap line
+  and stamps `legalAcceptedVersion`/`legalAcceptedAt` (lib/legal.ts);
+  `LegalGate` (mounted in Shell) shows a one-time accept banner to any
+  onboarded user whose stamp is missing or older than LEGAL_VERSION — which
+  covers every pre-mechanism account. Signup shows the same clickwrap line.
+  Privacy v3 deliberately reserves DE-IDENTIFIED/AGGREGATED use (product
+  improvement, research) while keeping identifiable-data promises strong —
+  that reservation is the owner's future-flexibility clause and must not be
+  quietly weakened or strengthened without a LEGAL_VERSION bump. Terms v3
+  adds the service-evolution clause (features/tiers may change; data never
+  deleted by a plan change). ⚠️ Not lawyer-reviewed — get an hour of real
+  counsel before meaningful revenue.
 - ✅ Analytics — Plausible env-gated via `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`.
   Cookie-less; inert until the owner adds the env var.
 - ✅ OG + Twitter card metadata on every route via `metadataBase` +

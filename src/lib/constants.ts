@@ -43,7 +43,11 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
  * materially — the app will then re-prompt accepted users to confirm
  * the new docs (minor copy fixes don't justify a bump).
  */
-export const LEGAL_VERSION = 2;
+// v3 (2026-08-17): privacy reserves de-identified/aggregated use; terms add
+// the service-evolution clause; the acceptance banner (LegalGate) now actually
+// exists. Nobody ever recorded acceptance of v1/v2 (the mechanism didn't
+// exist), so every existing account sees the banner once and stamps v3.
+export const LEGAL_VERSION = 3;
 
 // Trial length is NOT here — it is entitlements.TRIAL_DAYS (7), the single
 // source of truth that onboarding, terms and the import clamp all derive from.

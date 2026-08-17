@@ -5,27 +5,35 @@ import { LEGAL_VERSION } from "@/lib/constants";
 
 /**
  * Privacy policy. Plain-English, calm-system voice. Updated when
- * LEGAL_VERSION in src/lib/constants.ts is bumped — that bump triggers
- * re-acknowledgement for existing users.
+ * LEGAL_VERSION in src/lib/constants.ts is bumped — the bump triggers the
+ * LegalGate re-acceptance banner for existing users (lib/legal.ts).
  *
  * Style: not legalese. Not enterprise jargon. The point is to actually
  * tell the user what we do with their data in language they understand.
  * If they want the formal legal version, they can ask their lawyer to
  * parse this one.
  *
+ * v3 (2026-08-17) — the business-readiness pass:
+ *  - PERSONAL data promises stay strong: never sold, never used for ads,
+ *    shared only with the processors that run the service.
+ *  - DE-IDENTIFIED/AGGREGATED use is now expressly reserved (product
+ *    improvement, research, aggregate statistics). This is the deliberate
+ *    keep-the-future-open clause: it cannot be added retroactively later
+ *    without re-consent, so it is reserved now, honestly, before launch.
+ *  - Breach promise softened from a flat "72 hours" (that's the GDPR
+ *    regulator window, not a user-notification promise we should hard-code)
+ *    to "promptly, and within any legally required window".
+ *  - "Changes" section now describes the REAL acceptance banner (LegalGate)
+ *    instead of promising a mechanism that didn't exist.
+ *
  * Footprint check (what we actually do, not what we boilerplate):
- *  - Cloud storage: optional Supabase row keyed to the user's id. RLS
- *    enforces own-row access. No third party reads it.
- *  - Local storage: protocolize-v3 key, never leaves the device unless
- *    the user signs in.
- *  - Telemetry: not yet wired (phase 0.9). When wired, will be
- *    privacy-first (Plausible-style: no individual user IDs, no
- *    cookies, just aggregate counts).
- *  - Email: only transactional via Supabase Auth (magic links, password
- *    reset). No marketing list. No third-party email vendors yet.
- *  - Third parties: Supabase (cloud sync), Vercel (hosting), Anthropic
- *    (the CMS AI suggestions — admin-side only, user content does not
- *    leave the device for AI processing).
+ *  - Cloud storage: Supabase row keyed to the user's id. RLS enforces
+ *    own-row access. Entitlements table is server-written only.
+ *  - Local storage: protocolize-v3 key; local-only builds never sync.
+ *  - Telemetry: not yet wired. When wired, Plausible-style aggregate only.
+ *  - Email: transactional via Supabase Auth. No marketing list yet — if one
+ *    is added it will be opt-in.
+ *  - Payments: Stripe-hosted; card numbers never touch our code.
  */
 export default function PrivacyPage() {
   return (
@@ -34,16 +42,19 @@ export default function PrivacyPage() {
         <p className="t-eyebrow">Legal</p>
         <h1 className="t-title mt-2 mb-2">Privacy Policy</h1>
         <p className="text-[12px] text-[var(--text-3)] mb-8">
-          Version {LEGAL_VERSION} · Last updated April 2026
+          Version {LEGAL_VERSION} · Last updated August 2026
         </p>
 
         <div className="space-y-7 text-[15px] leading-relaxed text-[var(--text-2)]">
           <Section title="The short version">
             <p>
-              Protocolize collects the minimum data needed to run the
-              app and never sells it. Your behavior logs, biomarkers,
-              and check-ins are yours. If you don&apos;t sign up for an
-              account, nothing ever leaves your device.
+              Your health data belongs to you. We never sell it, never use it
+              for advertising, and never share anything that identifies you
+              except with the service providers that run the app (listed
+              below). We may use <strong>de-identified, aggregated</strong>{" "}
+              data — numbers that can&apos;t be traced back to you — to
+              improve the product and understand what works. That&apos;s the
+              whole deal.
             </p>
           </Section>
 
@@ -51,23 +62,27 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
                 <strong>Account information</strong> — when you create an
-                account: your email, hashed password (Supabase
-                Auth handles this), and a unique user ID. We never see
-                your password in plain text.
+                account: your email, hashed password (Supabase Auth handles
+                this), and a unique user ID. We never see your password in
+                plain text.
               </li>
               <li>
-                <strong>Your protocol data</strong> — installed packs,
-                custom behaviors, daily logs, biomarkers, sleep/energy
-                check-ins, and any notes you add. Stored locally on
-                your device; also stored in your private Supabase row
-                if you have an account.
+                <strong>Your protocol data</strong> — installed packs, custom
+                behaviors, daily logs, biomarkers, sleep/energy check-ins, and
+                any notes you add. Stored locally on your device; also stored
+                in your private database row when you have an account.
               </li>
               <li>
-                <strong>Personal factors you choose to share</strong> —
-                safety flags (e.g. pregnant, taking specific
-                medications). These never leave your account row and
-                are not used for any purpose other than tailoring what
-                we show you.
+                <strong>Personal factors you choose to share</strong> — safety
+                flags (e.g. pregnant, taking specific medications). Used only
+                to tailor what the app shows you, and excluded from the
+                de-identified analysis described below.
+              </li>
+              <li>
+                <strong>Billing status</strong> — when payments are active:
+                your plan and subscription status, written by our payment
+                processor. Card numbers are handled by Stripe and never touch
+                our systems.
               </li>
             </ul>
           </Section>
@@ -79,86 +94,148 @@ export default function PrivacyPage() {
               <li>Location data.</li>
               <li>Browsing history outside the app.</li>
               <li>Contacts, photos, or other device data.</li>
-              <li>Payment card numbers (handled by Stripe directly when billing is enabled).</li>
+              <li>Payment card numbers (Stripe processes those directly).</li>
             </ul>
+          </Section>
+
+          <Section title="How we use your data">
+            <ul className="list-disc pl-5 space-y-1.5">
+              <li>
+                <strong>To run the app for you</strong> — building your
+                timeline, adapting to your signals, syncing across devices,
+                sending the reminders you turn on. This is the core use, and
+                it operates on your identifiable data because it has to.
+              </li>
+              <li>
+                <strong>To improve the product, in de-identified form</strong>{" "}
+                — we may analyze usage and outcomes in aggregate (for example,
+                &quot;what share of users keep a morning-light habit past
+                week 3&quot;) after removing anything that identifies you.
+                De-identified data may also support research, published
+                statistics, and the development of new features, including
+                features informed by patterns across many users. We do not
+                include your personal safety factors in these analyses, and we
+                will never attempt to re-identify de-identified data.
+              </li>
+              <li>
+                <strong>To communicate with you</strong> — transactional email
+                only (sign-in links, password resets, billing receipts). If we
+                ever add a newsletter it will be opt-in, never default-on.
+              </li>
+            </ul>
+            <p className="mt-2">
+              What we will <strong>not</strong> do: sell your data, share
+              identifiable data with advertisers or data brokers, or use your
+              personal information for purposes beyond this policy without
+              asking you first.
+            </p>
           </Section>
 
           <Section title="Where your data lives">
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
-                <strong>On your device</strong> — under the localStorage
-                key <code className="text-[12px] bg-[var(--surface-2)] px-1.5 py-0.5 rounded">protocolize-v3</code>.
-                This is the source of truth when you&apos;re signed out.
+                <strong>On your device</strong> — under the localStorage key{" "}
+                <code className="text-[12px] bg-[var(--surface-2)] px-1.5 py-0.5 rounded">
+                  protocolize-v3
+                </code>
+                . This is the source of truth when you&apos;re signed out.
               </li>
               <li>
-                <strong>Supabase (US-region)</strong> — your account row
-                if you signed up for cloud sync. Row-level security
-                ensures only you can read it. Database is encrypted at
-                rest. <a className="text-[var(--readiness)] underline" href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase privacy policy</a>.
+                <strong>Supabase (US-region)</strong> — your account row.
+                Row-level security ensures only you can read it. Encrypted at
+                rest.{" "}
+                <a
+                  className="text-[var(--readiness)] underline"
+                  href="https://supabase.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Supabase privacy policy
+                </a>
+                .
               </li>
               <li>
                 <strong>Vercel (hosting)</strong> — serves the app code.
-                Receives standard web server logs (IP, user agent,
-                response status) which Vercel retains per their policy.
+                Receives standard web server logs (IP, user agent, response
+                status) which Vercel retains per their policy.
               </li>
             </ul>
           </Section>
 
-          <Section title="Third parties">
-            <ul className="list-disc pl-5 space-y-1.5">
+          <Section title="Service providers">
+            <p>
+              These are the companies that process data on our behalf, under
+              their own contractual obligations, strictly to run the service:
+            </p>
+            <ul className="list-disc pl-5 space-y-1.5 mt-2">
               <li>
-                <strong>Supabase</strong> — auth + database.
+                <strong>Supabase</strong> — authentication + database.
               </li>
               <li>
                 <strong>Vercel</strong> — hosting + edge serving.
               </li>
               <li>
-                <strong>Stripe</strong> (when billing is active) —
-                payment processing. We never see your card numbers; the
-                payment form is hosted by Stripe.
+                <strong>Stripe</strong> (when billing is active) — payment
+                processing. The payment form is hosted by Stripe; we receive
+                your plan and status, never your card.
               </li>
               <li>
-                <strong>Anthropic</strong> — admin-side only. Our CMS
-                uses Claude to help draft protocol content for review.
-                Your user data is never sent to Anthropic; only the
-                admin-side authoring prompts.
+                <strong>Anthropic</strong> — admin-side only. Our content
+                system uses Claude to help draft protocol content for human
+                review. Your personal data is not sent to Anthropic.
               </li>
             </ul>
             <p className="mt-2">
-              We do not have advertising vendors, analytics vendors that
-              track individual users, or any data brokers in our stack.
+              We do not have advertising vendors, analytics vendors that track
+              individual users, or data brokers in our stack. If a provider is
+              added or replaced, we&apos;ll update this page — and if the
+              change is material, you&apos;ll be asked to acknowledge it (see
+              &quot;Changes&quot; below).
             </p>
           </Section>
 
           <Section title="Your rights">
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
-                <strong>Export</strong> your data — Profile → Export.
-                You get a JSON file containing everything we have.
+                <strong>Export</strong> your data — Profile → Export. You get
+                a JSON file containing everything we have.
               </li>
               <li>
                 <strong>Delete</strong> your account — Profile → Delete
-                account. This removes your row from our database and
-                clears local storage. The deletion is immediate and
-                permanent.
+                account. This removes your row from our database and clears
+                local storage. The deletion is immediate and permanent.
+                (Already-aggregated statistics can&apos;t be un-aggregated,
+                but they contain nothing that identifies you.)
               </li>
               <li>
-                <strong>Correct</strong> anything — every field is
-                editable in the app. If you want help, email{" "}
-                <a className="text-[var(--readiness)] underline" href="mailto:privacy@protocolize.com">privacy@protocolize.com</a>.
+                <strong>Correct</strong> anything — every field is editable in
+                the app. If you want help, email{" "}
+                <a
+                  className="text-[var(--readiness)] underline"
+                  href="mailto:privacy@protocolize.com"
+                >
+                  privacy@protocolize.com
+                </a>
+                .
               </li>
             </ul>
           </Section>
 
           <Section title="If you're in the EU/UK/CA">
             <p>
-              GDPR / UK GDPR / PIPEDA apply. Our lawful basis for
-              processing your data is contract performance (we can&apos;t
-              run the app without it) and your consent (everything
-              optional). You have rights of access, rectification,
-              erasure, restriction, portability, and objection. To
-              exercise any of these, email{" "}
-              <a className="text-[var(--readiness)] underline" href="mailto:privacy@protocolize.com">privacy@protocolize.com</a>.
+              GDPR / UK GDPR / PIPEDA apply. Our lawful bases are contract
+              performance (we can&apos;t run the app without processing your
+              data), legitimate interest (de-identified product analytics),
+              and consent (everything optional). You have rights of access,
+              rectification, erasure, restriction, portability, and
+              objection. To exercise any of these, email{" "}
+              <a
+                className="text-[var(--readiness)] underline"
+                href="mailto:privacy@protocolize.com"
+              >
+                privacy@protocolize.com
+              </a>
+              .
             </p>
           </Section>
 
@@ -173,40 +250,46 @@ export default function PrivacyPage() {
 
           <Section title="Security">
             <p>
-              We use Supabase Auth (bcrypt-hashed passwords, JWT
-              sessions) and HTTPS everywhere. No system is perfectly
-              secure; if we ever experience a breach affecting your
-              data, we&apos;ll notify you within 72 hours.
+              We use Supabase Auth (bcrypt-hashed passwords, JWT sessions),
+              row-level security so accounts can only read their own data,
+              and HTTPS everywhere. Premium status is written only by our
+              payment processor&apos;s server-side confirmation — it can&apos;t
+              be granted or forged from a browser. No system is perfectly
+              secure; if we experience a breach affecting your data,
+              we&apos;ll notify you promptly and within any legally required
+              window.
             </p>
           </Section>
 
           <Section title="Changes to this policy">
             <p>
-              We&apos;ll update this page when something material
-              changes and bump the version. If the change affects you,
-              you&apos;ll see a one-time banner asking you to
-              acknowledge the new version.
+              When something material changes, we update this page, bump the
+              version number at the top, and show you a one-time in-app notice
+              asking you to review and accept the new version. Your acceptance
+              (version and date) is recorded in your own account data, where
+              you can see it and export it. We will not apply a materially
+              broader use of your personal data retroactively without asking
+              you first.
             </p>
           </Section>
 
           <Section title="Contact">
             <p>
-              <a className="text-[var(--readiness)] underline" href="mailto:privacy@protocolize.com">privacy@protocolize.com</a>
+              <a
+                className="text-[var(--readiness)] underline"
+                href="mailto:privacy@protocolize.com"
+              >
+                privacy@protocolize.com
+              </a>
             </p>
           </Section>
         </div>
 
         <div className="mt-12 flex items-center justify-between text-[13px]">
-          <Link
-            href="/terms"
-            className="text-[var(--readiness)]"
-          >
+          <Link href="/terms" className="text-[var(--readiness)]">
             Terms of Service →
           </Link>
-          <Link
-            href="/today"
-            className="text-[var(--text-3)]"
-          >
+          <Link href="/today" className="text-[var(--text-3)]">
             ← Back to app
           </Link>
         </div>

@@ -7,6 +7,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ToastProvider } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import Reminders from "@/components/Reminders";
+import LegalGate from "@/components/LegalGate";
 import SyncIndicator from "@/components/SyncIndicator";
 import GlobalSearch from "@/components/GlobalSearch";
 import { useAppState } from "@/hooks/useAppState";
@@ -58,6 +59,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <Reminders />
+      {/* One-time terms/privacy acceptance banner (lib/legal.ts). Mounted in
+          Shell so it appears on whichever tab the user opens first. */}
+      <LegalGate />
       <div className="min-h-screen">
         {/* pt-[env(safe-area-inset-top)]: in an installed iOS PWA the glass
             header fills the notch/status-bar strip instead of the app row

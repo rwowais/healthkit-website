@@ -1067,10 +1067,16 @@ export default function ProfilePage() {
               doctor before changing your routine.
             </p>
           </div>
+          {/* "never shared" was an overclaim — processors (Supabase, Vercel,
+              Stripe) do handle the data to run the service, and the policy
+              reserves de-identified aggregate use. The card must not promise
+              more than the policy it links to. */}
           <p className="t-caption mt-3 leading-relaxed">
-            Your data stays on this device unless you sign in. With an
-            account, it&apos;s stored in a private row in our database
-            and never shared.
+            Your health data is yours: never sold, never used for ads, and
+            nothing that identifies you is shared beyond the services that
+            run the app. The full picture — including how anonymous,
+            aggregated stats may be used to improve Protocolize — is in the
+            Privacy Policy.
           </p>
           <div className="mt-4 flex gap-3 text-[13px]">
             <Link
@@ -1086,6 +1092,20 @@ export default function ProfilePage() {
               Terms of Service
             </Link>
           </div>
+          {/* The visible acceptance record — the same stamp legal.ts writes.
+              Makes "your acceptance is recorded in your account data" a thing
+              the user can actually see. */}
+          {s.legalAcceptedVersion != null && s.legalAcceptedAt && (
+            <p className="mt-3 text-[11.5px] text-[var(--text-3)]">
+              You accepted version {s.legalAcceptedVersion} on{" "}
+              {new Date(s.legalAcceptedAt).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+              .
+            </p>
+          )}
         </Card>
 
         {/* Permanent account deletion — only when cloud sync is active.

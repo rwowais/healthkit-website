@@ -146,9 +146,12 @@ export default function TermsPage() {
 
           <Section title="Your data is yours">
             <p>
-              You own everything you put in. We have a limited license
-              to display it back to you, process it for the features
-              you&apos;ve enabled, and back it up. We do not sell it.
+              You own everything you put in. We have a limited license to
+              display it back to you, process it for the features you&apos;ve
+              enabled, back it up, and analyze it in{" "}
+              <strong>de-identified, aggregated form</strong> to improve the
+              product. We do not sell it, and we never share anything that
+              identifies you except with the providers that run the service.
               See the{" "}
               <Link href="/privacy" className="text-[var(--readiness)] underline">
                 Privacy Policy
@@ -164,6 +167,19 @@ export default function TermsPage() {
               property (or licensed to us). You can use them inside
               Protocolize for your personal practice. You can&apos;t
               redistribute them publicly without permission.
+            </p>
+          </Section>
+
+          <Section title="The service will evolve">
+            <p>
+              Protocolize is actively developed. Features may be added,
+              changed, moved between the free and Premium tiers, or retired;
+              free-tier limits may change. Two promises hold through any of
+              it: your data is never deleted by a plan change (anything over a
+              limit pauses, and restores exactly when unlocked), and if
+              you&apos;ve paid for something we materially remove, we&apos;ll
+              offer a fair remedy — a comparable feature, credit, or a
+              pro-rated refund.
             </p>
           </Section>
 
@@ -192,10 +208,13 @@ export default function TermsPage() {
 
           <Section title="Changes to these terms">
             <p>
-              We&apos;ll update these terms when something material
-              changes and bump the version. If the change affects you,
-              you&apos;ll see a one-time banner asking you to
-              acknowledge.
+              When something material changes we update this page, bump the
+              version number at the top, and show a one-time in-app notice
+              asking you to review and accept. Your acceptance (version and
+              date) is recorded in your account data. Continuing to use
+              Protocolize after accepting means the current version applies.
+              If you don&apos;t agree with a change, you can export your data
+              and delete your account at any time.
             </p>
           </Section>
 
@@ -206,8 +225,11 @@ export default function TermsPage() {
               <a className="text-[var(--readiness)] underline" href="mailto:legal@protocolize.com">legal@protocolize.com</a>.
               If that doesn&apos;t work within 60 days, disputes will be
               resolved by binding arbitration under the American
-              Arbitration Association&apos;s consumer rules, in your
-              home state.
+              Arbitration Association&apos;s consumer rules, in your home
+              state, under the laws of your state of residence. Either of us
+              can still bring an individual claim in small-claims court
+              instead. Disputes are resolved individually — not as part of a
+              class or representative action.
             </p>
           </Section>
 

@@ -9,6 +9,7 @@ import { getUserId, supabaseEnabled } from "@/lib/supabase";
 import { PACKS, packById } from "@/lib/packs";
 import { Button, Eyebrow } from "@/components/ui";
 import { getTrialDays } from "@/lib/entitlements";
+import { acceptanceStamp } from "@/lib/legal";
 import { Icon, type IconName } from "@/components/ui/icons";
 
 type Chip = { key: string; label: string; sub?: string; icon?: IconName };
@@ -315,6 +316,10 @@ export default function OnboardingPage() {
             premiumTrialEndsAt: new Date(
               Date.now() + getTrialDays() * 86400000
             ).toISOString(),
+            // The CTA above this stamp carries the consent line ("By
+            // continuing you agree…"), making this tap the recorded
+            // acceptance moment — see lib/legal.ts.
+            ...acceptanceStamp(),
           }),
     });
     // Fresh setup installs exactly the recommended packs; a re-tune ADDS them
@@ -649,11 +654,37 @@ export default function OnboardingPage() {
                           taken, and what stays free after. Absent, the CTA
                           read as an unexplained countdown (audit b.4). */}
                       {!isRedo() && (
-                        <p className="mt-3 px-2 text-center text-[12px] leading-relaxed text-[var(--text-3)]">
-                          Full Premium for {getTrialDays()} days — no card
-                          needed. After that, your core system and your entire
-                          history stay free forever.
-                        </p>
+                        <>
+                          <p className="mt-3 px-2 text-center text-[12px] leading-relaxed text-[var(--text-3)]">
+                            Full Premium for {getTrialDays()} days — no card
+                            needed. After that, your core system and your entire
+                            history stay free forever.
+                          </p>
+                          {/* The clickwrap line. finish() records this tap as
+                              acceptance (lib/legal.ts acceptanceStamp), so the
+                              agreement and the record are the same moment. */}
+                          <p className="mt-2 px-2 text-center text-[11.5px] leading-relaxed text-[var(--text-4,var(--text-3))]">
+                            By continuing you agree to our{" "}
+                            <a
+                              href="/terms"
+                              target="_blank"
+                              rel="noopener"
+                              className="underline"
+                            >
+                              Terms of Service
+                            </a>{" "}
+                            and{" "}
+                            <a
+                              href="/privacy"
+                              target="_blank"
+                              rel="noopener"
+                              className="underline"
+                            >
+                              Privacy Policy
+                            </a>
+                            .
+                          </p>
+                        </>
                       )}
                     </>
                   ) : (

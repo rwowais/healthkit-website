@@ -57,7 +57,12 @@ test(`completing onboarding activates the ${TRIAL_DAYS}-day trial`, async ({
         .eq("user_id", user.id)
         .maybeSingle();
       const st = (data?.state ?? {}) as {
-        settings?: { completedOnboarding?: boolean; premiumTrialEndsAt?: string };
+        settings?: {
+          completedOnboarding?: boolean;
+          premiumTrialEndsAt?: string;
+          legalAcceptedVersion?: number;
+          legalAcceptedAt?: string;
+        };
       };
       return st.settings;
     };
@@ -77,6 +82,13 @@ test(`completing onboarding activates the ${TRIAL_DAYS}-day trial`, async ({
       (new Date(settings!.premiumTrialEndsAt!).getTime() - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(TRIAL_DAYS - 1);
     expect(days).toBeLessThanOrEqual(TRIAL_DAYS);
+
+    // The finish tap is also the recorded legal-acceptance moment (the CTA
+    // carries the "By continuing you agree…" line) — the stamp must persist.
+    expect(settings!.legalAcceptedVersion).toBeGreaterThan(0);
+    expect(Number.isFinite(Date.parse(settings!.legalAcceptedAt ?? ""))).toBe(
+      true
+    );
   } finally {
     await ctx.close();
   }
