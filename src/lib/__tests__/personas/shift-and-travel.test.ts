@@ -609,7 +609,13 @@ describe("shift-and-travel — tz × sleep × adapt stress test", () => {
     expect.soft(a.mode, "post-conference adapt.mode").not.toBe("rebuild");
   });
 
-  it("final reports — print per-persona snapshot", { timeout: 30_000 }, () => {
+  // No inline timeout: this runs TWO full 365-day simulations, and a hard
+  // 30s override beat the global 300s budget in vitest.config — so on a
+  // thermally-throttled machine it failed as a "timeout" that looked like a
+  // regression (bisected to pre-existing 2026-08-16; same file has swung
+  // 141s–322s run-to-run with identical code). Correctness here is asserted,
+  // not timed; let it inherit the global budget.
+  it("final reports — print per-persona snapshot", () => {
     const nurse = simulateNurse();
     const traveler = simulateTraveler();
 

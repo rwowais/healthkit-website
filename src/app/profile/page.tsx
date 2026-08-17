@@ -899,10 +899,27 @@ export default function ProfilePage() {
             </>
           ) : (
             <>
+              {/* Expired vs never-trialed used to share identical copy — no
+                  acknowledgement that the expired user HAD Premium and lost
+                  it (audit b.5). */}
               <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">
-                You&apos;re on the free plan. Your starter system stays
-                free forever — Premium unlocks the parts that learn from
-                you.
+                {access.trialExpired ? (
+                  <>
+                    Your{" "}
+                    <span className="font-semibold text-[var(--text-1)]">
+                      Premium trial has ended
+                    </span>{" "}
+                    — your system, history and streaks keep running on the
+                    free plan. Premium brings back live insights, the full
+                    library, and your complete supplement stack.
+                  </>
+                ) : (
+                  <>
+                    You&apos;re on the free plan. Your starter system stays
+                    free forever — Premium unlocks the parts that learn from
+                    you.
+                  </>
+                )}
               </p>
               <button
                 onClick={() => router.push("/upgrade")}

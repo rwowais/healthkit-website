@@ -125,6 +125,17 @@ rule that prevents it.
   whole commit+push chain failed. **Rule:** for any multi-paragraph message —
   especially one quoting code, generics, or redirection characters — write it
   to a scratchpad file and use `git commit -F <file>`.
+- **An INLINE `{ timeout }` on a test silently overrides the global config.**
+  `shift-and-travel`'s "final reports" case carried `{ timeout: 30_000 }` while
+  vitest.config sets 300s — so on a throttled machine it failed as a timeout
+  that looked exactly like a regression from the batch in flight. Cost: three
+  bisect runs (2b → 2a → T1 → pre-batch) to prove innocence; the same file
+  swung 141s–322s run-to-run with IDENTICAL code. **Rules:** (1) when a
+  long-running test times out, check for an inline override before suspecting
+  your diff; (2) don't put wall-clock overrides on simulation tests —
+  correctness is asserted, not timed; (3) the stash A/B against the
+  pre-batch commit remains the fastest innocence proof — do it before
+  reading any code.
 - **I shipped a data-loss regression to prod with all gates green (2026-07-24).**
   647 unit tests, tsc and build were all clean, and I declared the sync track
   "closed". The e2e suite's FIRST run found it: completing a behavior didn't

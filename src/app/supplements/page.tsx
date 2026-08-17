@@ -15,10 +15,15 @@
  */
 import { Suspense, useMemo, useState } from "react";
 import Shell from "@/components/Shell";
-import { Card, Eyebrow, Button } from "@/components/ui";
+import { Card, Eyebrow, Button , useToast } from "@/components/ui";
 import { Icon } from "@/components/ui/icons";
 import * as haptic from "@/lib/haptics";
 import { useAppState } from "@/hooks/useAppState";
+import {
+  getAccess,
+  getFreeSupplements,
+  capsEnforced,
+} from "@/lib/entitlements";
 import {
   curatedSupplementCatalog,
   supplementsForBlock,
@@ -44,8 +49,10 @@ function SupplementsInner() {
     addSupplement,
     updateSupplement,
     removeSupplement,
+    setSupplementPaused,
     updateSettings,
   } = useAppState();
+  const toast = useToast();
   const [view, setView] = useState<ViewMode>("stack");
   const [editing, setEditing] = useState<Supplement | null>(null);
   const [creating, setCreating] = useState(false);
@@ -152,6 +159,17 @@ function SupplementsInner() {
                 ?.supplementCompletions ?? {}
             }
             stateSupplements={userSupplements}
+            onMakeActive={(id) => {
+              const cap = getFreeSupplements();
+              const active = userSupplements.filter((x) => !x.paused).length;
+              if (!getAccess(state).premium && capsEnforced() && active >= cap) {
+                toast.show(
+                  `The free plan runs ${cap} active supplements — pause one first, or go Premium for the full stack.`
+                );
+                return;
+              }
+              setSupplementPaused(id, false);
+            }}
             blockLabels={state.settings.blockLabels}
           />
         )}
@@ -238,6 +256,7 @@ function StackView({
   onAdd,
   onBrowse,
   onHideTab,
+  onMakeActive,
   today,
   completions,
   stateSupplements,
@@ -250,6 +269,9 @@ function StackView({
   /** Optional: hide-tab callback. When present we surface the
    * "Don't take supplements? Hide this tab" link in empty state. */
   onHideTab?: () => void;
+  /** Free-cap pause: try to reactivate a paused supplement (parent guards
+   *  the cap + toasts when a swap is needed). */
+  onMakeActive?: (id: string) => void;
   today: string;
   completions: Record<string, boolean>;
   stateSupplements: Supplement[];
@@ -381,6 +403,61 @@ function StackView({
           </div>
         );
       })}
+      {/* Paused (over the free cap) — lock-don't-delete: the stack beyond
+          the free plan lives here with data intact. "Make active" swaps
+          within the cap; upgrading restores everything at once. */}
+      {stateSupplements.some((s) => s.paused) && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <Eyebrow color="var(--warm)">Paused — beyond the free plan</Eyebrow>
+            <span className="text-[11px] font-semibold text-[var(--text-3)]">
+              Premium reactivates all
+            </span>
+          </div>
+          <Card>
+            <div className="-my-1.5 divide-y divide-[var(--hairline)]">
+              {stateSupplements
+                .filter((s) => s.paused)
+                .map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex w-full items-center gap-3 py-3"
+                  >
+                    <span
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                      style={{
+                        background: "var(--surface-2)",
+                        color: "var(--text-3)",
+                      }}
+                    >
+                      <Icon name="pill" size={16} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-medium text-[var(--text-2)]">
+                        {s.name}
+                      </p>
+                      <p className="text-[11.5px] text-[var(--text-4)]">
+                        Paused — history kept
+                      </p>
+                    </div>
+                    {onMakeActive && (
+                      <button
+                        onClick={() => onMakeActive(s.id)}
+                        className="press tap-44 tr-fast shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[12px] font-semibold"
+                        style={{
+                          background: "var(--surface-2)",
+                          color: "var(--text-2)",
+                        }}
+                      >
+                        Make active
+                      </button>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </Card>
+        </div>
+      )}
       <div className="flex gap-2.5">
         <Button onClick={onBrowse} full>
           Browse catalog

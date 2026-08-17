@@ -639,9 +639,22 @@ export default function OnboardingPage() {
                     // guarantees it before onboarding renders). One button to
                     // enter — and on a fresh setup (not a re-tune) this is
                     // where the 14-day trial starts.
-                    <Button full onClick={() => finish(true)}>
-                      {isRedo() ? "Save changes" : "Start my 14 days"}
-                    </Button>
+                    <>
+                      <Button full onClick={() => finish(true)}>
+                        {isRedo() ? "Save changes" : "Start my 14 days"}
+                      </Button>
+                      {/* State the reverse-trial deal at the exact moment of
+                          consent — what the 14 days are, that no card is
+                          taken, and what stays free after. Absent, the CTA
+                          read as an unexplained countdown (audit b.4). */}
+                      {!isRedo() && (
+                        <p className="mt-3 px-2 text-center text-[12px] leading-relaxed text-[var(--text-3)]">
+                          Full Premium for 14 days — no card needed. After
+                          that, your core system and your entire history stay
+                          free forever.
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <>
                       <Button full onClick={() => finish(true)}>

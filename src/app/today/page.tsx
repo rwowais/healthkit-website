@@ -76,7 +76,14 @@ import { identityReflection } from "@/lib/reflect";
 import { reflectionPrompt } from "@/lib/prompts";
 import BehaviorSheet from "@/components/BehaviorSheet";
 import { Skeleton, Eyebrow, Sheet, Button } from "@/components/ui";
-import { getAccess } from "@/lib/entitlements";
+import {
+  getAccess,
+  getFreePacks,
+  getFreeSupplements,
+  capsEnforced,
+} from "@/lib/entitlements";
+import { activePacks } from "@/lib/knowledge";
+import { billingConfigured } from "@/lib/billing";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { TimeBlock } from "@/lib/types";
 
@@ -541,6 +548,54 @@ export default function TodayPage() {
     }
     setTrialExtAcked(t);
   };
+  // "Your trial ended" moment (audit b.1 — THE conversion gap: premium used
+  // to vanish silently overnight). One-time calm card on the first open after
+  // expiry; ack keyed to the exact trial-end stamp, mirroring the extension
+  // card, so a different trial (new account era) surfaces fresh.
+  const [trialEndAcked, setTrialEndAcked] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem("pz:trial-end-ack");
+    } catch {
+      return null;
+    }
+  });
+  const showTrialEnd =
+    access.trialExpired &&
+    !access.paid &&
+    !!state.settings.premiumTrialEndsAt &&
+    trialEndAcked !== state.settings.premiumTrialEndsAt;
+  const ackTrialEnd = () => {
+    const t = state.settings.premiumTrialEndsAt ?? "";
+    try {
+      localStorage.setItem("pz:trial-end-ack", t);
+    } catch {}
+    setTrialEndAcked(t);
+  };
+  // What enforcement would/did pause — powers honest, personal copy in the
+  // warning ladder ("your 8 protocols will drop to 2") and the end card.
+  const officialCatalogIds = useMemo(
+    () =>
+      new Set(
+        activePacks()
+          .filter((p) => p.source === "official")
+          .map((p) => p.id)
+      ),
+    []
+  );
+  const activeOfficialCount = state.installedPacks.filter(
+    (id) =>
+      officialCatalogIds.has(id) && !(state.pausedPacks ?? []).includes(id)
+  ).length;
+  const activeSuppCount = (state.supplements ?? []).filter(
+    (s) => !s.paused
+  ).length;
+  const overPacks = Math.max(0, activeOfficialCount - getFreePacks());
+  const overSupps = Math.max(0, activeSuppCount - getFreeSupplements());
+  const willPauseSomething = capsEnforced() && (overPacks > 0 || overSupps > 0);
+  const pausedSuppCount = (state.supplements ?? []).filter(
+    (s) => s.paused
+  ).length;
   const [offset, setOffset] = useState(0);
   const [weekOpen, setWeekOpen] = useState(false);
   const selectedDate = useMemo(
@@ -1645,8 +1700,13 @@ export default function TodayPage() {
               </button>
             )}
             {/* Trial status lives in the summary's footer (was its own banner
-                row) — one less card between the user and the checklist. */}
-            {!showTrialExtension && access.inTrial && (
+                row) — one less card between the user and the checklist. At
+                ≤3 days it ESCALATES to the un-hideable ladder banner below
+                instead (this footer collapses away with the summary — the
+                audit found engaged users stopped seeing the clock at all). */}
+            {!showTrialExtension &&
+              access.inTrial &&
+              access.trialDaysLeft > 3 && (
               <div className="relative mt-4 flex items-center justify-between gap-3 border-t border-[var(--hairline)] pt-3">
                 <span className="text-[12px] text-[var(--text-3)]">
                   Premium trial — {access.trialDaysLeft}{" "}
@@ -1663,6 +1723,99 @@ export default function TodayPage() {
             )}
           </div>
         </motion.div>
+        )}
+
+        {/* ── Warning ladder (audit b.2/b.3): at ≤3 days the countdown
+            escalates and CANNOT be collapsed away — it renders outside the
+            summary, on every visit, with copy that names the user's own
+            stakes. This is the conversion window; a hidden clock sells
+            nothing. ── */}
+        {isToday && access.inTrial && access.trialDaysLeft <= 3 && !access.paid && (
+          <div
+            className="flex items-center justify-between gap-3 rounded-[var(--r-lg)] px-4 py-3"
+            style={{
+              background:
+                "color-mix(in srgb, var(--warm) 14%, var(--surface-1))",
+              boxShadow: "var(--shadow-soft)",
+            }}
+          >
+            <p className="text-[13px] leading-snug text-[var(--text-2)]">
+              <span className="font-semibold text-[var(--text-1)]">
+                {access.trialDaysLeft === 1
+                  ? "Your trial ends today."
+                  : `Your trial ends in ${access.trialDaysLeft} days.`}
+              </span>{" "}
+              {willPauseSomething
+                ? `Your ${activeOfficialCount} protocols and ${activeSuppCount} supplements will drop to the free ${getFreePacks()} + ${getFreeSupplements()} — choose your keepers, or keep everything with Premium.`
+                : "After that, insights go on a 3-day delay. Your system, history and streaks stay free forever."}
+            </p>
+            <button
+              onClick={() => router.push("/upgrade")}
+              className="press tr-fast shrink-0 rounded-[var(--r-pill)] bg-[var(--text-1)] px-3.5 py-2 text-[12px] font-semibold text-[var(--bg)]"
+            >
+              {billingConfigured ? "Keep Premium" : "Details"}
+            </button>
+          </div>
+        )}
+
+        {/* ── "Your trial ended" moment (audit b.1) — the single biggest
+            conversion gap: premium used to vanish silently overnight with no
+            acknowledgement. One calm card, once, tied to this trial's exact
+            end stamp. Copy is enforcement-aware: pre-Stripe nothing pauses,
+            so it must not claim otherwise. ── */}
+        {isToday && showTrialEnd && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="relative overflow-hidden rounded-[var(--r-xl)] p-5"
+            style={{
+              background:
+                "linear-gradient(155deg, color-mix(in srgb, var(--sleep) 11%, var(--surface-1)), var(--surface-1) 70%)",
+              boxShadow: "var(--shadow-soft)",
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="chip h-9 w-9 shrink-0"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--sleep) 18%, var(--surface-3))",
+                  color: "var(--sleep)",
+                }}
+              >
+                <Icon name="moon" size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-semibold text-[var(--text-1)]">
+                  Your Premium trial has ended
+                </p>
+                <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-2)]">
+                  {capsEnforced() && (pausedSuppCount > 0 || overPacks > 0)
+                    ? `The extras beyond the free plan are paused — nothing is deleted, and upgrading restores them exactly as they were. Insights now update on a 3-day delay.`
+                    : `Insights now update on a 3-day delay, and the free plan adds up to ${getFreePacks()} protocols and ${getFreeSupplements()} supplements. Everything you built — your system, history, streaks — stays yours, free forever.`}
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={() => router.push("/upgrade")}
+                    className="press tap-44 tr-fast rounded-[var(--r-pill)] bg-[var(--text-1)] px-4 py-2 text-[12px] font-semibold text-[var(--bg)]"
+                  >
+                    {billingConfigured ? "Restore Premium" : "See what changed"}
+                  </button>
+                  <button
+                    onClick={ackTrialEnd}
+                    className="press tap-44 tr-fast rounded-[var(--r-pill)] px-3.5 py-2 text-[12px] font-semibold"
+                    style={{
+                      background: "var(--surface-2)",
+                      color: "var(--text-2)",
+                    }}
+                  >
+                    Got it
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Trial extension — one-time calm note. The engagement-gated

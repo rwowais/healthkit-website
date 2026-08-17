@@ -669,10 +669,13 @@ export default function InsightsPage() {
                 otherwise see a dead screen and may assume the tab is
                 broken. Tell them what's coming (live + biomarker-aware)
                 and offer the upgrade path now, while interest is fresh. */}
+            {/* Same honest framing as the delayed-view banner above — the
+                page must not tell two different stories about the same
+                feature ("delayed on free" vs "Premium feature"). */}
             {!access.premium && (
               <UpgradeCTA
-                title="Insights is a Premium feature"
-                line="Once you have a week of data, Premium shows your patterns the moment they form — live, with weekly review and identity reflection."
+                title="Insights run on a delay on the free plan"
+                line="Once you have a week of data, you'll see your patterns here — free on a 3-day delay, or live the moment they form with Premium."
               />
             )}
             {/* Cross-link to Body Trends — gated off while biomarkers are hidden. */}

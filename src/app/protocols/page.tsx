@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAccess } from "@/lib/entitlements";
+import { getAccess , capsEnforced } from "@/lib/entitlements";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
@@ -1539,6 +1539,29 @@ export default function ProtocolsPage() {
                   )}
                   <button
                     onClick={() => {
+                      // Free-cap guard: the storage layer will refuse an
+                      // unpause past the active cap — surface WHY instead of
+                      // a switch that silently doesn't flip.
+                      if (
+                        isPaused &&
+                        capsEnforced() &&
+                        !access.premium &&
+                        officialPackIds.has(p.id)
+                      ) {
+                        const activeOfficial = (
+                          state?.installedPacks ?? []
+                        ).filter(
+                          (id) =>
+                            officialPackIds.has(id) &&
+                            !(state?.pausedPacks ?? []).includes(id)
+                        ).length;
+                        if (activeOfficial >= getFreePacks()) {
+                          toast.show(
+                            `The free plan runs ${getFreePacks()} active protocols — pause one first, or go Premium for the full library.`
+                          );
+                          return;
+                        }
+                      }
                       setPackPaused(p.id, !isPaused);
                       toast.show(
                         isPaused
