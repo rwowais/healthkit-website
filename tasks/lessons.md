@@ -125,6 +125,15 @@ rule that prevents it.
   whole commit+push chain failed. **Rule:** for any multi-paragraph message —
   especially one quoting code, generics, or redirection characters — write it
   to a scratchpad file and use `git commit -F <file>`.
+- **`git checkout <sha>` for a bisect leaves you DETACHED — commits land on
+  nothing.** After A/B-ing a suspected regression across three commits I
+  returned with `git checkout -q 79387d9` (a SHA, not `main`), popped the
+  stash, and committed Batch 2b onto a detached HEAD; the push reported
+  "Everything up-to-date" while `main` sat a commit behind. Recovered with
+  `git checkout main && git merge --ff-only <sha>`. **Rule:** end every
+  bisect with `git checkout main` (branch name, never a SHA), and treat
+  "Everything up-to-date" after a real commit as a red flag — check
+  `git status | head -1` for "HEAD detached" before trusting a push.
 - **An INLINE `{ timeout }` on a test silently overrides the global config.**
   `shift-and-travel`'s "final reports" case carried `{ timeout: 30_000 }` while
   vitest.config sets 300s — so on a throttled machine it failed as a timeout
