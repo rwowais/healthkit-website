@@ -33,7 +33,7 @@ import {
   ENTITLEMENTS_TABLE,
   getUserId,
 } from "./supabase";
-import { setEntitlement, type Entitlement } from "./entitlements";
+import { setEntitlement, getEntitlement, type Entitlement } from "./entitlements";
 
 export interface DataSource {
   readonly kind: "local" | "supabase";
@@ -44,6 +44,17 @@ export interface DataSource {
    *  gone (or there is nothing to clear); false if the remote delete failed, so
    *  the caller must NOT wipe local + claim success (the data would resurrect). */
   clearRemote(): Promise<boolean>;
+  /**
+   * Re-pull the server-authoritative entitlement WITHOUT a full state load.
+   *
+   * Exists for the post-checkout wait: the user returns from Stripe possibly
+   * before the fulfillment webhook has written their row, so the UI polls this
+   * until Premium appears. A full load() would work but re-downloads the whole
+   * state document every two seconds and races the save path — this reads one
+   * narrow row. Returns the fresh entitlement, or null when there is nothing
+   * server-side to read (local mode).
+   */
+  refreshEntitlement(): Promise<Entitlement | null>;
   /** True when this source persists off-device. */
   readonly isCloud: boolean;
 }
@@ -78,6 +89,10 @@ class LocalDataSource implements DataSource {
   async clearRemote(): Promise<boolean> {
     /* nothing off-device — treat as already cleared */
     return true;
+  }
+  async refreshEntitlement(): Promise<Entitlement | null> {
+    /* no server to ask — local mode can never be paid */
+    return null;
   }
 }
 
@@ -937,6 +952,19 @@ class SupabaseDataSource implements DataSource {
       currentPeriodEnd: (data?.current_period_end as string | null) ?? null,
       syncedAt: now,
     });
+  }
+
+  /**
+   * Public one-row entitlement re-read (see DataSource.refreshEntitlement).
+   * Used by the post-checkout wait, which polls until the Stripe webhook has
+   * written the row. Errors are swallowed by syncEntitlement (treated as
+   * offline), so a transient failure just means the next poll tries again.
+   */
+  async refreshEntitlement(): Promise<Entitlement | null> {
+    const sb = getSupabase();
+    if (!sb) return null;
+    await this.syncEntitlement(sb, await getUserId());
+    return getEntitlement();
   }
 
   async load(): Promise<AppState> {

@@ -9,10 +9,16 @@
 //
 // ── Owner steps to go live (≈15 min) ────────────────────────────────────────
 // 1. In Stripe: create your products/prices (monthly $8.99, annual $79.99,
-//    lifetime $179 one-time) and the Payment Links. On each Payment Link, under
-//    "After payment", DO NOT rely on email matching — instead the app appends
-//    ?client_reference_id=<supabase user id> to the checkout URL (billing.ts
-//    handles this once wired), so this webhook knows whose entitlement to set.
+//    lifetime $179 one-time) and the Payment Links.
+//    a. Buyer identity: DO NOT rely on email matching. billing.ts appends
+//       ?client_reference_id=<supabase user id> to the checkout URL (SHIPPED
+//       2026-08-17), and it refuses to open checkout at all if it cannot
+//       attach that id — so this webhook always knows whose entitlement to set.
+//    b. On each Payment Link, set "After payment" → "Redirect customers to"
+//       https://<your-domain>/upgrade?checkout=success
+//       That query param drives the CheckoutReturn screen, which polls the
+//       entitlement row until THIS webhook has written it. Without the
+//       redirect the customer lands back on a page still selling Premium.
 // 2. Deploy: `supabase functions deploy stripe-webhook --no-verify-jwt`
 //    (--no-verify-jwt because Stripe calls it, not a signed-in user; we verify
 //    the Stripe signature instead).

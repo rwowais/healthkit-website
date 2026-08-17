@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Shell from "@/components/Shell";
@@ -10,6 +10,7 @@ import { startCheckout, PRICING, billingConfigured, type Plan } from "@/lib/bill
 import { Eyebrow, Skeleton, useToast } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { BIOMARKERS_ENABLED } from "@/lib/flags";
+import CheckoutReturn from "@/components/CheckoutReturn";
 
 const VALUE: { icon: IconName; t: string; s: string }[] = [
   {
@@ -49,10 +50,45 @@ export default function UpgradePage() {
   const router = useRouter();
   const toast = useToast();
   const [plan, setPlan] = useState<Plan>("annual");
+  const [checkingOut, setCheckingOut] = useState(false);
   const access = useMemo(
     () => (state ? getAccess(state) : null),
     [state]
   );
+
+  // Stripe's Payment Links send the customer back to a URL the OWNER configures
+  // in the Stripe dashboard ("After payment" → redirect). Point it at
+  // /upgrade?checkout=success and this takes over: the entitlement is written
+  // by the webhook, not by the redirect, so we have to wait for it rather than
+  // assume it. Read from window (not useSearchParams) to avoid forcing this
+  // page into a Suspense boundary for a query param only used post-payment.
+  const [returning, setReturning] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("checkout") === "success") setReturning(true);
+  }, []);
+
+  const dismissReturn = useCallback(() => {
+    setReturning(false);
+    // Drop the param so a refresh doesn't re-enter the waiting screen.
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", "/upgrade");
+    }
+  }, []);
+
+  // Returning from Stripe takes priority over everything else on this page —
+  // a customer who has just been charged must not see a pitch to upgrade.
+  if (returning) {
+    return (
+      <Shell>
+        {/* Deliberately empty behind the overlay — loading skeletons would
+            show through the backdrop as meaningless flickering blocks. */}
+        <div aria-hidden="true" />
+        <CheckoutReturn onDismiss={dismissReturn} />
+      </Shell>
+    );
+  }
 
   if (loading || !access) {
     return (
@@ -202,13 +238,25 @@ export default function UpgradePage() {
           {billingConfigured ? (
             <>
               <button
-                onClick={() => {
-                  const r = startCheckout(plan);
-                  if (!r.ok) toast.show(r.reason ?? "Not available yet");
+                disabled={checkingOut}
+                aria-busy={checkingOut}
+                onClick={async () => {
+                  if (checkingOut) return;
+                  setCheckingOut(true);
+                  // On success this navigates away, so the button intentionally
+                  // stays disabled — re-enabling would let an impatient double
+                  // tap open checkout twice during the redirect.
+                  const r = await startCheckout(plan);
+                  if (r.ok) return;
+                  setCheckingOut(false);
+                  toast.show(r.reason ?? "Not available yet");
+                  // Missing account is recoverable — send them to sign in
+                  // rather than leaving them at a dead end.
+                  if (r.needsAuth) router.push("/auth");
                 }}
-                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)]"
+                className="press tr-fast w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-4 text-[15px] font-semibold text-[var(--bg)] disabled:opacity-60"
               >
-                Start Premium
+                {checkingOut ? "Opening checkout…" : "Start Premium"}
               </button>
               <button
                 onClick={() => router.push("/today")}
