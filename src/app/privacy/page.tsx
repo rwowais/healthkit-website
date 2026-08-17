@@ -334,14 +334,18 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="Contact">
+          <Section title="Who we are">
             <p>
+              Protocolize is operated by <strong>RO Group LLC</strong>, which
+              is the data controller for the personal data described in this
+              policy. Contact:{" "}
               <a
                 className="text-[var(--readiness)] underline"
                 href="mailto:privacy@protocolize.com"
               >
                 privacy@protocolize.com
               </a>
+              .
             </p>
           </Section>
         </div>

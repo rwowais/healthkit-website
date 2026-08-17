@@ -46,8 +46,12 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 // v3 (2026-08-17): privacy reserves de-identified/aggregated use; terms add
 // the service-evolution clause; the acceptance banner (LegalGate) now actually
 // exists. Nobody ever recorded acceptance of v1/v2 (the mechanism didn't
-// exist), so every existing account sees the banner once and stamps v3.
-export const LEGAL_VERSION = 3;
+// exist), so every existing account sees the banner once.
+// v4 (2026-08-17, same day): the documents now NAME the contracting party —
+// RO Group LLC. Naming the counterparty is material (it's who the arbitration
+// clause binds users to), so it re-asks; at bump time exactly one account had
+// accepted v3 (the owner), so the cost was one banner tap.
+export const LEGAL_VERSION = 4;
 
 // Trial length is NOT here — it is entitlements.TRIAL_DAYS (7), the single
 // source of truth that onboarding, terms and the import clamp all derive from.

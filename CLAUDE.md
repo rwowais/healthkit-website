@@ -330,7 +330,8 @@ onboarding guard handles new vs returning).
 - ✅ Email/password + magic link + password reset; OAuth built, disabled
   until providers configured.
 - ✅ Freemium gating + reverse-trial engine.
-- ✅ Legal pages + acceptance flow (2026-08-17, LEGAL_VERSION 3).
+- ✅ Legal pages + acceptance flow (2026-08-17, LEGAL_VERSION 4 — v4 names
+  RO Group LLC as the contracting party / data controller).
   Acceptance is RECORDED: onboarding's final CTA carries the clickwrap line
   and stamps `legalAcceptedVersion`/`legalAcceptedAt` (lib/legal.ts);
   `LegalGate` (mounted in Shell) shows a one-time accept banner to any
@@ -357,15 +358,14 @@ onboarding guard handles new vs returning).
 All app code is launch-ready. The remaining steps live in the owner's
 accounts, not the codebase:
 
-0. **Form a legal entity (LLC) BEFORE charging money.** The 2026-08-17
-   benchmark against Oura/Rise/Whoop found every comparable operates behind a
-   named company ("Rise Science, Inc.", "Oura Health Oy") — Protocolize's
-   Terms currently say "we" with no entity behind it, which means the
-   liability cap and arbitration clause protect *Rami personally* being sued,
-   not a company shielding him. An LLC is the single highest-leverage legal
-   protection available and no document wording substitutes for it. Once
-   formed, put the entity name + state into /terms and /privacy (and bump
-   LEGAL_VERSION).
+0. ✅ **Legal entity: RO Group LLC** (owner confirmed 2026-08-17). Named in
+   /terms ("agreement between you and RO Group LLC") and /privacy (data
+   controller) as of LEGAL_VERSION 4. Still on the owner: (a) tell Claude the
+   LLC's formation STATE so the docs can carry "an <State> limited liability
+   company"; (b) if "Protocolize" isn't registered as a DBA/trade name of RO
+   Group LLC, consider registering it; (c) run Protocolize's money through the
+   LLC (Stripe account, bank) — the liability shield only works if the
+   business actually operates through the entity.
 1. **Buy `protocolize.com`**, add it as a Vercel domain, follow the DNS
    instructions. Set `NEXT_PUBLIC_SITE_URL=https://protocolize.com` in
    Vercel env vars so OG previews resolve absolutely.

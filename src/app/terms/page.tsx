@@ -55,7 +55,10 @@ export default function TermsPage() {
 
           <Section title="What you're agreeing to">
             <p>
-              By using Protocolize you accept these terms and our{" "}
+              These terms are an agreement between you and{" "}
+              <strong>RO Group LLC</strong>, the company that operates
+              Protocolize (&quot;we&quot;, &quot;us&quot;). By using
+              Protocolize you accept these terms and our{" "}
               <Link href="/privacy" className="text-[var(--readiness)] underline">
                 Privacy Policy
               </Link>
