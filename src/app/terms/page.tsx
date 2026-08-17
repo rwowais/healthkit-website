@@ -65,7 +65,7 @@ export default function TermsPage() {
 
           <Section title="Your account">
             <ul className="list-disc pl-5 space-y-1.5">
-              <li>You must be at least 13 to create an account.</li>
+              <li>You must be at least 18 to create an account.</li>
               <li>Use a real email so you can recover your account.</li>
               <li>Keep your password to yourself.</li>
               <li>You&apos;re responsible for activity in your account.</li>
@@ -230,6 +230,13 @@ export default function TermsPage() {
               can still bring an individual claim in small-claims court
               instead. Disputes are resolved individually — not as part of a
               class or representative action.
+            </p>
+            <p>
+              You can opt out of arbitration entirely by emailing{" "}
+              <a className="text-[var(--readiness)] underline" href="mailto:legal@protocolize.com">legal@protocolize.com</a>{" "}
+              within 30 days of first accepting these terms, with the subject
+              line &quot;Arbitration opt-out&quot;. Opting out doesn&apos;t
+              affect anything else in these terms.
             </p>
           </Section>
 

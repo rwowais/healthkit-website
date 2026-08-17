@@ -25,6 +25,11 @@ import { LEGAL_VERSION } from "@/lib/constants";
  *    to "promptly, and within any legally required window".
  *  - "Changes" section now describes the REAL acceptance banner (LegalGate)
  *    instead of promising a mechanism that didn't exist.
+ *  - Benchmarked against Oura's and Rise's policies (2026-08-17): added
+ *    retention, international transfers, US state rights (incl. WA My Health
+ *    My Data — this IS a consumer-health-data app), explicit health-data
+ *    consent framing, and the no-selling-to-AI-trainers line. All additive
+ *    user protections, so no LEGAL_VERSION bump needed for them.
  *
  * Footprint check (what we actually do, not what we boilerplate):
  *  - Cloud storage: Supabase row keyed to the user's id. RLS enforces
@@ -124,8 +129,16 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p className="mt-2">
+              A note on health data specifically: it&apos;s treated as
+              sensitive data everywhere that concept exists in law, and we
+              process it <strong>only with your consent</strong> — which you
+              give by choosing to log it, and withdraw at any time by deleting
+              it or your account.
+            </p>
+            <p className="mt-2">
               What we will <strong>not</strong> do: sell your data, share
-              identifiable data with advertisers or data brokers, or use your
+              identifiable data with advertisers or data brokers, sell or
+              license your data to train third-party AI models, or use your
               personal information for purposes beyond this policy without
               asking you first.
             </p>
@@ -160,6 +173,37 @@ export default function PrivacyPage() {
                 status) which Vercel retains per their policy.
               </li>
             </ul>
+          </Section>
+
+          <Section title="How long we keep data">
+            <ul className="list-disc pl-5 space-y-1.5">
+              <li>
+                <strong>While your account is active</strong> — your logs and
+                history are kept so the app can work; nothing expires on its
+                own.
+              </li>
+              <li>
+                <strong>When you delete your account</strong> — your row is
+                removed from the live database immediately. Residual copies in
+                encrypted database backups age out automatically within 30
+                days.
+              </li>
+              <li>
+                <strong>Aggregated statistics</strong> — numbers that
+                can&apos;t identify you may be retained after deletion (they
+                contain nothing to delete about you).
+              </li>
+            </ul>
+          </Section>
+
+          <Section title="International transfers">
+            <p>
+              Our servers are in the United States. If you use Protocolize
+              from the EU, UK, or elsewhere, your data is transferred to and
+              processed in the US. Our service providers protect these
+              transfers with the EU-approved safeguards in their data
+              processing agreements (standard contractual clauses).
+            </p>
           </Section>
 
           <Section title="Service providers">
@@ -239,12 +283,29 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
+          <Section title="US state privacy rights">
+            <p>
+              Several states (California, Colorado, Connecticut, Virginia,
+              Washington, and others) give you specific rights over personal
+              data — access, correction, deletion, and portability, plus the
+              right to appeal if we decline a request. Protocolize&apos;s
+              answers are simple because of how it&apos;s built: we don&apos;t
+              sell personal data, we don&apos;t share it for targeted
+              advertising, and export/delete are self-serve in Profile. For
+              Washington residents: your health data here is &quot;consumer
+              health data&quot; under the My Health My Data Act; the
+              consent-based handling described above is how we meet it, and
+              you may appeal any decision by emailing us (and, if unresolved,
+              the Washington Attorney General).
+            </p>
+          </Section>
+
           <Section title="Children">
             <p>
-              Protocolize is not directed at children under 13. We don&apos;t
-              knowingly collect data from anyone under that age. If you
-              believe a child has signed up, email us and we&apos;ll delete
-              the account.
+              Protocolize is for adults — the Terms require you to be 18 to
+              create an account, and we don&apos;t knowingly collect data from
+              anyone younger. If you believe a minor has signed up, email us
+              and we&apos;ll delete the account.
             </p>
           </Section>
 

@@ -357,6 +357,15 @@ onboarding guard handles new vs returning).
 All app code is launch-ready. The remaining steps live in the owner's
 accounts, not the codebase:
 
+0. **Form a legal entity (LLC) BEFORE charging money.** The 2026-08-17
+   benchmark against Oura/Rise/Whoop found every comparable operates behind a
+   named company ("Rise Science, Inc.", "Oura Health Oy") — Protocolize's
+   Terms currently say "we" with no entity behind it, which means the
+   liability cap and arbitration clause protect *Rami personally* being sued,
+   not a company shielding him. An LLC is the single highest-leverage legal
+   protection available and no document wording substitutes for it. Once
+   formed, put the entity name + state into /terms and /privacy (and bump
+   LEGAL_VERSION).
 1. **Buy `protocolize.com`**, add it as a Vercel domain, follow the DNS
    instructions. Set `NEXT_PUBLIC_SITE_URL=https://protocolize.com` in
    Vercel env vars so OG previews resolve absolutely.
