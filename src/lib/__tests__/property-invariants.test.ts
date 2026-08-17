@@ -380,9 +380,11 @@ describe("property-based invariant fuzz", () => {
         // 1000 keeps CI ~2s; locally verified clean to 5000 runs.
         { numRuns: 1000, verbose: false }
       );
-    },
-    // Generous timeout — 1000 runs through getSignals + compileTimeline
-    // for 7 days each is non-trivial.
-    120_000
+    }
+    // No inline timeout: an explicit value OVERRIDES vitest.config's global
+    // budget (300s), and 1000 fuzz runs through getSignals + compileTimeline
+    // legitimately took 182s on a throttled machine — failing as a "timeout"
+    // that reads like a regression. Correctness here is asserted, not timed.
+    // (Second instance of this trap today; see tasks/lessons.md.)
   );
 });

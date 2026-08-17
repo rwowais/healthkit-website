@@ -45,8 +45,12 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
  */
 export const LEGAL_VERSION = 2;
 
-// (TRIAL_DURATION_DAYS removed 2026-08-16: dead code that said 7 while the
-// shipped trial is 14 days — stamped in onboarding/page.tsx finish().)
+// Trial length is NOT here — it is entitlements.TRIAL_DAYS (7), the single
+// source of truth that onboarding, terms and the import clamp all derive from.
+// (A dead TRIAL_DURATION_DAYS lived here until 2026-08-16; it read 7 while the
+// shipped trial was 14, so it was deleted as "wrong" — and 7 then turned out
+// to be the intended value. Keep the number in one place so they can't
+// disagree again.)
 
 export const SCORE_WEIGHTS = {
   completionBase: 80,

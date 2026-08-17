@@ -19,12 +19,15 @@ export default function MorningBriefing({
   cb,
   overnight,
   isToday,
+  onDismiss,
 }: {
   state: AppState;
   items: TimelineItem[];
   cb: TimeBlock;
   overnight: boolean;
   isToday: boolean;
+  /** Per-day dismissal from Today (encouragement cards are optional). */
+  onDismiss?: () => void;
 }) {
   const { total, focus } = useMemo(() => {
     const actionable = items.filter((i) => !i.muted && isActionable(i));
@@ -75,6 +78,18 @@ export default function MorningBriefing({
               </span>
               .
             </p>
+          )}
+          {onDismiss && (
+            <button
+              onClick={onDismiss}
+              className="press tap-44 tr-fast mt-2.5 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--text-2)",
+              }}
+            >
+              Got it
+            </button>
           )}
         </div>
       </div>

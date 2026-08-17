@@ -15,7 +15,18 @@ import { getCfgNumber } from "./knowledge";
  * runtime gates now go through the `getX()` accessors below so a CMS
  * Publish that overrides any of these takes effect without redeploying.
  */
-export const AHA_DAYS = 6;
+/** Reverse-trial length in days (founder call 2026-08-16: 14 → 7). Single
+ *  source of truth — it was a magic number typed into onboarding + three
+ *  copy strings, which is how a dead `TRIAL_DURATION_DAYS = 7` constant came
+ *  to disagree with the shipped 14. CMS-overridable like the other gates. */
+export const TRIAL_DAYS = 7;
+/** One-shot engagement-gated extension, in days. */
+export const TRIAL_EXTENSION_DAYS = 7;
+/** Engaged days that count as "had a fair shot" — below this the trial
+ *  auto-extends once. Dropped 6 → 4 alongside the 7-day trial: a 6-of-7
+ *  threshold would have auto-extended nearly everyone, so the advertised
+ *  "7 days" would almost never be the real number. */
+export const AHA_DAYS = 4;
 /** Free-tier cap on ACTIVE official packs. Dropped 3 → 2 (founder call,
  *  2026-08-16): most users run 1–2 packs, and the default starter system is
  *  exactly 2 — so 2 keeps the out-of-box experience valid while making the
@@ -42,6 +53,10 @@ export const getFreeInsightDays = (): number =>
   getCfgNumber("FREE_INSIGHT_DAYS", FREE_INSIGHT_DAYS);
 export const getFreeSupplements = (): number =>
   getCfgNumber("FREE_SUPPLEMENTS", FREE_SUPPLEMENTS);
+export const getTrialDays = (): number =>
+  getCfgNumber("TRIAL_DAYS", TRIAL_DAYS);
+export const getTrialExtensionDays = (): number =>
+  getCfgNumber("TRIAL_EXTENSION_DAYS", TRIAL_EXTENSION_DAYS);
 
 // ── Enforcement switch (founder call, 2026-08-16) ──────────────────────
 // Free-tier caps get TEETH only once payments are actually purchasable.
@@ -268,7 +283,9 @@ export function maybeExtendTrial(state: AppState): AppState {
     ...state,
     settings: {
       ...state.settings,
-      premiumTrialEndsAt: new Date(now + 7 * 86_400_000).toISOString(),
+      premiumTrialEndsAt: new Date(
+        now + getTrialExtensionDays() * 86_400_000
+      ).toISOString(),
       // Stamp the extension so Today can surface a calm one-time note —
       // a silent extension feels invisible; a *seen* one feels generous.
       trialExtendedAt: new Date(now).toISOString(),

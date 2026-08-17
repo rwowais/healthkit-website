@@ -83,6 +83,7 @@ import {
   capsEnforced,
 } from "@/lib/entitlements";
 import { activePacks } from "@/lib/knowledge";
+import { useDailyDismiss } from "@/lib/dailyDismiss";
 import { billingConfigured } from "@/lib/billing";
 import { Icon, type IconName } from "@/components/ui/icons";
 import type { TimeBlock } from "@/lib/types";
@@ -535,7 +536,7 @@ export default function TodayPage() {
   const showTrialExtension =
     !!state.settings.trialExtendedAt &&
     trialExtAcked !== state.settings.trialExtendedAt;
-  // Reverse-trial legibility: the user clicked "Start my 14 days" in onboarding
+  // Reverse-trial legibility: the user started the trial in onboarding
   // but Today never acknowledged the trial — no banner, no countdown. A calm
   // status line keeps the clock visible (the whole conversion mechanic).
   const access = getAccess(state);
@@ -572,6 +573,32 @@ export default function TodayPage() {
     } catch {}
     setTrialEndAcked(t);
   };
+  // Per-day dismissal for the encouragement cards (audit + founder report:
+  // these had NO dismiss control, so the evening "you moved N things" card
+  // greeted the user above their checklist every single evening). The global
+  // off switch lives in Profile (settings.hideEncouragement).
+  const encouragementOn = !state.settings.hideEncouragement;
+  const [briefingDismissed, dismissBriefing] = useDailyDismiss(
+    "briefing",
+    todayKey
+  );
+  const [partialDismissed, dismissPartial] = useDailyDismiss(
+    "partial",
+    todayKey
+  );
+  const [completeDismissed, dismissComplete] = useDailyDismiss(
+    "complete",
+    todayKey
+  );
+  const [restDayDismissed, dismissRestDay] = useDailyDismiss(
+    "restday",
+    todayKey
+  );
+  const [tomorrowDismissed, dismissTomorrow] = useDailyDismiss(
+    "tomorrow",
+    todayKey
+  );
+
   // What enforcement would/did pause — powers honest, personal copy in the
   // warning ladder ("your 8 protocols will drop to 2") and the end card.
   const officialCatalogIds = useMemo(
@@ -1341,8 +1368,9 @@ export default function TodayPage() {
 
         {/* Morning briefing — a calm frame for the day (morning block only,
             hidden once the day's already closed). */}
-        {!dayComplete && (
+        {!dayComplete && encouragementOn && !briefingDismissed && (
           <MorningBriefing
+            onDismiss={dismissBriefing}
             state={state}
             items={timeline}
             cb={cb}
@@ -1355,7 +1383,10 @@ export default function TodayPage() {
         {WEEKLY_GOAL_ENABLED && isToday && <WeeklyGoal state={state} />}
 
         {/* Planned rest day — streak-protected, timeline still available. */}
-        {isToday && (state.settings.restDays ?? []).includes(selectedDate) && (
+        {isToday &&
+          (state.settings.restDays ?? []).includes(selectedDate) &&
+          encouragementOn &&
+          !restDayDismissed && (
           <div className="panel flex items-center gap-3 p-4">
             <span
               className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
@@ -1374,6 +1405,14 @@ export default function TodayPage() {
               Your streak is protected today — do as much or as little as you
               like.
             </p>
+            <button
+              onClick={dismissRestDay}
+              aria-label="Dismiss rest day notice"
+              className="press tap-44 tr-fast ml-auto shrink-0 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+              style={{ background: "var(--surface-2)", color: "var(--text-2)" }}
+            >
+              Got it
+            </button>
           </div>
         )}
 
@@ -1392,7 +1431,7 @@ export default function TodayPage() {
           )}
 
         {/* Day complete — calm reward */}
-        {dayComplete && (
+        {dayComplete && encouragementOn && !completeDismissed && (
           <motion.div
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1436,12 +1475,19 @@ export default function TodayPage() {
                 This is the quiet, compounding work that actually changes a
                 healthspan. Rest well.
               </p>
+              <button
+                onClick={dismissComplete}
+                className="press tap-44 tr-fast mt-4 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
+                style={{ background: "var(--surface-2)", color: "var(--text-2)" }}
+              >
+                Got it
+              </button>
             </div>
           </motion.div>
         )}
 
         {/* Partial close — acknowledgement, not pressure */}
-        {partialClose && (
+        {partialClose && encouragementOn && !partialDismissed && (
           <motion.div
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1475,6 +1521,13 @@ export default function TodayPage() {
                 perfect score. Anything still open is there if you want
                 it, no pressure.
               </p>
+              <button
+                onClick={dismissPartial}
+                className="press tap-44 tr-fast mt-4 rounded-[var(--r-pill)] px-3.5 py-1.5 text-[11.5px] font-semibold"
+                style={{ background: "var(--surface-2)", color: "var(--text-2)" }}
+              >
+                Got it
+              </button>
             </div>
           </motion.div>
         )}
@@ -2022,7 +2075,7 @@ export default function TodayPage() {
         {/* First-day soft entry — tomorrow's first focus, not today's
             "up next" pressure. Replaces the standard Up Next card when
             the user joined mid-day and hasn't checked anything off yet. */}
-        {firstDaySoft && tomorrowFirstFocus && (
+        {firstDaySoft && tomorrowFirstFocus && !tomorrowDismissed && (
           <div>
             <div className="mb-3 flex items-center justify-between px-1">
               <Eyebrow color="var(--text-3)">Tomorrow&apos;s first focus</Eyebrow>
@@ -2078,6 +2131,16 @@ export default function TodayPage() {
                     Your system kicks off here in the morning. Browse the
                     rest of today below at your own pace.
                   </p>
+                  <button
+                    onClick={dismissTomorrow}
+                    className="press tap-44 tr-fast mt-2.5 rounded-[var(--r-pill)] px-3 py-1.5 text-[11.5px] font-semibold"
+                    style={{
+                      background: "var(--surface-2)",
+                      color: "var(--text-2)",
+                    }}
+                  >
+                    Got it
+                  </button>
                 </div>
               </div>
             </motion.div>

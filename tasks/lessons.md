@@ -209,3 +209,35 @@ rule that prevents it.
   tacked on. And always write full output to a file so failure NAMES survive;
   a persona failure showing a 120s+ duration + "Test timed out" is wall-clock
   (re-run the file in isolation to confirm), not a real assertion.
+- **Inline `{ timeout }` on a test — SECOND occurrence (2026-08-16).** After
+  fixing `shift-and-travel.test.ts`, `property-invariants.test.ts` failed the
+  same way: 182s against a trailing `120_000` arg while the global budget is
+  300s. The tell is a reported timeout number that does NOT match
+  `vitest.config.ts`. Run the file alone to confirm (it passed in 12s — the
+  182s was contention from the full parallel suite, not slow code). **Rule:**
+  the moment a long-running test "times out", grep the file for a trailing
+  numeric arg / `{ timeout }` BEFORE suspecting the diff, and delete it rather
+  than raising it — the global config already sets the real budget.
+- **`toBeHidden()` / "element not found" passes VACUOUSLY on a page that
+  hasn't finished loading.** The `hideEncouragement` e2e asserted the card was
+  absent and went green — while the seeded state was still being pulled from
+  the cloud, so the timeline (and every card) was absent regardless. The
+  feature was never exercised. **Rule:** every absence assertion must be
+  preceded by a POSITIVE anchor proving the app actually rendered
+  (`waitForTimeline()` here). An absence test with no readiness gate is not a
+  test.
+- **Never shim `Date`/`Date.now()` in a browser context that has a Supabase
+  session.** To force "evening" I pinned the clock forward; the next
+  `page.reload()` put the access token past `expires_at`, so the app landed on
+  `/auth` — and the "dismissal survives reload" assertion passed because the
+  card is absent on the SIGN-IN page. A green test proving nothing. Fix: shift
+  the WALL CLOCK, not epoch time — pick a timezone where it is currently ~19:xx
+  (`Etc/GMT±N`, signs inverted) and leave absolute time alone.
+- **This app's clock comes from `settings.timezone`, not the browser.**
+  `getTz(settings)` → `dateKeyInTz` / `nowMinutesInTz` drive both the day key
+  and the current block, and `onboardedState()` seeds `timezone: "UTC"`. Setting
+  only Playwright's `timezoneId` moved the browser to 19:44 while the app still
+  read UTC 02:44 ("Good night", next day's date), so the seeded log landed on
+  the wrong day and the card never fired. **Rule:** when seeding a
+  time-dependent e2e state, write the zone into `settings.timezone` AND match
+  the browser's `timezoneId` (the latter only to keep TimezoneSentry quiet).

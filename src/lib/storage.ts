@@ -29,6 +29,8 @@ import {
   getFreeBiomarkers,
   getFreePacks,
   getFreeSupplements,
+  getTrialDays,
+  getTrialExtensionDays,
   capsEnforced,
 } from "./entitlements";
 import { resolveBehaviorByKey } from "./workouts";
@@ -445,17 +447,19 @@ function normalize(s: AppState): AppState {
   // Trial-clamp (audit 2026-08-16 bug 6.6): a hand-edited backup with
   // premiumTrialEndsAt in 2099 imported as PERMANENT premium — importState is
   // a bare parseState, and the sync merge deliberately keeps the later end
-  // date. Clamp the trial to the longest legitimately reachable window:
-  // 14 days + the one-shot 7-day extension, which can itself fire up to 7 days
-  // after expiry → trialStartDate + 28d. Runs in normalize() so every path
-  // (import, cloud load, legacy migrate) heals the same way.
+  // date. Clamp to the longest LEGITIMATELY reachable window, derived from the
+  // constants so it can't drift when the trial length changes: the trial, plus
+  // the one-shot extension, which can itself fire up to 7 days after expiry.
+  // Runs in normalize() so every path (import, cloud load, migrate) heals.
   const mergedSettings = { ...d.settings, ...s.settings };
   if (mergedSettings.premiumTrialEndsAt) {
     const start = Date.parse(mergedSettings.trialStartDate ?? "");
     const end = Date.parse(mergedSettings.premiumTrialEndsAt);
     // A missing/garbled start falls back to "now" (d.settings stamps it), so
     // even a doctored state is bounded at 28 days from first sight.
-    const cap = (Number.isFinite(start) ? start : Date.now()) + 28 * 86_400_000;
+    const maxDays = getTrialDays() + getTrialExtensionDays() + 7;
+    const cap =
+      (Number.isFinite(start) ? start : Date.now()) + maxDays * 86_400_000;
     if (!Number.isFinite(end)) {
       delete mergedSettings.premiumTrialEndsAt;
     } else if (end > cap) {

@@ -8,8 +8,8 @@ merge into one de-duplicated, time-anchored daily timeline that adapts to
 recovery/adherence signals. Behaviors, biomarkers and a calm intelligence
 layer (keystone, weekly review, suggestions) sit on top.
 
-**Business model:** Freemium with a 14-day reverse trial (engagement-gated
-auto-extend). Free = the full habit loop + 2 ACTIVE protocol packs + 3 ACTIVE
+**Business model:** Freemium with a 7-day reverse trial (engagement-gated
+auto-extend; TRIAL_DAYS in entitlements.ts is the single source of truth). Free = the full habit loop + 2 ACTIVE protocol packs + 3 ACTIVE
 supplements + insights on a 3-day delay + 3 biomarkers + full history +
 local/cloud sync + export. Lock-don't-delete (2026-08-16): at trial expiry,
 over-cap packs/supplements PAUSE (data intact, instant restore on upgrade) —
@@ -330,8 +330,12 @@ onboarding guard handles new vs returning).
 - ✅ Email/password + magic link + password reset; OAuth built, disabled
   until providers configured.
 - ✅ Freemium gating + reverse-trial engine.
-- ✅ Legal pages — `/terms` and `/privacy` shipped; LEGAL_VERSION-gated
-  acceptance banner re-prompts on material changes.
+- ✅ Legal pages — `/terms` and `/privacy` shipped, LEGAL_VERSION-stamped.
+  ⚠️ There is NO acceptance banner: `settings.legalAcceptedVersion` /
+  `legalAcceptedAt` exist in types.ts but nothing reads or writes them, so a
+  LEGAL_VERSION bump currently re-prompts nobody. Terms changed materially on
+  2026-08-16 (free tier + pause promise) and the version is now 2 — build the
+  re-accept flow before real users sign up, or drop the fields.
 - ✅ Analytics — Plausible env-gated via `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`.
   Cookie-less; inert until the owner adds the env var.
 - ✅ OG + Twitter card metadata on every route via `metadataBase` +

@@ -8,6 +8,7 @@ import { activeDataSource } from "@/lib/datasource";
 import { getUserId, supabaseEnabled } from "@/lib/supabase";
 import { PACKS, packById } from "@/lib/packs";
 import { Button, Eyebrow } from "@/components/ui";
+import { getTrialDays } from "@/lib/entitlements";
 import { Icon, type IconName } from "@/components/ui/icons";
 
 type Chip = { key: string; label: string; sub?: string; icon?: IconName };
@@ -312,7 +313,7 @@ export default function OnboardingPage() {
             trialStartDate: new Date().toISOString(),
             tier: "free" as const,
             premiumTrialEndsAt: new Date(
-              Date.now() + 14 * 86400000
+              Date.now() + getTrialDays() * 86400000
             ).toISOString(),
           }),
     });
@@ -638,20 +639,20 @@ export default function OnboardingPage() {
                     // Account-first flow: they're already signed in (the wall
                     // guarantees it before onboarding renders). One button to
                     // enter — and on a fresh setup (not a re-tune) this is
-                    // where the 14-day trial starts.
+                    // where the reverse trial starts (length: getTrialDays()).
                     <>
                       <Button full onClick={() => finish(true)}>
-                        {isRedo() ? "Save changes" : "Start my 14 days"}
+                        {isRedo() ? "Save changes" : `Start my ${getTrialDays()} days`}
                       </Button>
                       {/* State the reverse-trial deal at the exact moment of
-                          consent — what the 14 days are, that no card is
+                          consent — what the trial window is, that no card is
                           taken, and what stays free after. Absent, the CTA
                           read as an unexplained countdown (audit b.4). */}
                       {!isRedo() && (
                         <p className="mt-3 px-2 text-center text-[12px] leading-relaxed text-[var(--text-3)]">
-                          Full Premium for 14 days — no card needed. After
-                          that, your core system and your entire history stay
-                          free forever.
+                          Full Premium for {getTrialDays()} days — no card
+                          needed. After that, your core system and your entire
+                          history stay free forever.
                         </p>
                       )}
                     </>

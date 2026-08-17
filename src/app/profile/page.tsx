@@ -544,6 +544,38 @@ export default function ProfilePage() {
             reach the page via the Manage link inside your daily
             supplement card.
           </p>
+          <Row label="Encouragement cards">
+            <button
+              onClick={() =>
+                updateSettings({
+                  hideEncouragement: !s.hideEncouragement,
+                })
+              }
+              role="switch"
+              aria-checked={!s.hideEncouragement}
+              aria-label="Show encouragement cards on Today"
+              className="tap-44 tr-fast h-7 w-12 rounded-full p-1"
+              style={{
+                background: !s.hideEncouragement
+                  ? "var(--vitality)"
+                  : "var(--surface-3)",
+              }}
+            >
+              <div
+                className="tr-fast h-5 w-5 rounded-full bg-white"
+                style={{
+                  transform: !s.hideEncouragement
+                    ? "translateX(20px)"
+                    : "translateX(0)",
+                }}
+              />
+            </button>
+          </Row>
+          <p className="t-caption mt-1 mb-3 leading-relaxed">
+            The morning framing and end-of-day acknowledgements on Today. Turn
+            off for a checklist with no commentary — your trial status, daily
+            check-in and day&apos;s read stay either way.
+          </p>
           <Row label="App icon badge">
             <button
               onClick={() =>

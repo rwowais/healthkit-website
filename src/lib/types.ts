@@ -186,6 +186,16 @@ export interface UserSettings {
   hideSupplementsTab?: boolean;
 
   /**
+   * Hide the encouragement cards on Today (morning briefing, the evening
+   * "you moved N things" acknowledgement, the day-complete celebration, the
+   * rest-day notice). Default undefined = shown. Some users want the calm
+   * coaching voice; others just want the checklist. Per-card "Got it" handles
+   * "not today"; this handles "never". Does NOT hide functional notices —
+   * the trial countdown, check-in, or operating summary.
+   */
+  hideEncouragement?: boolean;
+
+  /**
    * Vacation mode — a single toggle that pauses every pack at once,
    * empties the timeline, and freezes the streak math. For trips,
    * sick days, or any "I need a break" stretch where the user doesn't

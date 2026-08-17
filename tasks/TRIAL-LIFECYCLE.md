@@ -85,3 +85,40 @@ paid flag un-forgeable + canceled sub doesn't resurrect old trial (pinned).
 ## Test gaps to close alongside
 Over-cap-then-expire persona · maybeExtendTrial under server entitlement ·
 mergeStates trial fields · import clamp · clock rollback.
+
+---
+
+## How Rami can experience the real trial (without touching his own account)
+
+`rwowais@gmail.com` will **never** show you the trial or the free tier. It
+holds a manual lifetime Premium entitlement (`protocolize_entitlements`:
+`paid_tier: premium`, `plan: lifetime`, `source: manual`, stamped 2026-07-23)
+that was created while building server-authoritative entitlements. `getAccess()`
+prefers that row over everything else, so the app is permanently unlocked for
+it. **Keep the grant** — it is the owner account. Use a throwaway instead.
+
+1. **Sign up** at the live app with a plus-address — Gmail delivers
+   `rwowais+test1@gmail.com` to the normal inbox, and it is a distinct user to
+   Supabase. (Do NOT reuse `rwowais+demo@gmail.com` if you still want that one.)
+2. **Confirm** it from the Supabase dashboard (Authentication → Users → the
+   row → confirm) if the email doesn't arrive.
+3. **Run onboarding** normally. The final CTA reads "Start my 7 days" and
+   stamps `settings.premiumTrialEndsAt` 7 days out.
+4. **Jump to any trial state** by editing that user's row in
+   `protocolize_state` (Table Editor → find `user_id` → edit the `state` JSON →
+   `settings.premiumTrialEndsAt`), then reload the app:
+   - **2 days out** → the conversion ladder banner appears (≤3 days; this one
+     is intentionally not dismissible).
+   - **in the past** → the trial-ended card appears, and Today drops to the
+     free surface.
+   Set the value as an ISO string, e.g. `"2026-08-14T00:00:00.000Z"`.
+5. **Caveat — locking will NOT happen yet.** `capsEnforced()` returns false
+   until the `NEXT_PUBLIC_STRIPE_CHECKOUT_*` env vars exist, so over-cap packs
+   and supplements stay unlocked by design (nobody can pay yet, so nobody gets
+   locked out). To feel the paused-pack/paused-supplement experience before
+   Stripe, set one of those env vars locally in `.env.local` and run the dev
+   server — do not set it in production until fulfillment ships.
+
+### Two accounts that must never be treated as disposable
+`gbushee+healthkit@gmail.com`, `idahabibi@gmail.com`, `ava.habibi@gmail.com`
+are real tester friends — leave their rows alone in any cleanup or seeding.

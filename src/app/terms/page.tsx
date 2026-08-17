@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { LEGAL_VERSION } from "@/lib/constants";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 
 /**
  * Terms of Service. Plain-English, calm voice. Bumped when
@@ -133,9 +134,9 @@ export default function TermsPage() {
             </ul>
           </Section>
 
-          <Section title="The 14-day reverse trial">
+          <Section title="The reverse trial">
             <p>
-              New accounts start with full Premium for 14 days. If
+              New accounts start with full Premium for {TRIAL_DAYS} days. If
               you&apos;ve been actively using the app, we may extend
               this once — quietly — so you have a fair chance to feel
               the value. After the trial, premium features lock and the
