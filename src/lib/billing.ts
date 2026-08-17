@@ -15,7 +15,7 @@
  * nothing can grant them Premium — so every failure path below REFUSES to open
  * checkout rather than sending someone to a checkout we cannot fulfill.
  */
-import { getUserId } from "./supabase";
+import { getUserId, getUserEmail } from "./supabase";
 
 export type Plan = "annual" | "monthly" | "lifetime";
 
@@ -99,6 +99,66 @@ export async function startCheckout(plan: Plan): Promise<CheckoutResult> {
     };
   }
 
+  if (typeof window !== "undefined") window.location.href = target;
+  return { ok: true };
+}
+
+/**
+ * ── Managing an existing subscription ──────────────────────────────────────
+ *
+ * Stripe's HOSTED customer portal login page
+ * (Dashboard → Settings → Billing → Customer portal → share a login link).
+ * The customer enters the email they paid with and Stripe emails them a link
+ * into the portal, where they can cancel, switch plan, update their card and
+ * download invoices.
+ *
+ * Why the hosted page rather than a one-click portal session: creating a
+ * session requires the Stripe SECRET key, which means a server we do not have
+ * (the whole reason checkout is Payment Links). A secret key can never live in
+ * this bundle. The hosted page costs the customer one extra step and keeps the
+ * app backend-free. If a server appears later, swap this for a portal session
+ * and the call site below does not change.
+ */
+const PORTAL_URL = process.env.NEXT_PUBLIC_STRIPE_PORTAL_URL;
+
+export const portalConfigured = Boolean(PORTAL_URL);
+
+/**
+ * May this user be offered billing management?
+ *
+ * Both halves matter. Without a configured portal there is nowhere to send
+ * them; and an entitlement that did NOT come from Stripe (a manual comp —
+ * e.g. the owner's lifetime grant) has no Stripe customer record behind it, so
+ * the portal would dead-end on "we couldn't find that account". Offering a
+ * broken exit is worse than offering none.
+ */
+export function canManageBilling(
+  entitlement: { source?: string | null } | null | undefined
+): boolean {
+  return portalConfigured && entitlement?.source === "stripe";
+}
+
+/**
+ * Opens the billing portal, prefilling the signed-in email so the customer
+ * usually just clicks "send link".
+ *
+ * Gate the call site with canManageBilling().
+ */
+export async function openBillingPortal(): Promise<CheckoutResult> {
+  if (!PORTAL_URL) {
+    return { ok: false, reason: "Billing management isn't available yet." };
+  }
+  let target: string;
+  try {
+    const u = new URL(PORTAL_URL);
+    const email = await getUserEmail().catch(() => null);
+    // Prefill is a convenience only — the portal works without it, so a
+    // missing email must not block someone from reaching their subscription.
+    if (email) u.searchParams.set("prefilled_email", email);
+    target = u.toString();
+  } catch {
+    return { ok: false, reason: "Billing management isn't configured correctly." };
+  }
   if (typeof window !== "undefined") window.location.href = target;
   return { ok: true };
 }

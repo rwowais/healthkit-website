@@ -6,8 +6,12 @@ import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useAppState } from "@/hooks/useAppState";
 import { useSignedIn } from "@/hooks/useSignedIn";
-import { getAccess } from "@/lib/entitlements";
-import { billingConfigured } from "@/lib/billing";
+import { getAccess, getEntitlement } from "@/lib/entitlements";
+import {
+  billingConfigured,
+  canManageBilling,
+  openBillingPortal,
+} from "@/lib/billing";
 import {
   BIOMARKERS_ENABLED,
   DAY_BLOCKS_ENABLED,
@@ -65,6 +69,8 @@ export default function ProfilePage() {
   const access = getAccess(state);
   const signedIn = useSignedIn();
   const toast = useToast();
+  // Offered ONLY to people Stripe actually knows about — see canManageBilling.
+  const showBilling = canManageBilling(getEntitlement());
   const [confirmReset, setConfirmReset] = useState(false);
   // Personal factors is collapsed by default (pre-launch simplification) but
   // NOT removed: it's the ONLY input for the engine's safety gating
@@ -905,12 +911,34 @@ export default function ProfilePage() {
         <Card>
           <Eyebrow color="var(--readiness)">Membership</Eyebrow>
           {access.paid ? (
-            <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">
-              <span className="font-semibold text-[var(--text-1)]">
-                Premium
-              </span>{" "}
-              — the full intelligence layer is on. Thank you.
-            </p>
+            <>
+              <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">
+                <span className="font-semibold text-[var(--text-1)]">
+                  Premium
+                </span>{" "}
+                — the full intelligence layer is on. Thank you.
+              </p>
+              {showBilling && (
+                <>
+                  <button
+                    onClick={async () => {
+                      const r = await openBillingPortal();
+                      if (!r.ok) toast.show(r.reason ?? "Not available yet");
+                    }}
+                    className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] border border-[var(--hairline)] py-3 text-[14px] font-semibold text-[var(--text-1)]"
+                  >
+                    Manage billing
+                  </button>
+                  {/* Say plainly that cancelling is possible and where. Hiding
+                      the exit behind a vague label is what makes subscriptions
+                      feel like a trap. */}
+                  <p className="mt-2 text-center text-[12px] leading-relaxed text-[var(--text-3)]">
+                    Cancel, switch plan, update your card or download invoices —
+                    handled securely by Stripe.
+                  </p>
+                </>
+              )}
+            </>
           ) : access.inTrial ? (
             <>
               <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-2)]">

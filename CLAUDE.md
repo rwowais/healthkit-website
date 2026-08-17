@@ -356,13 +356,25 @@ accounts, not the codebase:
 2. **Plausible** — sign up at plausible.io (free 30-day trial), add
    `protocolize.com` as a site, then set
    `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=protocolize.com` in Vercel.
-3. **Stripe Payment Links — DO NOT WIRE YET.** ⚠️ The checkout redirect
-   works, but there is currently NO fulfillment path: nothing grants
-   `tier="premium"` after a successful payment (audit 2026-06-11,
-   HIGH). Wiring the env vars today would CHARGE customers without
-   delivering Premium. Fulfillment needs a small server piece (e.g. a
-   Supabase edge function receiving Stripe webhooks that stamps the
-   user's row) — ask Claude to build it BEFORE creating the links.
+3. **Stripe — the client half is DONE (2026-08-17); the deploy is not.**
+   Shipped: `billing.startCheckout` attaches the buyer's Supabase user id as
+   `client_reference_id` (and REFUSES to open checkout if it can't, so a
+   payment can never be unfulfillable); the `CheckoutReturn` overlay on
+   `/upgrade?checkout=success` polls the entitlement until the webhook lands;
+   and `canManageBilling` + `NEXT_PUBLIC_STRIPE_PORTAL_URL` give Stripe-sourced
+   customers a cancel/manage path (manual comps are excluded — no Stripe
+   customer behind them).
+   ⚠️ Still REQUIRED before any Payment Link goes live, in this order:
+   (a) deploy `supabase/functions/stripe-webhook` + set `STRIPE_SECRET_KEY` /
+   `STRIPE_WEBHOOK_SECRET`; (b) create products + Payment Links, each with
+   "After payment" → `https://<domain>/upgrade?checkout=success`;
+   (c) set the customer-portal login URL as `NEXT_PUBLIC_STRIPE_PORTAL_URL`;
+   (d) run a full TEST-MODE purchase end to end. The webhook has never
+   executed against a real Stripe account — treat that first test run as the
+   verification step.
+   ⚠️ Also note: adding any `NEXT_PUBLIC_STRIPE_CHECKOUT_*` var flips
+   `capsEnforced()` ON for EVERYONE at once (over-cap packs/supplements pause
+   the same day, testers included). Deliberate — but warn the testers first.
 
 After redeploy, analytics is live, social previews resolve, and the
 legal pages render at the production domain. Monetization goes live

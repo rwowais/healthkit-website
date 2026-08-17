@@ -63,6 +63,20 @@ export function invalidateUserId(): void {
   cachedUserId = null;
 }
 
+/**
+ * The signed-in user's email, or null. Deliberately NOT cached: it is read
+ * rarely (only to prefill Stripe's billing-portal login) and a stale value
+ * there would send someone to the wrong customer record.
+ */
+export async function getUserEmail(): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const {
+    data: { session },
+  } = await sb.auth.getSession();
+  return session?.user?.email ?? null;
+}
+
 export async function getUserId(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;

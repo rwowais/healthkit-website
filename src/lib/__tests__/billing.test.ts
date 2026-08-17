@@ -16,12 +16,14 @@ const USER = "11111111-2222-3333-4444-555555555555";
 
 let mockUserId: string | null = USER;
 let userIdThrows = false;
+let mockEmail: string | null = "buyer@example.com";
 
 vi.mock("../supabase", () => ({
   getUserId: async () => {
     if (userIdThrows) throw new Error("network");
     return mockUserId;
   },
+  getUserEmail: async () => mockEmail,
 }));
 
 /** Fresh module with the given env, so `LINKS` is rebuilt. */
@@ -38,6 +40,7 @@ const ENV_KEYS = [
   "NEXT_PUBLIC_STRIPE_CHECKOUT_ANNUAL",
   "NEXT_PUBLIC_STRIPE_CHECKOUT_MONTHLY",
   "NEXT_PUBLIC_STRIPE_CHECKOUT_LIFETIME",
+  "NEXT_PUBLIC_STRIPE_PORTAL_URL",
 ];
 const saved: Record<string, string | undefined> = {};
 
@@ -45,6 +48,7 @@ beforeEach(() => {
   for (const k of ENV_KEYS) saved[k] = process.env[k];
   mockUserId = USER;
   userIdThrows = false;
+  mockEmail = "buyer@example.com";
 });
 
 afterEach(() => {
@@ -163,5 +167,98 @@ describe("startCheckout", () => {
 
     await billing.startCheckout("lifetime");
     expect(new URL(navigatedTo).pathname).toContain("test_life");
+  });
+});
+
+const PORTAL = "https://billing.stripe.com/p/login/test_123";
+
+/** Captures window.location.href without a real DOM. */
+function captureNav(): () => string {
+  let to = "";
+  vi.stubGlobal("window", {
+    get location() {
+      return {
+        set href(v: string) {
+          to = v;
+        },
+      };
+    },
+  });
+  return () => to;
+}
+
+describe("openBillingPortal", () => {
+  it("is not configured until the owner sets the portal URL", async () => {
+    const billing = await loadBilling({
+      NEXT_PUBLIC_STRIPE_PORTAL_URL: undefined,
+    });
+    expect(billing.portalConfigured).toBe(false);
+    const r = await billing.openBillingPortal();
+    expect(r.ok).toBe(false);
+  });
+
+  it("prefills the signed-in email so cancelling is one step", async () => {
+    const billing = await loadBilling({ NEXT_PUBLIC_STRIPE_PORTAL_URL: PORTAL });
+    const nav = captureNav();
+    const r = await billing.openBillingPortal();
+    expect(r.ok).toBe(true);
+    expect(new URL(nav()).searchParams.get("prefilled_email")).toBe(
+      "buyer@example.com"
+    );
+  });
+
+  it("still opens the portal when the email is unknown", async () => {
+    // Prefill is a convenience; a missing email must never block someone from
+    // reaching the page where they cancel.
+    mockEmail = null;
+    const billing = await loadBilling({ NEXT_PUBLIC_STRIPE_PORTAL_URL: PORTAL });
+    const nav = captureNav();
+    const r = await billing.openBillingPortal();
+    expect(r.ok).toBe(true);
+    expect(nav()).toContain("billing.stripe.com");
+    expect(new URL(nav()).searchParams.get("prefilled_email")).toBeNull();
+  });
+
+  it("refuses a malformed portal URL instead of navigating nowhere", async () => {
+    const billing = await loadBilling({
+      NEXT_PUBLIC_STRIPE_PORTAL_URL: "not-a-url",
+    });
+    const r = await billing.openBillingPortal();
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("canManageBilling — who is offered the exit", () => {
+  it("offers it to a real Stripe customer", async () => {
+    const { canManageBilling } = await loadBilling({
+      NEXT_PUBLIC_STRIPE_PORTAL_URL: PORTAL,
+    });
+    expect(canManageBilling({ source: "stripe" })).toBe(true);
+  });
+
+  it("does NOT offer it for a MANUAL grant", async () => {
+    // The owner's comped lifetime entitlement has no Stripe customer, so the
+    // portal would dead-end on "we couldn't find that account". This is the
+    // case that would actually have shipped broken.
+    const { canManageBilling } = await loadBilling({
+      NEXT_PUBLIC_STRIPE_PORTAL_URL: PORTAL,
+    });
+    expect(canManageBilling({ source: "manual" })).toBe(false);
+  });
+
+  it("does not offer it when there is no entitlement at all", async () => {
+    const { canManageBilling } = await loadBilling({
+      NEXT_PUBLIC_STRIPE_PORTAL_URL: PORTAL,
+    });
+    expect(canManageBilling(null)).toBe(false);
+    expect(canManageBilling(undefined)).toBe(false);
+    expect(canManageBilling({})).toBe(false);
+  });
+
+  it("does not offer it before the owner configures a portal", async () => {
+    const { canManageBilling } = await loadBilling({
+      NEXT_PUBLIC_STRIPE_PORTAL_URL: undefined,
+    });
+    expect(canManageBilling({ source: "stripe" })).toBe(false);
   });
 });

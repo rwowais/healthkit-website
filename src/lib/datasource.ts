@@ -941,7 +941,7 @@ class SupabaseDataSource implements DataSource {
     }
     const { data, error } = await sb
       .from(ENTITLEMENTS_TABLE)
-      .select("paid_tier, status, plan, current_period_end")
+      .select("paid_tier, status, plan, current_period_end, source")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) return; // offline / transient → keep the last-cached entitlement
@@ -950,6 +950,7 @@ class SupabaseDataSource implements DataSource {
       status: (data?.status as Entitlement["status"]) ?? "none",
       plan: (data?.plan as Entitlement["plan"]) ?? null,
       currentPeriodEnd: (data?.current_period_end as string | null) ?? null,
+      source: (data?.source as Entitlement["source"]) ?? null,
       syncedAt: now,
     });
   }

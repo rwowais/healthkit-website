@@ -149,6 +149,14 @@ export interface Entitlement {
     | "expired";
   plan?: "monthly" | "annual" | "lifetime" | null;
   currentPeriodEnd?: string | null;
+  /**
+   * HOW this entitlement was granted. Load-bearing for billing management:
+   * only a "stripe" row has a Stripe customer behind it, so only those users
+   * may be offered the billing portal. A "manual" grant (e.g. the owner's
+   * lifetime comp) has no Stripe customer — sending them to the portal would
+   * dead-end on "no account found".
+   */
+  source?: "stripe" | "manual" | null;
   /** ISO stamp of when this was fetched/synthesized (for staleness/debug). */
   syncedAt: string;
 }
