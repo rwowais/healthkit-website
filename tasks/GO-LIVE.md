@@ -84,10 +84,25 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
         a health app), and reads as intentional rather than second-choice.
       - Backups if you'd rather have a `.com`: `getprotocolize.com` or
         `tryprotocolize.com` ($11.25), `protocolize.co` ($4.99).
-      - Checked 2026-08-18: **19 of 20** alternative names were already
-        taken (healthspan, regimen, cadence, baseline, keystone, circadia,
-        meridian, kairos, protokol, myprotocol, dailyprotocol…). The naming
-        space is picked over — a rename would likely land somewhere worse.
+      - **80 domains checked 2026-08-18. ZERO clean exact-match `.com`s were
+        available at registration price** — not dictionary words (healthspan,
+        cadence, keystone, baseline, meridian, solstice, helios, keel), not
+        Latin roots (aevum, vitae, diurna, circada, tempus), not two-word
+        compounds (dailycompound, vitalstack, compoundhealth, protocolstack),
+        not English phrases (longgame, steadystate, throughline, slowburn),
+        and not even invented 5–6 letter coinages (aevia, longeva, protova,
+        vitava, aeona, solvi, kaven). Domain investors hold essentially every
+        pronounceable short string. The only `.com`s free are
+        `get-`/`try-`/`-health`/`-labs` constructions, which are a weaker
+        brand than the name we already have.
+      - **The decisive consequence:** a clean `.com` for ANY good name costs
+        squatter money, not $12. So renaming to get a `.com` means paying the
+        rebrand cost *and* the squatter — strictly worse than simply buying
+        `protocolize.com`, where the brand is already in the code, the legal
+        documents and the dossier. **If we ever pay for a `.com`, pay for
+        ours.**
+      - Only new name that survived the sweep with a clean short domain:
+        **Circada** (`circada.app`, $9.99) — `circada.com` is taken.
       Then add it as a Vercel domain, follow the DNS steps, and set
       `NEXT_PUBLIC_SITE_URL=https://<domain>` so link previews resolve.
 - [ ] **Turn on analytics** — OWNER. Plausible (cookie-less, already wired):
