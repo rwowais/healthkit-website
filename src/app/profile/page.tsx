@@ -1094,12 +1094,17 @@ export default function ProfilePage() {
               Stripe) do handle the data to run the service, and the policy
               reserves de-identified aggregate use. The card must not promise
               more than the policy it links to. */}
+          {/* Present-tense on purpose (owner call, 2026-08-18): "never"
+              promises can't be walked back for data already collected, so
+              current practice is stated and future changes flow through the
+              LegalGate re-acceptance — the door stays open without
+              overclaiming. Mirrors the Privacy Policy's short version. */}
           <p className="t-caption mt-3 leading-relaxed">
-            Your health data is yours: never sold, never used for ads, and
-            nothing that identifies you is shared beyond the services that
-            run the app. The full picture — including how anonymous,
-            aggregated stats may be used to improve Protocolize — is in the
-            Privacy Policy.
+            Your health data is yours. Today Protocolize has no ads and
+            doesn&apos;t sell personal data; anything identifiable is shared
+            only with the services that run the app. If how we use data ever
+            changes, you&apos;ll be asked before it applies to you — the full
+            picture is in the Privacy Policy.
           </p>
           <div className="mt-4 flex gap-3 text-[13px]">
             <Link

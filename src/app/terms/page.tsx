@@ -195,8 +195,10 @@ export default function TermsPage() {
               display it back to you, process it for the features you&apos;ve
               enabled, back it up, and analyze it in{" "}
               <strong>de-identified, aggregated form</strong> to improve the
-              product. We do not sell it, and we never share anything that
-              identifies you except with the providers that run the service.
+              product. Today we don&apos;t sell it and share identifiable
+              data only with the providers that run the service; material
+              changes to how data is used take effect only after you accept
+              an updated policy.
               See the{" "}
               <Link href="/privacy" className="text-[var(--readiness)] underline">
                 Privacy Policy

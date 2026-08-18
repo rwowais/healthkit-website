@@ -53,13 +53,16 @@ export default function PrivacyPage() {
         <div className="space-y-7 text-[15px] leading-relaxed text-[var(--text-2)]">
           <Section title="The short version">
             <p>
-              Your health data belongs to you. We never sell it, never use it
-              for advertising, and never share anything that identifies you
-              except with the service providers that run the app (listed
+              Your health data belongs to you. Today, Protocolize shows no
+              ads, doesn&apos;t sell personal data, and shares identifiable
+              data only with the service providers that run the app (listed
               below). We may use <strong>de-identified, aggregated</strong>{" "}
               data — numbers that can&apos;t be traced back to you — to
-              improve the product and understand what works. That&apos;s the
-              whole deal.
+              improve the product and understand what works. If how we use
+              data ever changes materially, the change applies only after
+              you&apos;ve accepted an updated version of this policy — and
+              your logged health data will not be used to target advertising
+              without your separate, explicit opt-in.
             </p>
           </Section>
 
@@ -123,9 +126,12 @@ export default function PrivacyPage() {
                 will never attempt to re-identify de-identified data.
               </li>
               <li>
-                <strong>To communicate with you</strong> — transactional email
-                only (sign-in links, password resets, billing receipts). If we
-                ever add a newsletter it will be opt-in, never default-on.
+                <strong>To communicate with you</strong> — today, transactional
+                email only (sign-in links, password resets, billing receipts).
+                If we add product news or offers later, every such email will
+                have a one-tap unsubscribe, we&apos;ll honor opt-outs
+                immediately, and we&apos;ll use opt-in consent where the law
+                requires it.
               </li>
             </ul>
             <p className="mt-2">
@@ -136,11 +142,13 @@ export default function PrivacyPage() {
               it or your account.
             </p>
             <p className="mt-2">
-              What we will <strong>not</strong> do: sell your data, share
-              identifiable data with advertisers or data brokers, sell or
-              license your data to train third-party AI models, or use your
-              personal information for purposes beyond this policy without
-              asking you first.
+              What we <strong>don&apos;t</strong> do today: sell personal
+              data, share identifiable data with advertisers or data brokers,
+              license your data to train third-party AI models, or show ads.
+              If any of that changes, it applies only after you&apos;ve been
+              asked to accept an updated version of this policy — and your
+              logged health data would additionally require your separate,
+              explicit opt-in before any advertising use.
             </p>
           </Section>
 
@@ -311,9 +319,9 @@ export default function PrivacyPage() {
             </p>
             <p>
               Browser signals like Global Privacy Control ask sites to stop
-              selling or sharing your data for advertising. We never do either,
-              so there is nothing for the signal to switch off — but where law
-              treats it as a formal opt-out request, we honor it.
+              selling or sharing your data for advertising. We currently do
+              neither, so there is nothing for the signal to switch off — and
+              where law treats it as a formal opt-out request, we honor it.
             </p>
           </Section>
 

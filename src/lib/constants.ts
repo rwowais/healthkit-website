@@ -63,7 +63,15 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 // rendered on /supplements where the claims appear), and an explicit
 // assumption of risk. Material (a new user acknowledgment) -> re-ask; the
 // owner had accepted v5, so cost = one more tap by the owner.
-export const LEGAL_VERSION = 6;
+// v7 (2026-08-18): promises recast from "never" (eternal, un-walk-backable
+// for already-collected data) to PRESENT TENSE + changes-apply-after-you-
+// accept — the owner wants ads/monetization options open. Kept strong on
+// purpose: health-data ad targeting still requires separate explicit opt-in
+// (law effectively mandates it — WA MHMD, state sensitive-data consent, FTC
+// GoodRx/BetterHelp), no-re-identification, and the technical facts
+// (passwords, card numbers). WEAKENING promises is the clearest re-ask case
+// there is; the owner had accepted v6.
+export const LEGAL_VERSION = 7;
 
 // Trial length is NOT here — it is entitlements.TRIAL_DAYS (7), the single
 // source of truth that onboarding, terms and the import clamp all derive from.
