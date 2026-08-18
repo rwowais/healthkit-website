@@ -71,9 +71,25 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
 
 ## 🟡 LAUNCH POLISH — can ship after, but soon
 
-- [ ] **Buy `protocolize.com`** — OWNER. Add as a Vercel domain, follow the
-      DNS steps, then set `NEXT_PUBLIC_SITE_URL=https://protocolize.com` so
-      link previews resolve absolutely.
+- [ ] **Buy the domain** — OWNER. `protocolize.com` is **not available**, but
+      the research below says keep the name and take `.app`:
+      - `protocolize.com` redirects to a **GoDaddy for-sale parking page** —
+        a squatter, not a business. That's the good outcome: nobody is using
+        "Protocolize" as a brand, so there's no trademark conflict. (A USPTO/
+        web search for the name in health & fitness found nothing.) You can
+        make an offer through GoDaddy later if you ever want the .com; a name
+        like this typically lists in the high hundreds to low thousands.
+      - **`protocolize.app` — $9.99/yr, available.** Recommended. `.app` is
+        run by Google, HTTPS-only at the TLD level (a real security plus for
+        a health app), and reads as intentional rather than second-choice.
+      - Backups if you'd rather have a `.com`: `getprotocolize.com` or
+        `tryprotocolize.com` ($11.25), `protocolize.co` ($4.99).
+      - Checked 2026-08-18: **19 of 20** alternative names were already
+        taken (healthspan, regimen, cadence, baseline, keystone, circadia,
+        meridian, kairos, protokol, myprotocol, dailyprotocol…). The naming
+        space is picked over — a rename would likely land somewhere worse.
+      Then add it as a Vercel domain, follow the DNS steps, and set
+      `NEXT_PUBLIC_SITE_URL=https://<domain>` so link previews resolve.
 - [ ] **Turn on analytics** — OWNER. Plausible (cookie-less, already wired):
       add the site, then set `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` in Vercel.
       Without it you launch blind — no idea how many people finish
