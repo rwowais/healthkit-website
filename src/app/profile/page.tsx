@@ -1081,11 +1081,13 @@ export default function ProfilePage() {
             </p>
             <p className="text-[13px] leading-relaxed text-[var(--text-2)]">
               Protocolize is an educational tool — not medical advice,
-              diagnosis, or treatment. The ranges shown are general
-              references; interpret any health data with a qualified
-              clinician. If you&apos;re pregnant, under 18, on
-              medication, or have any condition, please consult your
-              doctor before changing your routine.
+              diagnosis, or treatment. Its suggestions are generated
+              automatically from what you log plus general research: starting
+              points, not instructions, and the ranges shown are general
+              references. Interpret any health data with a qualified
+              clinician, and if you&apos;re pregnant, on medication, or have
+              any condition, consult your doctor before changing your
+              routine.
             </p>
           </div>
           {/* "never shared" was an overclaim — processors (Supabase, Vercel,

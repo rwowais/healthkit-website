@@ -200,6 +200,20 @@ function SupplementsInner() {
             tz={tz}
           />
         )}
+
+        {/* The DSHEA disclaimer. The catalog makes structure/function claims
+            ("reduces inflammation", "acts as a mild sedative") with specific
+            mg doses — the exact statements that carry this line on every US
+            supplement label. We recommend without selling, which is MORE
+            exposed, not less. Required here, where the claims render. */}
+        <p className="px-1 text-[11px] leading-relaxed text-[var(--text-4,var(--text-3))]">
+          Doses shown are common ranges in published research — starting
+          points, not doses for you. Supplements can interact with medications
+          and health conditions; check with your doctor or pharmacist before
+          adding anything. These statements have not been evaluated by the
+          Food and Drug Administration. Protocolize does not diagnose, treat,
+          cure, or prevent any disease.
+        </p>
       </div>
 
       {/* Edit existing */}

@@ -66,6 +66,47 @@ export default function TermsPage() {
             </p>
           </Section>
 
+          <Section title="What the intelligence layer is — and isn't">
+            <p>
+              Protocolize generates personalized suggestions: when to do a
+              behavior, how to order your day, which supplements people
+              commonly take and in what ranges, what your patterns look like,
+              and gentle warnings when a plan conflicts with itself. All of it
+              is produced <strong>algorithmically</strong>, from what you log
+              plus general published research — not by a person who knows you,
+              and not by anyone licensed to advise you.
+            </p>
+            <ul className="list-disc pl-5 space-y-1.5 mt-2">
+              <li>
+                Suggestions are <strong>educational starting points</strong>,
+                not instructions or prescriptions. They can be wrong,
+                incomplete, out of date, or simply wrong <em>for you</em> —
+                the assumptions behind them may not fit your body, your
+                medications, or your situation.
+              </li>
+              <li>
+                Using Protocolize creates <strong>no doctor-patient or other
+                professional relationship</strong> with us, ever.
+              </li>
+              <li>
+                Supplement doses shown are common ranges in published
+                research, not doses chosen for you. Supplements can interact
+                with medications and conditions — clear anything new with
+                your doctor or pharmacist first. These statements have not
+                been evaluated by the FDA; Protocolize does not diagnose,
+                treat, cure, or prevent any disease.
+              </li>
+              <li>
+                <strong>You assume the risk</strong> of acting on any
+                suggestion. Changes to exercise, diet, supplements, or sleep
+                carry inherent risk; you are the one who decides what is safe
+                for you, and any reliance on the app&apos;s output is at your
+                own risk. If something feels wrong, stop and seek medical
+                care.
+              </li>
+            </ul>
+          </Section>
+
           <Section title="Your account">
             <ul className="list-disc pl-5 space-y-1.5">
               <li>You must be at least 18 to create an account.</li>
