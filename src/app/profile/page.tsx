@@ -41,6 +41,7 @@ import {
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import SupabaseAuth from "@/components/SupabaseAuth";
+import FeedbackSheet from "@/components/FeedbackSheet";
 
 function Row({
   label,
@@ -72,6 +73,7 @@ export default function ProfilePage() {
   // Offered ONLY to people Stripe actually knows about — see canManageBilling.
   const showBilling = canManageBilling(getEntitlement());
   const [confirmReset, setConfirmReset] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // Personal factors is collapsed by default (pre-launch simplification) but
   // NOT removed: it's the ONLY input for the engine's safety gating
   // (onboarding doesn't collect these), so it must stay reachable.
@@ -1042,6 +1044,25 @@ export default function ProfilePage() {
             Reset all data
           </button>
         </Card>
+
+        {/* Feature requests / bug reports — cloud-only (needs an authed
+            insert; local-only builds have nowhere to send it). */}
+        {supabaseEnabled && (
+          <Card>
+            <Eyebrow color="var(--warm)">Make it better</Eyebrow>
+            <p className="t-caption mt-2 leading-relaxed">
+              Missing something? Found a rough edge? Tell us — requests go
+              straight to the person building the app.
+            </p>
+            <button
+              onClick={() => setFeedbackOpen(true)}
+              className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] border border-[var(--hairline)] py-3 text-[14px] font-semibold text-[var(--text-1)]"
+            >
+              Request a feature
+            </button>
+          </Card>
+        )}
+        <FeedbackSheet open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
         {/* Disclaimer + legal links */}
         <Card>

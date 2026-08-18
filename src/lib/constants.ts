@@ -51,7 +51,13 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 // RO Group LLC. Naming the counterparty is material (it's who the arbitration
 // clause binds users to), so it re-asks; at bump time exactly one account had
 // accepted v3 (the owner), so the cost was one banner tap.
-export const LEGAL_VERSION = 4;
+// v5 (2026-08-17): clauses adopted from a Built With Science benchmark —
+// indemnification, conspicuous AS-IS block, feedback license (load-bearing
+// for the new Request-a-feature), business-transfer/assignment (without it an
+// acquisition could not lawfully take the database along), fine-print block,
+// GPC line. Indemnification + business transfer are material -> re-ask.
+// Verified before bumping: zero accounts had accepted v4.
+export const LEGAL_VERSION = 5;
 
 // Trial length is NOT here — it is entitlements.TRIAL_DAYS (7), the single
 // source of truth that onboarding, terms and the import clamp all derive from.

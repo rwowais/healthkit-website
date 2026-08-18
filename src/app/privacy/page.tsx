@@ -283,6 +283,17 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
+          <Section title="If the business is ever sold">
+            <p>
+              If Protocolize (or RO Group LLC) is acquired, merges, or sells
+              the business, your data may transfer to the new owner as part of
+              that transaction — bound by this policy&apos;s promises. If a
+              new owner wants to materially change how your data is used,
+              you&apos;ll be asked to accept the change first, same as any
+              other material update.
+            </p>
+          </Section>
+
           <Section title="US state privacy rights">
             <p>
               Several states (California, Colorado, Connecticut, Virginia,
@@ -297,6 +308,12 @@ export default function PrivacyPage() {
               consent-based handling described above is how we meet it, and
               you may appeal any decision by emailing us (and, if unresolved,
               the Washington Attorney General).
+            </p>
+            <p>
+              Browser signals like Global Privacy Control ask sites to stop
+              selling or sharing your data for advertising. We never do either,
+              so there is nothing for the signal to switch off — but where law
+              treats it as a formal opt-out request, we honor it.
             </p>
           </Section>
 

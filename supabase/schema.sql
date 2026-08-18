@@ -572,3 +572,27 @@ drop event trigger if exists ensure_rls;
 create event trigger ensure_rls on ddl_command_end
   when tag in ('CREATE TABLE','CREATE TABLE AS','SELECT INTO')
   execute function public.rls_auto_enable();
+
+-- ── Feedback (feature requests / bug reports) — added 2026-08-17 ──────────
+-- One-way suggestion box from Profile. Users insert as themselves; only
+-- admins read (no user select/update/delete — a reader-of-own-rows policy
+-- would add surface without user value).
+create table if not exists public.protocolize_feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  kind text not null default 'feature' check (kind in ('feature', 'bug')),
+  title text not null check (char_length(title) between 1 and 120),
+  body text check (char_length(body) <= 4000),
+  app_version text,
+  created_at timestamptz not null default now()
+);
+alter table public.protocolize_feedback enable row level security;
+drop policy if exists "feedback insert own" on public.protocolize_feedback;
+create policy "feedback insert own" on public.protocolize_feedback
+  for insert with check (auth.uid() = user_id);
+drop policy if exists "feedback admin read" on public.protocolize_feedback;
+create policy "feedback admin read" on public.protocolize_feedback
+  for select using (public.cms_is_admin());
+drop policy if exists "feedback admin delete" on public.protocolize_feedback;
+create policy "feedback admin delete" on public.protocolize_feedback
+  for delete using (public.cms_is_admin());

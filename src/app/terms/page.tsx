@@ -89,7 +89,8 @@ export default function TermsPage() {
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
                 Scrape, reverse-engineer, or attempt to access other
-                users&apos; data.
+                users&apos; data — including harvesting our content or data to
+                train AI models.
               </li>
               <li>
                 Use the app to give other people medical advice or to
@@ -163,6 +164,16 @@ export default function TermsPage() {
             </p>
           </Section>
 
+          <Section title="Ideas you send us">
+            <p>
+              If you send us feedback — feature requests, bug reports,
+              suggestions — we can use it freely to improve Protocolize,
+              without owing payment or credit. Your health data is not
+              &quot;feedback&quot;; this covers only the ideas you choose to
+              send.
+            </p>
+          </Section>
+
           <Section title="Our content">
             <p>
               Protocol packs, behavior descriptions, evidence
@@ -196,6 +207,27 @@ export default function TermsPage() {
               consequential damages from your use of the app. If we
               are liable for direct damages, our total liability is
               capped at the amount you paid us in the last 12 months.
+            </p>
+          </Section>
+
+          <Section title="If your use of the app causes a problem">
+            <p>
+              If your breach of these terms, or your unlawful use of
+              Protocolize, gets us sued or fined, you agree to cover the
+              costs and damages that result. This doesn&apos;t apply to
+              ordinary, good-faith use of the app.
+            </p>
+          </Section>
+
+          <Section title="The formal version">
+            <p className="text-[13.5px] leading-relaxed">
+              THE SERVICES ARE PROVIDED &quot;AS IS&quot; AND &quot;AS
+              AVAILABLE&quot;, WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
+              IMPLIED, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY,
+              FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. THIS
+              PARAGRAPH EXISTS BECAUSE THE LAW REQUIRES DISCLAIMERS TO BE
+              CONSPICUOUS — THE PLAIN-ENGLISH MEANING IS THE SAME AS THE
+              SECTIONS ABOVE: THE APP IS A TOOL, NOT A GUARANTEE.
             </p>
           </Section>
 
@@ -241,6 +273,36 @@ export default function TermsPage() {
               line &quot;Arbitration opt-out&quot;. Opting out doesn&apos;t
               affect anything else in these terms.
             </p>
+          </Section>
+
+          <Section title="The fine print">
+            <ul className="list-disc pl-5 space-y-1.5">
+              <li>
+                <strong>If the business changes hands</strong> — we may assign
+                these terms as part of a merger, acquisition, or sale of the
+                business; your data and these promises travel with it (see the
+                Privacy Policy). You can&apos;t assign your account to someone
+                else.
+              </li>
+              <li>
+                <strong>If a piece is struck down</strong> — the rest of these
+                terms still stand.
+              </li>
+              <li>
+                <strong>Whole agreement</strong> — these terms plus the
+                Privacy Policy are the entire agreement between us.
+              </li>
+              <li>
+                <strong>Not enforcing isn&apos;t waiving</strong> — if we
+                don&apos;t enforce a term today, we can still enforce it
+                later.
+              </li>
+              <li>
+                <strong>Events beyond our control</strong> — we&apos;re not
+                liable for failures caused by things like outages, disasters,
+                or acts of government.
+              </li>
+            </ul>
           </Section>
 
           <Section title="Contact">
