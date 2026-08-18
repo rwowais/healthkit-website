@@ -101,8 +101,23 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
         `protocolize.com`, where the brand is already in the code, the legal
         documents and the dossier. **If we ever pay for a `.com`, pay for
         ours.**
-      - Only new name that survived the sweep with a clean short domain:
-        **Circada** (`circada.app`, $9.99) — `circada.com` is taken.
+      - **CORRECTION after a wider sweep (140 domains).** The "no .com
+        available" conclusion was an artifact of only searching SHORT SINGLE
+        WORDS. The comparables don't use those — `builtwithscience.com`,
+        `risescience.com`, `eightsleep.com`, `functionhealth.com` are all two
+        or three words. Searching that band, real `.com`s ARE available:
+
+        | Name | Domain | $/yr | Read |
+        |---|---|---|---|
+        | **Ember Longevity** | `emberlongevity.com` | 11.25 | Brandable word + category, exactly the Rise Science pattern. "Ember" = slow sustained burn — an apt longevity metaphor. |
+        | **The Everyday Protocol** | `theeverydayprotocol.com` | 11.25 | Keeps the "protocol" equity already built; clear and memorable, but long to type. |
+        | **Diurna Health** | `diurnahealth.com` | 11.25 | Latin *diurna* = daily; distinctive, clean, matches the Function Health pattern. |
+        | Circada | `circada.app` / `circadalabs.com` | 9.99 | Circadian association; exact `.com` taken. |
+        | *(descriptive, weaker)* | `yourlongevityos.com`, `mylongevitysystem.com`, `yourdailysystem.com`, `oneprotocolday.com`, `builtwithprotocols.com` | 11.25 | Read as taglines rather than brands. |
+
+        Still true: every SHORT single-word `.com` is held by investors
+        (~120 checked across dictionary words, Latin roots, two-word
+        compounds, English phrases and invented coinages).
       Then add it as a Vercel domain, follow the DNS steps, and set
       `NEXT_PUBLIC_SITE_URL=https://<domain>` so link previews resolve.
 - [ ] **Turn on analytics** — OWNER. Plausible (cookie-less, already wired):
