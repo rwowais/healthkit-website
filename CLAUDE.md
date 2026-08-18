@@ -353,7 +353,14 @@ onboarding guard handles new vs returning).
 - ⏳ Custom domain (`protocolize.com`) — owner needs to purchase + point
   DNS at Vercel.
 
-### Owner action to flip the launch switch (≈10 minutes)
+### Owner action to flip the launch switch
+
+> **📋 The authoritative running list is [`tasks/GO-LIVE.md`](tasks/GO-LIVE.md).**
+> Read it first, keep it current, and add new pre-launch items THERE rather
+> than in a commit message. It carries the blockers (insurance, Stripe
+> fulfillment order, LLC-owned Stripe account, warning the testers), the
+> recommended items, and what's already done. The summary below duplicates
+> part of it and defers to it on any conflict.
 
 All app code is launch-ready. The remaining steps live in the owner's
 accounts, not the codebase:
