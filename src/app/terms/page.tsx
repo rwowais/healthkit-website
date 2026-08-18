@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LEGAL_VERSION } from "@/lib/constants";
+import { LEGAL_VERSION, ENTITY_STATE, ENTITY_NAME } from "@/lib/constants";
 import { TRIAL_DAYS } from "@/lib/entitlements";
 
 /**
@@ -20,6 +20,11 @@ import { TRIAL_DAYS } from "@/lib/entitlements";
  * and surface the formal language in a single readable block at the
  * bottom for users who want it.
  */
+/** Precise state once the owner confirms it; valid entity-relative fallback until then. */
+const governingLaw = ENTITY_STATE
+  ? `the State of ${ENTITY_STATE}`
+  : `the state in which ${ENTITY_NAME} is organized`;
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)] py-12">
@@ -107,6 +112,27 @@ export default function TermsPage() {
             </ul>
           </Section>
 
+          <Section title="Your health, and the risk you accept">
+            <p>
+              By using Protocolize you confirm that you are physically able to
+              undertake the activities you choose to log, that you have
+              consulted a physician if you have any condition, injury,
+              pregnancy, or medication that could make them unsafe, and that
+              you are not relying on us to tell you what is safe for you.
+            </p>
+            <p>
+              Exercise, dietary change, sleep change and supplementation carry
+              inherent risks, including injury and, rarely, serious harm.{" "}
+              <strong>
+                You voluntarily assume all of those risks, and to the fullest
+                extent permitted by law you release {ENTITY_NAME} from claims
+                for injury, illness, loss or damage arising out of your use of
+                the app or your decision to follow anything it suggests.
+              </strong>{" "}
+              Stop immediately and seek medical care if you feel unwell.
+            </p>
+          </Section>
+
           <Section title="Your account">
             <ul className="list-disc pl-5 space-y-1.5">
               <li>You must be at least 18 to create an account.</li>
@@ -168,9 +194,12 @@ export default function TermsPage() {
                 continues through the end of the billing period.
               </li>
               <li>
-                Refunds are handled case-by-case — email{" "}
+                Except where the law requires otherwise, fees are
+                non-refundable and non-transferable, including for partial
+                periods and unused time. We may still make exceptions at our
+                discretion — email{" "}
                 <a className="text-[var(--readiness)] underline" href="mailto:billing@protocolize.com">billing@protocolize.com</a>{" "}
-                within 14 days of charge.
+                within 14 days of a charge and we&apos;ll look at it.
               </li>
               <li>
                 We may change prices with at least 30 days&apos; notice
@@ -248,17 +277,24 @@ export default function TermsPage() {
               health outcome. To the maximum extent allowed by law,
               we&apos;re not liable for indirect, incidental, or
               consequential damages from your use of the app. If we
-              are liable for direct damages, our total liability is
-              capped at the amount you paid us in the last 12 months.
+              are liable for direct damages, our total liability for all
+              claims combined is capped at the amount you paid us in the 12
+              months before the claim arose. Some states don&apos;t allow
+              some of these limits, in which case they apply to the fullest
+              extent those states permit.
             </p>
           </Section>
 
           <Section title="If your use of the app causes a problem">
             <p>
-              If your breach of these terms, or your unlawful use of
-              Protocolize, gets us sued or fined, you agree to cover the
-              costs and damages that result. This doesn&apos;t apply to
-              ordinary, good-faith use of the app.
+              You agree to defend, indemnify and hold harmless {ENTITY_NAME}
+              and its members, officers and contractors from any claim,
+              damage, loss, liability and expense (including reasonable legal
+              fees) arising out of or connected with your use of Protocolize,
+              your breach of these terms, your violation of any law, or your
+              infringement of anyone&apos;s rights. We may take over the
+              defense of any such claim at your expense, and you agree to
+              cooperate with us.
             </p>
           </Section>
 
@@ -277,10 +313,11 @@ export default function TermsPage() {
           <Section title="Termination">
             <p>
               You can delete your account anytime from Profile. We can
-              terminate an account if it violates these terms (with
-              warning when reasonable). If we terminate your account
-              without cause, we&apos;ll refund any prepaid time you
-              didn&apos;t use.
+              terminate or suspend an account that violates these terms, or
+              where we reasonably suspect fraud, abuse or unlawful use — in
+              those cases no refund is owed for prepaid time. If we terminate
+              your account <em>without</em> cause, we&apos;ll refund any
+              prepaid time you didn&apos;t use.
             </p>
           </Section>
 
@@ -303,11 +340,21 @@ export default function TermsPage() {
               <a className="text-[var(--readiness)] underline" href="mailto:legal@protocolize.com">legal@protocolize.com</a>.
               If that doesn&apos;t work within 60 days, disputes will be
               resolved by binding arbitration under the American
-              Arbitration Association&apos;s consumer rules, in your home
-              state, under the laws of your state of residence. Either of us
-              can still bring an individual claim in small-claims court
-              instead. Disputes are resolved individually — not as part of a
-              class or representative action.
+              Arbitration Association&apos;s consumer rules, governed by{" "}
+              {governingLaw} (without regard to its conflict-of-laws rules).
+              Either of us can still bring an individual claim in small-claims
+              court instead.
+            </p>
+            <p className="text-[13.5px] leading-relaxed">
+              TO THE EXTENT PERMITTED BY LAW, YOU AND {ENTITY_NAME.toUpperCase()}{" "}
+              EACH WAIVE THE RIGHT TO A TRIAL BY JURY, AND EACH WAIVE THE
+              RIGHT TO BRING OR PARTICIPATE IN ANY CLASS, COLLECTIVE OR
+              REPRESENTATIVE ACTION. DISPUTES ARE RESOLVED INDIVIDUALLY.
+            </p>
+            <p>
+              Any claim relating to Protocolize must be brought within{" "}
+              <strong>one year</strong> after it arises, or it is permanently
+              barred — except where a longer period is required by law.
             </p>
             <p>
               You can opt out of arbitration entirely by emailing{" "}
@@ -344,6 +391,19 @@ export default function TermsPage() {
                 <strong>Events beyond our control</strong> — we&apos;re not
                 liable for failures caused by things like outages, disasters,
                 or acts of government.
+              </li>
+              <li>
+                <strong>Other people&apos;s content and services</strong> —
+                links, references, research summaries and any third-party
+                products mentioned are provided for information only. We
+                don&apos;t control them, don&apos;t endorse them, and
+                aren&apos;t responsible for them.
+              </li>
+              <li>
+                <strong>What survives</strong> — the health release, the
+                disclaimers, limitation of liability, indemnification,
+                dispute-resolution and this fine print all continue to apply
+                after your account ends.
               </li>
             </ul>
           </Section>

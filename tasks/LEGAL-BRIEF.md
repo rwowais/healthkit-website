@@ -106,18 +106,31 @@ that must be accepted. Acceptance is visible to the user in Profile.
 | Data-use promises | **Present tense** + material changes apply only after re-acceptance | Owner wants ads/other revenue open later |
 | Health data + advertising | Requires separate explicit opt-in (not foreclosed, but gated) | |
 | Business transfer | Data may transfer on sale/merger, bound by same promises | |
-| Refunds | Case-by-case within 14 days | BWS: none at all |
+| Refunds | Non-refundable by default; discretionary exceptions | Matched to BWS (v8) |
+| Health release | User represents fitness to participate + releases injury claims | Added v8 — the highest-value clause for this product type |
+| Limitations period | Claims barred after **1 year** | Added v8 |
+| Jury waiver | Explicit, alongside class waiver | Added v8 |
 
 **Questions for counsel:**
-7. Governing law is currently the **user's** state — unusual; most companies
-   pick their own (BWS picks BC). Should this be RO Group LLC's home state,
-   and does that change the arbitration seat?
+7. Governing law now points at **RO Group LLC's own state** (v8). Until the
+   owner confirms the formation state the docs say "the state in which RO
+   Group LLC is organized" — is that entity-relative phrasing acceptable, or
+   must the state be named to be enforceable?
 8. Is the liability cap enforceable as written for a paid consumer health
    app, and should there be a dollar floor?
 9. Is the 30-day arbitration opt-out + class waiver drafted well enough to
    survive a challenge?
 10. Anything **missing** entirely that a consumer health subscription app
     should have?
+11. **v8 was drafted for maximum defensibility at the owner's direction**
+    (health release, broad indemnity, 1-year limitations period, jury waiver,
+    no-refunds default). Is any of it likely to be found unconscionable — and
+    is there a risk that an aggressive clause causes a court to strike the
+    whole arbitration agreement rather than just that clause?
+12. **Insurance:** what coverage should be in place before revenue — general
+    liability, professional liability / E&O, product liability given the
+    supplement guidance? This is the owner's top priority and no drafting
+    substitutes for it.
 
 ## 5. Explicitly out of scope today
 

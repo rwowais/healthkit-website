@@ -56,6 +56,13 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 // for the new Request-a-feature), business-transfer/assignment (without it an
 // acquisition could not lawfully take the database along), fine-print block,
 // GPC line. Indemnification + business transfer are material -> re-ask.
+// v8 (2026-08-18): owner asked for maximum defensibility. Added a health
+// representation + release, broadened indemnity to use-of-Services, a 1-year
+// contractual limitations period, an explicit jury-trial waiver, no-refunds-
+// by-default (discretionary exceptions retained), no refund on for-cause
+// termination, third-party content disclaimer, and a survival clause.
+// Governing law moved from the USER's state to the company's. All of these
+// REDUCE user rights -> unambiguous re-ask. Owner had accepted v7.
 // Verified before bumping: zero accounts had accepted v4.
 // v6 (2026-08-18): the intelligence-layer clause — personalized suggestions
 // are algorithmic educational starting points, no professional relationship,
@@ -71,7 +78,16 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 // GoodRx/BetterHelp), no-re-identification, and the technical facts
 // (passwords, card numbers). WEAKENING promises is the clearest re-ask case
 // there is; the owner had accepted v6.
-export const LEGAL_VERSION = 7;
+export const LEGAL_VERSION = 8;
+
+/**
+ * Formation state of RO Group LLC. Owner has not confirmed it yet, so the
+ * legal docs fall back to entity-relative phrasing ("the state in which RO
+ * Group LLC is organized") — valid, just less precise. Set this string and
+ * both documents sharpen automatically.
+ */
+export const ENTITY_STATE: string | null = null;
+export const ENTITY_NAME = "RO Group LLC";
 
 // Trial length is NOT here — it is entitlements.TRIAL_DAYS (7), the single
 // source of truth that onboarding, terms and the import clamp all derive from.
