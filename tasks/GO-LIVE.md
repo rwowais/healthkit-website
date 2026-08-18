@@ -52,6 +52,28 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       otherwise bill to extract and ends with 12 specific questions. Priority
       ones: is the v8 aggressive pass at risk of being struck as
       unconscionable (Q11), and what insurance to carry (Q12).
+- [ ] **Trademark clearance search for "Diurna Health" — DO THIS FIRST** —
+      OWNER (via the attorney hour). A domain purchase gives nobody trademark
+      rights, so a later buyer of `diurna.com` cannot claim our app name. The
+      real risk runs the other way: someone who was ALREADY using "Diurna"
+      in commerce for related goods/services would have priority over us.
+      My own check was only a web search (found nothing in health/wellness),
+      which is NOT clearance — an attorney runs a proper USPTO + common-law
+      search. Cheap now, expensive after the brand is established.
+      Note: `diurna.com`, `diurna.app` and `diurna.io` are all registered but
+      appear to be parked/blank, i.e. reservers rather than operating brands.
+- [ ] **File the USPTO trademark for "Diurna Health"** — OWNER, after
+      clearance. This is the actual protection against the scenario the owner
+      asked about; registration + documented first use in commerce is what
+      lets us stop a copycat, and what stops a domain buyer from having any
+      claim. Likely classes: 9 (software), 42 (SaaS), possibly 44 (health
+      information services). Government fee is per class.
+      Also: **document first use** — launch date, dated screenshots, the first
+      paid receipt. US priority is date-based.
+- [ ] **Buy the cheap defensive domains** — OWNER, ~$45 total:
+      `diurnahealth.app` ($9.99), `getdiurna.com`, `trydiurna.com`,
+      `diurnaapp.com` ($11.25 each). Point them all at the main site. Note
+      `diurna.co` is priced at $308/yr (premium) and is not worth it.
 - [ ] **Confirm RO Group LLC's formation state** — OWNER → then CLAUDE sets
       `ENTITY_STATE` in `src/lib/constants.ts` and both documents sharpen
       from "the state in which RO Group LLC is organized" to the named state.

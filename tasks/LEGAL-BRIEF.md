@@ -132,6 +132,30 @@ that must be accepted. Acceptance is visible to the user in Profile.
     supplement guidance? This is the owner's top priority and no drafting
     substitutes for it.
 
+## 4b. Brand / trademark (added 2026-08-18)
+
+The app was renamed **Protocolize → Diurna Health** on 2026-08-18 (the .com was
+available). Owner's question: if someone later buys `diurna.com`, can they
+claim our app name?
+
+Our understanding, for confirmation: a domain registration confers no
+trademark rights, so a later buyer would have no claim; priority turns on use
+in commerce. Facts: `diurna.com`, `diurna.app` and `diurna.io` are all
+registered but appear parked/blank (no operating brand found). An in-house web
+search found no "Diurna" trademark in health/wellness — explicitly NOT a
+clearance search.
+
+**Questions for counsel:**
+13. Please run a proper clearance search on **"Diurna Health"** (and bare
+    "Diurna") before the brand is established. *diurna* is a Latin dictionary
+    word meaning "daily", which makes the mark suggestive for a daily-habit
+    health app — registrable, but weaker than a coined term. Does that change
+    your advice on the name, or on how to file?
+14. Which classes should we file — 9 (software), 42 (SaaS), 44 (health
+    information services)? File now (intent-to-use) or after launch?
+15. Anything we should be doing NOW to establish and document first use in
+    commerce so priority is defensible?
+
 ## 5. Explicitly out of scope today
 
 No wearable/HealthKit integrations, no user-facing AI, no social/sharing
