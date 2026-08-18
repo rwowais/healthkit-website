@@ -80,7 +80,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   <span className="h-2 w-2 rounded-full bg-[var(--bg)]" />
                 </span>
                 <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
-                  Protocolize
+                  Diurna
                 </span>
               </Link>
               {/* Sync status pill — calm, peripheral, never alarming.

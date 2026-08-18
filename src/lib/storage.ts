@@ -559,7 +559,7 @@ export function loadState(): AppState {
   return getDefaultState();
 }
 
-/** Wipe all Protocolize data across current + legacy keys. */
+/** Wipe all Diurna data across current + legacy keys. */
 export function clearAllData(): void {
   if (typeof window === "undefined") return;
   try {

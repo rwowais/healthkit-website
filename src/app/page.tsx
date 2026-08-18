@@ -65,7 +65,7 @@ export default function LandingPage() {
             <span className="h-2 w-2 rounded-full bg-[var(--bg)]" />
           </span>
           <span className="text-[16px] font-bold tracking-tight text-[var(--text-1)]">
-            Protocolize
+            Diurna
           </span>
         </div>
         <button
@@ -178,7 +178,7 @@ export default function LandingPage() {
           </ul>
         </div>
         <p className="mt-10 text-center text-[12px] leading-relaxed text-[var(--text-4)]">
-          Protocolize is an educational tool, not medical advice. Consult a
+          Diurna is an educational tool, not medical advice. Consult a
           clinician before changing your health routine.
         </p>
         <div className="mt-6 flex justify-center gap-5 text-[12px] text-[var(--text-4)]">
@@ -188,7 +188,7 @@ export default function LandingPage() {
           <a href="/terms" className="hover:text-[var(--text-3)]">
             Terms
           </a>
-          <a href="mailto:hello@protocolize.com" className="hover:text-[var(--text-3)]">
+          <a href="mailto:hello@diurnahealth.com" className="hover:text-[var(--text-3)]">
             Contact
           </a>
         </div>

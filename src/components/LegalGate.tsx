@@ -42,7 +42,7 @@ export default function LegalGate() {
           <Link href="/privacy" className="text-[var(--readiness)] underline">
             Privacy Policy
           </Link>
-          . Continuing to use Protocolize means you accept the current
+          . Continuing to use Diurna means you accept the current
           versions.
         </p>
         <button

@@ -1118,7 +1118,7 @@ export default function TodayPage() {
                 ? "Your day is cleared and your streak is paused — your data is safe, and your full system returns the moment you end the break."
                 : hasSystemOtherDays
                 ? "Your system just doesn't run today — enjoy the day off. It'll be back on its next scheduled day."
-                : "Install a protocol and Protocolize will assemble an adaptive daily system for you."}
+                : "Install a protocol and Diurna will assemble an adaptive daily system for you."}
             </p>
             <Link
               href={

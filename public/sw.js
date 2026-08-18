@@ -1,5 +1,5 @@
 /**
- * Protocolize service worker — offline-first.
+ * Diurna service worker — offline-first.
  *
  * Caching strategy (chosen for "installable PWA that opens instantly"):
  *
@@ -244,9 +244,9 @@ self.addEventListener("push", (e) => {
       try {
         data = e.data ? e.data.json() : {};
       } catch {
-        data = { title: "Protocolize", body: e.data ? e.data.text() : "" };
+        data = { title: "Diurna", body: e.data ? e.data.text() : "" };
       }
-      const title = data.title || "Protocolize";
+      const title = data.title || "Diurna";
       await self.registration.showNotification(title, {
         body: data.body || "",
         icon: "/icons/icon-192.png",

@@ -137,7 +137,7 @@ export default function UpgradePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
-          <Eyebrow color="var(--readiness)">Protocolize Intelligence</Eyebrow>
+          <Eyebrow color="var(--readiness)">Diurna Intelligence</Eyebrow>
           <h1 className="t-title mt-2 text-[var(--text-1)]">
             Keep the system that&apos;s adapting to you
           </h1>

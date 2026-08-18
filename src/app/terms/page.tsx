@@ -45,10 +45,10 @@ export default function TermsPage() {
             }}
           >
             <p className="text-[14px] font-semibold text-[var(--alert)] mb-1.5">
-              Important: Protocolize is not medical advice.
+              Important: Diurna Health is not medical advice.
             </p>
             <p className="text-[13.5px] leading-relaxed text-[var(--text-2)]">
-              Protocolize is a personal-tracking and habit-formation
+              Diurna Health is a personal-tracking and habit-formation
               tool inspired by longevity research. It is not a doctor,
               dietician, pharmacist, or therapist. Nothing in the app
               diagnoses, treats, cures, or prevents any condition. If
@@ -62,8 +62,8 @@ export default function TermsPage() {
             <p>
               These terms are an agreement between you and{" "}
               <strong>RO Group LLC</strong>, the company that operates
-              Protocolize (&quot;we&quot;, &quot;us&quot;). By using
-              Protocolize you accept these terms and our{" "}
+              Diurna Health (&quot;we&quot;, &quot;us&quot;). By using
+              Diurna Health you accept these terms and our{" "}
               <Link href="/privacy" className="text-[var(--readiness)] underline">
                 Privacy Policy
               </Link>
@@ -73,7 +73,7 @@ export default function TermsPage() {
 
           <Section title="What the intelligence layer is — and isn't">
             <p>
-              Protocolize generates personalized suggestions: when to do a
+              Diurna Health generates personalized suggestions: when to do a
               behavior, how to order your day, which supplements people
               commonly take and in what ranges, what your patterns look like,
               and gentle warnings when a plan conflicts with itself. All of it
@@ -90,7 +90,7 @@ export default function TermsPage() {
                 medications, or your situation.
               </li>
               <li>
-                Using Protocolize creates <strong>no doctor-patient or other
+                Using Diurna Health creates <strong>no doctor-patient or other
                 professional relationship</strong> with us, ever.
               </li>
               <li>
@@ -98,7 +98,7 @@ export default function TermsPage() {
                 research, not doses chosen for you. Supplements can interact
                 with medications and conditions — clear anything new with
                 your doctor or pharmacist first. These statements have not
-                been evaluated by the FDA; Protocolize does not diagnose,
+                been evaluated by the FDA; Diurna Health does not diagnose,
                 treat, cure, or prevent any disease.
               </li>
               <li>
@@ -114,7 +114,7 @@ export default function TermsPage() {
 
           <Section title="Your health, and the risk you accept">
             <p>
-              By using Protocolize you confirm that you are physically able to
+              By using Diurna Health you confirm that you are physically able to
               undertake the activities you choose to log, that you have
               consulted a physician if you have any condition, injury,
               pregnancy, or medication that could make them unsafe, and that
@@ -198,7 +198,7 @@ export default function TermsPage() {
                 non-refundable and non-transferable, including for partial
                 periods and unused time. We may still make exceptions at our
                 discretion — email{" "}
-                <a className="text-[var(--readiness)] underline" href="mailto:billing@protocolize.com">billing@protocolize.com</a>{" "}
+                <a className="text-[var(--readiness)] underline" href="mailto:billing@diurnahealth.com">billing@diurnahealth.com</a>{" "}
                 within 14 days of a charge and we&apos;ll look at it.
               </li>
               <li>
@@ -239,7 +239,7 @@ export default function TermsPage() {
           <Section title="Ideas you send us">
             <p>
               If you send us feedback — feature requests, bug reports,
-              suggestions — we can use it freely to improve Protocolize,
+              suggestions — we can use it freely to improve Diurna Health,
               without owing payment or credit. Your health data is not
               &quot;feedback&quot;; this covers only the ideas you choose to
               send.
@@ -251,14 +251,14 @@ export default function TermsPage() {
               Protocol packs, behavior descriptions, evidence
               summaries, and the app design are our intellectual
               property (or licensed to us). You can use them inside
-              Protocolize for your personal practice. You can&apos;t
+              Diurna Health for your personal practice. You can&apos;t
               redistribute them publicly without permission.
             </p>
           </Section>
 
           <Section title="The service will evolve">
             <p>
-              Protocolize is actively developed. Features may be added,
+              Diurna Health is actively developed. Features may be added,
               changed, moved between the free and Premium tiers, or retired;
               free-tier limits may change. Two promises hold through any of
               it: your data is never deleted by a plan change (anything over a
@@ -271,7 +271,7 @@ export default function TermsPage() {
 
           <Section title="If something goes wrong">
             <p>
-              We try hard to make Protocolize accurate and reliable, but
+              We try hard to make Diurna Health accurate and reliable, but
               it&apos;s a tool, not an oracle. We can&apos;t guarantee
               uptime, accuracy of recommendations, or any specific
               health outcome. To the maximum extent allowed by law,
@@ -290,7 +290,7 @@ export default function TermsPage() {
               You agree to defend, indemnify and hold harmless {ENTITY_NAME}
               and its members, officers and contractors from any claim,
               damage, loss, liability and expense (including reasonable legal
-              fees) arising out of or connected with your use of Protocolize,
+              fees) arising out of or connected with your use of Diurna Health,
               your breach of these terms, your violation of any law, or your
               infringement of anyone&apos;s rights. We may take over the
               defense of any such claim at your expense, and you agree to
@@ -327,7 +327,7 @@ export default function TermsPage() {
               version number at the top, and show a one-time in-app notice
               asking you to review and accept. Your acceptance (version and
               date) is recorded in your account data. Continuing to use
-              Protocolize after accepting means the current version applies.
+              Diurna Health after accepting means the current version applies.
               If you don&apos;t agree with a change, you can export your data
               and delete your account at any time.
             </p>
@@ -335,9 +335,9 @@ export default function TermsPage() {
 
           <Section title="Disputes (US users)">
             <p>
-              You and Protocolize agree to first try to resolve any
+              You and Diurna Health agree to first try to resolve any
               dispute informally by emailing{" "}
-              <a className="text-[var(--readiness)] underline" href="mailto:legal@protocolize.com">legal@protocolize.com</a>.
+              <a className="text-[var(--readiness)] underline" href="mailto:legal@diurnahealth.com">legal@diurnahealth.com</a>.
               If that doesn&apos;t work within 60 days, disputes will be
               resolved by binding arbitration under the American
               Arbitration Association&apos;s consumer rules, governed by{" "}
@@ -352,13 +352,13 @@ export default function TermsPage() {
               REPRESENTATIVE ACTION. DISPUTES ARE RESOLVED INDIVIDUALLY.
             </p>
             <p>
-              Any claim relating to Protocolize must be brought within{" "}
+              Any claim relating to Diurna Health must be brought within{" "}
               <strong>one year</strong> after it arises, or it is permanently
               barred — except where a longer period is required by law.
             </p>
             <p>
               You can opt out of arbitration entirely by emailing{" "}
-              <a className="text-[var(--readiness)] underline" href="mailto:legal@protocolize.com">legal@protocolize.com</a>{" "}
+              <a className="text-[var(--readiness)] underline" href="mailto:legal@diurnahealth.com">legal@diurnahealth.com</a>{" "}
               within 30 days of first accepting these terms, with the subject
               line &quot;Arbitration opt-out&quot;. Opting out doesn&apos;t
               affect anything else in these terms.
@@ -410,7 +410,7 @@ export default function TermsPage() {
 
           <Section title="Contact">
             <p>
-              <a className="text-[var(--readiness)] underline" href="mailto:legal@protocolize.com">legal@protocolize.com</a>
+              <a className="text-[var(--readiness)] underline" href="mailto:legal@diurnahealth.com">legal@diurnahealth.com</a>
             </p>
           </Section>
         </div>

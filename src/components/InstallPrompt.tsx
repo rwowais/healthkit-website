@@ -183,7 +183,7 @@ export default function InstallPrompt() {
             id="install-title"
             className="mt-1.5 text-[16px] font-semibold text-[var(--text-1)]"
           >
-            Get the full Protocolize experience
+            Get the full Diurna experience
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-2)]">
             Adds an icon to your home screen and opens full-screen with no
@@ -310,11 +310,11 @@ export default function InstallPrompt() {
               id="install-title-cta"
               className="text-[14.5px] font-semibold text-[var(--text-1)]"
             >
-              Install Protocolize
+              Install Diurna
             </h2>
             <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-3)]">
               {isDesktop
-                ? "One click — Protocolize opens in its own window, no browser tab needed."
+                ? "One click — Diurna opens in its own window, no browser tab needed."
                 : signedIn
                   ? "Adds to your home screen. Reminders work even when the app is closed."
                   : "Adds to your home screen for instant, full-screen access."}

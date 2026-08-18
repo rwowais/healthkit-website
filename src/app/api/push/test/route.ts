@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       sendPush(
         { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth },
         {
-          title: "Protocolize",
+          title: "Diurna",
           body: "Test reminder — you're all set.",
           tag: "pz-test",
           url: "/today",

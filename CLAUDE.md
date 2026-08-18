@@ -1,6 +1,12 @@
 @AGENTS.md
 
-# Protocolize
+# Diurna Health
+
+(Renamed from "Protocolize" on 2026-08-18 — diurnahealth.com was available where
+protocolize.com was not. Internal identifiers deliberately KEEP the old name:
+the `protocolize-v3` localStorage key, `protocolize-theme`, and the
+`protocolize_*` Postgres tables. They are invisible to users, and renaming
+them would risk live data for zero benefit.)
 
 An adaptive longevity operating system. Users install expert-designed
 **protocol packs** (sleep, training, focus, metabolic, recovery…) which
@@ -34,8 +40,9 @@ env-gated and inert until the owner wires Payment Links. Pricing lives in
   scientific. Inspiration: Oura, Whoop, Levels, Apple Health, Rise. No bright
   saturation, no rainbow dashboards, no Tailwind-template look. Elegance over density.
 - **GitHub:** rwowais (repo: healthkit-website)
-- **Brand name:** Protocolize (renamed from "HealthKit" which is Apple-trademarked)
-- **Domain:** protocolize.com (not yet purchased)
+- **Brand name:** Diurna Health — "HealthKit" (Apple-trademarked) → "Protocolize"
+  → **Diurna Health** (2026-08-18, chosen because the .com was available)
+- **Domain:** diurnahealth.com (owner still to purchase — $11.25/yr)
 
 ---
 
@@ -369,8 +376,8 @@ accounts, not the codebase:
    /terms ("agreement between you and RO Group LLC") and /privacy (data
    controller) as of LEGAL_VERSION 4. Still on the owner: (a) tell Claude the
    LLC's formation STATE so the docs can carry "an <State> limited liability
-   company"; (b) if "Protocolize" isn't registered as a DBA/trade name of RO
-   Group LLC, consider registering it; (c) run Protocolize's money through the
+   company"; (b) if "Diurna Health" isn't registered as a DBA/trade name of RO
+   Group LLC, consider registering it; (c) run Diurna Health's money through the
    LLC (Stripe account, bank) — the liability shield only works if the
    business actually operates through the entity.
 1. **Buy `protocolize.com`**, add it as a Vercel domain, follow the DNS

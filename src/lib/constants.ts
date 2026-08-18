@@ -78,7 +78,11 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 // GoodRx/BetterHelp), no-re-identification, and the technical facts
 // (passwords, card numbers). WEAKENING promises is the clearest re-ask case
 // there is; the owner had accepted v6.
-export const LEGAL_VERSION = 8;
+// v9 (2026-08-18): the app is now Diurna Health (was Protocolize). Renaming
+// the service is a change to WHAT the user agreed to use, so the documents
+// naming it must be re-accepted — cheap here, since only the owner had
+// accepted v8. RO Group LLC (the contracting party) is unchanged.
+export const LEGAL_VERSION = 9;
 
 /**
  * Formation state of RO Group LLC. Owner has not confirmed it yet, so the

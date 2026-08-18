@@ -14,29 +14,29 @@ import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://protocolize.com"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://diurnahealth.com"
   ),
-  title: "Protocolize — Longevity Intelligence",
+  title: "Diurna Health — Longevity Intelligence",
   description:
     "Your adaptive daily protocol. Track behaviors and the calm intelligence layer that shapes your longevity routine.",
-  applicationName: "Protocolize",
+  applicationName: "Diurna",
   // OG + Twitter cards so shared links render as a branded preview
   // (logo + title + line) instead of a barren URL. Image is the
   // existing 512×512 icon; if/when we ship a dedicated 1200×630
   // social image, swap it in here.
   openGraph: {
     type: "website",
-    siteName: "Protocolize",
-    title: "Protocolize — Longevity Intelligence",
+    siteName: "Diurna Health",
+    title: "Diurna Health — Longevity Intelligence",
     description:
       "Your adaptive daily protocol. Sleep, training, nutrition, supplements — calmly orchestrated into one day that reshapes itself around your recovery.",
     images: [
-      { url: "/icons/icon-512.png", width: 512, height: 512, alt: "Protocolize" },
+      { url: "/icons/icon-512.png", width: 512, height: 512, alt: "Diurna Health" },
     ],
   },
   twitter: {
     card: "summary",
-    title: "Protocolize — Longevity Intelligence",
+    title: "Diurna Health — Longevity Intelligence",
     description:
       "An adaptive daily protocol that calmly reshapes itself around your recovery.",
     images: ["/icons/icon-512.png"],
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     // app header colliding with the clock/notch. The Shell header also pads
     // env(safe-area-inset-top) as defense-in-depth.
     statusBarStyle: "default",
-    title: "Protocolize",
+    title: "Diurna",
     // iOS-specific splash screens. Apple requires exact-pixel PNGs
     // per device size; without these, iOS shows a white flash on
     // PWA launch instead of the branded splash. The generator script

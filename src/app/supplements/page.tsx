@@ -211,7 +211,7 @@ function SupplementsInner() {
           points, not doses for you. Supplements can interact with medications
           and health conditions; check with your doctor or pharmacist before
           adding anything. These statements have not been evaluated by the
-          Food and Drug Administration. Protocolize does not diagnose, treat,
+          Food and Drug Administration. Diurna does not diagnose, treat,
           cure, or prevent any disease.
         </p>
       </div>

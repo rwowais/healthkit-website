@@ -780,7 +780,7 @@ export default function ProfilePage() {
                 } catch {}
                 try {
                   const reg = await navigator.serviceWorker.ready;
-                  await reg.showNotification("Protocolize", {
+                  await reg.showNotification("Diurna", {
                     body: "Test reminder — you're all set (foreground only).",
                     icon: "/icon.svg",
                     tag: "pz-test",
@@ -1080,7 +1080,7 @@ export default function ProfilePage() {
               Not medical advice
             </p>
             <p className="text-[13px] leading-relaxed text-[var(--text-2)]">
-              Protocolize is an educational tool — not medical advice,
+              Diurna is an educational tool — not medical advice,
               diagnosis, or treatment. Its suggestions are generated
               automatically from what you log plus general research: starting
               points, not instructions, and the ranges shown are general
@@ -1100,7 +1100,7 @@ export default function ProfilePage() {
               LegalGate re-acceptance — the door stays open without
               overclaiming. Mirrors the Privacy Policy's short version. */}
           <p className="t-caption mt-3 leading-relaxed">
-            Your health data is yours. Today Protocolize has no ads and
+            Your health data is yours. Today Diurna has no ads and
             doesn&apos;t sell personal data; anything identifiable is shared
             only with the services that run the app. If how we use data ever
             changes, you&apos;ll be asked before it applies to you — the full
@@ -1160,7 +1160,7 @@ export default function ProfilePage() {
         )}
 
         <p className="pb-2 text-center text-[11px] text-[var(--text-4)]">
-          Protocolize · Adaptive Protocol OS · build{" "}
+          Diurna · Adaptive Protocol OS · build{" "}
           {process.env.NEXT_PUBLIC_BUILD ?? "dev"}
         </p>
       </div>

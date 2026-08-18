@@ -173,7 +173,7 @@ export const OUTPUT_JSON_SCHEMA_WITH_SUGGEST: Record<string, unknown> = {
  * (the route caches it). Volatile input (the user's description) goes in
  * the user turn, AFTER the cache breakpoint.
  */
-export const SYSTEM_PROMPT = `You are a careful longevity-protocol librarian for Protocolize.
+export const SYSTEM_PROMPT = `You are a careful longevity-protocol librarian for Diurna.
 From a short description, draft ONE atomic daily behavior with all of its
 attributes. Be precise, calm, and conservative.
 

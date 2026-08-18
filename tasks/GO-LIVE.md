@@ -71,55 +71,25 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
 
 ## 🟡 LAUNCH POLISH — can ship after, but soon
 
-- [ ] **Buy the domain** — OWNER. `protocolize.com` is **not available**, but
-      the research below says keep the name and take `.app`:
-      - `protocolize.com` redirects to a **GoDaddy for-sale parking page** —
-        a squatter, not a business. That's the good outcome: nobody is using
-        "Protocolize" as a brand, so there's no trademark conflict. (A USPTO/
-        web search for the name in health & fitness found nothing.) You can
-        make an offer through GoDaddy later if you ever want the .com; a name
-        like this typically lists in the high hundreds to low thousands.
-      - **`protocolize.app` — $9.99/yr, available.** Recommended. `.app` is
-        run by Google, HTTPS-only at the TLD level (a real security plus for
-        a health app), and reads as intentional rather than second-choice.
-      - Backups if you'd rather have a `.com`: `getprotocolize.com` or
-        `tryprotocolize.com` ($11.25), `protocolize.co` ($4.99).
-      - **80 domains checked 2026-08-18. ZERO clean exact-match `.com`s were
-        available at registration price** — not dictionary words (healthspan,
-        cadence, keystone, baseline, meridian, solstice, helios, keel), not
-        Latin roots (aevum, vitae, diurna, circada, tempus), not two-word
-        compounds (dailycompound, vitalstack, compoundhealth, protocolstack),
-        not English phrases (longgame, steadystate, throughline, slowburn),
-        and not even invented 5–6 letter coinages (aevia, longeva, protova,
-        vitava, aeona, solvi, kaven). Domain investors hold essentially every
-        pronounceable short string. The only `.com`s free are
-        `get-`/`try-`/`-health`/`-labs` constructions, which are a weaker
-        brand than the name we already have.
-      - **The decisive consequence:** a clean `.com` for ANY good name costs
-        squatter money, not $12. So renaming to get a `.com` means paying the
-        rebrand cost *and* the squatter — strictly worse than simply buying
-        `protocolize.com`, where the brand is already in the code, the legal
-        documents and the dossier. **If we ever pay for a `.com`, pay for
-        ours.**
-      - **CORRECTION after a wider sweep (140 domains).** The "no .com
-        available" conclusion was an artifact of only searching SHORT SINGLE
-        WORDS. The comparables don't use those — `builtwithscience.com`,
-        `risescience.com`, `eightsleep.com`, `functionhealth.com` are all two
-        or three words. Searching that band, real `.com`s ARE available:
-
-        | Name | Domain | $/yr | Read |
-        |---|---|---|---|
-        | **Ember Longevity** | `emberlongevity.com` | 11.25 | Brandable word + category, exactly the Rise Science pattern. "Ember" = slow sustained burn — an apt longevity metaphor. |
-        | **The Everyday Protocol** | `theeverydayprotocol.com` | 11.25 | Keeps the "protocol" equity already built; clear and memorable, but long to type. |
-        | **Diurna Health** | `diurnahealth.com` | 11.25 | Latin *diurna* = daily; distinctive, clean, matches the Function Health pattern. |
-        | Circada | `circada.app` / `circadalabs.com` | 9.99 | Circadian association; exact `.com` taken. |
-        | *(descriptive, weaker)* | `yourlongevityos.com`, `mylongevitysystem.com`, `yourdailysystem.com`, `oneprotocolday.com`, `builtwithprotocols.com` | 11.25 | Read as taglines rather than brands. |
-
-        Still true: every SHORT single-word `.com` is held by investors
-        (~120 checked across dictionary words, Latin roots, two-word
-        compounds, English phrases and invented coinages).
-      Then add it as a Vercel domain, follow the DNS steps, and set
-      `NEXT_PUBLIC_SITE_URL=https://<domain>` so link previews resolve.
+- [ ] **Buy `diurnahealth.com` — $11.25/yr** — OWNER. **Name decided
+      2026-08-18: the app is now Diurna Health** (was Protocolize; that .com
+      was held by a squatter). *diurna* is Latin for "daily" — it names the
+      circadian logic at the core of the engine, and follows the Function
+      Health / Rise Science pattern. The rename is already shipped in code,
+      legal docs (LEGAL_VERSION 9) and the PWA.
+      Buy it, add it as a Vercel domain, follow the DNS steps, then set
+      `NEXT_PUBLIC_SITE_URL=https://diurnahealth.com`.
+      ⚠️ **Until the domain is bought, the support addresses in the legal
+      documents don't resolve** — `privacy@`, `legal@`, `billing@` and
+      `support@diurnahealth.com` are referenced in /terms and /privacy. Set up
+      email forwarding for those as soon as the domain is live.
+      Also consider grabbing `diurna.app` / `diurnahealth.app` defensively.
+      Research trail (140 domains checked) is in the git history of this file;
+      short single-word .coms are all held by investors, which is why a
+      two-word name was the right band to search.
+- [ ] **Rename the GitHub repo** `healthkit-website` → `diurna-health` —
+      OWNER (Settings → rename). Vercel follows automatically; your local
+      remote needs `git remote set-url` afterwards, which Claude can do.
 - [ ] **Turn on analytics** — OWNER. Plausible (cookie-less, already wired):
       add the site, then set `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` in Vercel.
       Without it you launch blind — no idea how many people finish

@@ -1,5 +1,5 @@
 /**
- * invariants.ts — formal contracts the Protocolize engine MUST hold,
+ * invariants.ts — formal contracts the Diurna engine MUST hold,
  * independent of any single user scenario.
  *
  * Why this exists:

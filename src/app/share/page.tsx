@@ -3,8 +3,8 @@
 /**
  * /share — landing route for the Web Share Target.
  *
- * When the user shares something to Protocolize from another app
- * (e.g. tapping Share → Protocolize on a PDF, link, or selected
+ * When the user shares something to Diurna from another app
+ * (e.g. tapping Share → Diurna on a PDF, link, or selected
  * text), the OS opens this URL with `title`, `text`, and/or `url`
  * as query parameters. We then offer to file the content where it
  * makes sense.
@@ -93,7 +93,7 @@ function ShareInner() {
       upsertCustomPack({
         id: packId,
         name: "Saved from Share",
-        tagline: "Things you shared into Protocolize",
+        tagline: "Things you shared into Diurna",
         goal: "custom",
         accent: "var(--warm)",
         icon: "sparkle",
@@ -129,7 +129,7 @@ function ShareInner() {
     <Shell>
       <div className="flex flex-col gap-6">
         <div>
-          <Eyebrow>Shared with Protocolize</Eyebrow>
+          <Eyebrow>Shared with Diurna</Eyebrow>
           <h1 className="t-title mt-2 text-[var(--text-1)]">
             Where should this land?
           </h1>
@@ -196,7 +196,7 @@ export default function SharePage() {
       fallback={
         <Shell>
           <div className="flex flex-col gap-4">
-            <p className="t-eyebrow">Shared with Protocolize</p>
+            <p className="t-eyebrow">Shared with Diurna</p>
           </div>
         </Shell>
       }

@@ -1,7 +1,7 @@
 /**
  * Persona: "Priya the careful" — 52yo, free tier, never converts.
  *
- * This is a 365-day stress test of Protocolize's free-tier limits.
+ * This is a 365-day stress test of Diurna's free-tier limits.
  * Priya goes slow:
  *   - Installs ONLY longevity-foundation at onboarding (safetyFlags:
  *     anticoagulants=true, pregnant=false).

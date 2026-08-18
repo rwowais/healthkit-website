@@ -53,7 +53,7 @@ export default function PrivacyPage() {
         <div className="space-y-7 text-[15px] leading-relaxed text-[var(--text-2)]">
           <Section title="The short version">
             <p>
-              Your health data belongs to you. Today, Protocolize shows no
+              Your health data belongs to you. Today, Diurna Health shows no
               ads, doesn&apos;t sell personal data, and shares identifiable
               data only with the service providers that run the app (listed
               below). We may use <strong>de-identified, aggregated</strong>{" "}
@@ -206,7 +206,7 @@ export default function PrivacyPage() {
 
           <Section title="International transfers">
             <p>
-              Our servers are in the United States. If you use Protocolize
+              Our servers are in the United States. If you use Diurna Health
               from the EU, UK, or elsewhere, your data is transferred to and
               processed in the US. Our service providers protect these
               transfers with the EU-approved safeguards in their data
@@ -264,9 +264,9 @@ export default function PrivacyPage() {
                 the app. If you want help, email{" "}
                 <a
                   className="text-[var(--readiness)] underline"
-                  href="mailto:privacy@protocolize.com"
+                  href="mailto:privacy@diurnahealth.com"
                 >
-                  privacy@protocolize.com
+                  privacy@diurnahealth.com
                 </a>
                 .
               </li>
@@ -283,9 +283,9 @@ export default function PrivacyPage() {
               objection. To exercise any of these, email{" "}
               <a
                 className="text-[var(--readiness)] underline"
-                href="mailto:privacy@protocolize.com"
+                href="mailto:privacy@diurnahealth.com"
               >
-                privacy@protocolize.com
+                privacy@diurnahealth.com
               </a>
               .
             </p>
@@ -293,7 +293,7 @@ export default function PrivacyPage() {
 
           <Section title="If the business is ever sold">
             <p>
-              If Protocolize (or RO Group LLC) is acquired, merges, or sells
+              If Diurna Health (or RO Group LLC) is acquired, merges, or sells
               the business, your data may transfer to the new owner as part of
               that transaction — bound by this policy&apos;s promises. If a
               new owner wants to materially change how your data is used,
@@ -307,7 +307,7 @@ export default function PrivacyPage() {
               Several states (California, Colorado, Connecticut, Virginia,
               Washington, and others) give you specific rights over personal
               data — access, correction, deletion, and portability, plus the
-              right to appeal if we decline a request. Protocolize&apos;s
+              right to appeal if we decline a request. Diurna Health&apos;s
               answers are simple because of how it&apos;s built: we don&apos;t
               sell personal data, we don&apos;t share it for targeted
               advertising, and export/delete are self-serve in Profile. For
@@ -327,7 +327,7 @@ export default function PrivacyPage() {
 
           <Section title="Children">
             <p>
-              Protocolize is for adults — the Terms require you to be 18 to
+              Diurna Health is for adults — the Terms require you to be 18 to
               create an account, and we don&apos;t knowingly collect data from
               anyone younger. If you believe a minor has signed up, email us
               and we&apos;ll delete the account.
@@ -361,14 +361,14 @@ export default function PrivacyPage() {
 
           <Section title="Who we are">
             <p>
-              Protocolize is operated by <strong>RO Group LLC</strong>, which
+              Diurna Health is operated by <strong>RO Group LLC</strong>, which
               is the data controller for the personal data described in this
               policy. Contact:{" "}
               <a
                 className="text-[var(--readiness)] underline"
-                href="mailto:privacy@protocolize.com"
+                href="mailto:privacy@diurnahealth.com"
               >
-                privacy@protocolize.com
+                privacy@diurnahealth.com
               </a>
               .
             </p>

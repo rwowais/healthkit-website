@@ -25,8 +25,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Protocolize — Longevity Intelligence",
-    short_name: "Protocolize",
+    name: "Diurna Health — Longevity Intelligence",
+    short_name: "Diurna",
     description:
       "Your adaptive daily protocol. Track behaviors, biomarkers, and the calm intelligence layer that shapes your longevity routine.",
     start_url: "/today?source=pwa",
@@ -103,8 +103,8 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
     ],
-    // Web Share Target — lets other apps share content TO Protocolize.
-    // When the user picks Protocolize from their OS share sheet, the
+    // Web Share Target — lets other apps share content TO Diurna.
+    // When the user picks Diurna from their OS share sheet, the
     // shared text/url/title lands on /share via GET parameters; the
     // page then offers to file it as a note attached to a biomarker
     // entry or as a custom behavior reminder.

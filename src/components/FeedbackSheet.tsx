@@ -41,7 +41,7 @@ export default function FeedbackSheet({
   return (
     <Sheet open={open} onClose={close} title="Request a feature">
       <p className="t-caption mb-4 leading-relaxed">
-        Tell us what would make Protocolize work better for you. Every note
+        Tell us what would make Diurna work better for you. Every note
         goes straight to the person building the app.
       </p>
       <Segmented

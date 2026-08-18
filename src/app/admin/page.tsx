@@ -5408,7 +5408,7 @@ function AdminHomeInner() {
       </div>
 
       <p className="mt-8 text-center text-[11px] text-[var(--text-4)]">
-        Protocolize · internal · build{" "}
+        Diurna · internal · build{" "}
         {process.env.NEXT_PUBLIC_BUILD ?? "dev"} ·{" "}
         <button
           onClick={() => setPaletteOpen(true)}

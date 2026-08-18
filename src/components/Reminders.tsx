@@ -28,7 +28,7 @@ import {
 } from "@/lib/push";
 
 /**
- * Foreground + background reminders. While Protocolize is open in a
+ * Foreground + background reminders. While Diurna is open in a
  * tab, schedules in-tab notifications at each upcoming behavior's
  * anchored time (zero-latency, no server round-trip).
  *
@@ -218,7 +218,7 @@ export default function Reminders() {
         navigator.serviceWorker.ready
           .then((reg) =>
             reg.showNotification(it.title, {
-              body: it.dose || "It's time — open Protocolize.",
+              body: it.dose || "It's time — open Diurna.",
               tag: `pz-${it.canonicalKey}`,
               icon: "/icon.svg",
               badge: "/icon.svg",

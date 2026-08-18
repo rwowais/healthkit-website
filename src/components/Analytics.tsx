@@ -16,7 +16,7 @@
  * To enable:
  *   1. Sign up at plausible.io (or self-host).
  *   2. Add a site with the production domain.
- *   3. Set NEXT_PUBLIC_PLAUSIBLE_DOMAIN=protocolize.com in Vercel
+ *   3. Set NEXT_PUBLIC_PLAUSIBLE_DOMAIN=diurnahealth.com in Vercel
  *      env vars and redeploy.
  *
  * Wired from layout.tsx so it loads on every route. The script
