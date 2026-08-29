@@ -127,9 +127,25 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       Note `healthkit-website.vercel.app` is deliberately NOT allowlisted:
       anyone signing in there falls back to Site URL and lands on the
       canonical domain, which is the desired behaviour.
-- [ ] **Watch for the ICANN verification email** at `admin@rwoconsulting.com`
-      — OWNER. Unclicked within 15 days = the domain is SUSPENDED (site and
-      email both go down).
+- [x] 2026-08-29 · **ICANN verification — checked, nothing pending.** The
+      email never arrived, so the registry was queried directly instead of
+      guessing. RDAP (`rdap.verisign.com/com/v1/domain/diurnahealth.com`)
+      returns status `["client transfer prohibited"]` only — that is the
+      normal transfer lock on a new registration. There is **no `clientHold`,
+      `serverHold` or `pendingVerification`**, which is what an unverified or
+      suspended domain would show. Registered 2026-08-29, expires 2027-08-29,
+      registrar **Name.com** (Vercel's partner).
+      Most likely explanation: ICANN verification is per registrant EMAIL
+      ADDRESS, not per domain — if `admin@rwoconsulting.com` was already
+      verified with Name.com from an earlier registration, no new mail is
+      sent. It may also simply be in spam (it comes from **name.com**, not
+      Vercel).
+      **How to re-check at any time** — if this ever returns a `hold` status,
+      the domain is suspended and both site and email stop:
+      ```bash
+      curl -s https://rdap.verisign.com/com/v1/domain/diurnahealth.com \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
+      ```
 - [ ] **Set up the three iCloud addresses on the new domain** — OWNER.
       iCloud Settings → Custom Email Domain → add `diurnahealth.com` (4 of 5
       slots free) → Apple issues MX/TXT/CNAME records → add them in Vercel →
