@@ -16,7 +16,7 @@ selling, or being unavailable.
 | Need | Use | Cost | In whose name |
 |---|---|---|---|
 | Domain | **Vercel** (or Cloudflare Registrar) | ~$11/yr | RO Group LLC |
-| Business email | **Google Workspace Business Starter** | ~$7–8/user/mo | RO Group LLC |
+| Business email | **iCloud+ custom domain** (already paid) → Workspace later | $0 now | Apple ID today; LLC on migration |
 | Hosting | Vercel (already) | Free → $20/mo | RO Group LLC |
 | Database / auth | Supabase (already) | Free → $25/mo | RO Group LLC |
 | Payments | Stripe | 2.9% + 30¢ | **RO Group LLC + its EIN** |
@@ -52,33 +52,49 @@ available. The price difference is about a dollar a year — choose simplicity.
 **Avoid GoDaddy** for the registration: aggressive upsells and expensive
 renewals. (Fine to *buy from* if you ever pursue `diurna.com`, which they park.)
 
-## 2. Email — Google Workspace, not iCloud
+## 2. Email — start on iCloud+ (you already pay for it), move later
 
-**Honest read: iCloud+ works today and boxes you in immediately.**
+**Revised 2026-08-18** after learning the owner already runs
+`rwoconsulting.com` (the LLC's existing domain) on **iCloud+ Custom Email
+Domain**, with 3 addresses on it.
 
-iCloud+ Custom Email Domain gives you 3 personalized addresses per domain. You
-need exactly 3 right now (`privacy@`, `legal@`, `hello@`) — **zero headroom.**
-The moment you want `support@`, `rami@`, `press@` or `founders@`, you're
-migrating email for a live business, which is the worst time to do it.
+That changes the maths. iCloud+ allows **5 domains, 3 addresses each** — one
+domain is in use, so there are **4 slots free**. Adding `diurnahealth.com`
+costs **$0**, uses a workflow already familiar, and covers exactly the three
+addresses the legal documents name (`privacy@`, `legal@`, `hello@`).
 
-**Google Workspace Business Starter (~$7–8/user/month)** instead:
+**Recommendation: use iCloud+ for now.** Paying $84/yr for Google Workspace
+to solve a problem that isn't biting yet is the wrong trade pre-revenue —
+especially when the migration later is genuinely small (see below).
 
-- **Unlimited aliases on one mailbox.** `privacy@`, `legal@`, `hello@`,
-  `support@`, `rami@` all land in one inbox, and you can *send as* any of them.
-- Owned by RO Group LLC, with an admin console. Add a contractor later without
-  restructuring anything.
-- Docs/Sheets/Drive included — you'll want them for financials, the legal
-  brief, and investor or partner material.
-- Transfers cleanly if you ever sell the business.
-- Deliverability and spam filtering are best-in-class.
+### Know the two real limits you're accepting
 
-$84/year to remove an entire category of future friction, for a business that's
-about to take payments and handle health data. That's the right trade.
+1. **3 addresses per domain, hard cap.** No `support@`, no `rami@`, no
+   `press@` on this domain without migrating.
+2. **It's a consumer service on a personal Apple ID.** No admin console, no
+   way to add an employee, and the mailbox is tied to Rami's Apple account
+   rather than to RO Group LLC. Acceptable solo; not acceptable with staff.
 
-*(Free alternative if you want to defer the cost: Cloudflare Email Routing
-gives unlimited forwarding addresses for $0 — but forward-only, so you can't
-reply as `privacy@` without extra SMTP setup. Acceptable stopgap, not a
-destination.)*
+### The migration is cheap BECAUSE the domain is at Vercel
+
+This is the reason deferring is safe. Vercel holds the domain and its DNS, so
+switching email providers is **changing MX records** — a ten-minute job, not a
+migration project. Had the domain been bought through Apple, the registrar,
+DNS and mailbox would all be entangled in one consumer account, and this
+option would not be cheap. Buying at Vercel is what keeps the door open.
+
+### Move to Google Workspace when ANY of these fire
+
+- You need a 4th address on `diurnahealth.com`.
+- You hire or contract someone who needs an account.
+- You want Docs/Sheets/Drive under the business.
+- You are handling enough data-rights requests that a consumer mailbox with
+  no admin controls stops feeling appropriate.
+- You are preparing to sell or raise — buyers expect business-owned email.
+
+At that point: Workspace Business Starter (~$7–8/user/mo), add
+`diurnahealth.com`, recreate the aliases, cut the MX records over, export the
+old mail from iCloud.
 
 ## 3. App email is a SEPARATE system — don't confuse the two
 
