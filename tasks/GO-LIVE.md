@@ -13,6 +13,9 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
 
 ---
 
+> **Accounts & infrastructure decisions** (where to buy the domain, which
+> email provider, what to add later) live in [`ACCOUNTS.md`](ACCOUNTS.md).
+
 ## 🔴 BLOCKERS — do not take money until every one is done
 
 - [ ] **Insurance in force** — OWNER. The biggest remaining gap, and no
