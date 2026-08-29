@@ -111,17 +111,22 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       contradicted `NEXT_PUBLIC_SITE_URL`, the legal documents and the email
       addresses — all of which use the apex. Flipped: apex serves (200), `www`
       308-redirects to it, and the OG tags match the canonical host.
-- [ ] **Point Supabase auth at the new domain** — OWNER, 2 minutes. Magic
-      links and password-reset emails embed a redirect URL taken from
-      Supabase's config, and only allowlisted hosts are honoured. Today that
-      list has the `vercel.app` host, so those emails would land users on
-      `healthkit-website.vercel.app` — an unfamiliar domain mid-signin, and a
-      hard break the day that host is removed. Password sign-in is unaffected,
-      which is exactly why this stays invisible until a real user hits it.
-      Supabase → Authentication → URL Configuration:
-      set **Site URL** to `https://diurnahealth.com`, add
-      `https://diurnahealth.com/**` to **Redirect URLs**, and keep the
-      `vercel.app` entry until testing is done.
+- [x] 2026-08-29 · **Supabase auth pointed at the new domain, and verified
+      against production.** Site URL `https://diurnahealth.com`; redirect
+      allowlist is `https://diurnahealth.com/**`, `http://localhost:3000/**`
+      (dev) and `http://localhost:3100/**` (e2e harness) — matching what
+      `auth.ts` actually requests, since it builds redirects from
+      `window.location.origin`. Removed a corrupted entry that had two URLs
+      concatenated without a separator
+      (`...vercel.app/profileandhttp://localhost:3000/profile`), which matched
+      nothing and had silently been protecting nothing.
+      **Verified by running the e2e suite against the live domain**
+      (`E2E_BASE_URL=https://diurnahealth.com`): 5/5 passed — signed-out wall
+      redirects, public legal pages, and a real account creation + UI sign-in
+      + cloud-row write on `diurnahealth.com`.
+      Note `healthkit-website.vercel.app` is deliberately NOT allowlisted:
+      anyone signing in there falls back to Site URL and lands on the
+      canonical domain, which is the desired behaviour.
 - [ ] **Watch for the ICANN verification email** at `admin@rwoconsulting.com`
       — OWNER. Unclicked within 15 days = the domain is SUSPENDED (site and
       email both go down).
