@@ -96,33 +96,29 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
 
 ## 🟡 LAUNCH POLISH — can ship after, but soon
 
-- [ ] **Buy `diurnahealth.com` — $11.25/yr — DECIDED 2026-08-18** — OWNER.
-      Name search is closed: ~215 domains checked, Diurna tested cleaner than
-      every alternative (see the rejected-alternatives entry below). Runbook:
-      1. Buy `diurnahealth.com`.
-      2. **Set up the three email addresses** — they are PROMISED IN THE
-         LEGAL DOCUMENTS and must not bounce: `privacy@` (GDPR/CCPA rights
-         requests — a bouncing address here is a real compliance failure),
-         `legal@` (disputes + the 30-day arbitration opt-out), and `hello@`
-         (general + refund requests). Consolidated from four to three on
-         2026-08-18 to fit iCloud+'s limit of 3 addresses per domain.
-         **iCloud+ Custom Email Domain is a good fit** — unlike plain
-         forwarding it lets you REPLY as `privacy@diurnahealth.com`, which
-         matters when answering a data-rights request. Buying inside iCloud
-         Settings routes through Cloudflare Registrar (at-cost, full DNS
-         control), so step 3 still works. Verify you can add Vercel's
-         A/CNAME records before relying on it.
-         ⚠️ Buying via a personal Apple ID registers the domain to Rami
-         personally rather than RO Group LLC — fine for now and transferable
-         later, but it is the same entity-separation point as the Stripe
-         account.
-      3. Add it as a Vercel domain and follow the DNS steps.
-      4. Set `NEXT_PUBLIC_SITE_URL=https://diurnahealth.com` in Vercel.
-         (Code already falls back to this exact value, so the app is correct
-         the moment DNS resolves — the env var just makes it explicit.)
-      Until DNS is live, social/link previews point at a domain that doesn't
-      resolve. Harmless pre-launch, but it's why this should happen before
-      any public sharing.
+- [x] 2026-08-29 · **`diurnahealth.com` bought and live.** Registered at
+      Vercel with **RO Group LLC as the registrant organization** (so the
+      business owns it, not Rami personally), contact `admin@rwoconsulting.com`
+      (deliberately on a different domain, so a DNS/email failure here can't
+      lock us out of fixing it). Connected to the existing project;
+      `NEXT_PUBLIC_SITE_URL` set. **Verified:** HTTP 200 over HTTPS with a
+      valid Let's Encrypt certificate, OG/Twitter tags resolving to
+      `https://diurnahealth.com/icons/icon-512.png` (HTTP 200), PWA manifest
+      serving `Diurna Health` / `Diurna` / standalone, and `/terms` + `/privacy`
+      public and naming RO Group LLC.
+- [ ] **Add the `www` redirect** — OWNER, 1 minute. `www.diurnahealth.com`
+      currently does NOT resolve; people type it and would hit a dead page.
+      Vercel → project → Domains → Add `www.diurnahealth.com` and set it to
+      redirect to the apex.
+- [ ] **Watch for the ICANN verification email** at `admin@rwoconsulting.com`
+      — OWNER. Unclicked within 15 days = the domain is SUSPENDED (site and
+      email both go down).
+- [ ] **Set up the three iCloud addresses on the new domain** — OWNER.
+      iCloud Settings → Custom Email Domain → add `diurnahealth.com` (4 of 5
+      slots free) → Apple issues MX/TXT/CNAME records → add them in Vercel →
+      "Manage DNS records" → create `privacy@`, `legal@`, `hello@` → send a
+      test to each AND reply from each. These are promised in the legal
+      documents; a bouncing `privacy@` is a real compliance failure.
 - [ ] **Later: defensive Diurna domains** — OWNER, owner's call to defer
       (2026-08-18). ~$45 total: `diurnahealth.app` ($9.99), `getdiurna.com`,
       `trydiurna.com`, `diurnaapp.com` ($11.25 each). Point them at the main
