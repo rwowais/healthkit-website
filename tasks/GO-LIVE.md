@@ -93,22 +93,30 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
 
 ## 🟡 LAUNCH POLISH — can ship after, but soon
 
-- [ ] **Buy `diurnahealth.com` — $11.25/yr** — OWNER. **Name decided
-      2026-08-18: the app is now Diurna Health** (was Protocolize; that .com
-      was held by a squatter). *diurna* is Latin for "daily" — it names the
-      circadian logic at the core of the engine, and follows the Function
-      Health / Rise Science pattern. The rename is already shipped in code,
-      legal docs (LEGAL_VERSION 9) and the PWA.
-      Buy it, add it as a Vercel domain, follow the DNS steps, then set
-      `NEXT_PUBLIC_SITE_URL=https://diurnahealth.com`.
-      ⚠️ **Until the domain is bought, the support addresses in the legal
-      documents don't resolve** — `privacy@`, `legal@`, `billing@` and
-      `support@diurnahealth.com` are referenced in /terms and /privacy. Set up
-      email forwarding for those as soon as the domain is live.
-      Also consider grabbing `diurna.app` / `diurnahealth.app` defensively.
-      Research trail (140 domains checked) is in the git history of this file;
-      short single-word .coms are all held by investors, which is why a
-      two-word name was the right band to search.
+- [ ] **Buy `diurnahealth.com` — $11.25/yr — DECIDED 2026-08-18** — OWNER.
+      Name search is closed: ~215 domains checked, Diurna tested cleaner than
+      every alternative (see the rejected-alternatives entry below). Runbook:
+      1. Buy `diurnahealth.com`.
+      2. **Set up email forwarding for these four addresses** — they are
+         PROMISED IN THE LEGAL DOCUMENTS and must not bounce:
+         `privacy@` (GDPR/CCPA rights requests — a bouncing address is a real
+         compliance failure), `legal@` (disputes + the 30-day arbitration
+         opt-out), `billing@` (refund requests), `hello@` (general).
+         Forwarding to your normal inbox is fine; they just have to work.
+      3. Add it as a Vercel domain and follow the DNS steps.
+      4. Set `NEXT_PUBLIC_SITE_URL=https://diurnahealth.com` in Vercel.
+         (Code already falls back to this exact value, so the app is correct
+         the moment DNS resolves — the env var just makes it explicit.)
+      Until DNS is live, social/link previews point at a domain that doesn't
+      resolve. Harmless pre-launch, but it's why this should happen before
+      any public sharing.
+- [ ] **Later: defensive Diurna domains** — OWNER, owner's call to defer
+      (2026-08-18). ~$45 total: `diurnahealth.app` ($9.99), `getdiurna.com`,
+      `trydiurna.com`, `diurnaapp.com` ($11.25 each). Point them at the main
+      site. Skip `diurna.co` — premium-priced at $308/yr. Note `diurna.com`,
+      `diurna.app` and `diurna.io` are held by parkers; an offer on
+      `diurna.com` is a nice-to-have, never a blocker, since a domain confers
+      no trademark rights.
 - [ ] **(Decision recorded, no action) Two-word .com alternatives to Diurna —
       searched and rejected.** Owner asked 2026-08-18 for a different two-word
       name with an available .com. ~215 domains checked. Available options did
