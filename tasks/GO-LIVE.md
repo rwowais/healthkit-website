@@ -97,12 +97,22 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       Name search is closed: ~215 domains checked, Diurna tested cleaner than
       every alternative (see the rejected-alternatives entry below). Runbook:
       1. Buy `diurnahealth.com`.
-      2. **Set up email forwarding for these four addresses** — they are
-         PROMISED IN THE LEGAL DOCUMENTS and must not bounce:
-         `privacy@` (GDPR/CCPA rights requests — a bouncing address is a real
-         compliance failure), `legal@` (disputes + the 30-day arbitration
-         opt-out), `billing@` (refund requests), `hello@` (general).
-         Forwarding to your normal inbox is fine; they just have to work.
+      2. **Set up the three email addresses** — they are PROMISED IN THE
+         LEGAL DOCUMENTS and must not bounce: `privacy@` (GDPR/CCPA rights
+         requests — a bouncing address here is a real compliance failure),
+         `legal@` (disputes + the 30-day arbitration opt-out), and `hello@`
+         (general + refund requests). Consolidated from four to three on
+         2026-08-18 to fit iCloud+'s limit of 3 addresses per domain.
+         **iCloud+ Custom Email Domain is a good fit** — unlike plain
+         forwarding it lets you REPLY as `privacy@diurnahealth.com`, which
+         matters when answering a data-rights request. Buying inside iCloud
+         Settings routes through Cloudflare Registrar (at-cost, full DNS
+         control), so step 3 still works. Verify you can add Vercel's
+         A/CNAME records before relying on it.
+         ⚠️ Buying via a personal Apple ID registers the domain to Rami
+         personally rather than RO Group LLC — fine for now and transferable
+         later, but it is the same entity-separation point as the Stripe
+         account.
       3. Add it as a Vercel domain and follow the DNS steps.
       4. Set `NEXT_PUBLIC_SITE_URL=https://diurnahealth.com` in Vercel.
          (Code already falls back to this exact value, so the app is correct

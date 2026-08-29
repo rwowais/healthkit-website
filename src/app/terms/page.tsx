@@ -198,7 +198,7 @@ export default function TermsPage() {
                 non-refundable and non-transferable, including for partial
                 periods and unused time. We may still make exceptions at our
                 discretion — email{" "}
-                <a className="text-[var(--readiness)] underline" href="mailto:billing@diurnahealth.com">billing@diurnahealth.com</a>{" "}
+                <a className="text-[var(--readiness)] underline" href="mailto:hello@diurnahealth.com">hello@diurnahealth.com</a>{" "}
                 within 14 days of a charge and we&apos;ll look at it.
               </li>
               <li>
