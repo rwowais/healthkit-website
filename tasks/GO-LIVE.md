@@ -109,6 +109,31 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       Research trail (140 domains checked) is in the git history of this file;
       short single-word .coms are all held by investors, which is why a
       two-word name was the right band to search.
+- [ ] **(Decision recorded, no action) Two-word .com alternatives to Diurna —
+      searched and rejected.** Owner asked 2026-08-18 for a different two-word
+      name with an available .com. ~215 domains checked. Available options did
+      exist at $11.25 (`emberlongevity`, `tidelongevity`, `lanternlongevity`,
+      `harborlongevity`, `ridgelongevity`, `perenniallongevity`,
+      `perennialdaily`, `protocolarc`, `protocolridge`,
+      `theeverydayprotocol`, `quotidianapp`) — but conflict-checking the
+      leaders killed them:
+      - **Ember** — "Ember Health" is an operating NYC health company (~38
+        staff) and EMBER is a registered healthcare trademark (Reg. 6846847,
+        Ember LifeSciences).
+      - **Tide** — "Tide AI" is a health app that syncs Oura/Whoop/Garmin/CGM
+        and gives context-aware guidance: essentially our product. Also
+        Tidepool and Tidelands Health in the same space.
+      - Every common English word is already taken in health:
+        `perennialhealth.com`, `quotidianhealth.com`, `vesperhealth.com`,
+        `nocturnehealth.com`, `lanternhealth.com`, `tidehealth.com` are ALL
+        registered.
+      **Conclusion: Diurna tests cleaner than every alternative** — no
+      trademark and no operating business found in health/wellness, because an
+      uncommon Latin word is exactly what survives a saturated naming space.
+      The owner's original worry (someone buying `diurna.com`) confers no
+      trademark rights on that buyer, so it is not a reason to move. Keep the
+      name; buy `diurnahealth.com`; let the attorney's clearance search be the
+      real check.
 - [ ] **Rename the GitHub repo** `healthkit-website` → `diurna-health` —
       OWNER (Settings → rename). Vercel follows automatically; your local
       remote needs `git remote set-url` afterwards, which Claude can do.
