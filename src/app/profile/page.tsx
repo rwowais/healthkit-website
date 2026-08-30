@@ -41,6 +41,7 @@ import {
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icons";
 import SupabaseAuth from "@/components/SupabaseAuth";
+import { isAdmin } from "@/lib/admin";
 import FeedbackSheet from "@/components/FeedbackSheet";
 
 function Row({
@@ -74,6 +75,13 @@ export default function ProfilePage() {
   const showBilling = canManageBilling(getEntitlement());
   const [confirmReset, setConfirmReset] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Admin is a row in cms_admins, not a flag on the user — isAdmin() reads
+  // only the caller's own row (RLS "admins self-read"), so this is safe
+  // client-side. Non-admins never see the card at all.
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    isAdmin().then(setAdmin);
+  }, []);
   // Personal factors is collapsed by default (pre-launch simplification) but
   // NOT removed: it's the ONLY input for the engine's safety gating
   // (onboarding doesn't collect these), so it must stay reachable.
@@ -1044,6 +1052,30 @@ export default function ProfilePage() {
             Reset all data
           </button>
         </Card>
+
+        {admin && (
+          <Card>
+            <Eyebrow color="var(--readiness)">Owner</Eyebrow>
+            <p className="t-caption mt-2 leading-relaxed">
+              Users, trials, conversion and activation — the numbers the
+              Supabase dashboard doesn&apos;t show.
+            </p>
+            <div className="mt-3 flex gap-2.5">
+              <button
+                onClick={() => router.push("/admin/metrics")}
+                className="press tr-fast flex-1 rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[var(--bg)]"
+              >
+                Metrics
+              </button>
+              <button
+                onClick={() => router.push("/admin")}
+                className="press tr-fast flex-1 rounded-[var(--r-pill)] border border-[var(--hairline)] py-3 text-[14px] font-semibold text-[var(--text-1)]"
+              >
+                Content CMS
+              </button>
+            </div>
+          </Card>
+        )}
 
         {/* Feature requests / bug reports — cloud-only (needs an authed
             insert; local-only builds have nowhere to send it). */}

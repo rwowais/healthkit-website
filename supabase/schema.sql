@@ -596,3 +596,12 @@ create policy "feedback admin read" on public.protocolize_feedback
 drop policy if exists "feedback admin delete" on public.protocolize_feedback;
 create policy "feedback admin delete" on public.protocolize_feedback
   for delete using (public.cms_is_admin());
+
+-- ── admin_metrics() — business dashboard for /admin/metrics (2026-08-30) ───
+-- SECURITY DEFINER because protocolize_state is RLS'd to "own row", which is
+-- correct and must NOT be loosened to build a dashboard. This function is the
+-- single narrow hole: it refuses anyone absent from cms_admins and returns
+-- only aggregates plus the newest 100 users, so no service-role key ever
+-- reaches the browser. See src/app/admin/metrics/page.tsx.
+-- (Body lives in the applied migration `add_admin_metrics_function`; re-run
+-- that migration to recreate it.)
