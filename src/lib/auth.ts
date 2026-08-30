@@ -80,6 +80,34 @@ export async function updatePassword(
   return { ok: true };
 }
 
+/**
+ * Which OAuth providers are actually configured in the Supabase dashboard.
+ *
+ * The buttons used to render whenever Supabase was enabled, which is not the
+ * same question: Supabase can be live while Apple/Google are unconfigured.
+ * The result was the two MOST prominent buttons on the sign-in screen —
+ * Apple styled as the primary action — failing on tap for every first-time
+ * visitor. Gated by env like billing and analytics, so a provider appears
+ * only once it works.
+ *
+ * `NEXT_PUBLIC_OAUTH_PROVIDERS="google"` or `"google,apple"`. Unset = none,
+ * which is the correct default: showing a broken sign-in path costs more
+ * signups than offering one fewer option.
+ */
+const CONFIGURED = (process.env.NEXT_PUBLIC_OAUTH_PROVIDERS ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+export const oauthProviders = {
+  google: CONFIGURED.includes("google"),
+  apple: CONFIGURED.includes("apple"),
+} as const;
+
+/** True when at least one provider is live (drives the "or" divider). */
+export const anyOAuthConfigured =
+  oauthProviders.google || oauthProviders.apple;
+
 export async function signInOAuth(
   provider: "google" | "apple"
 ): Promise<AuthResult> {

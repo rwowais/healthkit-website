@@ -10,6 +10,8 @@ import {
   resetPassword,
   signInOAuth,
   supabaseEnabled,
+  oauthProviders,
+  anyOAuthConfigured,
 } from "@/lib/auth";
 import { activeDataSource } from "@/lib/datasource";
 import { Icon } from "@/components/ui/icons";
@@ -179,10 +181,15 @@ function AuthInner() {
                   submit();
                 }}
               >
-                {(mode === "signin" || mode === "signup") && (
+                {(mode === "signin" || mode === "signup") && anyOAuthConfigured && (
                   <>
                     {/* Apple is visually primary — calmest, most familiar,
-                        and the gesture that best fits a personal system. */}
+                        and the gesture that best fits a personal system.
+                        Each provider renders only when it is actually
+                        configured in Supabase (lib/auth oauthProviders) — a
+                        prominent button that fails on tap costs more signups
+                        than one fewer option. */}
+                    {oauthProviders.apple && (
                     <button
                       type="button"
                       onClick={() => oauth("apple")}
@@ -192,6 +199,8 @@ function AuthInner() {
                       <Icon name="sparkle" size={16} />
                       Continue with Apple
                     </button>
+                    )}
+                    {oauthProviders.google && (
                     <button
                       type="button"
                       onClick={() => oauth("google")}
@@ -201,9 +210,10 @@ function AuthInner() {
                       <Icon name="compass" size={16} />
                       Continue with Google
                     </button>
+                    )}
                   </>
                 )}
-                {(mode === "signin" || mode === "signup") && (
+                {(mode === "signin" || mode === "signup") && anyOAuthConfigured && (
                   <div className="flex items-center gap-3 py-1">
                     <span className="h-px flex-1 bg-[var(--hairline)]" />
                     <span className="text-[11px] uppercase tracking-wider text-[var(--text-4)]">
