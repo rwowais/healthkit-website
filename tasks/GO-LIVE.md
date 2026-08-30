@@ -149,6 +149,88 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       curl -s https://rdap.verisign.com/com/v1/domain/diurnahealth.com \
         | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
       ```
+- [x] 2026-08-29 · **`hello@diurnahealth.com` live on iCloud+.** Domain added
+      via Vercel's native iCloud integration (auto-created the records);
+      catch-all ("Allow All Incoming Messages") turned ON so mail to the
+      addresses earlier doc versions named — `privacy@`, `legal@`, `billing@` —
+      still lands rather than bouncing. Inbound tested from Gmail.
+      **Verified externally:** MX → `mx01`/`mx02.mail.icloud.com`; SPF
+      `v=spf1 include:icloud.com ~all` (exactly one record); DKIM CNAME
+      resolving to a live RSA public key, not a dangling alias.
+- [ ] **Test REPLYING from `hello@`** — OWNER, 1 min. Only inbound has been
+      tested. Replying is the half plain forwarding cannot do, and the reason
+      iCloud was chosen: /terms and /privacy tell users to write here, so the
+      reply must come FROM `hello@diurnahealth.com`, not from a personal
+      iCloud address. Send a reply to a Gmail account and check the From line.
+- [ ] **Publish a DMARC record** — OWNER, 2 min, Vercel → Manage DNS records.
+      SPF and DKIM are in place but DMARC is absent, which is the record that
+      tells receivers what to do with mail that fails those checks. Without it
+      anyone can spoof `@diurnahealth.com` — and a convincing fake "Diurna
+      Health" email asking users about their health data is a brand and trust
+      problem well beyond spam. Add:
+      ```
+      Type: TXT   Name: _dmarc   TTL: 3600
+      Value: v=DMARC1; p=none; rua=mailto:hello@diurnahealth.com
+      ```
+      `p=none` is monitor-only — it cannot break delivery. Once reports confirm
+      legitimate mail passes, it can be tightened to `p=quarantine`, then
+      `p=reject`.
+
+## 🟡 LAUNCH POLISH — can ship after, but soon
+
+- [x] 2026-08-29 · **`diurnahealth.com` bought and live.** Registered at
+      Vercel with **RO Group LLC as the registrant organization** (so the
+      business owns it, not Rami personally), contact `admin@rwoconsulting.com`
+      (deliberately on a different domain, so a DNS/email failure here can't
+      lock us out of fixing it). Connected to the existing project;
+      `NEXT_PUBLIC_SITE_URL` set. **Verified:** HTTP 200 over HTTPS with a
+      valid Let's Encrypt certificate, OG/Twitter tags resolving to
+      `https://diurnahealth.com/icons/icon-512.png` (HTTP 200), PWA manifest
+      serving `Diurna Health` / `Diurna` / standalone, and `/terms` + `/privacy`
+      public and naming RO Group LLC.
+- [x] 2026-08-29 · **`www` redirect added, pointing the right way.** Vercel
+      initially made `www` the primary with the apex redirecting to it, which
+      contradicted `NEXT_PUBLIC_SITE_URL`, the legal documents and the email
+      addresses — all of which use the apex. Flipped: apex serves (200), `www`
+      308-redirects to it, and the OG tags match the canonical host.
+- [x] 2026-08-29 · **Supabase auth pointed at the new domain, and verified
+      against production.** Site URL `https://diurnahealth.com`; redirect
+      allowlist is `https://diurnahealth.com/**`, `http://localhost:3000/**`
+      (dev) and `http://localhost:3100/**` (e2e harness) — matching what
+      `auth.ts` actually requests, since it builds redirects from
+      `window.location.origin`. Removed a corrupted entry that had two URLs
+      concatenated without a separator
+      (`...vercel.app/profileandhttp://localhost:3000/profile`), which matched
+      nothing and had silently been protecting nothing.
+      **Verified by running the e2e suite against the live domain**
+      (`E2E_BASE_URL=https://diurnahealth.com`): 5/5 passed — signed-out wall
+      redirects, public legal pages, and a real account creation + UI sign-in
+      + cloud-row write on `diurnahealth.com`.
+      Note `healthkit-website.vercel.app` is deliberately NOT allowlisted:
+      anyone signing in there falls back to Site URL and lands on the
+      canonical domain, which is the desired behaviour.
+- [ ] **Click the ICANN verification link — STILL OPEN, 15-day fuse** —
+      OWNER. The email was found in **spam**; sender is **Vercel Domain
+      Services** (not Name.com, despite Name.com being the registrar of
+      record). Subject: "Verify Your Domain Contact Information".
+      **Mark it Not Spam** — renewal notices and transfer-security alerts come
+      from the same sender, and a missed renewal takes down the site, the mail
+      and the addresses the legal documents promise.
+      ⚠️ **Correction to an earlier conclusion in this file:** a clean RDAP
+      status does NOT mean verification is complete. `clientHold` only appears
+      AFTER the 15-day window lapses, so "no hold" simply means the deadline
+      has not hit yet. RDAP is the right tool for detecting a suspension that
+      has already happened, and the wrong tool for confirming there is nothing
+      pending.
+      Confirmed by that email: because the Company field was filled in, **RO
+      Group LLC is the legal "Registered Name Holder"** — ICANN treats the
+      Organization field as legal ownership, so the domain belongs to the LLC
+      rather than to Rami personally.
+      Re-check status any time:
+      ```bash
+      curl -s https://rdap.verisign.com/com/v1/domain/diurnahealth.com \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
+      ```
 - [ ] **Set up ONE iCloud address: `hello@diurnahealth.com`** — OWNER,
       ~15 min (mostly DNS propagation). Owner's call 2026-08-18; every
       reference in /terms and /privacy now points here — general contact,
