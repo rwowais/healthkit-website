@@ -68,11 +68,32 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
 
 ## 🟠 STRONGLY RECOMMENDED before launch
 
-- [ ] **One hour with an attorney** — OWNER. Hand over
-      [`LEGAL-BRIEF.md`](LEGAL-BRIEF.md); it front-loads every fact they'd
-      otherwise bill to extract and ends with 12 specific questions. Priority
-      ones: is the v8 aggressive pass at risk of being struck as
-      unconscionable (Q11), and what insurance to carry (Q12).
+- [ ] **An hour with an attorney** — OWNER. Send
+      [`LEGAL-BRIEF.md`](LEGAL-BRIEF.md) BEFORE the call so they arrive
+      prepared; it front-loads every fact they would otherwise bill to extract
+      and ends with 19 specific questions.
+      **Who:** a *digital health / healthtech* attorney, not a general
+      business lawyer — the brief asks about the FDA wellness line, DSHEA
+      supplement claims and Washington's My Health My Data Act, which a
+      specialist answers from experience and a generalist researches on your
+      clock.
+      **Where:** Wisconsin State Bar referral service (cheap, vetted, local);
+      digital-health boutiques (Cohen Healthcare Law Group, Promise Legal —
+      $50 first consult, Terms.law); or a flat-fee marketplace like
+      ContractsCounsel/Priori where fees are quoted upfront. Most offer a free
+      15–30 min intro call — use it to check fit before paying.
+      **Cost:** a terms + privacy REVIEW averages ~$760 flat. Digital-health
+      *packages* run $2,500–$4,500, but those draft a document stack from
+      scratch and we already have documents.
+      💰 **Say this to avoid being quoted a package we don't need:** "I'm not
+      HIPAA-covered — no provider relationship, no insurance billing, no PHI
+      from a covered entity. I have drafted terms and a privacy policy and
+      need a review, not a drafting engagement." Most healthtech packages
+      bundle HIPAA/BAA work that does not apply here and is a large share of
+      the price.
+      **If budget-limited, prioritise:** the health/regulatory questions
+      (Q1–3), whether the v8 aggressive pass risks being struck as
+      unconscionable (Q11), and insurance (Q12).
 - [ ] **Trademark clearance search for "Diurna Health" — DO THIS FIRST** —
       OWNER (via the attorney hour). A domain purchase gives nobody trademark
       rights, so a later buyer of `diurna.com` cannot claim our app name. The
