@@ -88,20 +88,27 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       `diurnahealth.app` ($9.99), `getdiurna.com`, `trydiurna.com`,
       `diurnaapp.com` ($11.25 each). Point them all at the main site. Note
       `diurna.co` is priced at $308/yr (premium) and is not worth it.
-- [ ] **Verify RO Group LLC is in GOOD STANDING** — OWNER, 5 min, free.
-      Consulting stopped in March 2026, so a year of annual reports or
-      franchise tax may have gone unfiled. **An administratively dissolved LLC
-      provides no liability shield at all** — the terms would name an entity
-      that legally isn't there, and every protection built this week would
-      rest on nothing. Look up the entity on the state's Secretary of State
-      business search (free) and confirm "Active"/"Good Standing"; file any
-      missed reports before taking payment. Do this BEFORE the insurance call
-      — insurers ask, and coverage on a dissolved entity is a problem.
-- [ ] **Confirm RO Group LLC's formation state** — OWNER → then CLAUDE sets
-      `ENTITY_STATE` in `src/lib/constants.ts` and both documents sharpen
-      from "the state in which RO Group LLC is organized" to the named state.
-- [ ] **Register "Protocolize" as a DBA / trade name** of RO Group LLC if it
-      isn't already — OWNER. Usually a cheap state filing.
+- [x] 2026-08-29 · **RO Group LLC good standing — looks current.** Registered
+      agent **Northwest**; Wisconsin annual report filed **2025-10-13**
+      (status Completed). Wisconsin domestic LLCs file annually, so the next
+      report is due around **Oct 2026** — roughly six weeks out. Confirm
+      Northwest is set to auto-file it, or diary it; an administratively
+      dissolved LLC provides no liability shield, which would undermine every
+      protection built this week. Independent check any time (free, and the
+      state record — not the agent dashboard — is the authority):
+      Wisconsin DFI corporate records search for "RO Group LLC".
+- [x] 2026-08-29 · **Formation state confirmed: WISCONSIN.** `ENTITY_STATE`
+      set in `src/lib/constants.ts`, so /terms now reads "RO Group LLC, a
+      Wisconsin limited liability company" and governing law names the State
+      of Wisconsin instead of the entity-relative fallback. No LEGAL_VERSION
+      bump: governing law already resolved to this state via "the state in
+      which RO Group LLC is organized", so naming it removes ambiguity without
+      changing any right or obligation.
+- [ ] **Register "Diurna Health" as a DBA / trade name** of RO Group LLC
+      — OWNER, Wisconsin DFI. The app trades under a name the entity does not
+      carry; a DBA makes that formal. Cheap state filing, and Northwest can
+      file it. (Note: the name to register is Diurna Health, not the former
+      Protocolize.)
 - [ ] **Enable leaked-password protection** — OWNER. Supabase dashboard →
       Authentication → Password settings. Flagged in the 2026-07-16 audit,
       still off.

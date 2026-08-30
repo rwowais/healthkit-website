@@ -14,8 +14,8 @@ site (currently LEGAL_VERSION 7).
 
 | | |
 |---|---|
-| Entity | **RO Group LLC** (formation state: _owner to confirm_) |
-| Trading name | Protocolize (DBA status: _owner to confirm_) |
+| Entity | **RO Group LLC**, a **Wisconsin** LLC (registered agent: Northwest) |
+| Trading name | Diurna Health (DBA **not yet registered** — see Q19) |
 | Product | Consumer web app (installable PWA), habit/protocol tracking for longevity |
 | Stage | Pre-launch. 5 accounts: owner + 3 friend testers + 1 demo. **Zero revenue to date.** |
 | Model | Freemium. 7-day reverse trial → free tier, or Premium $8.99/mo · $79.99/yr · $179 lifetime |
@@ -112,10 +112,10 @@ that must be accepted. Acceptance is visible to the user in Profile.
 | Jury waiver | Explicit, alongside class waiver | Added v8 |
 
 **Questions for counsel:**
-7. Governing law now points at **RO Group LLC's own state** (v8). Until the
-   owner confirms the formation state the docs say "the state in which RO
-   Group LLC is organized" — is that entity-relative phrasing acceptable, or
-   must the state be named to be enforceable?
+7. Governing law and the arbitration seat now name **Wisconsin** (the LLC's
+   formation state). Is Wisconsin the right choice for a consumer app with
+   nationwide users, and does it hold up against consumer-protection statutes
+   in users' home states?
 8. Is the liability cap enforceable as written for a paid consumer health
    app, and should there be a dollar floor?
 9. Is the 30-day arbitration opt-out + class waiver drafted well enough to

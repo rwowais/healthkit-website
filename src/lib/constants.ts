@@ -85,12 +85,16 @@ export const LEGACY_STORAGE_KEYS = ["protocolize-v2", "protocolize-v1"];
 export const LEGAL_VERSION = 9;
 
 /**
- * Formation state of RO Group LLC. Owner has not confirmed it yet, so the
- * legal docs fall back to entity-relative phrasing ("the state in which RO
- * Group LLC is organized") — valid, just less precise. Set this string and
- * both documents sharpen automatically.
+ * Formation state of RO Group LLC — confirmed WISCONSIN 2026-08-29 (registered
+ * agent: Northwest; last annual report filed 2025-10-13). The legal docs read
+ * "the State of Wisconsin" instead of the entity-relative fallback.
+ *
+ * Deliberately NOT a LEGAL_VERSION bump: governing law already resolved to
+ * this state via "the state in which RO Group LLC is organized", so naming it
+ * removes ambiguity without changing a single right or obligation. A user who
+ * accepted the old phrasing agreed to exactly this.
  */
-export const ENTITY_STATE: string | null = null;
+export const ENTITY_STATE: string | null = "Wisconsin";
 export const ENTITY_NAME = "RO Group LLC";
 
 // Trial length is NOT here — it is entitlements.TRIAL_DAYS (7), the single

@@ -61,8 +61,10 @@ export default function TermsPage() {
           <Section title="What you're agreeing to">
             <p>
               These terms are an agreement between you and{" "}
-              <strong>RO Group LLC</strong>, the company that operates
-              Diurna Health (&quot;we&quot;, &quot;us&quot;). By using
+              <strong>RO Group LLC</strong>
+              {ENTITY_STATE ? `, a ${ENTITY_STATE} limited liability company` : ""}
+              , the company that operates Diurna Health (&quot;we&quot;,
+              &quot;us&quot;). By using
               Diurna Health you accept these terms and our{" "}
               <Link href="/privacy" className="text-[var(--readiness)] underline">
                 Privacy Policy
