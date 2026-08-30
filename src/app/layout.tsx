@@ -20,10 +20,11 @@ export const metadata: Metadata = {
   description:
     "Your adaptive daily protocol. Track behaviors and the calm intelligence layer that shapes your longevity routine.",
   applicationName: "Diurna",
-  // OG + Twitter cards so shared links render as a branded preview
-  // (logo + title + line) instead of a barren URL. Image is the
-  // existing 512×512 icon; if/when we ship a dedicated 1200×630
-  // social image, swap it in here.
+  // OG + Twitter cards so shared links render as a branded preview instead of
+  // a barren URL. Uses the dedicated 1200×630 card at /og.png (public/og.png,
+  // rendered from scratchpad/og.html) rather than the square app icon — a
+  // 512×512 icon in a wide social slot gets letterboxed or cropped, and shows
+  // no name or positioning to someone deciding whether to click.
   openGraph: {
     type: "website",
     siteName: "Diurna Health",
@@ -31,15 +32,22 @@ export const metadata: Metadata = {
     description:
       "Your adaptive daily protocol. Sleep, training, nutrition, supplements — calmly orchestrated into one day that reshapes itself around your recovery.",
     images: [
-      { url: "/icons/icon-512.png", width: 512, height: 512, alt: "Diurna Health" },
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Diurna Health — your adaptive daily protocol",
+      },
     ],
   },
   twitter: {
-    card: "summary",
+    // summary_large_image, not summary: "summary" renders a small SQUARE
+    // thumbnail, which would crop the 1200×630 card to an unreadable centre.
+    card: "summary_large_image",
     title: "Diurna Health — Longevity Intelligence",
     description:
       "An adaptive daily protocol that calmly reshapes itself around your recovery.",
-    images: ["/icons/icon-512.png"],
+    images: ["/og.png"],
   },
   appleWebApp: {
     capable: true,
