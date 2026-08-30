@@ -127,21 +127,24 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       Note `healthkit-website.vercel.app` is deliberately NOT allowlisted:
       anyone signing in there falls back to Site URL and lands on the
       canonical domain, which is the desired behaviour.
-- [x] 2026-08-29 · **ICANN verification — checked, nothing pending.** The
-      email never arrived, so the registry was queried directly instead of
-      guessing. RDAP (`rdap.verisign.com/com/v1/domain/diurnahealth.com`)
-      returns status `["client transfer prohibited"]` only — that is the
-      normal transfer lock on a new registration. There is **no `clientHold`,
-      `serverHold` or `pendingVerification`**, which is what an unverified or
-      suspended domain would show. Registered 2026-08-29, expires 2027-08-29,
-      registrar **Name.com** (Vercel's partner).
-      Most likely explanation: ICANN verification is per registrant EMAIL
-      ADDRESS, not per domain — if `admin@rwoconsulting.com` was already
-      verified with Name.com from an earlier registration, no new mail is
-      sent. It may also simply be in spam (it comes from **name.com**, not
-      Vercel).
-      **How to re-check at any time** — if this ever returns a `hold` status,
-      the domain is suspended and both site and email stop:
+- [ ] **Click the ICANN verification link — STILL OPEN, 15-day fuse** —
+      OWNER. The email was found in **spam**; sender is **Vercel Domain
+      Services** (not Name.com, despite Name.com being the registrar of
+      record). Subject: "Verify Your Domain Contact Information".
+      **Mark it Not Spam** — renewal notices and transfer-security alerts come
+      from the same sender, and a missed renewal takes down the site, the mail
+      and the addresses the legal documents promise.
+      ⚠️ **Correction to an earlier conclusion in this file:** a clean RDAP
+      status does NOT mean verification is complete. `clientHold` only appears
+      AFTER the 15-day window lapses, so "no hold" simply means the deadline
+      has not hit yet. RDAP is the right tool for detecting a suspension that
+      has already happened, and the wrong tool for confirming there is nothing
+      pending.
+      Confirmed by that email: because the Company field was filled in, **RO
+      Group LLC is the legal "Registered Name Holder"** — ICANN treats the
+      Organization field as legal ownership, so the domain belongs to the LLC
+      rather than to Rami personally.
+      Re-check status any time:
       ```bash
       curl -s https://rdap.verisign.com/com/v1/domain/diurnahealth.com \
         | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
