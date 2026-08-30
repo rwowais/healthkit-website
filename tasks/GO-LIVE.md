@@ -201,19 +201,11 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       **Verified externally:** MX → `mx01`/`mx02.mail.icloud.com`; SPF
       `v=spf1 include:icloud.com ~all` (exactly one record); DKIM CNAME
       resolving to a live RSA public key, not a dangling alias.
-- [ ] **Add a second sending identity** — OWNER, 2 min, free (2 of 3 iCloud
-      slots used). Suggested `admin@diurnahealth.com`: matches the convention
-      already in use on `admin@rwoconsulting.com`, is a ROLE rather than a
-      person (so it survives a handoff), and is the register vendors expect.
-      Alternatives: `ro@` (initials, doubles as RO Group) or `founder@` (good
-      for outreach, does not scale past one person). Avoid `team@` — it reads
-      as inflating a solo operation. Immediate use: the attorney, insurance
-      broker and Stripe correspondence all land better from a branded address
-      than from Gmail.
-      Note the limit is about SENDING, not receiving — with catch-all on, any
-      address @diurnahealth.com already arrives; the three slots are three
-      *sending identities*. Keep `hello@` as the reply address for anything
-      that arrived there, since the legal documents point users at it.
+- [x] 2026-08-29 · **`admin@diurnahealth.com` added** as the second sending
+      identity (2 of 3 iCloud slots used; catch-all covers receiving for any
+      other address). `hello@` stays the public address named in /terms and
+      /privacy; `admin@` is for vendor correspondence — attorney, insurance
+      broker, Stripe.
 - [ ] **Test REPLYING from `hello@`** — OWNER, 1 min. Only inbound has been
       tested. Replying is the half plain forwarding cannot do, and the reason
       iCloud was chosen: /terms and /privacy tell users to write here, so the
