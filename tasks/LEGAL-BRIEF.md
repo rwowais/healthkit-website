@@ -158,22 +158,26 @@ clearance search.
 
 ## 4c. Entity structure (added 2026-08-18)
 
-RO Group LLC is the owner's **pre-existing consulting entity**, now also
-operating Diurna Health. One LLC, two lines of business, no subsidiaries.
+RO Group LLC was formed for the owner's **consulting practice**. That work
+**ended in March 2026**, so the entity is now effectively **single-purpose**
+for Diurna Health. One LLC, one active line of business, no subsidiaries.
 
 **Questions for counsel:**
-16. Is running a consumer health app inside the same LLC as a consulting
-    practice acceptable, or should the app be carved into its own entity?
-    Note the asymmetry: an LLC shields the owner personally, but does NOT
-    wall off one business from the other — a health claim could reach
-    consulting assets and receivables, and the app is the materially
-    higher-risk activity of the two.
-17. If a separate entity is advisable, is it better done **now** (cheap,
-    pre-revenue, nothing to migrate) or at a revenue/fundraise trigger?
-18. Do any existing consulting client contracts contain exclusivity,
-    conflict-of-interest or indemnity terms that this affects?
-19. What should be documented internally to keep the two lines of business
-    distinct for liability and tax purposes within one entity?
+16. Given the consulting work has ceased, is reusing this entity for a
+    consumer health app appropriate, or is a fresh single-purpose entity
+    still preferable? (Reusing is cheaper and the entity is now effectively
+    single-purpose, but it carries the consulting history with it.)
+17. **Tail liability:** a claim over consulting work performed before March
+    2026 can still be brought, and would land on the same entity that now
+    holds the app. What is needed to close that exposure — an extended
+    reporting period on the old E&O policy, formal wind-down documentation of
+    the consulting line, or something else?
+18. Do any past consulting client contracts contain surviving obligations
+    (confidentiality, indemnity, IP assignment, non-compete) that persist
+    after the engagements ended and could touch the entity now?
+19. Anything to file or document to make the change of business purpose clean
+    — state filings, operating-agreement amendment, or the "Protocolize →
+    Diurna Health" DBA?
 
 ## 5. Explicitly out of scope today
 

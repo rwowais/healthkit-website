@@ -27,14 +27,17 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       - product liability (you recommend supplements with specific doses)
       Mention: consumer health/fitness app, pre-revenue, no supplement sales,
       no wearable integrations, US-only launch.
-      ⚠️ **Disclose BOTH activities.** RO Group LLC is the owner's existing
-      CONSULTING entity, now also operating a consumer health app. Insurers
-      underwrite what the entity actually does, so a policy written for
-      "consulting" may not respond to an app-related claim, and non-disclosure
-      can void coverage outright. Say plainly: "this LLC does IT/management
-      consulting AND operates a consumer health-and-fitness app" — then let
-      them price it. This is the difference between having coverage and
-      believing you have coverage.
+      ⚠️ **Mention the prior consulting work even though it has ended**
+      (ceased March 2026; the LLC is now effectively single-purpose for the
+      app). Two reasons: insurers underwrite current operations, so they need
+      to hear "consumer health app" and not "consulting"; and past consulting
+      engagements carry TAIL liability — a claim can be brought now over work
+      finished then, and it would land on RO Group LLC, which today also holds
+      the app. Ask the broker specifically: **does any prior consulting E&O
+      policy still respond to claims about past work, or is an extended
+      reporting period ("tail") needed?** Claims-made policies cover only
+      claims made while active, so a cancelled consulting policy may leave
+      that work uncovered.
 - [ ] **Stripe fulfillment deployed and tested** — OWNER + CLAUDE, in this
       order. Doing these out of order charges customers and delivers nothing:
       1. deploy `supabase/functions/stripe-webhook`
@@ -85,6 +88,15 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       `diurnahealth.app` ($9.99), `getdiurna.com`, `trydiurna.com`,
       `diurnaapp.com` ($11.25 each). Point them all at the main site. Note
       `diurna.co` is priced at $308/yr (premium) and is not worth it.
+- [ ] **Verify RO Group LLC is in GOOD STANDING** — OWNER, 5 min, free.
+      Consulting stopped in March 2026, so a year of annual reports or
+      franchise tax may have gone unfiled. **An administratively dissolved LLC
+      provides no liability shield at all** — the terms would name an entity
+      that legally isn't there, and every protection built this week would
+      rest on nothing. Look up the entity on the state's Secretary of State
+      business search (free) and confirm "Active"/"Good Standing"; file any
+      missed reports before taking payment. Do this BEFORE the insurance call
+      — insurers ask, and coverage on a dissolved entity is a problem.
 - [ ] **Confirm RO Group LLC's formation state** — OWNER → then CLAUDE sets
       `ENTITY_STATE` in `src/lib/constants.ts` and both documents sharpen
       from "the state in which RO Group LLC is organized" to the named state.
