@@ -241,3 +241,22 @@ rule that prevents it.
   the wrong day and the card never fired. **Rule:** when seeding a
   time-dependent e2e state, write the zone into `settings.timezone` AND match
   the browser's `timezoneId` (the latter only to keep TimezoneSentry quiet).
+- **A green local suite is not a green CI suite when the assertion is about a
+  CLOUD WRITE.** `legal-gate.spec.ts` passes 5/5 locally in isolation and 31/31
+  locally under full CI flags (`CI=true`, 2 workers, fresh build, retries), yet
+  fails **3/3 in GitHub Actions**. The log shows sign-in, banner and click all
+  succeeding quickly, then the 30s poll for `legalAcceptedVersion` expiring
+  with the stamp never reaching `protocolize_state`.
+  The difference is LATENCY, not logic: a GitHub runner in Azure westus3
+  talking to Supabase us-west-2 is slower than a laptop, and the write path is
+  debounce (600ms) → compare-and-swap on `updated_at` → defer-on-mismatch.
+  A deferred write is only retried by the next `load()` or a network-return
+  event, so under latency it can simply not happen within the window.
+  **Why this matters beyond CI:** the acceptance stamp IS the legal record.
+  The user taps "I agree", the banner disappears, local state updates — and the
+  cloud row may still lack it. On another device they are asked again, and the
+  record we tell users we keep does not exist yet.
+  **Rules:** (1) never dismiss a CI-only failure as flakiness until the failing
+  assertion is understood — this one is a real robustness gap the local machine
+  is too fast to expose; (2) for any write that is a RECORD rather than a
+  convenience, confirm it landed instead of firing and forgetting.
