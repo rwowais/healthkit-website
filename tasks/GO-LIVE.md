@@ -27,6 +27,14 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       - product liability (you recommend supplements with specific doses)
       Mention: consumer health/fitness app, pre-revenue, no supplement sales,
       no wearable integrations, US-only launch.
+      ⚠️ **Disclose BOTH activities.** RO Group LLC is the owner's existing
+      CONSULTING entity, now also operating a consumer health app. Insurers
+      underwrite what the entity actually does, so a policy written for
+      "consulting" may not respond to an app-related claim, and non-disclosure
+      can void coverage outright. Say plainly: "this LLC does IT/management
+      consulting AND operates a consumer health-and-fitness app" — then let
+      them price it. This is the difference between having coverage and
+      believing you have coverage.
 - [ ] **Stripe fulfillment deployed and tested** — OWNER + CLAUDE, in this
       order. Doing these out of order charges customers and delivers nothing:
       1. deploy `supabase/functions/stripe-webhook`

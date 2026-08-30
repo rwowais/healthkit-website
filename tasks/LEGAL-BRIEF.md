@@ -156,6 +156,25 @@ clearance search.
 15. Anything we should be doing NOW to establish and document first use in
     commerce so priority is defensible?
 
+## 4c. Entity structure (added 2026-08-18)
+
+RO Group LLC is the owner's **pre-existing consulting entity**, now also
+operating Diurna Health. One LLC, two lines of business, no subsidiaries.
+
+**Questions for counsel:**
+16. Is running a consumer health app inside the same LLC as a consulting
+    practice acceptable, or should the app be carved into its own entity?
+    Note the asymmetry: an LLC shields the owner personally, but does NOT
+    wall off one business from the other — a health claim could reach
+    consulting assets and receivables, and the app is the materially
+    higher-risk activity of the two.
+17. If a separate entity is advisable, is it better done **now** (cheap,
+    pre-revenue, nothing to migrate) or at a revenue/fundraise trigger?
+18. Do any existing consulting client contracts contain exclusivity,
+    conflict-of-interest or indemnity terms that this affects?
+19. What should be documented internally to keep the two lines of business
+    distinct for liability and tax purposes within one entity?
+
 ## 5. Explicitly out of scope today
 
 No wearable/HealthKit integrations, no user-facing AI, no social/sharing
