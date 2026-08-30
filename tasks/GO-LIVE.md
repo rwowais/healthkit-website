@@ -46,6 +46,13 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
          "After payment" redirect to `/upgrade?checkout=success`
       4. set `NEXT_PUBLIC_STRIPE_PORTAL_URL` (customer portal login link)
       5. run a full **test-mode** purchase end-to-end and watch Premium unlock
+      6. **Set the Stripe statement descriptor to `DIURNA HEALTH`** (or
+         `DIURNA`). This is the text on the customer's card statement. Left at
+         the default it shows the legal entity — `RO GROUP LLC` — which buyers
+         will not recognise a month later, and unrecognised descriptors are one
+         of the most common causes of chargebacks. Each dispute costs the
+         payment plus a fee, and a high dispute rate can get a Stripe account
+         restricted. Register the DBA first so the name is defensible.
       The webhook has never executed against a real Stripe account — treat
       that first test run as the verification step.
 - [ ] **Stripe account owned by RO Group LLC** — OWNER. Its EIN, its bank
@@ -104,6 +111,16 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       bump: governing law already resolved to this state via "the state in
       which RO Group LLC is organized", so naming it removes ambiguity without
       changing any right or obligation.
+- [ ] **Decide the long-term registrar contact address** — OWNER. The domain
+      contact is `admin@rwoconsulting.com`, which lives on the wound-down
+      consulting domain. It is a good choice TODAY (deliberately on a different
+      domain than diurnahealth.com, so a mail failure here cannot lock us out
+      of fixing it) — but if `rwoconsulting.com` is ever allowed to lapse, the
+      renewal and transfer-security notices for `diurnahealth.com` go to a dead
+      mailbox. Either commit to renewing rwoconsulting.com indefinitely, or
+      switch the contact to a durable personal address. Do NOT switch it to
+      `hello@diurnahealth.com` — same-domain contacts are how people lock
+      themselves out.
 - [ ] **Register "Diurna Health" as a DBA / trade name** of RO Group LLC
       — OWNER, Wisconsin DFI. The app trades under a name the entity does not
       carry; a DBA makes that formal. Cheap state filing, and Northwest can
