@@ -22,13 +22,14 @@ This file is a running record, not a launch gate. 29 open items reads as
 paralysing; the genuinely blocking set is much smaller. "Launch" is three
 different thresholds, and they have different requirements.
 
-**A. Let strangers sign up for FREE — essentially ready now.**
+**A. Let strangers sign up for FREE — nearly ready, one real gap.**
 The app works, the domain and email are live, auth is verified in production,
 and the legal documents are drafted, versioned and consented to. Remaining:
-enable leaked-password protection (5 min), publish DMARC (2 min), turn on
-analytics so the launch teaches you something. Insurance belongs here too —
-liability does not require revenue, and a free user can sue over health
-guidance exactly as a paying one can.
+**custom SMTP for auth email (see below — this one is blocking)**, enable
+leaked-password protection (5 min), publish DMARC (2 min), turn on analytics
+so the launch teaches you something. Insurance belongs here too — liability
+does not require revenue, and a free user can sue over health guidance exactly
+as a paying one can.
 
 **B. Take money — this is the real gate.**
 1. Stripe fulfillment deployed and test-mode verified, IN ORDER
@@ -178,6 +179,28 @@ people want the thing before building the machinery to charge for it.
       carry; a DBA makes that formal. Cheap state filing, and Northwest can
       file it. (Note: the name to register is Diurna Health, not the former
       Protocolize.)
+- [ ] **Replace Supabase's built-in auth email with real SMTP — BLOCKS A
+      PUBLIC LAUNCH** — OWNER + CLAUDE. Confirmed 2026-08-29 by signing up: the
+      confirmation email arrives from **"Supabase Auth"
+      <noreply@mail.app.supabase.io>**, footered "powered by Supabase", with an
+      "opt out of these emails" link on a transactional message.
+      Two problems, and the second is the blocking one:
+      1. **Trust.** A health app asking for sleep and supplement data sends its
+         first-ever email from an unrelated company on an unfamiliar domain.
+         That reads as phishing, and it advertises our vendor to our users.
+      2. **Rate limits.** Supabase's built-in email is a shared development
+         service, explicitly documented as not for production. Past a low
+         hourly threshold, confirmation emails simply stop being delivered —
+         silently. New users would never receive them and we would see no
+         error. This breaks signup at exactly the moment a launch works.
+      Fix: **Resend** (free tier ~3,000/month, 100/day — ample here) or
+      Postmark. Verify `diurnahealth.com` with them, then Supabase →
+      Project Settings → Auth → SMTP Settings, and set the sender to
+      `Diurna Health <hello@diurnahealth.com>`. Also rewrite the templates
+      under Authentication → Email Templates so the copy is ours.
+      ⚠️ **When adding the provider, MERGE the SPF include** — do not add a
+      second SPF record. See the SPF trap in [`ACCOUNTS.md`](ACCOUNTS.md);
+      two SPF records invalidate both and send mail to spam silently.
 - [ ] **Enable leaked-password protection** — OWNER. Supabase dashboard →
       Authentication → Password settings. Flagged in the 2026-07-16 audit,
       still off.
