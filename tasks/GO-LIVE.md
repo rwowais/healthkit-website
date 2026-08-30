@@ -16,6 +16,37 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
 > **Accounts & infrastructure decisions** (where to buy the domain, which
 > email provider, what to add later) live in [`ACCOUNTS.md`](ACCOUNTS.md).
 
+## What is actually gating what
+
+This file is a running record, not a launch gate. 29 open items reads as
+paralysing; the genuinely blocking set is much smaller. "Launch" is three
+different thresholds, and they have different requirements.
+
+**A. Let strangers sign up for FREE — essentially ready now.**
+The app works, the domain and email are live, auth is verified in production,
+and the legal documents are drafted, versioned and consented to. Remaining:
+enable leaked-password protection (5 min), publish DMARC (2 min), turn on
+analytics so the launch teaches you something. Insurance belongs here too —
+liability does not require revenue, and a free user can sue over health
+guidance exactly as a paying one can.
+
+**B. Take money — this is the real gate.**
+1. Stripe fulfillment deployed and test-mode verified, IN ORDER
+2. Statement descriptor set to `DIURNA HEALTH` (chargeback protection)
+3. Stripe account under RO Group LLC with its EIN
+4. Warn the three testers before caps flip on
+Nothing else on this list stops you charging.
+
+**C. Everything else — prudent, not blocking.**
+Trademark filing, the attorney review, the DBA, defensive domains, the iPhone
+PWA pass, security headers, deleting the demo account. All worth doing; none
+of them gate a launch. The trademark and the attorney hour are the two to do
+soonest, because both get more expensive the longer the brand is public.
+
+**Strategy worth considering:** launch free now, monetize once there are users
+worth monetizing. It shortens the critical path to (A), and you learn whether
+people want the thing before building the machinery to charge for it.
+
 ## 🔴 BLOCKERS — do not take money until every one is done
 
 - [ ] **Insurance in force** — OWNER. The biggest remaining gap, and no
