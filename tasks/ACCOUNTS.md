@@ -108,6 +108,15 @@ Workspace's terms don't permit bulk/app sending.
   service (Resend, Postmark or SendGrid, ~$0–20/mo) and point Supabase's SMTP
   at it. This also earns you proper SPF/DKIM/DMARC on your domain, which is
   what actually keeps mail out of spam folders.
+⚠️ **SPF trap for later — read this before adding any sending service.**
+iCloud installs `v=spf1 include:icloud.com ~all` on the apex. A domain may
+have only **ONE** SPF record; adding a second TXT record starting `v=spf1`
+makes BOTH invalid and silently sends your mail to spam. When you add
+Resend/Postmark, **merge** their include into the existing record:
+`v=spf1 include:icloud.com include:<provider> ~all`. Same applies to DKIM —
+add the provider's selector alongside iCloud's `sig1._domainkey`, never
+replace it.
+
 - **Marketing email, if you ever do it:** a third system again (an ESP with
   proper consent tracking). Never send marketing from Workspace.
 
