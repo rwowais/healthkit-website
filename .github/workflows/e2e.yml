@@ -8,8 +8,7 @@ on:
   schedule:
     - cron: "0 11 * * *"   # nightly ~11:00 UTC — catch backend/key drift
   pull_request:
-  push:
-    branches: [main]
+
   workflow_dispatch:
 
 concurrency:
