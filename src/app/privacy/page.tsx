@@ -264,9 +264,9 @@ export default function PrivacyPage() {
                 the app. If you want help, email{" "}
                 <a
                   className="text-[var(--readiness)] underline"
-                  href="mailto:privacy@diurnahealth.com"
+                  href="mailto:hello@diurnahealth.com"
                 >
-                  privacy@diurnahealth.com
+                  hello@diurnahealth.com
                 </a>
                 .
               </li>
@@ -283,9 +283,9 @@ export default function PrivacyPage() {
               objection. To exercise any of these, email{" "}
               <a
                 className="text-[var(--readiness)] underline"
-                href="mailto:privacy@diurnahealth.com"
+                href="mailto:hello@diurnahealth.com"
               >
-                privacy@diurnahealth.com
+                hello@diurnahealth.com
               </a>
               .
             </p>
@@ -366,9 +366,9 @@ export default function PrivacyPage() {
               policy. Contact:{" "}
               <a
                 className="text-[var(--readiness)] underline"
-                href="mailto:privacy@diurnahealth.com"
+                href="mailto:hello@diurnahealth.com"
               >
-                privacy@diurnahealth.com
+                hello@diurnahealth.com
               </a>
               .
             </p>
