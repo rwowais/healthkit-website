@@ -17,10 +17,15 @@ import { useAppState } from "@/hooks/useAppState";
 import { needsLegalAcceptance, acceptanceStamp } from "@/lib/legal";
 
 export default function LegalGate() {
-  const { state, loading, updateSettings } = useAppState();
+  const { state, loading, updateSettings, saveNow } = useAppState();
   const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  if (loading || !needsLegalAcceptance(state)) return null;
+  // While saving, keep rendering even though local state already satisfies
+  // needsLegalAcceptance — the banner must not disappear until the stamp is
+  // CONFIRMED in the cloud. Vanishing on the local write alone is what let a
+  // slow connection silently drop the record (caught by CI, 2026-08-30).
+  if (loading || (!needsLegalAcceptance(state) && !saving)) return null;
 
   return (
     <div
@@ -48,16 +53,32 @@ export default function LegalGate() {
         <button
           disabled={saving}
           aria-busy={saving}
-          onClick={() => {
-            // updateSettings persists through the active data source, so the
-            // stamp lands in the synced row — the record survives this device.
+          onClick={async () => {
             setSaving(true);
-            updateSettings(acceptanceStamp());
+            setFailed(false);
+            const stamp = acceptanceStamp();
+            updateSettings(stamp);
+            // Await the round-trip rather than trusting the debounce: this
+            // stamp IS the legal record, so a silent failure is worse than a
+            // visible retry. saveNow is given the next state explicitly
+            // because setState has not applied yet at this point.
+            const ok = await saveNow({
+              ...state,
+              settings: { ...state.settings, ...stamp },
+            });
+            setSaving(false);
+            if (!ok) setFailed(true);
           }}
           className="press tr-fast mt-3 w-full rounded-[var(--r-pill)] bg-[var(--text-1)] py-3 text-[14px] font-semibold text-[var(--bg)] disabled:opacity-60"
         >
-          I agree
+          {saving ? "Saving…" : failed ? "Try again" : "I agree"}
         </button>
+        {failed && (
+          <p className="mt-2 text-[12px] leading-relaxed text-[var(--alert)]">
+            Couldn&rsquo;t save that just now — check your connection and tap
+            again.
+          </p>
+        )}
       </div>
     </div>
   );

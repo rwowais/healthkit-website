@@ -212,6 +212,39 @@ export function useAppState() {
     saveTimer.current = setTimeout(() => flush.current(), 600);
   }, [state, loading]);
 
+  /**
+   * Persist immediately and AWAIT the round-trip, skipping the 600ms debounce.
+   *
+   * The normal path is fire-and-forget, which is right for a tapped checkbox:
+   * losing one is recoverable and the UI must stay instant. It is wrong for a
+   * write that IS the record — legal acceptance most of all, where the stamp is
+   * the evidence a user agreed. CI caught exactly this: on a slower link the
+   * banner closed, local state updated, and the cloud row never received the
+   * stamp, so the user would be asked again on another device and the record we
+   * promise to keep would not exist.
+   *
+   * Resolves true only if the write is confirmed. Callers that need the record
+   * should keep their UI in a pending state until then.
+   */
+  const saveNow = useCallback(async (next?: AppState): Promise<boolean> => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    const s = next ?? pendingSave.current ?? getShared();
+    pendingSave.current = null;
+    if (!s) return false;
+    saving.current = true;
+    try {
+      await activeDataSource.save(s);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      saving.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === "hidden") flush.current();
@@ -534,6 +567,7 @@ export function useAppState() {
     setPackPaused,
     // Config
     updateSettings,
+    saveNow,
     updateProtocols,
     // Manual refresh — pull-to-refresh, etc.
     refresh,
