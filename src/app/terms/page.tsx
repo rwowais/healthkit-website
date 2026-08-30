@@ -337,7 +337,7 @@ export default function TermsPage() {
             <p>
               You and Diurna Health agree to first try to resolve any
               dispute informally by emailing{" "}
-              <a className="text-[var(--readiness)] underline" href="mailto:legal@diurnahealth.com">legal@diurnahealth.com</a>.
+              <a className="text-[var(--readiness)] underline" href="mailto:hello@diurnahealth.com">hello@diurnahealth.com</a>.
               If that doesn&apos;t work within 60 days, disputes will be
               resolved by binding arbitration under the American
               Arbitration Association&apos;s consumer rules, governed by{" "}
@@ -358,7 +358,7 @@ export default function TermsPage() {
             </p>
             <p>
               You can opt out of arbitration entirely by emailing{" "}
-              <a className="text-[var(--readiness)] underline" href="mailto:legal@diurnahealth.com">legal@diurnahealth.com</a>{" "}
+              <a className="text-[var(--readiness)] underline" href="mailto:hello@diurnahealth.com">hello@diurnahealth.com</a>{" "}
               within 30 days of first accepting these terms, with the subject
               line &quot;Arbitration opt-out&quot;. Opting out doesn&apos;t
               affect anything else in these terms.
@@ -410,7 +410,7 @@ export default function TermsPage() {
 
           <Section title="Contact">
             <p>
-              <a className="text-[var(--readiness)] underline" href="mailto:legal@diurnahealth.com">legal@diurnahealth.com</a>
+              <a className="text-[var(--readiness)] underline" href="mailto:hello@diurnahealth.com">hello@diurnahealth.com</a>
             </p>
           </Section>
         </div>

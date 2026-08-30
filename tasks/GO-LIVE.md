@@ -149,6 +149,82 @@ Last reviewed: 2026-08-18 · LEGAL_VERSION 8 · HEAD after `ba79cf6`
       curl -s https://rdap.verisign.com/com/v1/domain/diurnahealth.com \
         | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
       ```
+- [ ] **Set up TWO iCloud addresses on the new domain** — OWNER, ~15 min
+      (mostly DNS propagation). Reduced from three on 2026-08-18: `legal@`
+      folded into `hello@`. Benchmark for the decision — Built With Science,
+      a real company with law-firm-drafted documents, runs EVERYTHING
+      (including its Privacy Officer contact) through a single
+      `support@` address; Rise Science uses two. The legal requirement is a
+      working contact channel, not a specific count.
+      - **`privacy@`** — kept separate deliberately: data-rights requests
+        carry a statutory response clock (30 days under GDPR/CCPA) and should
+        not be buried in general mail.
+      - **`hello@`** — general contact, refunds, disputes and the 30-day
+        arbitration opt-out.
+      Steps: iCloud Settings → Custom Email Domain → add `diurnahealth.com`
+      (4 of 5 slots free) → Apple issues MX/TXT/CNAME records → add them in
+      Vercel → Manage DNS records → create both addresses → send a test to
+      each **and reply from each** (replying is the half that plain
+      forwarding can't do, and it's why iCloud beats forwarding here).
+      Note: iCloud aliases all deliver into ONE mailbox, so two addresses is
+      not two inboxes to monitor.
+      Could be reduced to `hello@` alone if preferred — one line to change.
+
+## 🟡 LAUNCH POLISH — can ship after, but soon
+
+- [x] 2026-08-29 · **`diurnahealth.com` bought and live.** Registered at
+      Vercel with **RO Group LLC as the registrant organization** (so the
+      business owns it, not Rami personally), contact `admin@rwoconsulting.com`
+      (deliberately on a different domain, so a DNS/email failure here can't
+      lock us out of fixing it). Connected to the existing project;
+      `NEXT_PUBLIC_SITE_URL` set. **Verified:** HTTP 200 over HTTPS with a
+      valid Let's Encrypt certificate, OG/Twitter tags resolving to
+      `https://diurnahealth.com/icons/icon-512.png` (HTTP 200), PWA manifest
+      serving `Diurna Health` / `Diurna` / standalone, and `/terms` + `/privacy`
+      public and naming RO Group LLC.
+- [x] 2026-08-29 · **`www` redirect added, pointing the right way.** Vercel
+      initially made `www` the primary with the apex redirecting to it, which
+      contradicted `NEXT_PUBLIC_SITE_URL`, the legal documents and the email
+      addresses — all of which use the apex. Flipped: apex serves (200), `www`
+      308-redirects to it, and the OG tags match the canonical host.
+- [x] 2026-08-29 · **Supabase auth pointed at the new domain, and verified
+      against production.** Site URL `https://diurnahealth.com`; redirect
+      allowlist is `https://diurnahealth.com/**`, `http://localhost:3000/**`
+      (dev) and `http://localhost:3100/**` (e2e harness) — matching what
+      `auth.ts` actually requests, since it builds redirects from
+      `window.location.origin`. Removed a corrupted entry that had two URLs
+      concatenated without a separator
+      (`...vercel.app/profileandhttp://localhost:3000/profile`), which matched
+      nothing and had silently been protecting nothing.
+      **Verified by running the e2e suite against the live domain**
+      (`E2E_BASE_URL=https://diurnahealth.com`): 5/5 passed — signed-out wall
+      redirects, public legal pages, and a real account creation + UI sign-in
+      + cloud-row write on `diurnahealth.com`.
+      Note `healthkit-website.vercel.app` is deliberately NOT allowlisted:
+      anyone signing in there falls back to Site URL and lands on the
+      canonical domain, which is the desired behaviour.
+- [ ] **Click the ICANN verification link — STILL OPEN, 15-day fuse** —
+      OWNER. The email was found in **spam**; sender is **Vercel Domain
+      Services** (not Name.com, despite Name.com being the registrar of
+      record). Subject: "Verify Your Domain Contact Information".
+      **Mark it Not Spam** — renewal notices and transfer-security alerts come
+      from the same sender, and a missed renewal takes down the site, the mail
+      and the addresses the legal documents promise.
+      ⚠️ **Correction to an earlier conclusion in this file:** a clean RDAP
+      status does NOT mean verification is complete. `clientHold` only appears
+      AFTER the 15-day window lapses, so "no hold" simply means the deadline
+      has not hit yet. RDAP is the right tool for detecting a suspension that
+      has already happened, and the wrong tool for confirming there is nothing
+      pending.
+      Confirmed by that email: because the Company field was filled in, **RO
+      Group LLC is the legal "Registered Name Holder"** — ICANN treats the
+      Organization field as legal ownership, so the domain belongs to the LLC
+      rather than to Rami personally.
+      Re-check status any time:
+      ```bash
+      curl -s https://rdap.verisign.com/com/v1/domain/diurnahealth.com \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
+      ```
 - [ ] **Set up the three iCloud addresses on the new domain** — OWNER.
       iCloud Settings → Custom Email Domain → add `diurnahealth.com` (4 of 5
       slots free) → Apple issues MX/TXT/CNAME records → add them in Vercel →
