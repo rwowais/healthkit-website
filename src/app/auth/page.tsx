@@ -328,10 +328,16 @@ function AuthInner() {
                       >
                         Email me a link instead
                       </button>
+                      {/* Same visual weight as "Email me a link instead".
+                          It was text-3 (muted grey) while the magic-link
+                          option was accent-coloured — the MORE urgent action
+                          was the quieter one, and the owner could not find it
+                          in his own app. Someone who has forgotten their
+                          password is stressed and scanning. */}
                       <button
                         type="button"
                         onClick={() => setMode("forgot")}
-                        className="press font-medium text-[var(--text-3)]"
+                        className="press font-medium text-[var(--readiness)]"
                       >
                         Forgot password?
                       </button>
